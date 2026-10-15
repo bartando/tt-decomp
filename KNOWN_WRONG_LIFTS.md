@@ -3,6 +3,16 @@
 Found by lifting passes (2026-10-15) while working nearby, not fixed yet. Check the asm
 before relying on any of these; fix and delete the entry when done.
 
+## Systemic: explicit vtable member + C++ virtuals
+
+Many structs (likely hundreds; `rage_misc.hpp`, `pong_render.hpp`, `char_view.hpp`,
+`cm_operators.hpp`, `rage_grm.hpp`, …) declare a `void** vtable` / `m_vtable` field AND C++
+`virtual` methods. The compiler then adds its own hidden vptr in front, so every field sits
+one pointer late (4 bytes on the game's 32-bit layout). Found by lift-check on `grmModel`
+(+0xC read as +0x10) and `hsmStateBase`/`hsmState` (fixed). Fix per class: drop one of the
+two (keep C++ virtuals only where nothing needs the vtable field by name, otherwise make the
+methods non-virtual), then re-verify its lifts.
+
 ## Wrong lifts
 
 - `fiAsciiTokenizer` (`src/rage/io/fiAsciiTokenizer.cpp`) defines a virtual destructor, which
@@ -83,6 +93,9 @@ before relying on any of these; fix and delete the entry when done.
 - `gd_data.hpp`: `gdaiMeterLogic` slot 21 is named `Validate`; it registers fields.
 - `gmLogicSinglesMatch`/`gmLogicSpectator` header skeletons mix an explicit `vtable` member
   with C++ virtuals.
+- 0x820F0E78, 0x820F0EE8 (grm ScalarDtors) and 0x8222CFA8 (`fiAsciiTokenizer_SetString`)
+  return `this` in r3; the lifts return void (`rage_par.cpp` declares SetString void).
+- `grmModelGeom::GetGeometryEntry` reads `this[1]`; probably off by the vtable-member bug.
 - `globals.c`: `g_msgSinkTemplate` is at 0x8261A0C0, not 0x8241A0C0.
 - `pongPlayer_TossServeBall` (0x821934A0): the impulse's w lane (`_pad`) should be 0. The asm's
   1/t comes from the (1, 1, 1, 0) constant at 0x825CB7C0; the lift computes

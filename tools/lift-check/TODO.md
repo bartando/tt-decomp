@@ -16,3 +16,11 @@ Reported by the agents using it. Each was worked around in a spec; fix in the to
   address and a model mirroring the original's inlined code.
 - `model()` has no `args`; indirect calls through the game's own vtables compare r3 by value
   even when it's a stack address.
+- A `// @` marker on a function declared unqualified inside `namespace rage {}` never
+  resolves for `rage::X`; a same-TU callee then gets inlined into the lift silently.
+- `base_name()` cuts a lambda's name at its first `(`, so EXTERNS/markers for the enclosing
+  function turn the lambda into a call to that address.
+- Const pointees on the stack are compared even for empty structs (one uninitialised byte).
+- `stub(args=...)` compares stack pointers raw instead of as `<stack>` and doesn't switch off
+  pointee comparison (workaround: `deref={"rN": 0}`).
+- Helpers in `specs/` (e.g. `_rage_rsc.py`) start with `_`; anything globbing specs must skip them.
