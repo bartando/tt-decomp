@@ -22,3 +22,17 @@
 #define TT_DATA_ALIAS(alias, target)                         \
     __asm__(".globl " TT_ASM_SYMBOL(alias) "\n"              \
             ".set " TT_ASM_SYMBOL(alias) ", " TT_ASM_SYMBOL(target))
+
+/* `alias` names the address `offset` bytes into `target` (same TU). On Mach-O
+ * it is an alternate entry of the target's atom, so dead-stripping can't keep
+ * the alias and drop the bytes before it. */
+#if defined(__APPLE__)
+#define TT_DATA_ALIAS_AT(alias, target, offset)                  \
+    __asm__(".globl _" alias "\n"                                \
+            ".alt_entry _" alias "\n"                            \
+            ".set _" alias ", _" target "+" #offset)
+#else
+#define TT_DATA_ALIAS_AT(alias, target, offset)                  \
+    __asm__(".globl " alias "\n"                                 \
+            ".set " alias ", " target "+" #offset)
+#endif

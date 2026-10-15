@@ -13,11 +13,6 @@
 #include <cstdint>
 #include "link/tt_alias.h"
 
-// An alias `off` bytes into `target` (same TU), for lifts that step from one
-// global to its neighbour by pointer arithmetic.
-#define LD_DATA_ALIAS_AT(alias, target, off)                    \
-    __asm__(".globl " TT_ASM_SYMBOL(alias) "\n"                 \
-            ".set " TT_ASM_SYMBOL(alias) ", " TT_ASM_SYMBOL(target) "+" #off)
 
 
 // ── .rdata constants ────────────────────────────────────────────────────────
@@ -125,7 +120,7 @@ extern "C" uint32_t g_grcFormatId = 0x2D200196u;
 // 0x820EFA08) read 0x825C9A60 as "the word before g_grmShaderFx_defaultVariant"
 extern "C" alignas(4) int32_t g_grmShaderFx_forcedVariantId[3] = {-1, -1, -1};
 // @ 0x825C9A64 (.data)
-LD_DATA_ALIAS_AT("g_grmShaderFx_defaultVariant", "g_grmShaderFx_forcedVariantId", 8);
+TT_DATA_ALIAS_AT("g_grmShaderFx_defaultVariant", "g_grmShaderFx_forcedVariantId", 8);
 
 // @ 0x825EBA9C (.data) — runtime-initialised by 0x82153ED0
 extern "C" void* g_pGrcDeviceAlt = nullptr;
