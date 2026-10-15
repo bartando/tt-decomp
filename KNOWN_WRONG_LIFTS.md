@@ -24,6 +24,35 @@ C++ virtual call lands in the wrong slot. Found in `pongPlayer` (slot 9 called a
 slot 1..25 one off; header fixed, drill subclasses other than Movement not re-verified). Lifted code calls through
 `VCALL` with the game's slot number where verified; other virtual calls are suspect.
 
+## Link blockers (from the link pass, 2026-10-15)
+
+- ~240 data symbols stay undefined because their declared address is missing or wrong
+  (0x8204A5F8 is a string, not a tuning table; 0x82079ADC isn't FLT_MAX; 0x82077054 is a
+  vtable). Each needs a manual check against the asm.
+- Duplicate definitions will become link errors once nothing is undefined:
+  `msgMsgSink_D168_sp`/`D1D8_sp` (`pong_network_io.cpp` + `msg_msg_sink.cpp`), `atArray_Clear`,
+  `atHashMap_Find`, `rage_atStringCopy`, the `charViewCS` vtable (`char_view.cpp` +
+  `pong_camera.cpp`), `ph_Atan2`/`ph_Normalize`.
+- Placeholder bodies that callers rely on (not bridged): `at_types.cpp` `atSingleton_*`,
+  `datArray_Grow`, `datResource_Load`, `atArray_Clear`; `fiAsciiTokenizer.cpp`
+  `Destroy`/`ReadBool`/`ReadToken`; `kernel_shims.c` `ke_*Object*`; `hsm.cpp`
+  `hsmContext_Init*`, `gmLogic_StepFrame`, `SetTrainingState`, `hsmEvent_Init`;
+  `par_xml_types.cpp` `xml*`, `RegisterSerializationField`; `rage_core_utils.cpp` `rage_C1A8`,
+  `RtlEnterCriticalSection_D6F0_fw`, `rage::g_capsuleVolK*`/`g_ph*` (guessed values),
+  `atSingletonPool_AllocEntry` (always 64 bytes); `netStream_ReadS16`, `pongPlayer_0270_g`.
+- Signatures that really conflict across files: `_locale_register`/`XMemFree` 0x820C02D0 (four
+  spellings); `msg_msg_sink.cpp` declares 3E68/3EA8, D168/D1D8, 6220, 5098, A970, E860, EC28,
+  DC40, 7970, `game_8CF8_h`, `RtlEnterCriticalSection_A158_h` two ways each;
+  `atSingleton_89F8_2hr` (pointer as u32); inside `ph_physics.cpp` `grc_2CC8`, `ph_1B78`,
+  `phJoint3Dof_0170_g`, `ph_TokenizerReadInt`; `pongMover_Reset`, `pongPlayer_B208_g`,
+  `pongBallInstance_4980_g`, `pg_E6E0`, `LocomotionStateAnim_ApplyAnimData`,
+  `ReleaseSingleton`, `rage_strDuplicate`, `rage_7630`, `util_1568`, `xe_GetLoadContext`.
+- The `pg_6F48`/`6C40`/`6F10`/`B850`/`C3B8` group are Xbox thread/event wrappers (ResumeThread,
+  SetEvent, CloseHandle, SuspendThread, WaitForSingleObject); they need a per-thread
+  last-error and a kernel layer the port doesn't have.
+- Bridges that forward to ported bodies, not lifts: `rage_free` → `free()`, `xe_EC88` → host
+  malloc, `util_PackColorRGBA`.
+
 ## Wrong lifts
 
 - `fiAsciiTokenizer` (`src/rage/io/fiAsciiTokenizer.cpp`) defines a virtual destructor, which
@@ -133,6 +162,10 @@ slot 1..25 one off; header fixed, drill subclasses other than Movement not re-ve
 - `fx_effects.hpp`: `fxBallTrail::AddSample` (slot 4) takes r4 and r5, declared with one arg.
 - `pong_ball.cpp`: `pongBallInstance_4980_g` is two no-op overloads; the real one takes six
   args (r3–r8). 0x8227FDB0 has two names (`UpdatePhysicsState`, `pongBallInstance_OnBallMissed`).
+- `CheckButtonPressed` is commented as 0x8225FFF8; it's 0x821DFFF8.
+- `include/game/pong_network_io.hpp` gives `BeginNetworkWrite` as "0x822288AE0" (0x82238AE0).
+- `rage_grm.cpp` declares `rage_free_00C0(uint32_t)` (truncates host pointers).
+- `msg_msg_sink.cpp` 8B78/8B90 drop the slot argument in r4.
 - `globals.c`: `g_msgSinkTemplate` is at 0x8261A0C0, not 0x8241A0C0.
 
 
