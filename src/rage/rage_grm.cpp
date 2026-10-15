@@ -10,6 +10,8 @@ extern "C" void fragDrawable_0AA0_2h(void* geom, void* drawable, uint32_t index,
 
 // Helpers used by lifted dispatch methods (all raw recomp stubs).
 extern "C" void   rage_free_00C0(uint32_t ptr);              // @ 0x820C00C0
+extern "C" void   rage_free(void* ptr);                      // @ 0x820C00C0
+extern "C" void   rage_0F38(void* self);                     // @ 0x820F0F38
 extern "C" void   net_2228_h(void* self);                    // @ 0x820F2228
 extern "C" void   rage_1028(uint32_t a, uint32_t b,          // @ 0x820F1028
                             uint32_t c, uint32_t d,
@@ -163,57 +165,100 @@ void fragDrawable::ProcessGeometry(void* geometryContainer, void* param1, void* 
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * grmShaderGroup::~grmShaderGroup         [vtable slot 0]
- * @ 0x820F21D8 | size: 0x50 (80 bytes)
+ * grmModel::ScalarDtor                    [vtable slot 0]
+ * @ 0x820F0E78 | size: 0x6C (108 bytes)
  *
- * Auto-deleting destructor.  Calls the internal per-group teardown
- * (net_2228_h @ 0x820F2228), then scalar-frees self when (r4 & 1) is set.
- * The r4 flag is the standard RAGE "delete this" bit passed into slot 0.
- *
- * Pseudo-signature in PPC recomp form: void(*)(this, int deleteFlag).
- * We express the flag through a small wrapper, because the hpp declares
- * the destructor without parameters — the C++ abstraction hides the flag.
+ * Scalar-deleting destructor.  Installs grmModel's own vtable (0x8202F3B4),
+ * frees the geometry buffer at +0x0C, drops to the rage::datBase base
+ * vtable (0x820276C4), then frees the object itself when bit 0 of flags
+ * is set.  r3 comes back as `this`.
  * ═══════════════════════════════════════════════════════════════════════════ */
-grmShaderGroup::~grmShaderGroup() {
-    net_2228_h(this);
-    // Non-deleting variant: the scalar-free branch lives on the Xbox 360
-    // side of slot 0 and is reachable only via the auto-delete flag in r4.
-    // On host we rely on the C++ delete operator for the free path.
+void grmModel::ScalarDtor(int flags) {
+    vtable = reinterpret_cast<void**>(0x8202F3B4u);
+    rage_free(m_pGeometry);
+    vtable = reinterpret_cast<void**>(0x820276C4u);  // rage::datBase
+    if (flags & 1) {
+        rage_free(this);
+    }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * grmModelFactory::~grmModelFactory       [vtable slot 0]
- * @ 0x820F3C50 | size: 0x50 (80 bytes)
+ * grmModelGeom::ScalarDtor                [vtable slot 0]
+ * @ 0x820F0EE8 | size: 0x50 (80 bytes)
  *
- * Runs the static destructor on sm_DeclMap (stored at 0x820F3CA0, the
- * factory's global vertex-declaration registry), then scalar-frees self
- * on (r4 & 1).  Flag is folded into the host-side delete operator; the
- * body here only performs the member teardown.
+ * Scalar-deleting destructor: runs the non-deleting destructor body
+ * rage_0F38 @ 0x820F0F38, then frees the object when bit 0 of flags is set.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+void grmModelGeom::ScalarDtor(int flags) {
+    rage_0F38(this);
+    if (flags & 1) {
+        rage_free(this);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * grmShaderGroup::~grmShaderGroup
+ *
+ * Host destructor: runs the guest's non-deleting destructor body,
+ * net_2228_h @ 0x820F2228.  The slot-0 function is ScalarDtor below.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+grmShaderGroup::~grmShaderGroup() {
+    net_2228_h(this);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * grmShaderGroup::ScalarDtor              [vtable slot 0]
+ * @ 0x820F21D8 | size: 0x50 (80 bytes)
+ *
+ * Scalar-deleting destructor: runs the non-deleting destructor body
+ * net_2228_h @ 0x820F2228, then frees the object when bit 0 of flags is
+ * set.  r3 comes back as `this`.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+void grmShaderGroup::ScalarDtor(int flags) {
+    net_2228_h(this);
+    if (flags & 1) {
+        rage_free(this);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * grmModelFactory::~grmModelFactory
+ *
+ * Host destructor: runs the guest's non-deleting destructor body at
+ * 0x820F3CA0.  The slot-0 function is ScalarDtor below.
  * ═══════════════════════════════════════════════════════════════════════════ */
 grmModelFactory::~grmModelFactory() {
     grmModelFactory_sm_DeclMap_dtor(this);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * grmModelFactory::ScalarDtor             [vtable slot 1]
- * @ 0x820F3D10 | size: 0x18 (24 bytes)
+ * grmModelFactory::ScalarDtor             [vtable slot 0]
+ * @ 0x820F3C50 | size: 0x50 (80 bytes)
  *
- * Not actually a destructor — the recomp labelled it that way because it
- * sits in the "scalar dtor" slot, but the body is a pure argument-shuffle
- * thunk:
- *
- *     mr r3,r4; mr r4,r5; mr r5,r6; mr r6,r7; mr r7,r8
- *     b  0x820F1028              (rage_1028)
- *
- * I.e. drop the `this` pointer and tail-call the 5-arg free function
- * rage_1028 with (a,b,c,d,e) forwarded verbatim.  The `flags` param name
- * is kept for ABI consistency with the existing hpp declaration.
+ * Scalar-deleting destructor: runs the non-deleting destructor body at
+ * 0x820F3CA0, then frees the object when bit 0 of flags is set.  r3 comes
+ * back as `this`.
  * ═══════════════════════════════════════════════════════════════════════════ */
 void grmModelFactory::ScalarDtor(int flags) {
-    // The PPC body forwards r4..r8 as-is.  We cannot reach all 5 inbound
-    // regs from a single-arg C++ signature, so we forward (flags,0,0,0,0)
-    // — which mirrors what every caller in the binary actually passes.
-    rage_1028(static_cast<uint32_t>(flags), 0, 0, 0, 0);
+    grmModelFactory_sm_DeclMap_dtor(this);
+    if (flags & 1) {
+        rage_free(this);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * grmModelFactory::Dispatch5              [vtable slot 1]
+ * @ 0x820F3D10 | size: 0x18 (24 bytes)
+ *
+ * Drops `this` and tail-calls rage_1028 @ 0x820F1028 with r4..r8 moved
+ * down into r3..r7:
+ *
+ *     mr r3,r4; mr r4,r5; mr r5,r6; mr r6,r7; mr r7,r8
+ *     b  0x820F1028
+ * ═══════════════════════════════════════════════════════════════════════════ */
+void grmModelFactory::Dispatch5(uint32_t a, uint32_t b, uint32_t c,
+                                uint32_t d, uint32_t e) {
+    rage_1028(a, b, c, d, e);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -250,13 +295,20 @@ void grmModelFactory::vfn_2(datResource& rsc, grmModel*& model) {
  * Rebases the vtable to the grmShaderFactory slot (0x8202F808) — matches
  * -32253<<16 + -2040 in the original.  Clears the global instance pointer
  * iff it was pointing at `this` (lbl_82606374 == g_grmShaderFactory_instance).
- * Finally scalar-frees self on (r4 & 1); the host-side delete operator
- * supersedes that leg.
+ * Finally scalar-frees self on (r4 & 1); that leg is ScalarDeleteSelf below.
  * ═══════════════════════════════════════════════════════════════════════════ */
 grmShaderFactory::~grmShaderFactory() {
     vtable = reinterpret_cast<void**>(0x8202F808u);
     if (g_grmShaderFactory_instance == this) {
         g_grmShaderFactory_instance = nullptr;
+    }
+}
+
+// The free leg of 0x820F6E60 (0x820F6E98..0x820F6EAC): free(this) when bit 0
+// of the delete flag is set.
+void grmShaderFactory::ScalarDeleteSelf(int deleteFlag) {
+    if (deleteFlag & 1) {
+        rage_free(this);
     }
 }
 
@@ -417,6 +469,17 @@ extern "C" {
 }
 
 namespace rage {
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * grmShader::Reset                                    [vtable slot 7]
+ * @ 0x820F5350 | size: 0x10 (16 bytes)
+ *
+ * Zeroes the active-shader cell 0x825EBA68 (g_grmShaderFx_activeState),
+ * which grmShader's slot 6 (0x820F5330) points at `this`.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+void grmShader::Reset() {
+    g_grmShaderFx_activeState = 0;
+}
 
 // Small helper to recover the active variant index with the same
 // decision tree the PPC bodies inline in every caller of the variant
