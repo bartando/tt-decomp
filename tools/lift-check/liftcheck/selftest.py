@@ -29,6 +29,9 @@ EXPECT = [
     ("pong_player_toss_serve_ball", "PASS", (TOSS_W_FIX,)),
     ("ccal_dispatch_color_constants", "UNSUPPORTED", ()),
     ("lc_drill_on_rally_end", "PASS", ()),
+    ("lc_camviewcs_update_leaf", "PASS", ()),     # a stub keeps what its leaf callee keeps
+    ("lc_xact_image_dtor_thunk", "PASS", ()),     # a call through `b X` is a call to X
+    ("lc_drill_strings", "PASS", ()),             # const char* by content, any length
 ]
 
 MUTATIONS = [
@@ -56,6 +59,11 @@ MUTATIONS = [
     ("lc_drill_on_rally_end", "carry = the sum's sign (a 32-bit add's upper half)",
      [("uint32_t nNewCarry = (uint32_t)(nNext >> 32);",
        "uint32_t nNewCarry = (uint32_t)((int32_t)nNewSeed >> 31);")]),
+    ("lc_drill_strings", "change the tail of the 90-byte debug message",
+     [('"something is wrong"', '"something is off"')]),
+    ("lc_drill_strings", "post 2 instead of 1 (a variadic argument)",
+     [('m_numSuccesses);\n    PostPageGroupMessageFmt(0x5008, 0x40, "i", 1);',
+       'm_numSuccesses);\n    PostPageGroupMessageFmt(0x5008, 0x40, "i", 2);')]),
 ]
 
 

@@ -73,6 +73,7 @@ class CallRecord:
     lr: int
     ret: dict = field(default_factory=dict)
     derefs: dict = field(default_factory=dict)   # reg -> bytes read at call time
+    strings: dict = field(default_factory=dict)  # r3.. index -> const char* text at call time
     transparent: bool = False
     note: str = ""
 

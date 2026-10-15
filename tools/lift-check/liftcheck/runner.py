@@ -15,7 +15,7 @@ from .build import build_lift
 from .dwarf import arg_registers
 from .machine import (ARENA_BASE, FAKE_BASE, FAKE_SIZE, IMAGE_BASE, STACK_HI, STACK_LO,
                       STACK_TOP, TLS_BASE, CallRecord, Fault, Machine, Stop)
-from .spec import MODELS, CallCtx, Policy, Trial, stub
+from .spec import MODELS, CallCtx, Policy, Trial, alloc, stub
 from .symbols import Symbols
 
 DEFAULT_IMAGE = "~/PhpstormProjects/ttrecomp/out/xexdump/default_82000000_00770000.bin"
@@ -114,6 +114,8 @@ class Checker:
         self.lift_home.append((cur, text_hi))
         self.policies: dict = {}
         self.fake_policies: dict = {}
+        self._canon: dict[int, int] = {}
+        self._leaf: dict[int, tuple | None] = {}
         for key, pol in getattr(self.spec, "CALLS", {}).items():
             if isinstance(key, int):
                 self.policies[key] = pol
@@ -125,7 +127,40 @@ class Checker:
                     self.policies[a] = pol
                 else:
                     self.fake_policies[key] = pol
+        for a, pol in list(self.policies.items()):
+            self.policies.setdefault(self.canonical(a), pol)
+        self.ignore = [tuple(r) for r in getattr(self.spec, "IGNORE", ())]
         self.disasm_cache: dict[int, str] = {}
+
+    def canonical(self, target: int) -> int:
+        """A call to a one-branch thunk (`b X`) is a call to X."""
+        a = self._canon.get(target)
+        if a is None:
+            a = target
+            for _ in range(4):
+                if not IMAGE_BASE <= a < IMAGE_BASE + len(self.image) - 4:
+                    break
+                w = int.from_bytes(self.image[a - IMAGE_BASE: a - IMAGE_BASE + 4], "big")
+                if w & 0xFC000003 != 0x48000000:
+                    break
+                li = w & 0x03FFFFFC
+                a = (a + (li - 0x04000000 if li & 0x02000000 else li)) & M32
+            self._canon[target] = a
+        return a
+
+    def leaf_writes(self, target: int) -> tuple | None:
+        """(GPRs, FPRs) the original callee can write, if it's a leaf (see leaf.py)."""
+        if target not in self._leaf:
+            from .leaf import written
+            r = self.syms.func_range(target)
+            res = None
+            if r is not None and r[1] - r[0] <= 0x4000:
+                lo, hi = r
+                data = self.image[lo - IMAGE_BASE: hi - IMAGE_BASE]
+                res = written([int.from_bytes(data[k:k + 4], "big") for k in range(0, len(data), 4)],
+                              lo, hi)
+            self._leaf[target] = res
+        return self._leaf[target]
 
     # ── one side ────────────────────────────────────────────────────────────
     def _policy(self, target: int, trial: Trial) -> Policy:
@@ -150,18 +185,27 @@ class Checker:
                     raise Stop()
                 target = lift.call_map[addr]
             sig = lift.signatures.get(target)
+            target = self.canonical(target)
+            if sig is None:
+                sig = lift.signatures.get(target)
             rec = CallRecord(target, [m.gpr(n) for n in range(3, 11)],
                              [m.gpr64(n) for n in range(3, 11)],
                              [m.fpr(n) for n in range(1, 9)], m.uc.reg_read(_LR) & M32)
             pol = self._policy(target, trial)
             rec.transparent = pol.transparent
             self._derefs(m, rec, sig, pol)
+            self._strings(m, rec, sig)
             k = counts.get(target, 0)
             counts[target] = k + 1
             crng = random.Random(hash((seed, trial_no, target, k)))
             ctx = CallCtx(m, rec, crng, sig, side)
             m.calls.append(rec)
-            action = pol.handle(ctx)
+            try:
+                action = pol.handle(ctx)
+            except AssertionError as e:
+                m.fault = Fault("assert", addr, f"{type(pol).__name__} for {self.call_name(target, trial)} "
+                                                f"(call #{len(m.calls)}): {e or 'assertion failed'}")
+                raise Stop()
             if action == "run":
                 r = self.syms.func_range(target)
                 if r is None:
@@ -173,26 +217,65 @@ class Checker:
                 if target != addr:
                     m.uc.reg_write(_PC, target)
                 return
-            # clobber what a real callee may clobber, the same way on both sides
+            # clobber what the callee may clobber, the same way on both sides: every
+            # volatile register, or for a leaf only those it writes (MSVC's LTCG callers
+            # keep values in the rest)
+            leaf = self.leaf_writes(target)
+            keep = set(getattr(pol, "preserves", None) or ())
+            if leaf is not None:
+                keep |= {f"r{n}" for n in range(0, 13) if n not in leaf[0]}
+                keep |= {f"f{n}" for n in range(0, 14) if n not in leaf[1]}
+                if isinstance(pol, stub) and not isinstance(pol, alloc) and pol.ret_ is None:
+                    for reg in ("r3", "f1"):
+                        if reg in keep and reg in rec.ret:     # undo the random return
+                            del rec.ret[reg]
+                            if reg == "r3":
+                                m.set_gpr64(3, rec.gpr64[0])
+                            else:
+                                m.set_fpr(1, rec.fpr[0])
             for n in [0] + list(range(5, 13)) + ([] if "r4" in rec.ret else [4]):
                 if n != 3 or "r3" not in rec.ret:
-                    m.set_gpr(n, crng.getrandbits(32))
+                    v = crng.getrandbits(32)
+                    if f"r{n}" not in keep:
+                        m.set_gpr(n, v)
             if "r3" not in rec.ret:
-                m.set_gpr(3, crng.getrandbits(32))
+                v = crng.getrandbits(32)
+                if "r3" not in keep:
+                    m.set_gpr(3, v)
             for n in [0] + list(range(2, 14)):
-                m.set_fpr(n, f32_rounds(crng.uniform(-1e3, 1e3)))
+                v = f32_rounds(crng.uniform(-1e3, 1e3))
+                if f"f{n}" not in keep:
+                    m.set_fpr(n, v)
             if "f1" not in rec.ret:
-                m.set_fpr(1, f32_rounds(crng.uniform(-1e3, 1e3)))
+                v = f32_rounds(crng.uniform(-1e3, 1e3))
+                if "f1" not in keep:
+                    m.set_fpr(1, v)
             m.uc.reg_write(_PC, rec.lr)
 
         return dispatch
 
+    def _strings(self, m, rec, sig):
+        for reg, t in arg_registers(sig) if sig else []:
+            if t.kind == "ptr" and t.const_pointee and _is_char(t.pointee) and ":" not in reg:
+                n = int(reg[1:]) - 3
+                p, raw = rec.gpr[n], b""
+                try:
+                    while b"\0" not in raw and len(raw) < 4096:
+                        raw += bytes(m.uc.mem_read(p + len(raw), 64 - (p + len(raw)) % 64))
+                except Exception:
+                    continue                    # unreadable: compared as a pointer
+                rec.strings[n] = raw[:raw.index(b"\0")] if b"\0" in raw else raw
+
     def _derefs(self, m, rec, sig, pol):
         forced = getattr(pol, "deref", None) or {}
+        only = getattr(pol, "args", None)
         regs = arg_registers(sig) if sig else []
         for reg, t in regs:
-            if t.kind != "ptr" or ":" in reg or reg in forced:
+            if t.kind != "ptr" or ":" in reg or reg in forced or (only and reg not in only):
                 continue
+            pt = t.pointee
+            if pt is not None and pt.kind == "struct" and not pt.fields:
+                continue                # an empty struct: its one byte is padding
             p = rec.gpr[int(reg[1:]) - 3]
             if t.const_pointee and STACK_LO <= p < STACK_HI and t.pointee and 0 < t.pointee.size <= 512:
                 try:
@@ -363,6 +446,13 @@ class Checker:
                 return repr(s)
         return f"0x{v:08X}"
 
+    def _string_arg(self, rec, n, v, ty):
+        """A const char* argument: its text when the call was made."""
+        s = rec.strings.get(n)
+        if s is None:
+            return self.render_arg("", v, ty)
+        return repr(s)
+
     def _cstring(self, a):
         m = self.machine
         if not ((IMAGE_BASE <= a < IMAGE_BASE + len(self.image)) or (self.lift.lo <= a < self.lift.hi)):
@@ -381,9 +471,17 @@ class Checker:
         # faults
         if o.fault and o.fault.kind == "unsupported":
             raise Unsupported(o.fault)
+        if o.fault and o.fault.kind == "assert":
+            raise SpecError(f"the original failed an assertion in the {o.fault.detail}", o)
         if o.fault:
             raise SpecError(f"the original faulted: {o.fault.kind}: {o.fault.detail} at "
                             f"{self.where('orig', o.fault.pc)}", o)
+        if l.fault and l.fault.kind == "assert":
+            raise Divergence(f"the lift failed an assertion in the {l.fault.detail}",
+                             ["the original passed it"] + self.call_context(
+                                 [c for c in o.calls if not c.transparent],
+                                 [c for c in l.calls if not c.transparent],
+                                 len([c for c in l.calls if not c.transparent]) - 1, t))
         if l.fault:
             if l.fault.kind == "unsupported":
                 raise Unsupported(l.fault)
@@ -436,7 +534,10 @@ class Checker:
         # memory
         diffs = []
         init = self.initial(t)
+        ignore = self.ignore + t.ignored
         for a in sorted(set(o.final) | set(l.final)):
+            if any(lo <= a < lo + n for lo, n in ignore):
+                continue
             va = o.final.get(a)
             vb = l.final.get(a)
             if va is None:
@@ -508,7 +609,8 @@ class Checker:
         regs = arg_registers(sig) if sig else [("r3", None)]
         forced = getattr(self._policy(a.target, t), "args", None)
         if forced:
-            regs = [(r, None) for r in forced]
+            types = dict(regs) if sig else {}
+            regs = [(r, types.get(r)) for r in forced]
         name = self.call_name(a.target, t)
         for reg, ty in regs:
             if ty is not None and ty.kind in ("struct", "array"):
@@ -531,11 +633,19 @@ class Checker:
             size = ty.size if ty is not None and ty.kind == "int" else 4
             mask = (1 << (8 * size)) - 1
             av, bv = a.gpr[n] & mask, b.gpr[n] & mask
-            ra = self.render_arg("orig", av, ty)
-            rb = self.render_arg("lift", bv, ty)
-            if ty is not None and ty.kind == "ptr":
+            if ty is not None and ty.kind == "ptr" and _is_char(ty.pointee) and ty.const_pointee:
+                ra, rb = self._string_arg(a, n, av, ty), self._string_arg(b, n, bv, ty)
                 same = ra == rb
+            elif ty is not None and ty.kind == "ptr":
+                ra = self.render_arg("orig", av, ty)
+                rb = self.render_arg("lift", bv, ty)
+                same = ra == rb
+            elif ty is None and STACK_LO <= av < STACK_HI and STACK_LO <= bv < STACK_HI:
+                ra = rb = "<stack>"     # untyped (no declaration, args=): frames differ
+                same = True
             else:
+                ra = self.render_arg("orig", av, ty)
+                rb = self.render_arg("lift", bv, ty)
                 same = av == bv
             if not same:
                 raise Divergence(f"call #{k + 1} to {name}: {reg} = {ra} (original) vs {rb} (lift)",
@@ -639,6 +749,10 @@ class Checker:
         if not self.opts.quiet:
             print(f"PASS {self.name}: {self.trials} trials (seed {self.opts.seed}{ftxt})", file=out)
         return 0
+
+
+def _is_char(t) -> bool:
+    return t is not None and t.kind == "int" and t.size == 1
 
 
 class Unsupported(Exception):

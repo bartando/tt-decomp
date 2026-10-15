@@ -80,22 +80,33 @@ all fail (about 40 s).
   with tolerance and names fields in reports); `t.w8/w16/w32/w64/wf32/wf64(addr, v)`;
   `t.floats(addr, n, lo, hi)`; `t.args(r3=..., f1=...)`; `t.vtable("name")` returns a table
   of fake functions whose calls show up as `name.vfn_<k>`; `t.fake_fn("name")`;
-  `t.sym("g_x")`; `t.w32(t.sym("g_x"), v)` patches a global in the image for this trial.
+  `t.sym("g_x")`; `t.w32(t.sym("g_x"), v)` patches a global in the image for this trial;
+  `t.ignore(addr, size)` leaves bytes out of this trial's memory comparison.
   Unset registers are random; `r1` is a fresh stack, `r13` a zeroed block.
 - `CALLS`, keyed by symbol name, address or fake-function name:
   - `stub(ret=None|int|float|"void"|fn(ctx), out={"r4": size}, args=("r3", "f1"),
     deref={"r4": 16})`: record and return. The default returns random r3 and f1, and fills
     non-const pointer arguments that point into the stack (out-params) with random data
-    typed from the lift's declaration. `args` overrides which registers are compared,
-    `deref` compares what a register points at.
-  - `returns(v)`, `alloc(size_reg="r3")` (fresh zeroed heap block), `run()` (execute the
-    original callee, on both sides), `model(fn)` (Python; `ctx.r(3)`, `ctx.read/write`,
-    `ctx.ret(r3=, f1=)`), `fail()`.
-  - memcpy, memmove, memset and strlen are Python models and stay out of the call trace
-    (MSVC and clang inline different copies); their effects are in the memory diff.
+    typed from the lift's declaration. `args` overrides which registers are compared (typed
+    from the declaration where it has them, so a variadic `r6` can be added) and limits the
+    pointee comparison to them; `deref` compares what a register points at;
+    `preserves=("r8", "f1")` keeps registers the callee leaves alone.
+  - `returns(v)`, `alloc(size_reg="r3")` (fresh zeroed heap block), `run(transparent=False)`
+    (execute the original callee, on both sides; `transparent` leaves it out of the trace,
+    for a helper the lift calls and the original inlines), `model(fn, args=, deref=,
+    preserves=)` (Python; `ctx.r(3)`, `ctx.read/write`, `ctx.ret(r3=, f1=)`, `ctx.side`;
+    a failed `assert` in it is a FAIL on the lift side, a SPEC problem on the original's),
+    `fail()`.
+  - memcpy, memmove, memset, strlen and strcmp are Python models and stay out of the call
+    trace (MSVC and clang inline different copies); their effects are in the memory diff.
+  - After a stub or model returns, the volatile registers are clobbered with random values,
+    except, when the original callee is a leaf (no calls, no branches out), those it never
+    writes: MSVC's link-time codegen keeps values in them across such calls. A stub with
+    the default return also keeps r3/f1 then. A call to a one-branch thunk (`b X`) is
+    recorded, matched and handled as a call to X.
 - `EXTERNS`, `FTOL` (relative float tolerance, default 0), `TRIALS`, `RET` (`"r3"`, `"f1"`,
   `None`; default from the lift's return type), `EXTRA_RANGES` (more code ranges that belong
-  to the original function).
+  to the original function), `IGNORE = [(addr, size), ...]` (left out of the memory diff).
 - `FP_CONTRACT = "off"` (or `--fp-contract off`): compile the lift without fusing `a*b + c`
   into fmadd. The default, `"on"`, fuses within one expression, which is what MSVC did for
   most of the game (5 specs fail with `off`); use `off` where the asm rounds the product
@@ -135,8 +146,10 @@ all fail (about 40 s).
   volatile registers.
 - **Comparison.** Bytes written outside the stack, with floats in `ctype`/`wf32` words and
   float arguments compared to `FTOL` relative to max(1, |a|, |b|); ints exactly. Pointer
-  arguments into the stack compare as `<stack>`, plus the pointee if it's `const`; string
-  pointers compare by content.
+  arguments into the stack compare as `<stack>` (also untyped ones: calls without a
+  declaration, `args=` registers the declaration lacks), plus the pointee if it's `const`
+  and not an empty struct. `const char*` arguments compare by their text at the call (any
+  length, any memory); other pointers into the image that look like short strings, too.
 
 ## Limits
 
