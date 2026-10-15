@@ -951,54 +951,637 @@ const char* gmBallNode::GetTypeName() {
     return reinterpret_cast<const char*>(0x820570A0u);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// gmBallNode::Reset()  [vtable slot 24 @ 0x82281368]
-// Resets the ball node — frees allocated resources, destroys child objects,
-// and clears global ball state pointer.
-// ─────────────────────────────────────────────────────────────────────────────
-void gmBallNode::Reset() {
-    extern void rage_free(void* ptr);       // @ 0x820C00C0
-    extern uint32_t g_gameBallStatePtr;     // @ 0x8271A2F4
-    extern uint32_t g_activeBallNodePtr;    // @ 0x82606570
+// ═════════════════════════════════════════════════════════════════════════════
+// gmBallNode — the ball's scene-graph node
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// gmBallNode owns the ball's physics instance (the pongBallInstance at +0x74,
+// made by CreateInst), its effects (two trails, a shadow, the spin texture and
+// a 2D splash) and the game-pace tuning it loads from XML. Initialize builds the
+// effects, gives the ball the mass properties of a thin shell and publishes the
+// node and its pace settings; Reset puts everything back for a new rally; Draw
+// queues the effects; Terminate frees them.
+//
+// Objects it doesn't own are read through the views in namespace gmball, which
+// hold only offsets these functions' asm proves (the game's 32-bit offsets are
+// in the comments). Method names on the views say what a call does here; they
+// are not proven RAGE names.
 
-    // Clear the global game ball state pointer
-    g_gameBallStatePtr = 0;
+namespace gmball {
 
-    // Free allocated buffers at offsets +172, +176, +180
-    uint8_t* self = reinterpret_cast<uint8_t*>(this);
-    rage_free(reinterpret_cast<void*>(*reinterpret_cast<uint32_t*>(self + 172)));
-    rage_free(reinterpret_cast<void*>(*reinterpret_cast<uint32_t*>(self + 176)));
-    rage_free(reinterpret_cast<void*>(*reinterpret_cast<uint32_t*>(self + 180)));
+using Vec4 = gmBallNode::Vec4;
 
-    // Destroy physics object at offset +184 (has secondary base at +16)
-    void* physicsObj = reinterpret_cast<void*>(*reinterpret_cast<uint32_t*>(self + 184));
-    if (physicsObj != nullptr) {
-        void* secondaryBase = reinterpret_cast<uint8_t*>(physicsObj) + 16;
-        void** objVtable = *reinterpret_cast<void***>(secondaryBase);
-        void (*destructor)(void*, int) = reinterpret_cast<void (*)(void*, int)>(objVtable[0]);
-        destructor(secondaryBase, 1);
-    }
+inline Vec4 Splat(float v) { return Vec4{v, v, v, v}; }
 
-    // Destroy audio object at offset +188
-    void* audioObj = reinterpret_cast<void*>(*reinterpret_cast<uint32_t*>(self + 188));
-    if (audioObj != nullptr) {
-        void** audioVtable = *reinterpret_cast<void***>(audioObj);
-        void (*audioDtor)(void*, int) = reinterpret_cast<void (*)(void*, int)>(audioVtable[0]);
-        audioDtor(audioObj, 1);
-    }
-
-    // Clear the active ball node pointer
-    g_activeBallNodePtr = 0;
+// Calls slot `slot` of the object's vtable with the object as `this`.
+template <typename R, typename... A>
+inline R CallSlot(void* object, int slot, A... args) {
+    void** vtable = *static_cast<void***>(object);
+    return reinterpret_cast<R (*)(void*, A...)>(vtable[slot])(object, args...);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// gmBallNode secondary vtable destructor thunk  [rtti_7298_0 @ 0x82282498]
-// Adjusts 'this' by -128 to reach primary base, then calls primary destructor.
-// ─────────────────────────────────────────────────────────────────────────────
-void gmBallNode_SecondaryDtorThunk(gmBallNode* secondaryBase) {
-    gmBallNode* primary = reinterpret_cast<gmBallNode*>(
-        reinterpret_cast<uint8_t*>(secondaryBase) - 128);
-    primary->~gmBallNode();
+inline void** GameVtable(uintptr_t address) { return reinterpret_cast<void**>(address); }
+
+constexpr uintptr_t kVtable_gmBallNode            = 0x820571DCu;
+constexpr uintptr_t kVtable_gmBallNode_renderEnt  = 0x82057288u;  // +0x60
+constexpr uintptr_t kVtable_gmBallNode_sink       = 0x82057298u;  // +0x80
+constexpr uintptr_t kVtable_msgMsgSink            = 0x82027B34u;
+constexpr uintptr_t kVtable_pongRenderable        = 0x82032404u;
+constexpr uintptr_t kVtable_fxBallShadow          = 0x82057188u;
+constexpr uintptr_t kVtable_fxBallSpin            = 0x8206B3B0u;
+constexpr uintptr_t kVtable_fxBallSpin_sink       = 0x8206B3D0u;
+constexpr uintptr_t kVtable_fxBallSpinTex         = 0x820572A8u;
+constexpr uintptr_t kVtable_fxBallSpinTex_sink    = 0x820572CCu;
+constexpr uintptr_t kVtable_fxBallSplash2D        = 0x82057198u;
+constexpr uintptr_t kVtable_fxBallSplash2D_render = 0x820571A8u;
+
+// ── Memory ──────────────────────────────────────────────────────────────────
+// `new` is inlined everywhere: make sure the thread has an allocator
+// (0x820C0038), then call slot 1 of the allocator in TLS word 1.
+struct AllocatorView {
+    void** vtable;
+    void* Allocate(uint32_t size, uint32_t align) { return CallSlot<void*>(this, 1, size, align); }
+};
+
+// ── Physics ─────────────────────────────────────────────────────────────────
+struct BoundView {                 // rage::phBound
+    void**  vtable;                // +0x00
+    uint32_t _04;
+    float   radius;                // +0x08  Initialize's inertia reads it; SetScale writes it
+    uint8_t _pad0C[0x64];
+    Vec4    radiusSplat;           // +0x70  phBoundSphere only: the radius in all four lanes
+
+    // Slot 37, called after SetScale changes the radius (presumably refits the bound).
+    void RadiusChanged() { CallSlot<void>(this, 37); }
+};
+
+struct ArchetypeView {             // rage::phArchetype
+    void**     vtable;             // +0x00
+    uint8_t    _pad04[8];
+    BoundView* bound;              // +0x0C
+    uint32_t   typeFlags;          // +0x10
+    uint32_t   includeFlags;       // +0x14
+
+    // Slot 7: inferred to be the mass (Initialize multiplies it by r² · 2/3).
+    float GetMass() { return CallSlot<float>(this, 7); }
+    // Slot 14: takes the three diagonal inertia terms.
+    void SetAngInertia(const float* inertia) { CallSlot<void>(this, 14, inertia); }
+};
+
+struct BallAudioView {             // pongBallAudio (0x340 bytes, made by 0x8228A7D8)
+    uint8_t  _pad000[0x32C];
+    uint32_t word32C;              // +0x32C  Reset clears it
+};
+
+struct BallInstView {              // pongBallInstance (ctor 0x8227F870), a rage::phInst
+    void**          vtable;        // +0x00
+    ArchetypeView*  archetype;     // +0x04
+    uint16_t        levelIndex;    // +0x08
+    uint8_t         _pad0A[0x4B];
+    uint8_t         flag55;        // +0x55  ctor and Reset set it to 1
+    uint8_t         _pad56[2];
+    BallAudioView*  audio;         // +0x58
+};
+
+inline BallInstView* View(pongBallInstance* inst) { return reinterpret_cast<BallInstView*>(inst); }
+
+struct ColliderView {              // what the level hands back for an active object
+    uint8_t _pad00[0x94];
+    float   maxAngularSpeed;       // +0x94  inferred: Initialize stores 40π here
+};
+
+struct LevelView {                 // rage::phLevelNew
+    void**   vtable;               // +0x00
+    uint8_t  _pad04[0x18];
+    uint8_t* objectStates;         // +0x1C  one byte per level index; low 3 bits 0 = active
+
+    bool IsActive(uint16_t index) const { return (objectStates[index] & 7) == 0; }
+    ColliderView* GetActiveCollider(uint16_t index) { return CallSlot<ColliderView*>(this, 4, index); }
+};
+
+struct SimulatorView {             // rage::phSimulator
+    void**     vtable;             // +0x00
+    LevelView* level;              // +0x04
+};
+
+// ── Effects ─────────────────────────────────────────────────────────────────
+// pongRenderable (vtable 0x82032404): each effect's constructor starts with
+// these three stores.
+struct RenderableView {
+    void**  vtable;                // +0x00
+    float   sortValue;             // +0x04  inferred: Draw sets it right before queuing
+    int32_t field08;               // +0x08  ctor: 0
+    int32_t field0C;               // +0x0C  ctor: -1
+};
+
+inline void ConstructRenderable(RenderableView* r) {
+    r->sortValue = 0.0f;
+    r->field08 = 0;
+    r->field0C = -1;
+}
+
+// fxBallTrail (vtable 0x820571B8, 0xB4D0 bytes)
+inline void Trail_Draw(fxBallTrail* t)  { CallSlot<void>(t, 1); }  // 0x82382230
+inline void Trail_Reset(fxBallTrail* t) { CallSlot<void>(t, 2); }  // 0x82381150; its ctor calls it too
+// 0x82381208: stores intensity at +0xB470, data at +0x3C2C and entry type+1 of
+// the table at *0x8271A394 at +0x3C28.
+inline void Trail_Setup(fxBallTrail* t, int32_t type, int32_t intensity, void* data) {
+    CallSlot<void>(t, 3, type, intensity, data);
+}
+
+// fxBallSpinTex : fxBallSpin : pongRenderable, with a msgMsgSink base at +0x10 (0x1A0 bytes)
+struct SpinTexView {
+    RenderableView renderable;     // +0x00
+    void**         sinkVtable;     // +0x10
+    void*          texture;        // +0x14  slot 4 stores its argument here
+    uint8_t        flag18;         // +0x18  ctor: 1
+    uint8_t        flag19;         // +0x19  ctor: 1
+    uint8_t        _pad1A[2];
+    float          f1C;            // +0x1C  ctor: 1
+    float          f20;            // +0x20  ctor: 1
+    float          f24;            // +0x24  ctor: 1
+    uint8_t        _pad28[0x88];
+    Vec4           vecB0[6];       // +0xB0  ctor: 0
+};
+
+inline void SpinTex_Draw(fxBallSpinTex* s)     { CallSlot<void>(s, 1); }  // 0x82388B70
+inline void SpinTex_Register(fxBallSpinTex* s) { CallSlot<void>(s, 2); }  // 0x82388978
+inline void SpinTex_Reset(fxBallSpinTex* s)    { CallSlot<void>(s, 3); }  // 0x82388C58
+inline void SpinTex_SetTexture(fxBallSpinTex* s, void* texture) { CallSlot<void>(s, 4, texture); }  // 0x82280898
+
+// fxBallSplash2D: msgMsgSink at +0 (slot 1, 0x82389C50, handles the messages),
+// pongRenderable at +4 (0x240 bytes)
+struct Splash2DView {
+    void**         vtable;         // +0x00
+    RenderableView renderable;     // +0x04
+    uint8_t        _pad14[0xAC];
+    struct Mark { uint8_t active; uint8_t _pad[0x4F]; };
+    Mark           marks[4];       // +0xC0  0x50 apart
+};
+
+inline RenderableView* AsRenderable(fxBallSplash2D* splash) {
+    return splash ? &reinterpret_cast<Splash2DView*>(splash)->renderable : nullptr;
+}
+
+// ── Other objects ───────────────────────────────────────────────────────────
+// The object sgPhysicalObject builds next to the instance (0x8227F810 sets its
+// +0x10 to 4 and +0x60 to 0).
+struct DrawInstView {
+    void**   vtable;               // +0x00
+    uint8_t  _pad04[8];
+    uint32_t mode0C;               // +0x0C  Initialize sets 2
+    uint8_t  _pad10[0x50];
+    void*    drawable60;           // +0x60  Draw draws it only when set
+    uint8_t  _pad64[0x0C];
+    Vec4     scale;                // +0x70  SetScale splats the scale here
+
+    void Draw() { CallSlot<void>(this, 1); }
+};
+
+inline DrawInstView* View(gmBallDrawInst* d) { return reinterpret_cast<DrawInstView*>(d); }
+
+// The object at 0x825EAB28 (g_input_obj_ptr): Initialize hands it the pace settings.
+struct GameContextView {
+    uint8_t  _pad000[0x28];
+    uint32_t lookupKey28;          // +0x028  key for pg_C2A0_g (pong_misc.cpp: m_registryLookupKey)
+    uint8_t  _pad02C[0x70];
+    float    gamePace;             // +0x09C
+    float    gamePaceA0;           // +0x0A0  gets the same value
+    uint8_t  _pad0A4[0x60];
+    float    gamePaceFactor;       // +0x104
+    float    gamePaceNormalBias;   // +0x108
+    float    gamePaceNetworkBias;  // +0x10C
+    int32_t  gamePaceStart;        // +0x110
+    float    minGamePaceDelta;     // +0x114
+    float    maxGamePaceDelta;     // +0x118
+    float    networkFastestBallTravelTime;  // +0x11C
+};
+
+// What pg_C2A0_g returns for that key; Reset reads the ball colour from it.
+struct LookupRecordView {
+    uint8_t _pad0000[0x1710];
+    Vec4    ballColor;             // +0x1710
+};
+
+// The table at *0x8271A7F8: 12-byte records, the current one picked by +0x2C.
+struct SpinTextureSetView {
+    struct Record { uint32_t _00, _04; void* texture; };
+    Record  records[3];            // +0x00
+    uint8_t _pad24[8];
+    int32_t current;               // +0x2C
+};
+
+struct Lookup826063C8View {        // *(0x826063C8)->+0x08
+    uint8_t     _pad000[0x460];
+    gmBallNode* ballNode;          // +0x460
+};
+
+struct Holder826063C8View {        // *(0x826063C8)
+    uint8_t             _pad00[8];
+    Lookup826063C8View* target;    // +0x08
+};
+
+// The draw-bucket manager at *0x826064F4.
+struct DrawBucketView {
+    uint8_t  _pad00[0x5C];
+    uint32_t mask5C;               // +0x5C  passed as the bucket mask for the shadow and splash
+};
+
+// Shader globals (*0x825EBC40). A handle packs the dirty-bit index in bits
+// 1..17 and the entry index in bits 18..31; the entry's low 16 bits pick the
+// 16-byte value slot.
+struct ShaderGlobalTableView {
+    uint8_t   dirtyBits[0x100];    // +0x000
+    uint32_t* entries;             // +0x100  8 bytes each; word 1 is used
+    uint32_t  _104;
+    Vec4*     values;              // +0x108
+};
+
+// Fixed-path asset folder stack at 0x825D0080 (shape of RAGE's ASSET.PushFolder);
+// Initialize pops it by decrementing the depth inline.
+struct AssetManagerView {
+    uint8_t _pad000[0x600];
+    int32_t folderDepth;           // +0x600
+};
+
+struct Options825C5EC8View {
+    uint8_t _pad00[0x30];
+    uint8_t flag30;                // +0x30  with it set (and the 0x822823E0 test true) Reset draws the ball 5x
+};
+
+}  // namespace gmball
+
+// ── Globals ─────────────────────────────────────────────────────────────────
+extern void*                         g_sda_base;          // r13: word 0 is the thread's TLS block
+extern gmball::SimulatorView*        g_pPhysicsSim;       // @ 0x825F5BD0
+extern gmball::LevelView*            g_pPhysicsLevel;     // @ 0x826065E4
+extern pongBallInstance**            g_ppBallInst;        // @ 0x8271A2F4  where the current ball instance is published
+extern gmBallNode*                   g_activeBallNode;    // @ 0x82606570
+extern void*                         g_game_state_ptr;    // @ 0x8271A2F8
+extern void*                         g_input_obj_ptr;     // @ 0x825EAB28
+extern void*                         lbl_8271A310;        // @ 0x8271A310  root for pg_C2A0_g
+extern gmball::SpinTextureSetView*   lbl_8271A7F8;        // @ 0x8271A7F8
+extern gmball::Holder826063C8View*   lbl_826063C8;        // @ 0x826063C8
+extern gmball::AssetManagerView      g_assetFolderStack;  // @ 0x825D0080
+extern gmball::ShaderGlobalTableView* lbl_825EBC40;       // @ 0x825EBC40
+extern "C" uint32_t                  g_grmShaderFx_boundContext;  // @ 0x825EBC54  bumped on every shader-global write
+extern const uint8_t                 lbl_825D4C80[8];     // @ 0x825D4C80  0x80 >> n
+extern const float                   lbl_825C5938;        // @ 0x825C5938  -1.0 in the image
+extern const int32_t                 lbl_825C9A2C;        // @ 0x825C9A2C
+extern gmball::Options825C5EC8View   lbl_825C5EC8;        // @ 0x825C5EC8
+extern uint8_t                       lbl_82630710[];      // @ 0x82630710  data both trails are set up with
+extern "C" void*                     g_drawBucket;        // @ 0x826064F4
+
+// Message-sink list at 0x825F3864..0x825F3A68 (msg_event_handler.cpp names it an
+// event queue): per entry a sink, a mask of message kinds and the byte 0x80.
+extern uint32_t g_eventQueueIndex;      // @ 0x825F3864
+extern void*    g_eventQueuePtrs[];     // @ 0x825F3868
+extern uint32_t g_eventQueueMasks[];    // @ 0x825F3968
+extern uint8_t  g_eventQueueFlags[];    // @ 0x825F3A68
+
+// XML field handlers: each slot holds a rage::xmlNodeStruct* object; the
+// registration takes the slot's address.
+extern void* g_boolFieldType;   // @ 0x825CAF80  rage::xmlNodeStructBool
+extern void* g_intFieldType;    // @ 0x825CAF90  rage::xmlNodeStructInt
+extern void* g_floatFieldType;  // @ 0x825CAF94  rage::xmlNodeStructFloat
+
+// MSVC RTTI (decorated name at +8)
+struct RTTITypeDescriptor;
+extern RTTITypeDescriptor g_typeDescriptor_phBound;        // @ 0x825D2C78  ".?AVphBound@rage@@"
+extern RTTITypeDescriptor g_typeDescriptor_phBoundSphere;  // @ 0x825DE100  ".?AVphBoundSphere@rage@@"
+
+// ── Callees ─────────────────────────────────────────────────────────────────
+extern "C" void  sysMemAllocator_InitMainThread(void);                       // @ 0x820C0038
+extern void      rage_free(void* ptr);                                        // @ 0x820C00C0
+extern "C" void  RegisterSerializedField(void* node, const char* name, void* field,
+                                         void* fieldType, int flags);        // @ 0x821A8F58
+extern void      sgRMDrawable_RegisterFields(void* node);                     // @ 0x823D8F18
+extern void      sgPhysicalObject_Initialize(void* node);                     // @ 0x823D9160  slot 23
+extern void      sgPhysicalObject_Destruct(void* node);                       // @ 0x823D90A0
+extern void      fiAssetFolders_Push(gmball::AssetManagerView* assets, const char* path);  // @ 0x822E2E60
+extern "C" void* RTDynamicCast(void* object, int32_t vfDelta, RTTITypeDescriptor* sourceType,
+                               RTTITypeDescriptor* targetType, int32_t isReference);  // @ 0x82430978
+extern fxBallTrail*      fxBallTrail_Construct(void* mem);                    // @ 0x822812A8
+extern void              fxBallSplash2D_ResetSplashes(fxBallSplash2D* splash); // @ 0x82389BD8 (gmBallNode_9BD8)
+extern pongBallInstance* pongBallInstance_Construct(void* mem);               // @ 0x8227F870
+extern void      game_4B60(void* scene, uint16_t handle);                     // @ 0x822C4B60  deactivates the object
+extern void      game_3860(void* gameState, int kind, const char* name);      // @ 0x821D3860
+extern "C" void* pg_C2A0_g(void* lookupRoot, uint32_t lookupKey);             // @ 0x821DC2A0
+extern int       io_Input_poll_9D68(void* inputObj);                          // @ 0x821C9D68
+extern uint32_t  game_A2F8(const char* name, int create);                     // @ 0x8215A2F8  returns a shader-global handle (inferred)
+struct pongDrawBucket;
+void pongDrawBucket_AddEntry(pongDrawBucket* bucket, void* renderable, uint32_t bucketMask);  // @ 0x822278D8
+
+namespace gmball {
+
+inline AllocatorView* ThreadAllocator() {
+    void** tls = *static_cast<void***>(g_sda_base);
+    return static_cast<AllocatorView*>(tls[1]);
+}
+
+inline void* RageNew(uint32_t size) {
+    sysMemAllocator_InitMainThread();
+    return ThreadAllocator()->Allocate(size, 16);
+}
+
+inline void RegisterMessageSink(void* sink, uint32_t mask) {
+    uint32_t i = g_eventQueueIndex;
+    g_eventQueueFlags[i] = 0x80;
+    g_eventQueuePtrs[i] = sink;
+    g_eventQueueMasks[i] = mask;
+    g_eventQueueIndex = i + 1;
+}
+
+inline void SetShaderGlobal(uint32_t handle, const Vec4& value) {
+    ShaderGlobalTableView* table = lbl_825EBC40;
+    ++g_grmShaderFx_boundContext;
+    uint32_t bit = (handle >> 1) & 0x1FFFF;
+    uint32_t entryWord = table->entries[(handle >> 18) * 2 + 1];
+    table->dirtyBits[bit >> 3] |= lbl_825D4C80[bit & 7];
+    table->values[entryWord & 0xFFFF] = value;
+}
+
+inline fxBallTrail* NewTrail() {
+    void* mem = RageNew(0xB4D0);
+    return mem ? fxBallTrail_Construct(mem) : nullptr;
+}
+
+inline fxBallShadow* NewShadow() {
+    auto* shadow = static_cast<RenderableView*>(RageNew(0x10));
+    if (!shadow) return nullptr;
+    ConstructRenderable(shadow);
+    shadow->vtable = GameVtable(kVtable_fxBallShadow);
+    return reinterpret_cast<fxBallShadow*>(shadow);
+}
+
+// The fxBallSpinTex constructor, inlined with fxBallSpin's and msgMsgSink's.
+inline fxBallSpinTex* NewSpinTex() {
+    auto* spin = static_cast<SpinTexView*>(RageNew(0x1A0));
+    if (!spin) return nullptr;
+    ConstructRenderable(&spin->renderable);
+    spin->sinkVtable = GameVtable(kVtable_msgMsgSink);
+    spin->f24 = 1.0f;
+    spin->f1C = 1.0f;
+    spin->f20 = 1.0f;
+    spin->flag18 = 1;
+    spin->renderable.vtable = GameVtable(kVtable_fxBallSpin);
+    spin->flag19 = 1;
+    spin->sinkVtable = GameVtable(kVtable_fxBallSpin_sink);
+    for (Vec4& v : spin->vecB0) v = Splat(0.0f);
+    spin->renderable.vtable = GameVtable(kVtable_fxBallSpinTex);
+    spin->sinkVtable = GameVtable(kVtable_fxBallSpinTex_sink);
+    return reinterpret_cast<fxBallSpinTex*>(spin);
+}
+
+// The fxBallSplash2D constructor, inlined; it ends by resetting the splashes.
+inline fxBallSplash2D* NewSplash2D() {
+    auto* splash = static_cast<Splash2DView*>(RageNew(0x240));
+    if (!splash) return nullptr;
+    ConstructRenderable(&splash->renderable);
+    splash->renderable.vtable = GameVtable(kVtable_pongRenderable);
+    splash->vtable = GameVtable(kVtable_fxBallSplash2D);
+    splash->renderable.vtable = GameVtable(kVtable_fxBallSplash2D_render);
+    auto* result = reinterpret_cast<fxBallSplash2D*>(splash);
+    fxBallSplash2D_ResetSplashes(result);
+    return result;
+}
+
+}  // namespace gmball
+
+using namespace gmball;
+
+// ── [0] ScalarDtor @ 0x82280B18 ───────────────────────────────────────────────
+gmBallNode* gmBallNode::ScalarDtor(int flags) {
+    vtable = GameVtable(kVtable_gmBallNode);
+    renderEntryVtable = GameVtable(kVtable_gmBallNode_renderEnt);
+    sinkVtable = GameVtable(kVtable_gmBallNode_sink);
+    sinkVtable = GameVtable(kVtable_msgMsgSink);  // ~msgMsgSink, inlined
+    sgPhysicalObject_Destruct(this);
+    if (flags & 1) {
+        rage_free(this);
+    }
+    return this;
+}
+
+// ── msgMsgSink-base slot 0 @ 0x82282498 ───────────────────────────────────────
+// `addi r3,r3,-0x80; b 0x82280B18`: the deleting destructor through the +0x80 base.
+gmBallNode* gmBallNode_SecondaryDtorThunk(void* sinkBase, int flags) {
+    auto* node = reinterpret_cast<gmBallNode*>(static_cast<uint8_t*>(sinkBase) - 0x80);
+    return node->ScalarDtor(flags);
+}
+
+// ── [21] LoadProperties @ 0x82280B98 ──────────────────────────────────────────
+// Calls sgRMDrawable's registration directly (not sgPhysicalObject's 0x823D94C0)
+// and registers "Fixed" itself.
+void gmBallNode::LoadProperties() {
+    sgRMDrawable_RegisterFields(this);
+    RegisterSerializedField(this, "Fixed", &fixed, &g_boolFieldType, 0);
+    RegisterSerializedField(this, "PopFlyMinHeight", &popFlyMinHeight, &g_floatFieldType, 0);
+    RegisterSerializedField(this, "Scale", &scale, &g_floatFieldType, 0);
+    RegisterSerializedField(this, "VisualSpinScale", &visualSpinScale, &g_floatFieldType, 0);
+    RegisterSerializedField(this, "GamePace", &gamePace, &g_floatFieldType, 0);
+    RegisterSerializedField(this, "GamePaceFactor", &gamePaceFactor, &g_floatFieldType, 0);
+    RegisterSerializedField(this, "GamePaceNormalBias", &gamePaceNormalBias, &g_floatFieldType, 0);
+    RegisterSerializedField(this, "GamePaceNetworkBias", &gamePaceNetworkBias, &g_floatFieldType, 0);
+    RegisterSerializedField(this, "GamePaceStart", &gamePaceStart, &g_intFieldType, 0);
+    RegisterSerializedField(this, "MinGamePaceDelta", &minGamePaceDelta, &g_floatFieldType, 0);
+    RegisterSerializedField(this, "MaxGamePaceDelta", &maxGamePaceDelta, &g_floatFieldType, 0);
+    RegisterSerializedField(this, "ServeTimeout", &serveTimeout, &g_floatFieldType, 0);
+    RegisterSerializedField(this, "NetworkFastestBallTravelTime", &networkFastestBallTravelTime,
+                            &g_floatFieldType, 0);
+}
+
+// ── [23] Initialize @ 0x82280D48 ──────────────────────────────────────────────
+void gmBallNode::Initialize() {
+    fiAssetFolders_Push(&g_assetFolderStack, "$/props");
+    transform.d.x = 0.0f;
+    transform.d.y = 4.0f;  // the float at 0x825C90BC
+    transform.d.z = 0.0f;
+    sgPhysicalObject_Initialize(this);
+    --g_assetFolderStack.folderDepth;  // pop "$/props"
+
+    // Mass properties of a thin spherical shell: I = 2/3 m r² about every axis.
+    BallInstView* ball = View(inst);
+    ArchetypeView* archetype = ball->archetype;
+    archetype->typeFlags = 2;
+    archetype->includeFlags = 0xFFFFFFFFu;
+    float mass = archetype->GetMass();
+    float radius = archetype->bound->radius;
+    float inertia = mass * radius * radius * 0.6666667f;  // the float at 0x825D4164
+    float angInertia[3] = {inertia, inertia, inertia};
+    archetype->SetAngInertia(angInertia);
+
+    // The asm stores through the result without a null check.
+    ColliderView* collider = nullptr;
+    if (g_pPhysicsSim->level->IsActive(ball->levelIndex)) {
+        collider = g_pPhysicsSim->level->GetActiveCollider(ball->levelIndex);
+    }
+    collider->maxAngularSpeed = 125.66371f;  // 40π
+
+    *g_ppBallInst = inst;
+    storeScale = 1;
+
+    // fsel clamps: a NaN falls to the lower bound.
+    float s = (scale - 0.1f >= 0.0f) ? scale : 0.1f;
+    s = (s - 10.0f >= 0.0f) ? 10.0f : s;
+    scale = s;
+    SetScale(s);
+
+    float h = (popFlyMinHeight >= 0.0f) ? popFlyMinHeight : 0.0f;
+    h = (h - 10.0f >= 0.0f) ? 10.0f : h;
+    popFlyMinHeight = h;
+
+    trails[0] = NewTrail();
+    Trail_Setup(trails[0], 0, 0, lbl_82630710);
+    trails[1] = NewTrail();
+    Trail_Setup(trails[1], 0, 0, lbl_82630710);
+
+    shadow = NewShadow();
+
+    spinTex = NewSpinTex();
+    SpinTex_Register(spinTex);
+    SpinTextureSetView* textures = lbl_8271A7F8;
+    SpinTex_SetTexture(spinTex, textures->records[textures->current].texture);
+
+    splash = NewSplash2D();
+    fxBallSplash2D_ResetSplashes(splash);
+    RegisterMessageSink(splash, 1);
+    auto* splashView = reinterpret_cast<Splash2DView*>(splash);
+    for (int i = 0; i < 2; ++i) {
+        splashView->marks[i].active = 0;
+        splashView->marks[i + 2].active = 0;
+    }
+    RegisterMessageSink(&sinkVtable, 0x23);
+
+    g_activeBallNode = this;
+    lbl_826063C8->target->ballNode = this;
+    View(drawInst)->mode0C = 2;
+
+    auto* context = static_cast<GameContextView*>(g_input_obj_ptr);
+    context->gamePace = gamePace;
+    context->gamePaceA0 = context->gamePace;
+    context->gamePaceFactor = gamePaceFactor;
+    context->gamePaceNormalBias = gamePaceNormalBias;
+    context->gamePaceNetworkBias = gamePaceNetworkBias;
+    context->gamePaceStart = gamePaceStart;
+    context->minGamePaceDelta = minGamePaceDelta;
+    context->maxGamePaceDelta = maxGamePaceDelta;
+    context->networkFastestBallTravelTime = networkFastestBallTravelTime;  // ServeTimeout isn't copied
+
+    ballColorVar = game_A2F8("Ball_Color", 1);
+}
+
+// ── [24] Terminate @ 0x82281368 ───────────────────────────────────────────────
+void gmBallNode::Terminate() {
+    *g_ppBallInst = nullptr;
+    rage_free(trails[0]);
+    rage_free(trails[1]);
+    rage_free(shadow);
+    if (spinTex) {
+        // deleting destructor through the msgMsgSink base at +0x10
+        CallSlot<void>(&reinterpret_cast<SpinTexView*>(spinTex)->sinkVtable, 0, 1);
+    }
+    if (splash) {
+        CallSlot<void>(splash, 0, 1);
+    }
+    g_activeBallNode = nullptr;
+}
+
+// ── [25] Reset @ 0x82281408 ───────────────────────────────────────────────────
+// Puts the ball back for a new rally: back on the node's matrix, out of the
+// physics level, effects cleared, ball colour and scale reapplied.
+void gmBallNode::Reset() {
+    CallSlot<void>(this, 32, &transform);  // sgPhysicalObject slot 32 (0x823D93A0)
+    if (trails[0]) Trail_Reset(trails[0]);
+    if (trails[1]) Trail_Reset(trails[1]);
+    if (spinTex) SpinTex_Reset(spinTex);
+    if (splash) fxBallSplash2D_ResetSplashes(splash);
+    CallSlot<void>(this, 35, 0);  // sgPhysicalObject slot 35 (0x823D94B0): flag71 = drawInst+0x85 = 0
+
+    BallInstView* ball = View(inst);
+    if (g_pPhysicsLevel->IsActive(ball->levelIndex)) {
+        game_4B60(g_pPhysicsSim, ball->levelIndex);
+    }
+    ball->archetype->includeFlags = 0;
+    ball->flag55 = 1;
+    if (ball->audio) {
+        ball->audio->word32C = 0;
+    }
+
+    game_3860(g_game_state_ptr, 1, "gmBallNode::Reset");
+
+    f094[2] = 1.0f;
+    f094[1] = 1.0f;
+    f094[0] = 1.0f;
+    f0A0 = 0.0f;
+    f0A4 = lbl_825C5938;
+
+    auto* context = static_cast<GameContextView*>(g_input_obj_ptr);
+    auto* record = static_cast<LookupRecordView*>(pg_C2A0_g(lbl_8271A310, context->lookupKey28));
+    SetShaderGlobal(ballColorVar, record->ballColor);
+
+    // Same test as 0x822823E0, inlined.
+    bool test = false;
+    if (static_cast<uint8_t>(io_Input_poll_9D68(g_input_obj_ptr)) == 0) {
+        test = (lbl_825C9A2C == 0);
+    }
+    float newScale = 1.0f;
+    if (test && lbl_825C5EC8.flag30 != 0) {
+        newScale = 5.0f;  // the float at 0x8202C504
+    }
+    g_activeBallNode->SetScale(newScale);
+}
+
+// ── [29] Draw @ 0x82281C10 ────────────────────────────────────────────────────
+// Only the first trail is drawn.
+void gmBallNode::Draw() {
+    DrawInstView* draw = View(drawInst);
+    if (draw->drawable60) {
+        draw->Draw();
+    }
+    if (trails[0]) {
+        Trail_Draw(trails[0]);
+    }
+    if (shadow) {
+        auto* bucket = static_cast<DrawBucketView*>(g_drawBucket);
+        reinterpret_cast<RenderableView*>(shadow)->sortValue = 100.0f;
+        pongDrawBucket_AddEntry(reinterpret_cast<pongDrawBucket*>(bucket), shadow, bucket->mask5C);
+    }
+    if (spinTex) {
+        SpinTex_Draw(spinTex);
+    }
+    if (splash) {
+        auto* bucket = static_cast<DrawBucketView*>(g_drawBucket);
+        reinterpret_cast<Splash2DView*>(splash)->renderable.sortValue = 300.0f;
+        pongDrawBucket_AddEntry(reinterpret_cast<pongDrawBucket*>(bucket), AsRenderable(splash),
+                                bucket->mask5C);
+    }
+}
+
+// ── SetScale @ 0x82282318 ─────────────────────────────────────────────────────
+// Scales the drawn ball and, if the bound is a sphere, its radius (0.02 per unit:
+// a 40 mm ball at scale 1).
+void gmBallNode::SetScale(float newScale) {
+    View(drawInst)->scale = Splat(newScale);
+    auto* sphere = static_cast<BoundView*>(RTDynamicCast(View(inst)->archetype->bound, 0,
+                                                        &g_typeDescriptor_phBound,
+                                                        &g_typeDescriptor_phBoundSphere, 0));
+    if (sphere) {
+        float radius = newScale * 0.02f;  // the float at 0x825C8138
+        sphere->radius = radius;
+        sphere->radiusSplat = Splat(radius);
+        sphere->RadiusChanged();
+    }
+    if (storeScale) {
+        scale = newScale;
+    }
+}
+
+// ── [37] CreateInst @ 0x82282430 ──────────────────────────────────────────────
+// sgPhysicalObject slot 36 (0x823D9708) calls this and stores the result at +0x74.
+pongBallInstance* gmBallNode::CreateInst() {
+    void* mem = RageNew(0xD0);
+    return mem ? pongBallInstance_Construct(mem) : nullptr;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

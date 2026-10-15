@@ -29,20 +29,79 @@ struct gdBallPredictManager {
     virtual ~gdBallPredictManager(); // [0] @ 0x821d31c8
 };
 
-// ── gmBallNode  [3 vtables — template/MI] ───────────────────────────
-struct gmBallNode {
-    void** vtable;  // +0x00
+// ── gmBallNode  [vtables @ 0x820571DC (+0x00), 0x82057288 (+0x60), 0x82057298 (+0x80)] ──
+// The ball's scene-graph node, 0x150 bytes (ctor 0x822809B8). Its slots 26 and
+// 31..40 are sgPhysicalObject's (vtable 0x8204F35C), and the sgTraverse* visitors
+// (0x823D9F10..) name slots 23..29: Initialize, Terminate, Reset, Restart, Update,
+// PostUpdate, Draw. +0x80 is a msgMsgSink base (its vtable 0x82027B34 is stored
+// back there by the destructor). Members are plain functions so no vtable is
+// emitted here; each comment gives the slot it fills. Offsets are the game's 32-bit ones.
+// Field names in quotes are the ones LoadProperties registers with the XML loader.
+struct fxBallTrail;
+struct fxBallShadow;
+struct fxBallSpinTex;
+struct fxBallSplash2D;
+struct pongBallInstance;
+struct gmBallDrawInst;  // what sgPhysicalObject builds at +0x7C (0x8227F810); see pong_ball.cpp
 
-    // ── virtual methods ──
-    virtual ~gmBallNode(); // [0] @ 0x82280b18
-    virtual const char* GetTypeName(); // [19] @ 0x82280940
-    virtual bool IsEventHandled(uint32_t eventHash); // [20] @ 0x822808e8
-    virtual void vfn_21(); // [21] @ 0x82280b98
-    virtual void vfn_23(); // [23] @ 0x82280d48
-    virtual void Reset();  // [24] @ 0x82281368
-    virtual void vfn_27(); // [27] @ 0x82281630
-    virtual void vfn_29(); // [29] @ 0x82281c10
-    virtual void vfn_37(); // [37] @ 0x82282430
+struct gmBallNode {
+    struct Vec4 { float x, y, z, w; };
+    struct Matrix34 { Vec4 a, b, c, d; };  // rows a, b, c and the translation d
+
+    void**             vtable;                 // +0x000
+    uint8_t            _pad004[0x0C];
+    Matrix34           transform;              // +0x010  sgRMDrawable's "Matrix"
+    uint8_t            _pad050[0x10];
+    void**             renderEntryVtable;      // +0x060
+    uint8_t            _pad064[0x0C];
+    uint8_t            fixed;                  // +0x070  "Fixed"
+    uint8_t            flag71;                 // +0x071  written by sgPhysicalObject slot 35
+    uint8_t            _pad072[2];
+    pongBallInstance*  inst;                   // +0x074  the ball's phInst, made by CreateInst
+    void*              archetype;              // +0x078  copy of inst's archetype
+    gmBallDrawInst*    drawInst;               // +0x07C
+    void**             sinkVtable;             // +0x080  msgMsgSink base
+    float              popFlyMinHeight;        // +0x084  "PopFlyMinHeight"
+    uint8_t            storeScale;             // +0x088  SetScale writes `scale` back only when set
+    uint8_t            _pad089[3];
+    float              scale;                  // +0x08C  "Scale"
+    float              visualSpinScale;        // +0x090  "VisualSpinScale"
+    float              f094[3];                // +0x094  Reset sets all three to 1
+    float              f0A0;                   // +0x0A0  Reset sets 0
+    float              f0A4;                   // +0x0A4  Reset copies the float at 0x825C5938 (-1 in the image)
+    uint8_t            effectsEnabled;         // +0x0A8  Update resets the effects only when set (ctor: 1)
+    uint8_t            _pad0A9[3];
+    fxBallTrail*       trails[2];              // +0x0AC
+    fxBallShadow*      shadow;                 // +0x0B4
+    fxBallSpinTex*     spinTex;                // +0x0B8
+    fxBallSplash2D*    splash;                 // +0x0BC
+    float              gamePace;               // +0x0C0  "GamePace"
+    float              gamePaceFactor;         // +0x0C4  "GamePaceFactor"
+    float              gamePaceNormalBias;     // +0x0C8  "GamePaceNormalBias"
+    float              gamePaceNetworkBias;    // +0x0CC  "GamePaceNetworkBias"
+    int32_t            gamePaceStart;          // +0x0D0  "GamePaceStart" (registered as an int)
+    float              minGamePaceDelta;       // +0x0D4  "MinGamePaceDelta"
+    float              maxGamePaceDelta;       // +0x0D8  "MaxGamePaceDelta"
+    float              serveTimeout;           // +0x0DC  "ServeTimeout"
+    float              networkFastestBallTravelTime;  // +0x0E0  "NetworkFastestBallTravelTime"
+    uint8_t            flagsE4[3];             // +0x0E4  ctor clears them
+    uint8_t            _pad0E7[9];
+    Matrix34           matrixF0;               // +0x0F0  ctor: identity, translation 0
+    Vec4               vec130;                 // +0x130  ctor: 0
+    uint32_t           ballColorVar;           // +0x140  handle of the "Ball_Color" shader global
+    uint8_t            _pad144[0x0C];
+
+    gmBallNode*       ScalarDtor(int flags);           // [0]  @ 0x82280B18
+    const char*       GetTypeName();                   // [19] @ 0x82280940
+    bool              IsEventHandled(uint32_t eventHash); // [20] @ 0x822808E8
+    void              LoadProperties();                // [21] @ 0x82280B98
+    void              Initialize();                    // [23] @ 0x82280D48
+    void              Terminate();                     // [24] @ 0x82281368
+    void              Reset();                         // [25] @ 0x82281408
+    // [27] Update @ 0x82281630 is not lifted yet.
+    void              Draw();                          // [29] @ 0x82281C10
+    pongBallInstance* CreateInst();                    // [37] @ 0x82282430
+    void              SetScale(float newScale);        // @ 0x82282318
 };
 
 // ── gmBallRobot  [2 vtables — template/MI] ──────────────────────────
