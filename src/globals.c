@@ -918,3 +918,5 @@ TT_DATA_ALIAS("_ZN4rage13g_phCallback2E", "g_phCallback2");
 TT_DATA_ALIAS("_ZN4rage13g_phCallback3E", "g_phCallback3");
 TT_DATA_ALIAS("_ZN4rage13g_phCallback4E", "g_phCallback4");
 TT_DATA_ALIAS("_ZN4rage13g_phCallback5E", "g_phCallback5");
+/* swf.cpp declares the script object pool inside namespace rage */
+TT_DATA_ALIAS("_ZN4rage21g_swfScriptObjectPoolE", "g_swfScriptObjectPool");

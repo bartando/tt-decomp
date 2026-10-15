@@ -184,6 +184,7 @@ set(SOURCES
     src/game/player/player_state_queries.cpp
     src/game/misc/ccal_ring_buffer.cpp
     src/game/misc/ccal_movie_player.cpp
+    src/game/network/xact_sink_forwards.cpp
 )
 
 # Create executable
