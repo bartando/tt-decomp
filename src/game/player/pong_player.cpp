@@ -5323,10 +5323,8 @@ extern "C" int pongPlayer_0270_g(void* /*self*/) { return 0; }
 // Stub pending a decomposition pass (too large for a single lift).
 extern "C" void pongPlayer_1460_g(void* /*self*/, int /*arg*/) {}
 
-// pongPlayer_5B60_gen @ 0x82195B60 | size: 0xA0
-// Boolean predicate; returns the "passive swing commit absorbs release" gate
-// status used by OnButtonReleased (vfn_9). Stub pending lift.
-extern "C" bool pongPlayer_5B60_gen(pongPlayer* /*p*/) { return false; }
+// pongPlayer_5B60_gen @ 0x82195B60 — lifted below as pongPlayer_CheckServeInput.
+extern "C" bool pongPlayer_5B60_gen(pongPlayer* p) { return pongPlayer_CheckServeInput(p); }
 
 // pongPlayer_6470_g @ 0x821D6470 | size: 0x13C
 // Two signatures were historically declared for this symbol (vec3* vs float*).
@@ -6479,30 +6477,57 @@ extern void game_D1C0(vec3* outPos, pongSwingAnimView* swingAnim);
 // @ 0x820CE090 — a bone matrix from the creature's skeleton (bone id at +0x1C
 // of the blender), translation pushed a little along the bone's motion.
 extern void game_E090(pongServeBlenderView* blender, pongMatrix34* outMatrix);
-// @ 0x820DD060 — starts the serve blender; a stub until it is lifted.
-bool game_D060(pongSwingAnimView* /*blender*/, const vec3* /*position*/, bool /*canStart*/,
-               bool /*useAltClips*/) {
-    return false;
-}
+// @ 0x820DD388 — the serve blender refuses to start when this is true.
+extern bool game_D388(pongSwingAnimView* blender);
+// @ 0x820DD3E8 — Start's last step on the blender once the clip is set.
+extern void game_D3E8(pongSwingAnimView* blender);
+// @ 0x821CE0F0 — Start calls it on lbl_8271A2EC unless lbl_825C9A2C is 1.
+extern void game_E0F0(void* object);
+extern void*   lbl_8271A2EC;  // @ 0x8271A2EC
+extern int32_t lbl_825C9A2C;  // @ 0x825C9A2C  -1 in the image
 
 // ── Player side ────────────────────────────────────────────────────────────
 
 // rtti shotTarget (vtable 0x8203A824, stored by pongPlayer's fixup at
 // 0x82198D88); lives at pongPlayer+0x1EC.
 struct shotTargetLayout {
-    void**      vtable;  // +0x00
+    void**      vtable;     // +0x00
     uint8_t     _pad04[0x28];
-    pongPlayer* owner;   // +0x2C  also read by 0x8219F9C0
+    pongPlayer* owner;      // +0x2C  also read by 0x8219F9C0
+    uint8_t     _pad30[0x3E4];
+    int32_t     field_414;  // +0x414  InitSwing sets +0x414, +0x418, +0xEA4 and +0xEA8 to 1
+    int32_t     field_418;  // +0x418
+    uint8_t     _pad41C[0xA88];
+    int32_t     field_EA4;  // +0xEA4
+    int32_t     field_EA8;  // +0xEA8
 };
 
 // rtti aiPlayer (vtable 0x8203A83C, stored by 0x821A5FC8); pongPlayer+0x1F0.
+// What 0x821A66A8 fills in: four direction weights the AI wants for its swing.
+// The names follow the pad's order (see pongPlayer_ReadSwingDirectionInput).
+struct aiSwingDirectionView {
+    uint8_t _pad00[0x04];
+    float   up;        // +0x04
+    float   down;      // +0x08
+    float   right;     // +0x0C
+    float   left;      // +0x10
+    uint8_t _pad14[0x44];
+    uint8_t resolved;  // +0x58  set by 0x821A66A8, which returns at once while it is set
+};
+
 struct aiPlayerServeView {
     struct Sub34 {
         uint8_t _pad00[0x04];
         float   value4;  // +0x04
     };
-    uint8_t _pad00[0x34];
-    Sub34*  sub34;       // +0x34
+    uint8_t               _pad00[0x34];
+    Sub34*                sub34;           // +0x34
+    aiSwingDirectionView* swingDir;        // +0x38
+    uint8_t               _pad3C[0x480];
+    float                 reactionDelay;   // +0x4BC  inferred: the AI's direction waits until
+    float                 reactionTimer;   // +0x4C0  ...this, stepped 1/60 per call, reaches it
+    uint8_t               _pad4C4[0x1D];
+    uint8_t               field_4E1;       // +0x4E1  updates take the AI's direction only when set
 };
 
 // pongPlayer+0x17F0; only the byte SetupServe clears is known.
@@ -6511,8 +6536,8 @@ struct pongPlayerSub17F0 {
     uint8_t flag22;  // +0x22
 };
 
-// pongPlayer+0x185C, read by pg_9A70 (0x82199A70): returns 5, or 9 when
-// flag4 is set (posting message 0x101A), or 3 when flag6 is set.
+// pongPlayer+0x185C, read by pongPlayer_SelectShotType (0x82199A70): 5, or 9
+// when flag4 is set (posting message 0x101A), or 3 when flag6 is set.
 struct pongServeTypeFlags {
     uint8_t _pad00[0x04];
     uint8_t flag4;  // +0x04
@@ -6529,7 +6554,8 @@ struct pongPlayerServeLayout {
     float                  serveBounceZ;    // +0x1C8  inferred: the serve's bounce depth on the server's half
     int32_t                moveMode;        // +0x1CC  "Move mode is %d." (vfn_2); set by 0x82195C00
     int32_t                playerIndex;     // +0x1D0  header: m_inputSlotIdx
-    uint8_t                _pad1D4[0x18];
+    uint8_t                _pad1D4[0x10];
+    float                  aimNorm[2];      // +0x1E4  InitSwing copies the shot record's aimNorm here
     shotTargetLayout*      shotTarget;      // +0x1EC
     aiPlayerServeView*     ai;              // +0x1F0  header: m_pActionState
     uint8_t                _pad1F4[0x15F4];
@@ -6542,9 +6568,29 @@ struct pongPlayerServeLayout {
     uint8_t                field_18BA;      // +0x18BA  cleared by Serve
     uint8_t                _pad18BB[0x0D];
     uint8_t                field_18C8;      // +0x18C8  set by StartServe and SetupServe
-    uint8_t                _pad18C9[0x27];
+    uint8_t                _pad18C9[0x07];
+    float                  storedSwingDir[4];  // +0x18D0  left, right, up, down (ReadSwingDirectionInput)
+    uint8_t                _pad18E0[0x10];
     float                  serveHitDelay;   // +0x18F0  seconds from the toss to the hit frame
     float                  serveStartTime;  // +0x18F4  match clock when Serve ran
+    uint8_t                _pad18F8[0x10];
+    float                  field_1908[4];   // +0x1908  zeroed by InitSwing
+    uint8_t                _pad1918[0x70];
+    uint8_t                field_1988;      // +0x1988  set: ReadSwingDirectionInput ignores the pad
+    uint8_t                _pad1989[0x27];
+    vec3                   field_19B0;      // +0x19B0  zeroed by InitSwing
+    uint8_t                swingDirLatched[4];  // +0x19C0  up, down, left, right were nonzero
+    uint8_t                _pad19C4;
+    uint8_t                noSwingDir;      // +0x19C5  set when an update finds none latched
+    uint8_t                _pad19C6[0x10];
+    uint8_t                field_19D6;      // +0x19D6  cleared by InitSwing
+    uint8_t                field_19D7;      // +0x19D7  InitSwing sets both right before logging
+    uint8_t                field_19D8;      // +0x19D8  "Locked Out swing Input for player %d."
+    uint8_t                _pad19D9[0x03];
+    uint32_t               swingDirMask;    // +0x19DC  bit 0 on: 0x8 drops down, else 0x10 drops up
+    uint8_t                _pad19E0;
+    uint8_t                field_19E1;      // +0x19E1  cleared by InitSwing
+    uint8_t                field_19E2;      // +0x19E2  likewise
 };
 
 static pongPlayerServeLayout* ServeLayout(pongPlayer* player) {
@@ -6558,15 +6604,29 @@ struct pongShotRecord {
     uint8_t  _pad00[0x20];
     vec3     targetPos;    // +0x20  world point the shot aims at (Serve mirrors its z)
     uint8_t  _pad30[0x10];
-    vec3     vec40;        // +0x40  zeroed by SetupServe unless shotType is 3
-    uint8_t  _pad50[0x44];
+    vec3     vec40;        // +0x40  zeroed by SetupServe unless shotType is 3; its x gates up/down input
+    uint8_t  _pad50[0x10];
+    vec3     vec60;        // +0x60  InitSwing measures targetPos's distance from this
+    uint8_t  _pad70[0x24];
     float    gravity;      // +0x94  inferred: 0x821D6100 sets it between the ball's gravity and -11.85
     uint8_t  _pad98[0x04];
-    int32_t  shotType;     // +0x9C  pg_9A70's 5, 9 or 3
-    uint8_t  _padA0[0x26];
-    uint16_t flagsC6;      // +0xC6  SetupServe sets the high byte to 0x10
-    uint8_t  _padC8[0x38];
+    int32_t  shotType;     // +0x9C  pongPlayer_SelectShotType's 5, 9 or 3
+    uint8_t  _padA0[0x20];
+    uint16_t fieldC0;      // +0xC0  InitSwing: the score object's +0x18
+    uint16_t fieldC2;      // +0xC2  InitSwing: the score object's +0x14
+    uint8_t  fieldC4;      // +0xC4  InitSwing: the sum of the two scores
+    uint8_t  _padC5;
+    uint16_t flagsC6;      // +0xC6  SetupServe sets the high byte to 0x10, InitSwing clears it
+    uint8_t  _padC8[0x0C];
+    uint8_t  fieldD4;      // +0xD4  cleared by InitSwing when fieldD5 is set
+    uint8_t  fieldD5;      // +0xD5
+    uint8_t  _padD6[0x1A];
+    vec3     vecF0;        // +0xF0  zeroed by InitSwing
     float    aimNorm[2];   // +0x100 aim on the table, each in [-1, 1]; [1] follows depth
+    uint8_t  _pad108[0x48];
+    uint8_t  field150;     // +0x150 cleared by InitSwing
+    uint8_t  _pad151[0x03];
+    float    field154;     // +0x154 InitSwing: (|targetPos - vec60|^2 - 7, at least 0) / 15
 };
 
 struct pongPlayerShotEntry {
@@ -6575,7 +6635,7 @@ struct pongPlayerShotEntry {
     uint8_t        flag05;  // +0x05  likewise
     uint8_t        _pad06[0x2A];
     pongShotRecord shot;    // +0x30
-    uint8_t        _pad138[0x68];
+    uint8_t        _pad188[0x18];
 };
 static_assert(sizeof(pongPlayerShotEntry) == 0x1A0, "pongPlayerShotEntry is 416 bytes");
 static_assert(offsetof(pongPlayerShotEntry, shot) + offsetof(pongShotRecord, aimNorm) == 0x130,
@@ -6588,12 +6648,17 @@ static pongPlayerShotEntry* PlayerShotEntries() {
 // The match-settings singleton the file reaches as g_pInputArrayTable
 // (0x825EAB28; also g_pInputObj / g_pButtonStateTable above).
 struct pongMatchSettingsView {
-    uint8_t _pad00[0x38];
-    int32_t playerMode[2];   // +0x38  per player; picks EnterServeMode's path
+    uint8_t _pad00[0x14];
+    int32_t field_14;        // +0x14  CheckServeInput is false while this is positive
+    uint8_t _pad18[0x20];
+    int32_t playerMode[2];   // +0x38  per player; picks EnterServeMode's path (1: reads the pad)
     uint8_t sideFlipped[2];  // +0x40  per player; mirrors serve depth and aim (cf. SetServeSideFlip)
     uint8_t _pad42[0x5A];
-    float   field_9C[2];     // +0x9C  per player; SetupServe feeds it to 0x821D6100
+    float   field_9C[2];     // +0x9C  per player; SetupServe and InitSwing feed it to 0x821D6100
+    uint8_t _padA4[0xB5];
+    uint8_t field_159;       // +0x159 CheckServeInput's answer for a mode-1 player
 };
+static_assert(offsetof(pongMatchSettingsView, field_159) == 0x159, "settings +0x159");
 static_assert(offsetof(pongMatchSettingsView, field_9C) == 0x9C, "settings +0x9C");
 
 static pongMatchSettingsView* MatchSettings() {
@@ -6648,12 +6713,94 @@ extern void game_3860(void* gameState, int kind, const char* name);
 extern void PostGameMessage(uint32_t messageId, uint32_t flags, uint32_t param1, uint32_t param2);
 // @ 0x82198A48 — StartServe's query callback: *answer = io_Input_poll_9D68 && +0x17EC != 0.
 extern void io_8A48(pongPlayer* player, int32_t* answer);
-// @ 0x82199A70 — picks the serve's shot type from the flags (see pongServeTypeFlags).
-extern int32_t pg_9A70(pongServeTypeFlags* flags, int32_t playerIndex);
 // Flags argument of PostGameMessage: one bit per player.
 static uint32_t PlayerMessageBit(int32_t playerIndex) {
     return playerIndex != 0 ? 2u : 1u;
 }
+
+// ── Swing and shot externs ─────────────────────────────────────────────────
+
+// What 0x825EAB2C points at; message.cpp and globals.c call it g_render_obj_ptr.
+// pong_match.cpp reads +0x1C and +0x20 as the two players' scores.
+struct pongScoreView {
+    uint8_t _pad00[0x14];
+    int32_t field_14;   // +0x14
+    int32_t field_18;   // +0x18
+    int32_t points[2];  // +0x1C
+};
+extern void* g_render_obj_ptr;  // @ 0x825EAB2C
+
+// The controller table behind 0x8271A31C (g_pPlayerDataTable above): which pad
+// each player uses, then 0x328-byte pad records from +0x0C.
+struct pongPadTableView {
+    uint8_t _pad00[0x04];
+    int32_t padForPlayer[2];  // +0x04
+};
+
+static void* PlayerPad(int32_t playerIndex) {
+    uint8_t* table = g_pPlayerDataTable;
+    int32_t pad = reinterpret_cast<const pongPadTableView*>(table)->padForPlayer[playerIndex];
+    return table + 0x0C + pad * 0x328;
+}
+
+// @ 0x821E04B0 — true when bit 7 differs between bytes 0 and 3 of the button's
+// entry in the pad record. The lift above as pongPlayer::CheckHandednessDifference
+// takes a pongPlayer and drops the button argument.
+extern bool pongPlayer_04B0_g(void* pad, int32_t button);
+// @ 0x821921D0 — 0, or the stick's direction as 1..8; going by how
+// ReadSwingDirectionInput maps it, 1 is up and they run clockwise.
+extern int32_t phBoundCapsule_21D0_g(pongPlayer* player);
+// @ 0x821A66A8 — works out the AI's direction weights once (sets `resolved`).
+extern void pongPlayer_66A8_g(aiSwingDirectionView* dir);
+// @ 0x82193A68 — applies the four weights (left, right, up, down) to the swing.
+extern void pongPlayer_3A68_g(pongPlayer* player, float left, float right, float up, float down);
+// @ 0x8219EE88 — the shotTarget's side: hands the weights to its +0xAF0 object.
+extern void game_EE88(shotTargetLayout* target, int32_t arg, float left, float right,
+                      float up, float down);
+
+extern uint8_t lbl_8260642F;  // @ 0x8260642F  set by vfn_2 right before an update; gates storing the pad's weights
+extern float   lbl_825C7598;  // @ 0x825C7598  7.0 in the image (.data)
+extern float   lbl_825CAF0C;  // @ 0x825CAF0C  1/60 in the image (.data)
+
+
+/**
+ * pongServeBlender_Start  (game_D060 @ 0x820DD060 | size: 0x160)
+ * (called by pongCreature_StartServeBlender and LocomotionStateAnim_CDB8_g)
+ *
+ * Starts the serve blender if it is idle: when canStart is false or 0x820DD388
+ * objects, only marks it pending. Otherwise stamps the match clock, plays the
+ * last clip of one of its two lists at `position`, resets its progress and
+ * posts messages 0x1004 and 0x1002. Every path returns 0.
+ */
+bool pongServeBlender_Start(pongSwingAnimView* blender, const vec3* position, bool canStart,
+                            bool useAltClips)
+{
+    // pongPlayerState::IsRecovering inlined: idle once progress reaches 1.0.
+    bool idle = !blender->pending && blender->progress >= 1.0f;  // 1.0f @ 0x8202D108
+    if (!idle)
+        return false;
+
+    int32_t playerIndex = blender->creature->playerIndex;
+    if (!canStart || game_D388(blender)) {
+        blender->pending = 1;
+        return false;
+    }
+
+    blender->startTime = MatchClockNow();
+    const pongAnimClipList& list = useAltClips ? blender->altClips : blender->clips;
+    blender->clip = list.items[list.count - 1];
+    blender->position = *position;
+    game_D3E8(blender);
+
+    blender->fieldA8 = 0.0f;   // @ 0x8202D110
+    blender->progress = 0.0f;
+    PostGameMessage(0x1004, (uint8_t)(1u << playerIndex) | 0x40, 0, 0);
+    if (lbl_825C9A2C != 1)
+        game_E0F0(lbl_8271A2EC);
+    PostGameMessage(0x1002, (uint8_t)(1u << blender->field_04) | 0x40, 0, 0);
+    return false;
+}
+
 
 /**
  * pongCreature_StartServeBlender  (pongPlayer_7248_g @ 0x820C7248 | size: 0x19C)
@@ -6686,7 +6833,7 @@ void pongCreature_StartServeBlender(pongCreatureServeView* creature, const pongC
     bool useAltClips = sub94->field_20 == 1;
     blender->swingAnim->action = *action;
     blender->swingAnim->query = *query;
-    game_D060(blender->swingAnim, &position, canStart, useAltClips);
+    pongServeBlender_Start(blender->swingAnim, &position, canStart, useAltClips);
 }
 
 
@@ -6694,7 +6841,7 @@ extern float lbl_825C7600;  // @ 0x825C7600  -11.85 in the image (.data)
 
 /**
  * pongShotRecord_SetGravity  (pongPlayer_6100_g @ 0x821D6100 | size: 0xA8)
- * (called by pongPlayer_SetupServe and 0x82190780)
+ * (called by pongPlayer_SetupServe and pongPlayer_InitSwing)
  *
  * Runs on the per-player shot record. Sets +0x94 between the ball's gravity
  * and -11.85 (0x825C7600) by |input| clamped to [-0.9, -0.9]: both bounds are
@@ -6727,6 +6874,262 @@ void pongShotRecord_SetGravity(pongShotRecord* shot, float input)
         break;
     }
 }
+
+
+/**
+ * pongPlayer_SelectShotType  (pg_9A70 @ 0x82199A70 | size: 0x6C)
+ * (called by pongPlayer_SetupServe and pongPlayer_InitSwing on pongPlayer+0x185C)
+ *
+ * 5 by default; 9 when flag4 is set, after posting message 0x101A to the
+ * player's bit; 3 when flag6 is set, whatever flag4 said.
+ */
+int32_t pongPlayer_SelectShotType(pongServeTypeFlags* flags, int32_t playerIndex)
+{
+    int32_t shotType = 5;
+    if (flags->flag4) {
+        PostGameMessage(0x101A, (uint8_t)(1u << playerIndex) | 0x40, 0, 0);
+        shotType = 9;
+    }
+    if (flags->flag6)
+        shotType = 3;
+    return shotType;
+}
+
+
+/**
+ * pongPlayer_CheckServeInput  (pongPlayer_5B60_gen @ 0x82195B60 | size: 0xA0)
+ *
+ * False while io_Input_poll_9D68 reports the settings busy or the settings'
+ * +0x14 is positive; otherwise true only for a mode-1 (pad-driven) player
+ * whose settings byte +0x159 is set. ReadSwingDirectionInput reads the pad
+ * only when this is false, so the name (from EnterServeMode's use) is loose.
+ */
+bool pongPlayer_CheckServeInput(pongPlayer* player)
+{
+    pongMatchSettingsView* settings = MatchSettings();
+    if (io_Input_poll_9D68(settings))
+        return false;
+    if (settings->field_14 > 0)
+        return false;
+    if (settings->playerMode[ServeLayout(player)->playerIndex] != 1)
+        return false;
+    return settings->field_159 != 0;
+}
+
+
+/**
+ * pongPlayer_ReadSwingDirectionInput  (pongPlayer_1B10_g @ 0x82191B10 | size: 0x414)
+ * (called by InitSwing with update = false; vfn_2, F6D0, FinalizeSwing, 2D88
+ *  and ref_fi_EFD0 pass 0 or 1)
+ *
+ * Builds four direction weights for the swing, each 0 or 1 from the pad, or
+ * the AI's own. A pad-driven player (mode 1, +0x1988 clear, CheckServeInput
+ * false) reads pad buttons 0x32..0x35 (up, down, left, right; up only while
+ * the shot's vec40.x isn't positive, down only while it isn't negative) and
+ * the stick's octant, which also sets the two neighbours of a diagonal. Any
+ * other player takes the AI's weights: on an update only once the AI's +0x4E1
+ * is set, otherwise once its reaction timer (stepped 1/60) reaches the delay.
+ * Outside updates swingDirMask can drop down or up. Each nonzero weight is
+ * latched; an update with nothing latched only sets noSwingDir. Then the swing
+ * gets the weights (the stored ones on an update) and the shotTarget the
+ * fresh ones.
+ *
+ * The up/down/left/right names are inferred: 0x32..0x35 in XInput's d-pad
+ * order, and the octants running clockwise from up, agree with each other.
+ */
+void pongPlayer_ReadSwingDirectionInput(pongPlayer* player, bool update)
+{
+    pongPlayerServeLayout* self = ServeLayout(player);
+    const float kZero = 0.0f;  // @ 0x8202D110
+    const float kOne  = 1.0f;  // @ 0x8202D108
+
+    int32_t playerIndex = self->playerIndex;
+    float left = kZero, right = kZero, up = kZero, down = kZero;
+    self->swingDirLatched[0] = 0;
+    self->swingDirLatched[1] = 0;
+    self->swingDirLatched[2] = 0;
+    self->swingDirLatched[3] = 0;
+    const pongShotRecord& shot = PlayerShotEntries()[playerIndex].shot;
+
+    if (MatchSettings()->playerMode[playerIndex] == 1 && !self->field_1988 &&
+        !pongPlayer_CheckServeInput(player)) {
+        void* pad = PlayerPad(playerIndex);
+        if (pongPlayer_04B0_g(pad, 0x32) && !(shot.vec40.x > kZero))
+            up = kOne;
+        if (pongPlayer_04B0_g(pad, 0x33) && (shot.vec40.x >= kZero || -shot.vec40.x == kZero))
+            down = kOne;
+        if (pongPlayer_04B0_g(pad, 0x34))
+            left = kOne;
+        if (pongPlayer_04B0_g(pad, 0x35))
+            right = kOne;
+
+        switch (phBoundCapsule_21D0_g(player)) {
+        case 1: up = kOne; break;
+        case 2: right = kOne; up = kOne; break;
+        case 3: right = kOne; break;
+        case 4: down = kOne; right = kOne; break;
+        case 5: down = kOne; break;
+        case 6: down = kOne; left = kOne; break;
+        case 7: left = kOne; break;
+        case 8: left = kOne; up = kOne; break;
+        default: break;
+        }
+
+        if (lbl_8260642F) {
+            self->storedSwingDir[0] = left;
+            self->storedSwingDir[1] = right;
+            self->storedSwingDir[2] = up;
+            self->storedSwingDir[3] = down;
+        }
+    } else {
+        // 0x821A66A8 leaves r3 alone, so the asm goes on using it as `dir`.
+        aiSwingDirectionView* dir = self->ai->swingDir;
+        if (!dir->resolved)
+            pongPlayer_66A8_g(dir);
+
+        if (update) {
+            if (self->ai->field_4E1) {
+                left = dir->left;
+                right = dir->right;
+                up = dir->up;
+                down = dir->down;
+                self->storedSwingDir[0] = left;
+                self->storedSwingDir[1] = right;
+                self->storedSwingDir[2] = up;
+                self->storedSwingDir[3] = down;
+            }
+        } else if (!(self->ai->reactionTimer >= self->ai->reactionDelay)) {
+            left = dir->left;
+            right = dir->right;
+            up = dir->up;
+            down = dir->down;
+            self->ai->reactionTimer = self->ai->reactionTimer + lbl_825CAF0C;
+        } else {
+            left = kZero;
+            right = kZero;
+            up = kZero;
+            down = kZero;
+        }
+    }
+
+    if (!update) {
+        uint32_t mask = self->swingDirMask;
+        if (mask & 0x1) {
+            if (mask & 0x8)
+                down = kZero;
+            else if (mask & 0x10)
+                up = kZero;
+        }
+    }
+
+    if (up != kZero)
+        self->swingDirLatched[0] = 1;
+    if (down != kZero)
+        self->swingDirLatched[1] = 1;
+    if (left != kZero)
+        self->swingDirLatched[2] = 1;
+    if (right != kZero)
+        self->swingDirLatched[3] = 1;
+
+    if (update) {
+        if (!self->swingDirLatched[0] && !self->swingDirLatched[1] &&
+            !self->swingDirLatched[2] && !self->swingDirLatched[3]) {
+            self->noSwingDir = 1;
+            return;
+        }
+        pongPlayer_3A68_g(player, self->storedSwingDir[0], self->storedSwingDir[1],
+                          self->storedSwingDir[2], self->storedSwingDir[3]);
+    } else {
+        pongPlayer_3A68_g(player, left, right, up, down);
+    }
+    game_EE88(self->shotTarget, 0, left, right, up, down);
+}
+
+
+/**
+ * pongPlayer_InitSwing  (pongPlayer_0780_g @ 0x82190780 | size: 0x208)
+ * (called by pongPlayer_vfn_2)
+ *
+ * "Called Init Swing for Player %d": resets the player's shot record and
+ * swing input for a new swing (like SetupServe does for a serve), picks the
+ * shot type, recomputes the record's gravity and +0x154, reads the swing
+ * direction, then locks swing input ("Locked Out swing Input for player %d.").
+ */
+void pongPlayer_InitSwing(pongPlayer* player)
+{
+    pongPlayerServeLayout* self = ServeLayout(player);
+    const float kZero = 0.0f;  // @ 0x8202D110
+    nop_8240E6D0("Called Init Swing for Player %d", self->playerIndex);
+
+    pongShotRecord& shot = PlayerShotEntries()[self->playerIndex].shot;
+    self->swingDirMask = 0;
+
+    // The asm writes x, y and z of a stack vector and copies all 16 bytes, so
+    // vecF0's w gets whatever was on the stack; zeroed here.
+    vec3 zero;
+    zero.x = kZero;
+    zero.y = kZero;
+    zero.z = kZero;
+    zero._pad = kZero;
+
+    if (shot.fieldD5)
+        shot.fieldD4 = 0;
+    else
+        nop_8240E6D0("Cannot Lock when Unlock is not enabled");
+
+    // 0x8219F9C0 is lifted above as pongPlayer::FinalizeServeSetup, but its
+    // `this` is the shotTarget (it finds the player at +0x2C).
+    reinterpret_cast<pongPlayer*>(self->shotTarget)->FinalizeServeSetup();
+    self->sub17F0->flag22 = 0;
+
+    // The asm clears the high byte of +0xC6 twice (two bitfields, presumably).
+    shot.flagsC6 = (uint16_t)(shot.flagsC6 & 0x00FF);
+    shot.vecF0 = zero;
+    shot.flagsC6 = (uint16_t)(shot.flagsC6 & 0x00FF);
+
+    const pongScoreView* score = static_cast<const pongScoreView*>(g_render_obj_ptr);
+    shot.fieldC0 = (uint16_t)score->field_18;
+    shot.fieldC4 = (uint8_t)(score->points[1] + score->points[0]);
+    shot.fieldC2 = (uint16_t)score->field_14;
+
+    self->aimNorm[0] = shot.aimNorm[0];
+    self->aimNorm[1] = shot.aimNorm[1];
+    self->shotTarget->field_EA4 = 1;
+    self->shotTarget->field_EA8 = 1;
+    self->shotTarget->field_414 = 1;
+    self->shotTarget->field_418 = 1;
+
+    memset(&self->field_19B0, 0, sizeof(self->field_19B0));
+    for (int i = 0; i < 4; ++i) {
+        self->swingDirLatched[i] = 0;
+        self->field_1908[i] = kZero;
+    }
+    self->field_19D6 = 0;
+    self->field_19E1 = 0;
+    self->field_19E2 = 0;
+    shot.field150 = 0;
+
+    player->OnButtonReleased();  // vtable slot 9 (0x821935B8)
+
+    shot.shotType = pongPlayer_SelectShotType(&self->serveTypeFlags, self->playerIndex);
+    pongShotRecord_SetGravity(&shot, MatchSettings()->field_9C[self->playerIndex]);
+
+    // dot3 of the difference (vmsum3fp128), less 7, floored at 0, over 15.
+    float dx = shot.targetPos.x - shot.vec60.x;
+    float dy = shot.targetPos.y - shot.vec60.y;
+    float dz = shot.targetPos.z - shot.vec60.z;
+    float excess = (dx * dx + dy * dy + dz * dz) - lbl_825C7598;
+    if (!(excess >= kZero))
+        excess = kZero;
+    shot.field154 = excess * (1.0f / 15.0f);  // @ 0x82079E7C
+
+    pongPlayer_ReadSwingDirectionInput(player, false);
+
+    self->field_19D8 = 1;
+    self->field_19D7 = 1;
+    nop_8240E6D0("Locked Out swing Input for player %d.", self->playerIndex);
+}
+
 
 
 /**
@@ -6979,7 +7382,7 @@ void pongPlayer_SetupServe(pongPlayer* player)
 
     self->serveTypeFlags.flag4 = 0;
     self->serveTypeFlags.flag6 = 0;
-    shot.shotType = pg_9A70(&self->serveTypeFlags, self->playerIndex);
+    shot.shotType = pongPlayer_SelectShotType(&self->serveTypeFlags, self->playerIndex);
     pongShotRecord_SetGravity(&shot, MatchSettings()->field_9C[self->playerIndex]);
 
     shot.flagsC6 = (uint16_t)((shot.flagsC6 & 0x00FF) | 0x1000);
