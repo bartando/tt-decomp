@@ -1010,24 +1010,24 @@ struct pongCreatureInst {
     // ── virtual methods ──
     virtual ~pongCreatureInst();                  // [0] @ 0x820c8ee0 — body lifted as ScalarDeletingDtor
     virtual int GetType();              // [1] @ 0x8210cc40
-    virtual void* GetEmbeddedObject();  // [2] @ 0x820c8ed8
-    virtual void* GetSubObjectTransform(int index);  // [3] @ 0x820c8e98
+    virtual const float* GetLastMatrix();  // [2] @ 0x820c8ed8 — the 4x4 kept at +0xE0
+    virtual void SetLastMatrix(const float* matrix);  // [3] @ 0x820c8e98 — copies a 4x4 into +0xE0
     virtual void ClearBoundingVector(void* outVector);  // [4] @ 0x822c90f8
     virtual void TransformBoundingVector(void* inOutVector, void* transform);  // [6] @ 0x822c9108 — cross-product transform on bounding vector
-    virtual void UpdateBoundsWithDefaults();  // [9] @ 0x822c90b0
-    virtual void ForwardToUpdateBounds();  // [10] @ 0x822c90a0
-    virtual void OnEnter();  // [11] @ 0x821210a8
-    virtual void ComputeBoundsPartial(void* outMin, void* outMax);  // [14] @ 0x822c90e0
+    virtual void ApplyAtPosition(const float* vec);  // [9] @ 0x822c90b0 — slot 10 at the matrix translation
+    virtual void ApplyAt(const float* vec, const float* point, int component, int element);  // [10] @ 0x822c90a0 — forwards to slot 15
+    virtual void ApplyToRope(const float* vec, const float* point, int component);  // [11] @ 0x821210a8 — slot 16, then the phRope behaviour
+    virtual void ApplyAtComponent(const float* vec, const float* point, int component);  // [14] @ 0x822c90e0 — slot 10 with element 0
     virtual int GetDefaultIndex();  // [19] @ 0x824ff7c8
-    virtual void* GetBoneTransform(int boneIndex);  // [22] @ 0x8211ddb8
+    virtual bool TouchCacheEntry();  // [22] @ 0x8211ddb8 — stamps the cache entry with the pool's current stamp
     virtual void SelectBestBone(void* boneData);  // [26] @ 0x8211ddf8 — iterates bones, selects by weight
     virtual void UpdateBoneTransforms();  // [28] @ 0x8211f2a0 — transposes matrix, transforms bones
-    virtual void* GetCreatureInfo();  // [30] @ 0x820c8f80
-    virtual void* GetPhysicsState();  // [31] @ 0x822c9200
+    virtual void* PrepareForActivation(void** outObject, void* arg2, void* arg3, void* arg4);  // [30] @ 0x820c8f80 — runs fragInst's, returns null
+    virtual void FillMatrixFromConstant(float* outMatrix);  // [31] @ 0x822c9200 — four copies of the vector at 0x82606750
     virtual bool ComputeCollisionRadius(void* rayOrigin, void* outRadius, void* outByte, float* outFraction);  // [34] @ 0x8211d760 — physics bound check, normalizes, divides radius
     virtual void UpdateCollisionFlags(void* flagData);  // [35] @ 0x82120880 — sets dirty bit, checks collision type
     virtual bool ResolveCollision(void* player, void* rayData, void* hitList, void* hitCount, void* outHit, void* colGroup, void* mask);  // [36] @ 0x82120408 — resolves collision, updates flags
-    virtual uint32_t GetCollisionFlags();  // [37] @ 0x822c92d8
+    virtual int CountBoundParts();  // [37] @ 0x822c92d8 — non-null part pointers of the archetype's bound
     virtual void* GetEntityByIndex(int index);  // [38] @ 0x822c9318
     virtual bool AttachToScene(bool rejectIfKeyCached);  // [41] @ 0x8211d0e0 — sets attached flag, notifies manager, links into type holder's list
     virtual void DetachFromScene();  // [42] @ 0x8211ecc0 — removes from physics, updates color/transform
@@ -1066,7 +1066,7 @@ struct pongCreatureInst {
     void ArrayRemove(void* element); // @ 0x822C9420
     void SetRefPtr(void* newObj);    // @ 0x822C9030
     void SetArraySlot(int index, void* newObj);  // @ 0x8228E7B8
-    void Detach();              // @ 0x8211D470
+    void FragInstDtor();        // @ 0x8211D470 — rage::fragInst destructor body
     void SetMatrix(const void* srcMatrix);  // @ 0x820D5040
     void UpdateHeading();       // @ 0x8228E828
     void BuildTranslationMatrix(float* outMatrix, const float* srcBasis);  // @ 0x820D50A0
