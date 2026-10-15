@@ -42,3 +42,7 @@ Reported by the agents using it. Each was worked around in a spec; fix in the to
   into the upper half is wrong (drill RNG 0x82113BA8 / `OnRallyEnd` 0x8210D660 uncheckable).
 - Strings shorter than 2 or longer than ~63 bytes compare as raw pointers; varargs aren't
   compared; a `// @` marker on the second line of a multi-line declaration is missed.
+- Link-time codegen keeps registers alive across some calls (`pg_C2A0_g` r8,
+  `io_Input_poll_9D68` f1/r7, `pg_0C98_g` r4, trail reset returns `this`); stubs break them.
+  A per-callee "preserves" list in the symbol data would let `stub()` keep them.
+- clang keeps a libm `sqrtf` call for the errno path; compile lifts with `-fno-math-errno`.

@@ -126,6 +126,13 @@ slot 1..25 one off; header fixed, drill subclasses other than Movement not re-ve
   bounds (leaf, keeps r3).
 - `pong_match.hpp`: gmPracticeTarget +0x17 (`field_17`) is a keep-on-table clamp flag.
 - `pong_states.cpp` puts string-address `// @` markers on `rage_debugLog` calls.
+- `msg_event_handler.hpp` puts `g_eventQueueIndex`/`Ptrs` at 0x8271A864/0x8271A868; the asm
+  uses 0x825F3864/0x825F3868.
+- 0x8225E998 (`atSingleton_E998_g`, "NotifyObservers") is a variadic message-argument reader
+  driven by a format string.
+- `fx_effects.hpp`: `fxBallTrail::AddSample` (slot 4) takes r4 and r5, declared with one arg.
+- `pong_ball.cpp`: `pongBallInstance_4980_g` is two no-op overloads; the real one takes six
+  args (r3–r8). 0x8227FDB0 has two names (`UpdatePhysicsState`, `pongBallInstance_OnBallMissed`).
 - `globals.c`: `g_msgSinkTemplate` is at 0x8261A0C0, not 0x8241A0C0.
 
 
