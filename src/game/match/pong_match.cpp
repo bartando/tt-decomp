@@ -16,9 +16,9 @@ extern "C" {
 }
 
 // External globals
-extern uint8_t g_spectatorModeEnabled;
-extern void* g_pongGameInstance;
-extern void* g_playerDataArray;
+extern uint8_t g_spectatorModeEnabled;  // @ 0x82606672
+extern void* g_pongGameInstance;        // @ 0x8271A31C
+extern void* g_playerDataArray;         // @ 0x8271A7B0
 
 // Event type constants
 enum GameEventType {

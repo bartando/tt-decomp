@@ -31,3 +31,4 @@ extern "C" alignas(16) float lbl_82606750[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 /* pong_player.cpp and anim_blender_init.cpp/cloth.cpp name the same vector */
 TT_DATA_ALIAS("g_kVecConst_606750", "lbl_82606750");
 TT_DATA_ALIAS("g_playerMirrorPlane", "lbl_82606750");
+TT_DATA_ALIAS("g_zeroVec4", "lbl_82606750");

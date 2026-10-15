@@ -164,6 +164,7 @@ set(SOURCES
     src/game/match/match_data.cpp
     src/game/misc/misc_data.cpp
     src/game/network/net_data.cpp
+    src/game/network/ld_net_data.cpp
     src/game/player/player_data.cpp
     src/graphics/grc_data.cpp
     src/physics/ph_data.cpp

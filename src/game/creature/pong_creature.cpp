@@ -3012,7 +3012,7 @@ void LocomotionStateAnim_BE20_g(void* dst, void* src) {
     util_BBB0(dst, srcPos, (float*)((char*)dst + 16));
 
     // result_pos = reference_zero - combined_pos (vsubfp with zero vector)
-    extern const float g_zeroVec4[4];  // reference zero vector
+    extern const float g_zeroVec4[4];  // @ 0x82606750 (.data, zero in the image)
     float* dstPos = (float*)((char*)dst + 16);
     dstPos[0] = g_zeroVec4[0] - dstPos[0];
     dstPos[1] = g_zeroVec4[1] - dstPos[1];
@@ -3089,7 +3089,7 @@ float LocomotionStateAnim_6DD8_w(void* self, float maxWeight, float frameTime) {
         return 0.0f;
     } else if (pos < rangeEnd) {
         float t = (pos - rangeStart) / (rangeEnd - rangeStart);
-        extern const float g_blendCurveScale;   // @ 0x82029B20
+        extern const float g_blendCurveScale;   // @ 0x82079B20
         extern float g_blendCurveOffset;         // @ 0x825C8078 (.data)
         float blendVal = t * g_blendCurveScale + g_blendCurveOffset;
         float diff = blendVal - maxWeight;

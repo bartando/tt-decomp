@@ -44,10 +44,8 @@ extern uint8_t  lbl_826063B8[8];  /* SDA+25528 — creature manager slot */
 
 /* .data — UI/system singleton pointer slots */
 extern void* lbl_8271A328;  /* network timing / atSingleton / gameState ptr alias */
-extern void* lbl_8271A7B0;  /* network base/state ptr alias */
 extern void* lbl_8271A344;  /* rage::cmSampleCamActions ptr (RTTI name nearby) */
 extern void* lbl_8271A2E4;  /* game data manager slot */
-extern void* lbl_8271A2F0;  /* char view data slot */
 extern void* lbl_8271A378;  /* locomotion anim instance slot */
 extern void* lbl_8271A3A8;  /* vibration manager slot */
 
@@ -468,7 +466,7 @@ void* g_sda_base = NULL;
 // Command Line Globals
 // ============================================================================
 
-void* g_pCmdArgRegistry = NULL;
+void* g_pCmdArgRegistry = NULL;  // @ 0x825EBCF4  head of the command-line option list, built by static initialisers
 const char* g_pExeName = "default.xex";
 const char* g_empty_str = "";
 
@@ -720,8 +718,6 @@ void*     g_pGameStatePtr             = NULL;   // @ 0x8271A328
 void**    g_pInputArrayTable          = NULL;   // @ 0x825EAB28
 void**    g_pMessageQueuePool         = NULL;   // @ 0x825D128C
 void*     g_pNetworkBase              = NULL;   // @ 0x8271A7B0
-void*     g_pNetworkState             = NULL;   // @ 0x8271A7B0
-uint32_t* g_pNetworkStatePtr          = NULL;   // @ 0x8271A7B0
 void*     g_pNetworkTimer             = NULL;   // @ 0x8201A328
 void*     g_pPlayerArrayBase          = NULL;   // @ 0x8211A31C
 uint8_t*  g_pPlayerInputTable         = NULL;
@@ -905,6 +901,13 @@ TT_DATA_ALIAS("g_kGeomOffset", "g_pInputArrayTable");                         /*
 TT_DATA_ALIAS("g_pMatchState", "g_pCamShotMgr");                              /* 0x8271A318 */
 TT_DATA_ALIAS("g_pMatchConfig", "g_pCameraSharedState");                      /* 0x8271A32C */
 TT_DATA_ALIAS("g_pPlayerSlotLookup", "g_pCameraSharedState");
+TT_DATA_ALIAS("g_pNetworkState", "g_pNetworkBase");                            /* 0x8271A7B0 */
+TT_DATA_ALIAS("g_pNetworkStatePtr", "g_pNetworkBase");
+TT_DATA_ALIAS("g_playerDataArray", "g_pNetworkBase");
+TT_DATA_ALIAS("lbl_8271A7B0", "g_pNetworkBase");
+TT_DATA_ALIAS("lbl_8271A2F0", "g_charViewData_ptr");                          /* 0x8271A2F0 */
+TT_DATA_ALIAS("FloatAverager_vtable_4", "lbl_8207166C");                      /* 0x8207166C */
+TT_DATA_ALIAS("g_staticInitListHead", "g_pCmdArgRegistry");                  /* 0x825EBCF4 */
 TT_DATA_ALIAS("g_phActiveCameraPtr", "g_loop_obj_ptr");                        /* 0x825EAB30 */
 TT_DATA_ALIAS("g_phGlobalStatePtr", "g_rendererState");                        /* 0x8260641C */
 TT_DATA_ALIAS("g_phBoundTaperedCapsuleUpdateImpl", "g_display_obj_ptr");       /* 0x826066E4 */
