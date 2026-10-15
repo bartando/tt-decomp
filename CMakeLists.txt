@@ -154,6 +154,37 @@ set(SOURCES
     src/scene/sg_drawable.cpp
     src/scene/sg_physical.cpp
     src/scene/sg_scene_graph.cpp
+
+    # Definitions the link was missing: data from the image, small lifts,
+    # and bridges between spellings of one symbol
+    src/game/ball/ball_data.cpp
+    src/game/camera/camera_data.cpp
+    src/game/char_view/char_view_data.cpp
+    src/game/creature/creature_data.cpp
+    src/game/match/match_data.cpp
+    src/game/misc/misc_data.cpp
+    src/game/network/net_data.cpp
+    src/game/player/player_data.cpp
+    src/graphics/grc_data.cpp
+    src/physics/ph_data.cpp
+    src/rage/animation/anim_data.cpp
+    src/rage/audio/aud_data.cpp
+    src/rage/network/sn_data.cpp
+    src/rage/rage_data.cpp
+    src/xam/xam_data.cpp
+    src/link/linkage_bridges.cpp
+    src/rage/net/dat_bit_buffer.cpp
+    src/rage/core/debug_print_nops.cpp
+    src/rage/data/dat_parser_fields.cpp
+    src/rage/data/dat_resource_fixup.cpp
+    src/rage/network/sn_event.cpp
+    src/xam/kernel_import_thunks.c
+    src/rage/math/ph_math.cpp
+    src/game/input/button_edges.cpp
+    src/game/player/player_state_queries.cpp
+    src/game/misc/ccal_ring_buffer.cpp
+    src/game/misc/ccal_movie_player.cpp
+    src/game/network/xact_sink_forwards.cpp
 )
 
 # Create executable

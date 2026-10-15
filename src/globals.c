@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "globals.h"
+#include "link/tt_alias.h"
 
 // ============================================================================
 // Named externs for top-referenced raw addresses.
@@ -696,7 +697,7 @@ const float g_kMaxAdjustment       = 0.0f;  // @ 0x82079CD8
 const float g_kQuantScale1         = 0.0f;  // @ 0x82079FFC
 const float g_kQuantScale2         = 0.0f;  // @ 0x82079FF8
 const float g_kSpecialThreshold    = 0.0f;  // @ 0x825C8A50
-float       g_kTimingConstant      = 0.0f;  // @ 0x825C4930
+float       g_kTimingConstant      = 0.9f;  // @ 0x825C4930 (image: 0.9)
 const float g_kZeroThreshold       = 0.0f;  // @ 0x8202D108
 
 // Local user pointer
@@ -803,8 +804,8 @@ uint32_t g_sceneResetMatrix[4] = {0};      // @ 0x8261A0C0
 int32_t g_selectedCharacterIndex = -1;     // @ 0x825C76B8
 
 // Scene graph type IDs
-uint32_t g_sgNode_typeId       = 0;        // @ 0x825C93D0
-uint32_t g_sgRMDrawable_typeId = 0;        // @ 0x825C2D78
+uint32_t g_sgNode_typeId       = 0x825C93D0u;  // @ 0x825C93D0, holds its own address
+uint32_t g_sgRMDrawable_typeId = 0x825C2D78u;  // @ 0x825C2D78, holds its own address
 
 // Slow motion manager
 void* g_slowmo_manager_ptr = NULL;         // @ 0x825C6540
@@ -817,25 +818,8 @@ void* g_someRenderObj2 = NULL;             // @ 0x825FEAB0
 const char* g_stateName_attract  = "";     // @ 0x8205E094
 const char* g_stateName_charView = "";     // @ 0x8205EF5C
 
-// Game data error strings
-const char* g_str_gdLadder_duplicateLevel       = "";
-const char* g_str_gdLadder_missingLadder        = "";
-const char* g_str_gdLadder_unknownNodeType      = "";
-const char* g_str_gdRivalryData_noCharName      = "";
-const char* g_str_gdRivalryData_noRivalName     = "";
-const char* g_str_gdRivalryData_unknownRival    = "";
-const char* g_str_gdRivalry_duplicateChar       = "";
-const char* g_str_gdRivalry_missingRival        = "";
-const char* g_str_gdRivalry_unknownChar         = "";
-const char* g_str_gdRivalry_unknownNodeType     = "";
-const char* g_str_gdTierMember_noCharName       = "";
-const char* g_str_gdTierMember_unknownChar      = "";
-const char* g_str_gdTier_noTierName             = "";
-const char* g_str_gdTier_unknownNodeType        = "";
-
-// Pong strings
-const char* g_str_pongDrill_tooManySuccesses = "";
-const char* g_str_pongMover_calcInitMatrix   = "";
+// The gd* and pong error strings are defined, with their text, in
+// gd_data_strings.cpp and pong_strings.cpp.
 
 // Swipe patterns array
 struct SwipePattern g_swipePatterns[17] = {{0}};  // @ 0x825D09A0
@@ -888,3 +872,34 @@ uint32_t g_xmlNodeStruct_typeId2 = 0;      // @ 0x825C8038
 // Zero / constant floats
 const float g_zeroConstant = 0.0f;         // @ 0x8202D110
 const float g_zeroFloat    = 0.0f;         // @ 0x82079AD8
+
+// ============================================================================
+// Other names for the objects above
+// ============================================================================
+// Other files call some of these addresses by their own names. Each name is
+// the same object, not a copy.
+
+TT_DATA_ALIAS("g_netMessageHolderLiveCount_raw", "g_netMessageHolderCount");  /* 0x826066A4 */
+TT_DATA_ALIAS("g_defaultData16", "g_sceneResetMatrix");                       /* 0x8261A0C0 */
+TT_DATA_ALIAS("g_netMessageHolderBufferPrefix", "g_sceneResetMatrix");
+TT_DATA_ALIAS("g_unlockDialogParams", "g_sceneResetMatrix");
+TT_DATA_ALIAS("g_cameraLerpFlags", "g_cameraFlags");                          /* 0x826064D0 */
+TT_DATA_ALIAS("g_ReplayActive", "g_pauseFlag");                               /* 0x82606670 */
+TT_DATA_ALIAS("g_cameraMgrSingleton", "g_rendererState");                     /* 0x8260641C */
+TT_DATA_ALIAS("g_renderWorld", "g_rendererState");
+TT_DATA_ALIAS("lbl_8260641C", "g_rendererState");
+TT_DATA_ALIAS("g_eventHash_BallCollision", "g_sgNode_typeId");                /* 0x825C93D0 */
+TT_DATA_ALIAS("g_eventHash_BallSpin", "g_sgRMDrawable_typeId");               /* 0x825C2D78 */
+TT_DATA_ALIAS("g_pGrcDevice_beginScene", "g_ui_context");                     /* 0x8271A81C */
+TT_DATA_ALIAS("lbl_826064F4", "g_drawBucket");                                /* 0x826064F4 */
+TT_DATA_ALIAS("lbl_82606600", "g_globalStreamer");                            /* 0x82606600 */
+TT_DATA_ALIAS("lbl_825C4930", "g_kTimingConstant");                           /* 0x825C4930 */
+/* ph_physics.cpp declares the physics callbacks inside namespace rage */
+TT_DATA_ALIAS("_ZN4rage13g_phCallback0E", "g_phCallback0");                   /* 0x825EA900 */
+TT_DATA_ALIAS("_ZN4rage13g_phCallback1E", "g_phCallback1");
+TT_DATA_ALIAS("_ZN4rage13g_phCallback2E", "g_phCallback2");
+TT_DATA_ALIAS("_ZN4rage13g_phCallback3E", "g_phCallback3");
+TT_DATA_ALIAS("_ZN4rage13g_phCallback4E", "g_phCallback4");
+TT_DATA_ALIAS("_ZN4rage13g_phCallback5E", "g_phCallback5");
+/* swf.cpp declares the script object pool inside namespace rage */
+TT_DATA_ALIAS("_ZN4rage21g_swfScriptObjectPoolE", "g_swfScriptObjectPool");
