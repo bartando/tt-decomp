@@ -183,16 +183,16 @@ void* pcrFaceAnimBlender::StartPostPoint()
     // ── Resolve the active clip's data pointer ────────────────────────────
     //
     // The body-anim object maintains an array of clip entries.
-    // Each entry carries a sub-object at +16 that holds the clip data at +32.
-    // We need this pointer to key into the face-material hash table below.
-    void* clipData = nullptr;
+    // Each entry carries a sub-object at +16 that holds the clip name at +32.
+    // The name keys the face-material hash table below (a strcmp lookup).
+    const char* clipName = nullptr;
     int32_t clipIdx = animObj->m_activeClipIdx;
     if (clipIdx >= 0)
     {
         void*  clipEntry  = animObj->m_pClipArray[clipIdx];
         void*  clipSubObj = *reinterpret_cast<void**>(
                                 static_cast<char*>(clipEntry) + 16);
-        clipData          = *reinterpret_cast<void**>(
+        clipName          = *reinterpret_cast<const char**>(
                                 static_cast<char*>(clipSubObj) + 32);
     }
 
@@ -213,7 +213,7 @@ void* pcrFaceAnimBlender::StartPostPoint()
     // atHashMap_Find performs a hash-table lookup inside the
     // creature's face-material registry (an inline struct at cs+0xB0).
     // Returns a pointer to the matched value cell, or null on miss.
-    void* materialResult = atHashMap_Find(&cs->m_faceMaterial, clipData);
+    void* materialResult = atHashMap_Find(&cs->m_faceMaterial, clipName);
     if (!materialResult)
         return activationToken;
 
