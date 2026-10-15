@@ -1873,10 +1873,11 @@ extern fragCacheEntry* fragCachePool_Acquire(fragCachePool* pool);
 // @ 0x8212A700 (ph_A700) — binds the entry to the instance (entry+0x1B4 = inst,
 // inst+0x54 = entry). With a type, the last three go to ph_A808, which sets
 // bit `index` of the entry's bitset at +0x1CC when markIndex is set; without
-// one, arg5 and index are only stored at entry+0x1B8 / +0x1BC.
+// one, arg5 and index are only stored at entry+0x1B8 / +0x1BC. index comes
+// in r8 (stored with sth) and arg5 in r9.
 extern void fragCacheEntry_Init(fragCacheEntry* entry, fragTypeHolder* typeHolder, fragType* type,
-                                const float* matrix, pongCreatureInst* inst, void* arg5,
-                                uint16_t index, bool markIndex);
+                                const float* matrix, pongCreatureInst* inst, uint16_t index,
+                                void* arg5, bool markIndex);
 // @ 0x82120120 (fragInst_vfn_30), not lifted. Returns null unless flag 0x2 at
 // +0x50 is set, and the instance at once unless bit 0 of its fragType's byte
 // +0x1AF is set. Otherwise gets a cache entry through slot 43 if there is none
@@ -2070,8 +2071,10 @@ fragCacheEntry* pongCreatureInst::AcquireCacheEntry() {
         return nullptr;
     }
 
-    void* arg5 = GetPhysicsAllocator();  // vtable slot 53
-    fragCacheEntry_Init(entry, self->typeHolder, self->type, &self->matrix[0][0], this, arg5, 0xFF, false);
+    // The game's slot 53 (GetPhysicsAllocator); a C++ virtual call would use
+    // the header's slot order, which isn't the game's.
+    void* arg5 = VCALL(this, 53, void* (*)(pongCreatureInst*))(this);
+    fragCacheEntry_Init(entry, self->typeHolder, self->type, &self->matrix[0][0], this, 0xFF, arg5, false);
     return entry;
 }
 
