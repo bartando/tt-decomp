@@ -19,19 +19,6 @@ struct bpReplayBall {
 };
 extern void gdReplayMgr_RecordBallSample(void* replay, bpReplayBall* s);        // @ 0x821CD0F8
 
-extern double crt_sqrt(double x);                                              // @ 0x824301D0
-extern double crt_tan(double x);                                               // @ 0x82432628
-
-// The ball instance's physics object; slot 12 returns the gravity scale.
-struct bpPhysView {
-    void** vtable;
-};
-struct bpBallInstView {
-    uint32_t    _pad00;
-    bpPhysView* phys;     // +0x04
-};
-extern "C" bpBallInstView** g_ppBallInst;           // @ 0x8271A2F4
-
 extern "C" const uint32_t g_vectorComparisonMask[4];   // @ 0x82619BE0
 
 struct bpInputView {
@@ -315,59 +302,6 @@ void gdBallPredictData::CountBouncesSoFar(int* localSide, int* otherSide) {
 }
 
 namespace ballPredict {
-
-// @ 0x822832D0
-void ComputeAccel(bpVec4* out, const bpShotParams* params, const bpVec4* vel, const bpVec4* angVel) {
-    const bpVec4 v = *vel;
-    const bpVec4 w = *angVel;
-
-    // Magnus: angVel x vel. The w lane follows the vector code (0 for finite input).
-    bpVec4 a;
-    a.x = v.z * w.y - v.y * w.z;
-    a.y = v.x * w.z - v.z * w.x;
-    a.z = v.y * w.x - v.x * w.y;
-    a.w = v.w * w.w - v.w * w.w;
-    *out = a;
-
-    // No sideways lift once the ball travels more across the table than along it
-    // (|vx| >= |vz| * tan 60 deg).
-    float k = static_cast<float>(crt_tan(1.0471975430846214));
-    if (std::fabs(vel->x) >= std::fabs(vel->z) * k) {
-        out->x = 0.0f;
-        out->z = 0.0f;
-    }
-
-    const float speed2 = vel->x * vel->x + vel->y * vel->y + vel->z * vel->z;
-    const float kMagnus = 0.004f;
-    a = *out;
-    a.x *= kMagnus;
-    a.y *= kMagnus;
-    a.z *= kMagnus;
-    a.w *= kMagnus;
-    *out = a;
-
-    // Quadratic drag: a -= v * |v| * c.
-    if (speed2 > 1e-6f) {
-        const float c = (params->spinType == 10) ? 0.011f : 0.01f;
-        const float s = static_cast<float>(crt_sqrt(speed2)) * c;
-        a = *out;
-        a.x -= v.x * s;
-        a.y -= v.y * s;
-        a.z -= v.z * s;
-        a.w -= v.w * s;
-        *out = a;
-    }
-
-    bpPhysView* phys = (*g_ppBallInst)->phys;
-    const float g = reinterpret_cast<float (*)(bpPhysView*)>(phys->vtable[12])(phys);
-    a = *out;
-    a.y += -9.8f * g;
-    a.x += 0.0f * g;
-    a.z += 0.0f * g;
-    a.w += 0.0f * g;
-    *out = a;
-}
-
 
 // @ 0x821D4F80
 bool VecPairEqual(const bpVec4* a, const bpVec4* b) {
