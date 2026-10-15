@@ -317,8 +317,8 @@ struct msgMsgSink {
     uint8_t      _pad01A8[0x1B8];     // +0x01A8  padding to offset 0x360
     MsgSlot      m_slots[32];         // +0x0360  32 message slots (32 x 1152 = 36864 bytes)
     uint32_t     m_slotSentinel;      // +0x9360  sentinel after slot array
-    uint8_t      _pad9364[0x44];      // +0x9364  padding
-    uint32_t     m_tailSentinel;      // +0x93A8  tail sentinel
+    uint8_t      _pad9364[0x34];      // +0x9364  padding
+    uint32_t     m_tailSentinel;      // +0x9398  tail sentinel (ctor: stwx r10, r3, 0x9398)
     // NOTE: Old field_0x0a20..field_0x3c40 entries were all within the
     // m_slots[32] array region (0x360-0x9360) and are now accessed via
     // m_slots[N].m_fieldXX instead. Some (0x35a8 = offset 13736) map to

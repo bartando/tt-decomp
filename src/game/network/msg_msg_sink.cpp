@@ -39,6 +39,7 @@
  */
 
 #include "../misc/pong_misc.hpp"
+#include <cstddef>
 #include <cstring>
 
 // Xbox kernel critical-section stubs
@@ -60,17 +61,22 @@ static void* const kVtable_3E28            = (void*)0x82003E28;  // lbl_82003E28
 
 // Constant data addresses used by constructor
 extern const float  g_msgSinkInitFloat;   // @ 0x825C5938  initial float per slot
-extern const uint32_t g_msgSinkTemplate[4]; // @ 0x8241A0C0  16-byte template per slot
+extern const uint32_t g_msgSinkTemplate[4]; // @ 0x8261A0C0  16-byte template per slot (lis 0x8262 - 0x5F40;
+                                            // globals.c files it at 0x8241A0C0)
 
 /**
- * msgMsgSink::msgMsgSink() @ 0x822EC7F8 | size: 0x12C
+ * msgMsgSink::msgMsgSink() @ 0x822EC7F8 | size: 0x104
  *
  * Initializes the message sink:
  *   1. Sets vtable and sub-vtable pointer
  *   2. Zeroes control byte at +8, fields at +12 and +20
  *   3. Fills 32 message-slot entries (1152-byte stride) starting at offset +0x360
  *   4. Zeroes the 840-byte region at +0x18 through +0x35F (210 uint32s)
- *   5. Zeroes sentinel fields at +0x9360 and +0x93A8
+ *   5. Zeroes sentinel fields at +0x9360 and +0x9398
+ *
+ * The vtables it stores (0x8205B0D0 at +0, 0x8205B0DC at +4) are
+ * dialogManager's per RTTI, so this is really dialogManager's constructor
+ * with its msgMsgSink base at +4.
  */
 msgMsgSink::msgMsgSink()
 {
@@ -3682,3 +3688,488 @@ void game_9D28_h(void* self, uint32_t param) {
     (void)param;
 }
 
+
+// ============================================================================
+// XACT global settings (filed under msgMsgSink by the symbol map)
+// ============================================================================
+//
+// The functions below belong to the XACT 2 runtime the game links statically
+// (its xact2System wrapper logs "Unable to find global settings file '%s'"),
+// not to msgMsgSink:
+//
+//   * every block they allocate or free carries XALLOC allocator id 0x84,
+//     eXALLOCAllocatorId_XACT (attributes 0x2084xxxx). The game's XMemAlloc /
+//     XMemFree overrides (0x820C01B8 / 0x820C02D0) send ids 0x84 (XACT) and
+//     0x82 (XAudio) to the rage heap;
+//   * the engine's Initialize (vtable 0x82003DB0 slot 14, 0x82448558) takes
+//     an XACT_RUNTIME_PARAMETERS block, allocates a 0x94-byte object,
+//     constructs it with 0x8244B330 and passes it pGlobalSettingsBuffer,
+//     globalSettingsBufferSize, globalSettingsFlags & 1 (MANAGEDATA) and
+//     globalSettingsAllocAttributes through xactGlobalSettingsImage::Initialize;
+//   * the engine's GetCategory (slot 22, 0x82448728) and
+//     GetGlobalVariableIndex (slot 26, 0x82449798) are locked wrappers around
+//     FindCategory and FindVariable, and its DoWork (slot 16, 0x82449E28)
+//     asks HasInstanceRoom before it plays a waiting cue.
+//
+// XACT is built without RTTI, so these class names are descriptive.
+// xactGlobalSettings (vtable 0x820042C8, constructor 0x8244C6D8) owns the
+// runtime state; xactGlobalSettingsImage (vtable 0x82003E58, constructor
+// 0x8244B330) implements its accessor slots by reading the .xgs file image in
+// place. The engine keeps the object at +0x7C.
+
+struct xactGlobalSettings;
+struct xactGlobalRpc;  // 0x30 bytes, built by 0x8244BAA0 for each RPC whose parameter is above 2
+
+// The .xgs image is big-endian and packed; the PowerPC reads its fields with
+// plain unaligned lhz/lwz, so these records are declared packed.
+#pragma pack(push, 1)
+
+// File header. Offsets past +0x08 come from the image's accessor slots
+// (0x8244B380..0x8244B7A0) and from 0x8244CD40 / 0x8244B950, which size the
+// runtime state from the counts.
+struct xactGlobalSettingsHeader {
+    uint8_t  _00[0x08];                  // +0x00  signature and versions, not read here
+    uint8_t  flags;                      // +0x08  XGS_FLAG_*
+    uint16_t categoryCount;              // +0x09
+    uint16_t variableCount;              // +0x0B
+    uint16_t categoryNameBucketCount;    // +0x0D
+    uint16_t variableNameBucketCount;    // +0x0F
+    uint16_t rpcCount;                   // +0x11
+    uint16_t dspPresetCount;             // +0x13  non-zero: 0x8244B950 creates the DSP effect
+    uint16_t dspParameterCount;          // +0x15
+    uint32_t categoriesOffset;           // +0x17  10-byte category records (slot 1)
+    uint32_t variablesOffset;            // +0x1B  13-byte variable records (slot 2)
+    uint32_t categoryNameBucketsOffset;  // +0x1F  uint16_t per bucket: first entry, 0xFFFF = empty
+    uint32_t categoryNameEntriesOffset;  // +0x23  one xactNameEntry per category
+    uint32_t variableNameBucketsOffset;  // +0x27
+    uint32_t variableNameEntriesOffset;  // +0x2B  one xactNameEntry per variable
+    uint8_t  _2F[0x08];                  // +0x2F
+    uint32_t rpcsOffset;                 // +0x37  first xactRpcRecord
+};
+
+// Friendly-name hash entry; entry i names category (or variable) i.
+struct xactNameEntry {
+    uint32_t nameOffset;  // +0x00  string offset, resolved by slot 14 / 17
+    uint16_t next;        // +0x04  next entry in the bucket, 0xFFFF ends the chain
+};
+
+// Runtime parameter control curve: a 5-byte head, then pointCount 9-byte
+// points.
+struct xactRpcRecord {
+    uint16_t _00;         // +0x00  not read here
+    uint8_t  pointCount;  // +0x02
+    uint16_t parameter;   // +0x03
+};
+
+// Head of a sound bank's sound record.
+struct xactSoundRecord {
+    uint8_t  _00;       // +0x00  not read here
+    uint16_t category;  // +0x01  0xFFFF = none
+};
+
+#pragma pack(pop)
+
+static_assert(offsetof(xactGlobalSettingsHeader, rpcsOffset) == 0x37, "xgs header layout");
+static_assert(sizeof(xactNameEntry) == 6, "6-byte name entries (0x8244B3E8 multiplies by 6)");
+static_assert(sizeof(xactRpcRecord) == 5, "5-byte RPC head (0x8244B870 adds 5 + 9 * points)");
+
+static const uint8_t XGS_FLAG_CATEGORY_NAMES = 0x01;  // category name table present
+static const uint8_t XGS_FLAG_VARIABLE_NAMES = 0x02;  // variable name table present
+
+static const uint16_t XACTINDEX_INVALID = 0xFFFF;
+
+// XALLOC attributes of the per-category arrays (0x8244CD40) and the list
+// chunks: allocator id 0x84, XACT.
+static const uint32_t kXactAllocAttributes = 0x20840001;
+
+static const uintptr_t kXactGlobalSettingsVtbl      = 0x820042C8;
+static const uintptr_t kXactGlobalSettingsImageVtbl = 0x82003E58;
+static const uintptr_t kXactGlobalVariableVtbl      = 0x82003E54;  // its base's is kVtable_3DC8
+
+// @ 0x820C02D0 — the game's XMemFree override, called _locale_register
+// elsewhere in this file.
+extern void XMemFree(void* address, uint32_t allocAttributes);
+
+// @ 0x82448290 (msgMsgSink_8290_v12) — friendly-name bucket: h = 3h + (h >> 1)
+// + (signed char)c over the string in 16 bits, then h % bucketCount. Takes the
+// engine as `this` without reading it.
+extern uint32_t msgMsgSink_8290_v12(void* engine, const char* name, uint16_t bucketCount);
+
+// The engine's effect factory at engine+0x0C (built in Initialize by
+// 0x8244C630). 0x8244B950 creates the global DSP effect through slot 2.
+struct xactEffectFactory {
+    struct Vtbl {
+        void* _slot0;
+        void* _slot1;
+        int32_t (*CreateEffect)(xactEffectFactory* self, void** outEffect);  // 2
+        void* _slot3;
+        void (*ReleaseEffect)(xactEffectFactory* self, void* effect);        // 4
+    };
+    const Vtbl* vtbl;
+};
+
+// The engine (vtable 0x82003DB0), reduced to what these methods touch.
+struct xactEngine {
+    const void*         vtbl;            // +0x00
+    uint8_t             _04[0x08];
+    xactEffectFactory*  effectFactory;   // +0x0C
+    uint8_t             _10[0x6C];
+    xactGlobalSettings* globalSettings;  // +0x7C
+    uint8_t             _80[0x10];
+    uint8_t             lock[0x1C];      // +0x90  CRITICAL_SECTION taken by the public calls
+};
+
+// Sound bank side of a cue (assumed): only the per-cue instance counters are read.
+struct xactSoundBank {
+    uint8_t  _000[0xF8];
+    int32_t* cueInstanceCounts;  // +0xF8  indexed by cue index
+};
+
+struct xactSound {
+    uint8_t                _00[0x1C];
+    const xactSoundRecord* record;  // +0x1C
+};
+
+// A cue the engine wants to start. Its slot 0 is IXACTCue::Play, which DoWork
+// calls once HasInstanceRoom lets the cue through.
+struct xactCue {
+    struct Vtbl {
+        void* _slots0to24[25];
+        const uint8_t* (*GetInstanceLimit)(xactCue* self);  // 25  byte 0: maximum instances (assumed)
+        int32_t (*HasInstanceLimit)(xactCue* self);         // 26
+    };
+    const Vtbl*    vtbl;       // +0x000
+    uint8_t        _004[0x30];
+    xactSound*     sound;      // +0x034  null when the cue has no sound to play
+    uint8_t        _038[0xE4];
+    xactSoundBank* soundBank;  // +0x11C
+    uint8_t        _120[0x04];
+    uint16_t       cueIndex;   // +0x124
+};
+
+// Pointer list with its own node pool: 16 nodes live inline, more come in
+// chunks from XMemAlloc. 0x8244C158 sets it up; 0x8244EF40 unlinks a node and
+// returns it to the free list.
+struct xactPtrListNode {
+    void*            value;  // +0x00
+    xactPtrListNode* next;   // +0x04  also links the free list
+    xactPtrListNode* prev;   // +0x08
+};
+
+struct xactPtrListChunk {
+    xactPtrListChunk* next;       // +0x00
+    xactPtrListNode   nodes[16];  // +0x04
+};
+
+struct xactPtrList {
+    xactPtrListNode*  freeNodes;    // +0x00
+    xactPtrListChunk* chunks;       // +0x04  inlineChunk is always on it
+    xactPtrListChunk  inlineChunk;  // +0x08
+    xactPtrListNode*  head;         // +0xCC
+    xactPtrListNode*  tail;         // +0xD0
+    uint32_t          count;        // +0xD4
+
+    // @ 0x8244EA00 (msgMsgSink_EA00) — XMemFree every chunk except inlineChunk
+    void FreeChunks();
+};
+
+// Runtime state of one global variable (0xFC bytes, vtable 0x82003E54;
+// constructor 0x8244B230, filled in by 0x8244B008). xactGlobalSettings keeps
+// them in a new[] array with one per header variableCount.
+struct xactGlobalVariable {
+    const void*         vtbl;       // +0x00
+    xactGlobalVariable* linkNext;   // +0x04  base (vtable 0x82003DC8): circular links,
+    xactGlobalVariable* linkPrev;   // +0x08  pointing at itself when unlinked
+    xactEngine*         engine;     // +0x0C
+    const uint8_t*      record;     // +0x10  13-byte variable record: flags, then the initial value
+    float               value;      // +0x14  starts at the record's initial value
+    xactPtrList         listeners;  // +0x18  objects bound to this variable; an xactGlobalRpc's
+                                    //        destructor (0x82453108) unlinks itself from here
+    uint32_t            _F0;        // +0xF0
+    uint16_t            index;      // +0xF4  0xFFFF until 0x8244B008
+    uint32_t            _F8;        // +0xF8
+
+    void Dtor();
+};
+
+// vtable of xactGlobalSettings (0x820042C8, accessors pure) and
+// xactGlobalSettingsImage (0x82003E58). Bodies listed are the image's.
+struct xactGlobalSettingsVtbl {
+    void* (*ScalarDeletingDtor)(xactGlobalSettings* self, uint32_t flags);  // 0  0x8244D2B8 / 0x8244BCF8
+    const uint8_t* (*GetCategoryRecord)(xactGlobalSettings* self, uint16_t category);  // 1  0x8244B508
+    const uint8_t* (*GetVariableRecord)(xactGlobalSettings* self, uint16_t variable);  // 2  0x8244B568
+    const char* (*GetString)(xactGlobalSettings* self, uint32_t offset);    // 3  0x8244B7A0  image + offset
+    uint8_t (*GetCategoryMaxInstances)(xactGlobalSettings* self, uint16_t category);   // 4  0x8244B5C0  0xFF = no limit
+    uint32_t (*GetCategoryField5)(xactGlobalSettings* self, uint16_t category);        // 5  0x8244B5F0  (record[5] >> 3) & 7
+    uint16_t (*GetCategoryParent)(xactGlobalSettings* self, uint16_t category);        // 6  0x8244B628  0xFFFF = none
+    uint8_t (*GetCategoryVolume)(xactGlobalSettings* self, uint16_t category);         // 7  0x8244B658
+    int32_t (*GetCategoryFlag0)(xactGlobalSettings* self, uint16_t category);          // 8  0x8244B758  record[9] bit 0
+    uint16_t (*CategoryOfNameEntry)(xactGlobalSettings* self, const xactNameEntry* entry);  // 9   0x8244B688
+    uint16_t (*VariableOfNameEntry)(xactGlobalSettings* self, const xactNameEntry* entry);  // 10  0x8244B6F0
+    const xactGlobalSettingsHeader* (*GetHeader)(xactGlobalSettings* self);                // 11  0x8244B380
+    const uint16_t* (*GetCategoryNameBuckets)(xactGlobalSettings* self);                   // 12  0x8244B388
+    const xactNameEntry* (*GetCategoryNameEntry)(xactGlobalSettings* self, uint16_t index);  // 13  0x8244B3E8
+    const char* (*GetCategoryName)(xactGlobalSettings* self, uint32_t nameOffset);         // 14  body not identified
+    const uint16_t* (*GetVariableNameBuckets)(xactGlobalSettings* self);                   // 15  0x8244B448
+    const xactNameEntry* (*GetVariableNameEntry)(xactGlobalSettings* self, uint16_t index);  // 16  0x8244B4A8
+    const char* (*GetVariableName)(xactGlobalSettings* self, uint32_t nameOffset);         // 17  body not identified
+};
+
+struct xactGlobalSettings {
+    const xactGlobalSettingsVtbl* vtbl;      // +0x00
+    xactEngine*         engine;              // +0x04
+    void*               dspEffect;           // +0x08  from engine->effectFactory (0x8244B950)
+    uint32_t            dspParameters[22];   // +0x0C  13 integers then 9 floats, set one at a time by
+                                             //        0x8244C790 and handed to the effect's slot 0
+    uint16_t            dspRpcCount;         // +0x64  RPCs whose parameter is above 2
+    int32_t*            categoryInstanceCounts;  // +0x68  per category
+    uint32_t*           categoryState6C;     // +0x6C  per category, zeroed by 0x8244CD40
+    uint32_t*           categoryState70;     // +0x70  per category, zeroed by 0x8244CD40
+    uint32_t            _74;                 // +0x74
+    float*              categoryVolumes;     // +0x78  per category: its volume byte looked up in the
+                                             //        256-float table at 0x82003EC8
+    xactGlobalVariable* variables;           // +0x7C  new[], header variableCount entries
+    xactGlobalRpc*      dspRpcs;             // +0x80  new[] by 0x8244BAA0, dspRpcCount entries
+
+    // Virtual (slot 11): the image's header.
+    const xactGlobalSettingsHeader* Header() { return vtbl->GetHeader(this); }
+
+    // @ 0x8244CD40 (msgMsgSink_CD40_w) — allocates the per-category arrays and
+    // the variables; returns E_OUTOFMEMORY or S_OK
+    int32_t CreateRuntimeState();
+
+    void     Dtor();
+    uint16_t FindCategory(const char* name);
+    uint16_t FindVariable(const char* name);
+    bool     HasInstanceRoom(xactCue* cue);
+};
+
+struct xactGlobalSettingsImage : xactGlobalSettings {
+    const uint8_t* image;            // +0x84  the .xgs file (pGlobalSettingsBuffer)
+    uint32_t       allocAttributes;  // +0x88  globalSettingsAllocAttributes
+    uint32_t       imageSize;        // +0x8C  globalSettingsBufferSize
+    uint32_t       ownsImage;        // +0x90  MANAGEDATA: XMemFree the image on destruction
+
+    int32_t Initialize(const void* data, uint32_t size, uint32_t owns, uint32_t attributes);
+    void    Dtor();
+};
+
+// delete[] of an array whose element type has a virtual destructor, as MSVC
+// expands it: the element count is in the word before element 0. A non-empty
+// array is destroyed and freed by element 0's vector deleting destructor
+// (flags 3), called through the vfptr of the base that declares the
+// destructor, vfptrOffset bytes into the element. An empty array has nothing
+// to dispatch through, so its block goes straight to operator delete
+// (0x820C0120, a branch to rage_free).
+static void DeleteVirtualArray(void* first, uint32_t vfptrOffset) {
+    int32_t* cookie = static_cast<int32_t*>(first) - 1;
+    if (*cookie != 0) {
+        void* base = static_cast<uint8_t*>(first) + vfptrOffset;
+        using VectorDeletingDtor = void* (*)(void* self, uint32_t flags);
+        VectorDeletingDtor dtor = reinterpret_cast<VectorDeletingDtor>((*static_cast<void***>(base))[0]);
+        dtor(base, 3);
+    } else {
+        rage_free(cookie);
+    }
+}
+
+/**
+ * xactGlobalVariable::Dtor @ 0x8244B2A8 | size: 0x84  (was msgMsgSink_B2A8_fw)
+ *
+ * Non-deleting destructor; its vector deleting destructor (0x8244D0B8) runs
+ * it on each element. Hands every node still on the listener list back to
+ * the free list, clears the tail and count, frees the extra node chunks and
+ * drops to the list-node base's vtable.
+ */
+void xactGlobalVariable::Dtor() {
+    vtbl = reinterpret_cast<const void*>(kXactGlobalVariableVtbl);
+
+    xactPtrList& list = listeners;
+    while (list.head != nullptr) {
+        xactPtrListNode* node = list.head;
+        xactPtrListNode* next = node->next;
+        node->next = list.freeNodes;
+        list.freeNodes = node;
+        list.head = next;
+    }
+    list.count = 0;
+    list.tail = nullptr;
+    list.FreeChunks();
+
+    vtbl = kVtable_3DC8;
+}
+
+/**
+ * xactGlobalSettingsImage::Initialize @ 0x8244B870 | size: 0xE0  (was msgMsgSink_B870_w)
+ *
+ * Takes the .xgs image from XACT_RUNTIME_PARAMETERS, counts the RPCs whose
+ * parameter is above 2 (0x8244BAA0 later builds one xactGlobalRpc for each)
+ * and allocates the runtime state. Returns that allocation's HRESULT.
+ */
+int32_t xactGlobalSettingsImage::Initialize(const void* data, uint32_t size, uint32_t owns,
+                                            uint32_t attributes) {
+    ownsImage = owns;
+    allocAttributes = attributes;
+    imageSize = size;
+    image = static_cast<const uint8_t*>(data);
+
+    if (Header()->rpcCount != 0) {
+        (void)Header();  // fetched and dropped in the original
+        const uint8_t* rpc = static_cast<const uint8_t*>(data) + Header()->rpcsOffset;
+        dspRpcCount = 0;
+
+        for (uint16_t i = 0; i < Header()->rpcCount; ++i) {
+            const xactRpcRecord* record = reinterpret_cast<const xactRpcRecord*>(rpc);
+            if (record->parameter > 2)
+                ++dspRpcCount;
+            rpc += 5 + 9 * record->pointCount;
+        }
+    }
+
+    return CreateRuntimeState();
+}
+
+/**
+ * xactGlobalSettingsImage::Dtor @ 0x8244B7E0 | size: 0x90  (was msgMsgSink_B7E0_v12)
+ *
+ * Non-deleting destructor; the deleting one (slot 0, 0x8244BCF8) frees the
+ * object with attributes 0x20848020. Deletes the DSP RPC array, frees the
+ * image if the engine was given ownership of it, then runs the base
+ * destructor.
+ */
+void xactGlobalSettingsImage::Dtor() {
+    vtbl = reinterpret_cast<const xactGlobalSettingsVtbl*>(kXactGlobalSettingsImageVtbl);
+
+    // xactGlobalRpc's destructor is declared by its second base, whose vfptr
+    // is at +4 (vtable 0x82004A48: slot 0 steps back 4 bytes and runs the
+    // array's vector deleting destructor, 0x8244BC40).
+    if (dspRpcs != nullptr)
+        DeleteVirtualArray(dspRpcs, 4);
+
+    if (ownsImage)
+        XMemFree(const_cast<uint8_t*>(image), allocAttributes);
+
+    xactGlobalSettings::Dtor();
+}
+
+/**
+ * xactGlobalSettings::Dtor @ 0x8244C980 | size: 0xFC  (was msgMsgSink_C980_v12)
+ *
+ * Non-deleting destructor (the deleting one is slot 0, 0x8244D2B8). Releases
+ * the DSP effect through the engine's effect factory, frees the per-category
+ * arrays and deletes the variables.
+ */
+void xactGlobalSettings::Dtor() {
+    vtbl = reinterpret_cast<const xactGlobalSettingsVtbl*>(kXactGlobalSettingsVtbl);
+
+    if (dspEffect != nullptr) {
+        xactEffectFactory* factory = engine->effectFactory;
+        factory->vtbl->ReleaseEffect(factory, dspEffect);
+        dspEffect = nullptr;
+    }
+
+    if (categoryInstanceCounts != nullptr)
+        XMemFree(categoryInstanceCounts, kXactAllocAttributes);
+    if (categoryVolumes != nullptr)
+        XMemFree(categoryVolumes, kXactAllocAttributes);
+    if (categoryState70 != nullptr)
+        XMemFree(categoryState70, kXactAllocAttributes);
+    if (categoryState6C != nullptr)
+        XMemFree(categoryState6C, kXactAllocAttributes);
+
+    // The variables' vector deleting destructor (0x8244D0B8) runs
+    // xactGlobalVariable::Dtor on each and frees the block (attributes 0x20840051).
+    if (variables != nullptr)
+        DeleteVirtualArray(variables, 0);
+}
+
+/**
+ * xactGlobalSettings::FindCategory @ 0x8244CA80 | size: 0x150  (was msgMsgSink_CA80_v12)
+ *
+ * Category index for a friendly name, or XACTINDEX_INVALID when the image
+ * has no category names or none matches. Looks the name up in the image's
+ * hash table under the engine lock. The original returns -1 in a full
+ * register; callers only look at the low 16 bits.
+ */
+uint16_t xactGlobalSettings::FindCategory(const char* name) {
+    void* lock = engine->lock;
+    RtlEnterCriticalSection(lock);
+
+    uint16_t category = XACTINDEX_INVALID;
+    if (Header()->flags & XGS_FLAG_CATEGORY_NAMES) {
+        const uint16_t* buckets = vtbl->GetCategoryNameBuckets(this);
+        uint32_t bucket = msgMsgSink_8290_v12(engine, name, Header()->categoryNameBucketCount);
+
+        for (uint16_t i = buckets[static_cast<uint16_t>(bucket)]; i != 0xFFFF;) {
+            const xactNameEntry* entry = vtbl->GetCategoryNameEntry(this, i);
+            if (strcmp(name, vtbl->GetCategoryName(this, entry->nameOffset)) == 0) {  // inlined
+                category = vtbl->CategoryOfNameEntry(this, entry);
+                break;
+            }
+            i = entry->next;
+        }
+    }
+
+    RtlLeaveCriticalSection(lock);
+    return category;
+}
+
+/**
+ * xactGlobalSettings::FindVariable @ 0x8244CBD0 | size: 0x170  (was msgMsgSink_CBD0_v12)
+ *
+ * FindCategory for global variables: also gives up when the image has no
+ * variables. GetGlobalVariableIndex then rejects a variable whose record
+ * lacks flag 0x01 or has 0x04 (XACT's public and per-cue-instance bits,
+ * assumed).
+ */
+uint16_t xactGlobalSettings::FindVariable(const char* name) {
+    void* lock = engine->lock;
+    RtlEnterCriticalSection(lock);
+
+    uint16_t variable = XACTINDEX_INVALID;
+    if ((Header()->flags & XGS_FLAG_VARIABLE_NAMES) && Header()->variableCount != 0) {
+        const uint16_t* buckets = vtbl->GetVariableNameBuckets(this);
+        uint32_t bucket = msgMsgSink_8290_v12(engine, name, Header()->variableNameBucketCount);
+
+        for (uint16_t i = buckets[static_cast<uint16_t>(bucket)]; i != 0xFFFF;) {
+            const xactNameEntry* entry = vtbl->GetVariableNameEntry(this, i);
+            if (strcmp(name, vtbl->GetVariableName(this, entry->nameOffset)) == 0) {  // inlined
+                variable = vtbl->VariableOfNameEntry(this, entry);
+                break;
+            }
+            i = entry->next;
+        }
+    }
+
+    RtlLeaveCriticalSection(lock);
+    return variable;
+}
+
+/**
+ * xactGlobalSettings::HasInstanceRoom @ 0x8244DA40 | size: 0x118  (was msgMsgSink_DA40_p33)
+ *
+ * Whether a waiting cue may start: false when the cue limits its own
+ * instances and that many are playing, or when its sound's category or any
+ * parent category is at its instance limit (0xFF = no limit). Both counts
+ * are compared signed.
+ */
+bool xactGlobalSettings::HasInstanceRoom(xactCue* cue) {
+    if (cue->vtbl->HasInstanceLimit(cue) != 0) {
+        int32_t playing = cue->soundBank->cueInstanceCounts[cue->cueIndex];
+        if (playing >= *cue->vtbl->GetInstanceLimit(cue))
+            return false;
+    }
+
+    if (cue->sound == nullptr)
+        return true;
+
+    for (uint16_t category = cue->sound->record->category; category != 0xFFFF;
+         category = vtbl->GetCategoryParent(this, category)) {
+        if (vtbl->GetCategoryMaxInstances(this, category) != 0xFF) {
+            int32_t playing = categoryInstanceCounts[category];
+            if (playing >= vtbl->GetCategoryMaxInstances(this, category))
+                return false;
+        }
+    }
+    return true;
+}
