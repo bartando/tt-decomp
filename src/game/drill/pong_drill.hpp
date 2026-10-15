@@ -10,15 +10,22 @@
  *       Cross-ref recomp/structured_pass5_final/ for each method.
  */
 #pragma once
+#include <stddef.h>
 #include <stdint.h>
+
+// Structs below that carry the game's vtable as an explicit `vtable` member
+// list their slots as plain (non-virtual) methods: a C++ virtual would add a
+// hidden vptr in front of `vtable` and shift every member by 4. The drill
+// classes (pongTrainingDrill and subclasses) are real C++ polymorphic classes
+// whose virtuals are declared in the game's slot order.
 
 // ── backspinTipData  [2 vtables — template/MI] ──────────────────────────
 struct backspinTipData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x821f2910
-    virtual void PostLoadChildren();  // [22] @ 0x821161c0
+    void PostLoadProperties();  // [20] @ 0x821f2910
+    void PostLoadChildren();  // [22] @ 0x821161c0
 };
 
 // ── badSoftShotTipData  [2 vtables — template/MI] ──────────────────────────
@@ -26,10 +33,10 @@ struct badSoftShotTipData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void CallInit();  // [2] @ 0x821f28c0
-    virtual void PostLoadProperties();  // [20] @ 0x821f2858
-    virtual void Validate();  // [21] @ 0x821f28a0
-    virtual void PostLoadChildren();  // [22] @ 0x821160e8
+    void CallInit();  // [2] @ 0x821f28c0
+    void PostLoadProperties();  // [20] @ 0x821f2858
+    void Validate();  // [21] @ 0x821f28a0
+    void PostLoadChildren();  // [22] @ 0x821160e8
 };
 
 // ── firstServeTipData  [2 vtables — template/MI] ──────────────────────────
@@ -37,8 +44,8 @@ struct firstServeTipData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x821f2958
-    virtual void PostLoadChildren();  // [22] @ 0x82116288
+    void PostLoadProperties();  // [20] @ 0x821f2958
+    void PostLoadChildren();  // [22] @ 0x82116288
 };
 
 // ── focusMeterTipData  [2 vtables — template/MI] ──────────────────────────
@@ -46,10 +53,10 @@ struct focusMeterTipData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void CallInit();  // [2] @ 0x821f2550
-    virtual void PostLoadProperties();  // [20] @ 0x821f2498
-    virtual void Validate();  // [21] @ 0x821f24e0
-    virtual void PostLoadChildren();  // [22] @ 0x82115d90
+    void CallInit();  // [2] @ 0x821f2550
+    void PostLoadProperties();  // [20] @ 0x821f2498
+    void Validate();  // [21] @ 0x821f24e0
+    void PostLoadChildren();  // [22] @ 0x82115d90
 };
 
 // ── forcedFromTableCenterTipData  [2 vtables — template/MI] ──────────────────────────
@@ -57,10 +64,10 @@ struct forcedFromTableCenterTipData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void CallInit();  // [2] @ 0x821f2628
-    virtual void PostLoadProperties();  // [20] @ 0x821f25c0
-    virtual void Validate();  // [21] @ 0x821f2608
-    virtual void PostLoadChildren();  // [22] @ 0x82115e68
+    void CallInit();  // [2] @ 0x821f2628
+    void PostLoadProperties();  // [20] @ 0x821f25c0
+    void Validate();  // [21] @ 0x821f2608
+    void PostLoadChildren();  // [22] @ 0x82115e68
 };
 
 // ── gdDrillChargingData  [vtable @ 0x82041264] ──────────────────────────
@@ -69,9 +76,9 @@ struct gdDrillChargingData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x821df330
-    virtual void Validate();  // [21] @ 0x821df448
-    virtual void PostLoadChildren();  // [22] @ 0x821df388
+    void PostLoadProperties();  // [20] @ 0x821df330
+    void Validate();  // [21] @ 0x821df448
+    void PostLoadChildren();  // [22] @ 0x821df388
 
 };
 
@@ -81,9 +88,9 @@ struct gdDrillCounterSpinData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x821df9b8
-    virtual void Validate();  // [21] @ 0x821dfac8
-    virtual void PostLoadChildren();  // [22] @ 0x821dfa10
+    void PostLoadProperties();  // [20] @ 0x821df9b8
+    void Validate();  // [21] @ 0x821dfac8
+    void PostLoadChildren();  // [22] @ 0x821dfa10
 
 };
 
@@ -93,8 +100,8 @@ struct gdDrillFocusShotData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x821df7a8
-    virtual void PostLoadChildren();  // [22] @ 0x821df800
+    void PostLoadProperties();  // [20] @ 0x821df7a8
+    void PostLoadChildren();  // [22] @ 0x821df800
 
 };
 
@@ -104,9 +111,9 @@ struct gdDrillMovementData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x821de898
-    virtual void Validate();  // [21] @ 0x821de9c8
-    virtual void PostLoadChildren();  // [22] @ 0x821de8f0
+    void PostLoadProperties();  // [20] @ 0x821de898
+    void Validate();  // [21] @ 0x821de9c8
+    void PostLoadChildren();  // [22] @ 0x821de8f0
 
 };
 
@@ -115,8 +122,8 @@ struct gdDrillPlacementData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x821def48
-    virtual void PostLoadChildren();  // [22] @ 0x821defa0
+    void PostLoadProperties();  // [20] @ 0x821def48
+    void PostLoadChildren();  // [22] @ 0x821defa0
 };
 
 // ── gdDrillReturnData  [vtable @ 0x8204112C] ──────────────────────────
@@ -124,8 +131,8 @@ struct gdDrillReturnData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x821dee70
-    virtual void PostLoadChildren();  // [22] @ 0x821deec8
+    void PostLoadProperties();  // [20] @ 0x821dee70
+    void PostLoadChildren();  // [22] @ 0x821deec8
 };
 
 // ── gdDrillServeMeterData  [vtable @ 0x8204105C] ──────────────────────────
@@ -133,9 +140,9 @@ struct gdDrillServeMeterData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x821dec00
-    virtual void Validate();  // [21] @ 0x821dece8
-    virtual void PostLoadChildren();  // [22] @ 0x821dec58
+    void PostLoadProperties();  // [20] @ 0x821dec00
+    void Validate();  // [21] @ 0x821dece8
+    void PostLoadChildren();  // [22] @ 0x821dec58
 };
 
 // ── gdDrillSmashData  [vtable @ 0x82041404] ──────────────────────────
@@ -143,8 +150,8 @@ struct gdDrillSmashData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x821dfcb8
-    virtual void PostLoadChildren();  // [22] @ 0x821dfd10
+    void PostLoadProperties();  // [20] @ 0x821dfcb8
+    void PostLoadChildren();  // [22] @ 0x821dfd10
 };
 
 // ── gdDrillSoftShotData  [vtable @ 0x820411FC] ──────────────────────────
@@ -153,9 +160,9 @@ struct gdDrillSoftShotData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x821df020
-    virtual void Validate();  // [21] @ 0x821df130
-    virtual void PostLoadChildren();  // [22] @ 0x821df078
+    void PostLoadProperties();  // [20] @ 0x821df020
+    void Validate();  // [21] @ 0x821df130
+    void PostLoadChildren();  // [22] @ 0x821df078
 
 };
 
@@ -165,9 +172,9 @@ struct gdDrillSpinData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x821df610
-    virtual void Validate();  // [21] @ 0x821df898
-    virtual void PostLoadChildren();  // [22] @ 0x821df668
+    void PostLoadProperties();  // [20] @ 0x821df610
+    void Validate();  // [21] @ 0x821df898
+    void PostLoadChildren();  // [22] @ 0x821df668
 
 };
 
@@ -177,10 +184,10 @@ struct gdTrainingDrillData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~gdTrainingDrillData();                  // [0] @ 0x821dfd90
-    virtual void PostLoadProperties();  // [20] @ 0x821de2d8
-    virtual void Validate();  // [21] @ 0x821de3c0
-    virtual void PostLoadChildren();  // [22] @ 0x821de320
+    ~gdTrainingDrillData();                  // [0] @ 0x821dfd90
+    void PostLoadProperties();  // [20] @ 0x821de2d8
+    void Validate();  // [21] @ 0x821de3c0
+    void PostLoadChildren();  // [22] @ 0x821de320
 
     // ── non-virtual methods (from debug strings) ──
     void Load();
@@ -191,8 +198,8 @@ struct gdTrainingDrills {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x821de200
-    virtual void PostLoadChildren();  // [22] @ 0x821de248
+    void PostLoadProperties();  // [20] @ 0x821de200
+    void PostLoadChildren();  // [22] @ 0x821de248
 };
 
 // ── gdTrainingSaveData  [2 vtables — template/MI] ──────────────────────────
@@ -200,8 +207,8 @@ struct gdTrainingSaveData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~gdTrainingSaveData();                  // [0] @ 0x821cacd8
-    virtual void Init();  // [3] @ 0x82212ff0
+    ~gdTrainingSaveData();                  // [0] @ 0x821cacd8
+    void Init();  // [3] @ 0x82212ff0
 };
 
 // ── gdTrainingSaveValues  [vtable @ 0x8204A870] ──────────────────────────
@@ -228,11 +235,11 @@ struct hitTipData {
     int32_t     m_enabled;                // +0x20 (32) — Active flag, registered as "Active"
 
     // ── virtual methods ──
-    virtual ~hitTipData();                          // [0] @ 0x821F2AB8
-    virtual void PostLoadProperties();              // [2] @ 0x821F2298
-    virtual bool IsApplicable(uint32_t typeHash);   // [20] @ 0x821F2188
-    virtual void LoadProperties();                  // [21] @ 0x821F21D0
-    virtual const char* GetNodeTypeName();          // [22] @ 0x82115BD8
+    ~hitTipData();                          // [0] @ 0x821F2AB8
+    void PostLoadProperties();              // [2] @ 0x821F2298
+    bool IsApplicable(uint32_t typeHash);   // [20] @ 0x821F2188
+    void LoadProperties();                  // [21] @ 0x821F21D0
+    const char* GetNodeTypeName();          // [22] @ 0x82115BD8
 };
 
 
@@ -243,7 +250,7 @@ struct xmlNodeStructGroupType {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnStart();  // [5] @ 0x821f2148
+    void OnStart();  // [5] @ 0x821f2148
 };
 
 } // namespace hitTipDataInner
@@ -253,10 +260,10 @@ struct noSoftShotsTipData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void CallInit();  // [2] @ 0x821f2730
-    virtual bool PostLoadProperties(uint32_t typeHash);  // [20] @ 0x821f2678
-    virtual void Validate();  // [21] @ 0x821f26c0
-    virtual void PostLoadChildren();  // [22] @ 0x82115f38
+    void CallInit();  // [2] @ 0x821f2730
+    bool PostLoadProperties(uint32_t typeHash);  // [20] @ 0x821f2678
+    void Validate();  // [21] @ 0x821f26c0
+    void PostLoadChildren();  // [22] @ 0x82115f38
 };
 
 // ── reviewOnlyTipData  [2 vtables — template/MI] ──────────────────────────
@@ -264,10 +271,10 @@ struct reviewOnlyTipData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void CallInit();  // [2] @ 0x821f2a68
-    virtual void PostLoadProperties();  // [20] @ 0x821f29a0
-    virtual void Validate();  // [21] @ 0x821f2a48
-    virtual void PostLoadChildren();  // [22] @ 0x82116358
+    void CallInit();  // [2] @ 0x821f2a68
+    void PostLoadProperties();  // [20] @ 0x821f29a0
+    void Validate();  // [21] @ 0x821f2a48
+    void PostLoadChildren();  // [22] @ 0x82116358
 };
 
 // ── serveTipData  [2 vtables — template/MI] ──────────────────────────
@@ -275,10 +282,10 @@ struct serveTipData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void CallInit();  // [2] @ 0x821f2410
-    virtual void PostLoadProperties();  // [20] @ 0x821f2320
-    virtual void Validate();  // [21] @ 0x821f2368
-    virtual void PostLoadChildren();  // [22] @ 0x82115cb8
+    void CallInit();  // [2] @ 0x821f2410
+    void PostLoadProperties();  // [20] @ 0x821f2320
+    void Validate();  // [21] @ 0x821f2368
+    void PostLoadChildren();  // [22] @ 0x82115cb8
 };
 
 namespace serveTipDataInner {
@@ -292,10 +299,10 @@ struct statsThresholdData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void CallInit();  // [2] @ 0x82218828
-    virtual void PostLoadProperties();  // [20] @ 0x82218718
-    virtual void Validate();  // [21] @ 0x82218760
-    virtual void PostLoadChildren();  // [22] @ 0x821e1070
+    void CallInit();  // [2] @ 0x82218828
+    void PostLoadProperties();  // [20] @ 0x82218718
+    void Validate();  // [21] @ 0x82218760
+    void PostLoadChildren();  // [22] @ 0x821e1070
 };
 
 // ── tooFarFromTableTipData  [2 vtables — template/MI] ──────────────────────────
@@ -303,10 +310,10 @@ struct tooFarFromTableTipData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void CallInit();  // [2] @ 0x821f2808
-    virtual void PostLoadProperties();  // [20] @ 0x821f27a0
-    virtual void Validate();  // [21] @ 0x821f27e8
-    virtual void PostLoadChildren();  // [22] @ 0x82116010
+    void CallInit();  // [2] @ 0x821f2808
+    void PostLoadProperties();  // [20] @ 0x821f27a0
+    void Validate();  // [21] @ 0x821f27e8
+    void PostLoadChildren();  // [22] @ 0x82116010
 };
 
 
@@ -555,12 +562,11 @@ public:
     virtual const char* GetConfigName() override;       // vfn_18 @ 0x8210CC78 — "Soft Shot"
     virtual bool HasActiveTarget() override;            // vfn_21 @ 0x8210CC88 — m_softShotTargetIdx (+52) >= 0
 
-    void ScalarDestructor(int flags);
-
 private:
     // Base class ends at +36 (0x24); target field sits at +52 (0x34).
     uint8_t m_pad24[16];                                // +0x24..+0x33 — subclass state (uninvestigated)
     int32_t m_softShotTargetIdx;                        // +0x34 (+52) — active soft-shot target; >=0 = active
+    pongTrainingDrillConfig* m_pSoftShotData;           // +0x38 — the config, when it is a gdDrillSoftShotData
 };
 
 /**
@@ -687,7 +693,7 @@ struct pongTrainingUIContext {
     uint32_t vtable;                 // +0x00  primary vtable VA (0x8205E6D4)
     uint8_t  _opaqueBase[16];        // +0x04..+0x13  primary base payload
     uint32_t m_vtableSecondary;      // +0x14  secondary vtable VA (0x8205E73C)
-    uint8_t  _pad18[8];              // +0x18..+0x1B
+    uint8_t  _pad18[4];              // +0x18..+0x1B
     uint32_t m_pChildCtx;            // +0x1C  child context (drill-session object, 208 bytes, alloc via rage_ADF8)
     bool     m_bPendingStateAdvance; // +0x20  (byte +32) — set by OnUpdate when child triggers state 3 advance
     bool     m_bNetFinalizePending;  // +0x21  (byte +33) — gates the network finalize path in OnUpdate
@@ -701,7 +707,7 @@ struct pongTrainingUIContext {
     void Init();                     // [23] @ 0x82307420
 };
 
-// Static-asserts deferred — void* is 8 bytes on the 64-bit host, which
-// perturbs intra-struct offsets. Field comments document the PPC-native
-// offsets used by the non-virtual slot bodies in pong_drill.cpp.
+// OnUpdate (0x823071B8) reads +0x1C, +0x20 and +0x21.
+static_assert(offsetof(pongTrainingUIContext, m_pChildCtx) == 0x1C, "");
+static_assert(offsetof(pongTrainingUIContext, m_bNetFinalizePending) == 0x21, "");
 
