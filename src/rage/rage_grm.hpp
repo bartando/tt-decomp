@@ -10,6 +10,9 @@
 
 namespace rage {
 
+struct datResource;     // animation/rage_anim.hpp — rsc pointer-fixup state
+struct grmShaderGroup;
+
 // ── rage::fragDrawable  [vtable @ 0x82033094] ──────────────────────────
 struct fragDrawable {
     void**      vtable;           // +0x00
@@ -126,7 +129,9 @@ struct grmModelFactory {
     //     rage_1028 (likely a static Create/Register forwarder).
     virtual void Dispatch5(uint32_t a, uint32_t b, uint32_t c,
                            uint32_t d, uint32_t e);  // [1] @ 0x820f3d10  size 0x18
-    virtual void vfn_2(uint32_t* cursor);   // [2] @ 0x820f4cf0
+    // [2] rsc placement: relocates a saved grmModel* through rsc (r4 = rsc,
+    //     r5 = the pointer field), then runs grmModel's rsc constructor on it.
+    virtual void vfn_2(datResource& rsc, grmModel*& model);   // [2] @ 0x820f4cf0  size 0x48
 };
 
 // ── rage::grmModelGeom  [vtable @ 0x8202F3CC] ──────────────────────────
@@ -249,13 +254,11 @@ struct grmShaderFactoryStandard {
     virtual void vfn_3();                       // [3] @ 0x820f7640
     virtual void vfn_4();                       // [4] @ 0x820f74f8
     virtual void vfn_5();                       // [5] @ 0x820f7190
-    virtual void vfn_6();                       // [6] @ 0x820f7290
-    // [7] Cursor-advance for the shader-factory's chunked allocator:
-    //     same shape as grmModelFactory::vfn_2 (buffer-base at +0x04,
-    //     stride at +0x4C, per-chunk step indexed off this).  The
-    //     post-advance hook is fragDrawable_3010 (shader-factory slot
-    //     initialiser).
-    virtual void AdvanceCursor(uint32_t* cursor);   // [7] @ 0x820f72d8  size 0x1b8
+    // [6] rsc placement, same shape as grmModelFactory::vfn_2: relocates a
+    //     saved grmShaderGroup* through rsc, then runs grmShaderGroup's rsc
+    //     constructor (fragDrawable_3010) on it.
+    virtual void vfn_6(datResource& rsc, grmShaderGroup*& group); // [6] @ 0x820f7290  size 0x48
+    virtual void vfn_7();                       // [7] @ 0x820f72d8  size 0x1b8
 };
 
 // ── rage::grmShaderFx  [vtable @ 0x8202F2DC] ──────────────────────────

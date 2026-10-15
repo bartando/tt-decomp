@@ -3,26 +3,31 @@
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
  */
 #include "rage_grm.hpp"
+#include "animation/rage_anim.hpp"   // rage::datResource
 
 // Forward declarations for external functions
 extern "C" void fragDrawable_0AA0_2h(void* geom, void* drawable, uint32_t index, void* param);
 
 // Helpers used by lifted dispatch methods (all raw recomp stubs).
 extern "C" void   rage_free_00C0(uint32_t ptr);              // @ 0x820C00C0
-extern "C" void   net_2228_h(uint32_t self);                 // @ 0x820F2228
+extern "C" void   net_2228_h(void* self);                    // @ 0x820F2228
 extern "C" void   rage_1028(uint32_t a, uint32_t b,          // @ 0x820F1028
                             uint32_t c, uint32_t d,
                             uint32_t e);
-extern "C" void   grmModelFactory_sm_DeclMap_dtor(uint32_t); // @ 0x820F3CA0
-extern "C" void   ke_1ED8(uint32_t chunk);                   // @ 0x820F1ED8
+extern "C" void   grmModelFactory_sm_DeclMap_dtor(void* self); // @ 0x820F3CA0
+// grmModel rsc constructor (installs the grmModel vtable 0x8202F3B4).
+extern "C" void   ke_1ED8(rage::grmModel* model,             // @ 0x820F1ED8
+                          rage::datResource& rsc);
 extern "C" void   ke_2160(uint32_t chunk);                   // @ 0x820F2160
-extern "C" void   fragDrawable_3010(uint32_t chunk);         // @ 0x820F3010
-extern "C" void   grcSetup_vfn_2_CFD0_1(uint32_t self);      // @ 0x8215CFD0
+// grmShaderGroup rsc constructor (installs the grmShaderGroup vtable 0x8202F528).
+extern "C" void   fragDrawable_3010(rage::grmShaderGroup* group, // @ 0x820F3010
+                                    rage::datResource& rsc);
+extern "C" void   grcSetup_vfn_2_CFD0_1(void* self);         // @ 0x8215CFD0
 extern "C" void   xe_main_thread_init_0038();                // @ 0x820C0038
 
 // SDA-resident globals (r13+0 chain / factory-singleton pointer).
 extern "C" uint32_t g_rageDescriptorHead;                    // @ 0x82600000
-extern "C" uint32_t g_grmShaderFactory_instance;             // @ 0x82606374
+extern "C" rage::grmShaderFactory* g_grmShaderFactory_instance; // @ 0x82606374
 
 namespace rage {
 
@@ -170,7 +175,7 @@ void fragDrawable::ProcessGeometry(void* geometryContainer, void* param1, void* 
  * the destructor without parameters — the C++ abstraction hides the flag.
  * ═══════════════════════════════════════════════════════════════════════════ */
 grmShaderGroup::~grmShaderGroup() {
-    net_2228_h(reinterpret_cast<uint32_t>(this));
+    net_2228_h(this);
     // Non-deleting variant: the scalar-free branch lives on the Xbox 360
     // side of slot 0 and is reachable only via the auto-delete flag in r4.
     // On host we rely on the C++ delete operator for the free path.
@@ -186,7 +191,7 @@ grmShaderGroup::~grmShaderGroup() {
  * body here only performs the member teardown.
  * ═══════════════════════════════════════════════════════════════════════════ */
 grmModelFactory::~grmModelFactory() {
-    grmModelFactory_sm_DeclMap_dtor(reinterpret_cast<uint32_t>(this));
+    grmModelFactory_sm_DeclMap_dtor(this);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -215,47 +220,26 @@ void grmModelFactory::ScalarDtor(int flags) {
  * grmModelFactory::vfn_2                  [vtable slot 2]
  * @ 0x820F4CF0 | size: 0x48 (72 bytes)
  *
- * Advances a caller-owned cursor cell (r5 = uint32_t*) to the next chunk
- * inside the factory's block-allocated buffer:
+ * Relocates the caller's pointer field (r5) through the datResource in r4;
+ * `this` (r3) is never read:
  *
- *     chunk  = *cursor
+ *     chunk  = *field
  *     if (chunk == 0) return
- *     base   = *(uint32_t*)(this + 0x04)
- *     stride = *(uint32_t*)(this + 0x4C)         (twllei trap if zero)
+ *     base   = *(uint32_t*)(rsc + 0x04)
+ *     stride = *(uint32_t*)(rsc + 0x4C)          (twllei trap if zero)
  *     idx    = (chunk - base) / stride + 2       ( +2 skips 8-byte hdr )
- *     step   = *(uint32_t*)(this + idx*4)
+ *     step   = *(uint32_t*)(rsc + idx*4)
  *     next   = chunk + step
- *     *cursor = next
- *     if (next != 0) ke_1ED8(next)               (post-advance hook)
+ *     *field = next
+ *     if (next != 0) ke_1ED8(next, rsc)          (grmModel rsc constructor)
  *
- * The +2 offset in the index expression is the RAGE convention for
- * skipping the 8-byte (vtable, base) header at the start of a factory
- * object's chunk-table.
+ * That arithmetic is datResource::PointerFixup: rsc + 8 holds the
+ * per-chunk deltas.
  * ═══════════════════════════════════════════════════════════════════════════ */
-void grmModelFactory::vfn_2() {
-    // The r5 cursor pointer is part of the caller's frame; we model the
-    // pass-through by taking `this + 0x50` as the synthetic cursor cell
-    // (the nearest SDA-resident slot used by every in-tree caller).
-    uint32_t* cursor = reinterpret_cast<uint32_t*>(
-        reinterpret_cast<uint8_t*>(this) + 0x50);
-    const uint32_t chunk = *cursor;
-    if (chunk == 0) {
-        return;
-    }
-    const uint32_t base   = *reinterpret_cast<uint32_t*>(
-        reinterpret_cast<uint8_t*>(this) + 0x04);
-    const uint32_t stride = *reinterpret_cast<uint32_t*>(
-        reinterpret_cast<uint8_t*>(this) + 0x4C);
-    if (stride == 0) {
-        __builtin_trap();   // matches PPC `twllei r9,0`
-    }
-    const uint32_t idx_bytes = ((chunk - base) / stride + 2) << 2;
-    const uint32_t step = *reinterpret_cast<uint32_t*>(
-        reinterpret_cast<uint8_t*>(this) + idx_bytes);
-    const uint32_t next = chunk + step;
-    *cursor = next;
-    if (next != 0) {
-        ke_1ED8(next);
+void grmModelFactory::vfn_2(datResource& rsc, grmModel*& model) {
+    rsc.PointerFixup(model);
+    if (model != nullptr) {
+        ke_1ED8(model, rsc);
     }
 }
 
@@ -271,13 +255,13 @@ void grmModelFactory::vfn_2() {
  * ═══════════════════════════════════════════════════════════════════════════ */
 grmShaderFactory::~grmShaderFactory() {
     vtable = reinterpret_cast<void**>(0x8202F808u);
-    if (g_grmShaderFactory_instance == reinterpret_cast<uint32_t>(this)) {
-        g_grmShaderFactory_instance = 0;
+    if (g_grmShaderFactory_instance == this) {
+        g_grmShaderFactory_instance = nullptr;
     }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * grmShaderFactoryStandard::vfn_2         [vtable slot 2]
+ * grmShaderFactoryStandard::Allocate40    [vtable slot 2]
  * @ 0x820F7490 | size: 0x64 (100 bytes)
  *
  * Allocates a 40-byte shader slot via the first registered descriptor's
@@ -293,7 +277,7 @@ grmShaderFactory::~grmShaderFactory() {
  * Size 40 / align 16 are the canonical grmShader dimensions for this
  * factory; callers rely on them being baked in.
  * ═══════════════════════════════════════════════════════════════════════════ */
-void grmShaderFactoryStandard::vfn_2() {
+uint32_t grmShaderFactoryStandard::Allocate40() {
     xe_main_thread_init_0038();
     auto* desc = reinterpret_cast<uint32_t*>(g_rageDescriptorHead);
     uint32_t allocator = desc[1];  // word-index 1 == byte offset 4
@@ -302,44 +286,25 @@ void grmShaderFactoryStandard::vfn_2() {
     AllocFn fn = reinterpret_cast<AllocFn>(allocVT[1]);
     uint32_t blk = fn(allocator, 40, 16);
     if (blk == 0) {
-        return;
+        return 0;
     }
     ke_2160(blk);
-    // The original returns the pointer via r3; the hpp declares this as
-    // `void vfn_2()`, so the returned block becomes a stashed side effect.
-    // Callers inside the engine retrieve it via the factory's scratch slot.
+    return blk;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * grmShaderFactoryStandard::vfn_7         [vtable slot 7]
- * @ 0x820F72D8 | size: 0x1b8 (440 bytes)
+ * grmShaderFactoryStandard::vfn_6         [vtable slot 6]
+ * @ 0x820F7290 | size: 0x48 (72 bytes)
  *
- * Cursor-advance of the same shape as grmModelFactory::vfn_2 — identical
- * base/stride layout — but the post-advance hook is fragDrawable_3010
- * (the shader-factory chunk initialiser) rather than ke_1ED8.  See the
- * grmModelFactory::vfn_2 comment for the arithmetic rationale.
+ * Same body as grmModelFactory::vfn_2 — relocate the r5 pointer field
+ * through the datResource in r4 — but the tail call is fragDrawable_3010
+ * (the grmShaderGroup rsc constructor) rather than ke_1ED8.  Slot 7
+ * (0x820F72D8) is a different, unlifted function.
  * ═══════════════════════════════════════════════════════════════════════════ */
-void grmShaderFactoryStandard::vfn_7() {
-    uint32_t* cursor = reinterpret_cast<uint32_t*>(
-        reinterpret_cast<uint8_t*>(this) + 0x50);
-    const uint32_t chunk = *cursor;
-    if (chunk == 0) {
-        return;
-    }
-    const uint32_t base   = *reinterpret_cast<uint32_t*>(
-        reinterpret_cast<uint8_t*>(this) + 0x04);
-    const uint32_t stride = *reinterpret_cast<uint32_t*>(
-        reinterpret_cast<uint8_t*>(this) + 0x4C);
-    if (stride == 0) {
-        __builtin_trap();
-    }
-    const uint32_t idx_bytes = ((chunk - base) / stride + 2) << 2;
-    const uint32_t step = *reinterpret_cast<uint32_t*>(
-        reinterpret_cast<uint8_t*>(this) + idx_bytes);
-    const uint32_t next = chunk + step;
-    *cursor = next;
-    if (next != 0) {
-        fragDrawable_3010(next);
+void grmShaderFactoryStandard::vfn_6(datResource& rsc, grmShaderGroup*& group) {
+    rsc.PointerFixup(group);
+    if (group != nullptr) {
+        fragDrawable_3010(group, rsc);
     }
 }
 
@@ -352,7 +317,7 @@ void grmShaderFactoryStandard::vfn_7() {
  * derived vtable layout demands a unique function pointer per slot.
  * ═══════════════════════════════════════════════════════════════════════════ */
 void grmSetup::vfn_2() {
-    grcSetup_vfn_2_CFD0_1(reinterpret_cast<uint32_t>(this));
+    grcSetup_vfn_2_CFD0_1(this);
 }
 
 } // namespace rage
