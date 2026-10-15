@@ -94,6 +94,11 @@ extern "C" void* pongHairData_7B60_g(void* parser, int32_t type, const char* nam
     return datParser_AddField(parser, type, name, field);
 }
 
+// pong_camera.cpp's camViewCS::RegisterParams calls it under this name.
+void pongCameraView_RegisterParamHook(void* parser, int type, const char* name, void* field, int, int) {
+    datParser_AddField(parser, type, name, field);
+}
+
 // rage_audio.cpp names it with __asm__("pongHairData_7B60_g"), which on Mach-O
 // is the symbol without the leading underscore C names get. On ELF that is the
 // C name above already.

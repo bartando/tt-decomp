@@ -180,6 +180,7 @@ set(SOURCES
     src/rage/network/sn_event.cpp
     src/xam/kernel_import_thunks.c
     src/rage/math/ph_math.cpp
+    src/game/input/button_edges.cpp
 )
 
 # Create executable
