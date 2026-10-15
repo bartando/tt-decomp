@@ -3679,8 +3679,8 @@ void pongCreature::RegisterShadowCasters(bool useSecondaryEmitter) {
 //        • Zero the host's live-anim fields (+60..+65) and mark the
 //          "needs rebuild" bit at +64 on its local anim buffer (offset +16).
 //        • If an active anim descriptor lives at host+48, zero its first
-//          4 header bytes and its 16-byte transform vector, reset its sign
-//          scale to 1.0, and zero the phase counter at +32.
+//          4 header bytes, the word at +8, its 16-byte vector at +16 and
+//          the float at +32.
 //
 //   2. Forward-chain to phUpdateObject::vfn_3(this, world, scene) — the
 //      actual physics-world bind step.
@@ -3733,8 +3733,9 @@ void pongCreature::Reset(void* world, void* scene) {
         memset(animBuf, 0, 16);
         animBuf[16] = 1;
 
-        // If an active anim descriptor exists at +48, zero its header +
-        // transform and restore scale = 1.0f.
+        // If an active anim descriptor exists at +48, zero its header bytes,
+        // the vector at +16, the word at +8 and the float at +32 (the asm
+        // loads 0.0f from 0x8202D110).
         void* activeAnim = *(void**)((char*)colliderBlock + 48);
         if (activeAnim != nullptr) {
             *(uint8_t*)((char*)activeAnim + 4) = 0;
@@ -3743,8 +3744,7 @@ void pongCreature::Reset(void* world, void* scene) {
             *(uint8_t*)((char*)activeAnim + 7) = 0;
             memset((char*)activeAnim + 16, 0, 16);
             *(uint32_t*)((char*)activeAnim + 8) = 0;
-            // Restore unit sign-scale (stored as .rdata float constant +32).
-            *(float*)((char*)activeAnim + 32) = 1.0f;
+            *(float*)((char*)activeAnim + 32) = 0.0f;
         }
     }
 
@@ -3763,8 +3763,8 @@ void pongCreature::Reset(void* world, void* scene) {
     // --- Step 5: decide mover-flip based on render ownership.
     extern void* g_render_obj_ptr;  // @ 0x825EAB2C
     int32_t thisPlayer  = *(int32_t*)((char*)this + 188);
-    void*   renderObj   = g_render_obj_ptr;
-    int32_t boundPlayer = renderObj ? *(int32_t*)((char*)renderObj + 296) : -1;
+    void*   renderObj   = g_render_obj_ptr;  // not null-checked in the asm
+    int32_t boundPlayer = *(int32_t*)((char*)renderObj + 296);
     bool    needsFlip   = (thisPlayer == boundPlayer);
 
     pongMover_Reset(*(void**)((char*)this + 152), needsFlip);
