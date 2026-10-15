@@ -26,48 +26,245 @@
  */
 
 #include <cstdint>
+#include <cstring>
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// rage::xmlTree teardown. Callers know 0x821A8070 as atArray_Clear; it is the
+// xmlTree destructor body (vtable 0x8203A928, back to datBase 0x820276C4 at the end).
+// rage_core_utils.cpp aliases it to the C symbol _atArray_Clear.
+// ─────────────────────────────────────────────────────────────────────────────
+
+void rage_free(void* p);
+
+struct xmlTreeListNode {
+    void** vtable;              // slot 0: scalar deleting destructor
+    uint32_t _4;
+    xmlTreeListNode* next;      // +0x08
+};
+
+struct xmlTreeEntry {           // 12 bytes on the game
+    char* name;                 // +0x00
+    uint32_t _4;
+    xmlTreeListNode* head;      // +0x08
+};
+
+struct xmlTreeView {
+    void** vtable;
+    xmlTreeListNode* root;      // +0x04
+    xmlTreeEntry* entries;      // +0x08, new[]'d with a count word in front
+    uint16_t count;             // +0x0C
+    uint16_t capacity;          // +0x0E
+};
 
 namespace {
 
-uint32_t ComputeHashString(const char* text)
-{
-    if (text == nullptr) {
-        return 0;
-    }
+using ScalarDtorFn = void (*)(void*, int);
 
-    uint32_t hash = 0;
-    while (*text != '\0') {
-        hash = (hash << 4) + static_cast<uint8_t>(*text++);
-
-        const uint32_t highBits = hash & 0xF0000000;
-        if (highBits != 0) {
-            hash ^= (highBits >> 24);
-            hash ^= highBits;
-        }
-    }
-
-    return hash;
-}
-
-bool StringsMatch(const char* left, const char* right)
-{
-    if (left == right) {
-        return true;
-    }
-
-    if (left == nullptr || right == nullptr) {
-        return false;
-    }
-
-    while (*left != '\0' && *left == *right) {
-        ++left;
-        ++right;
-    }
-
-    return *left == *right;
-}
+constexpr uintptr_t kVtable_xmlTree = 0x8203A928;
+constexpr uintptr_t kVtable_datBase = 0x820276C4;
 
 } // namespace
+
+// @ 0x821A8118
+void xmlTreeEntry_Destruct(xmlTreeEntry* entry)
+{
+    for (xmlTreeListNode* node = entry->head; node != nullptr;) {
+        xmlTreeListNode* next = node->next;
+        reinterpret_cast<ScalarDtorFn>(node->vtable[0])(node, 1);
+        node = next;
+    }
+    rage_free(entry->name);
+}
+
+// delete[] for xmlTreeEntry; the flags argument in r4 is ignored.
+// @ 0x820C2980
+void* xmlTreeEntry_DeleteArray(xmlTreeEntry* entries)
+{
+    uint32_t* block = reinterpret_cast<uint32_t*>(entries) - 1;
+    for (int32_t i = static_cast<int32_t>(*block) - 1; i >= 0; --i) {
+        xmlTreeEntry_Destruct(&entries[i]);
+    }
+    rage_free(block);
+    return block;
+}
+
+// @ 0x821A8070
+void atArray_Clear(void* obj)
+{
+    auto* tree = static_cast<xmlTreeView*>(obj);
+    tree->vtable = reinterpret_cast<void**>(kVtable_xmlTree);
+    if (tree->root != nullptr) {
+        reinterpret_cast<ScalarDtorFn>(tree->root->vtable[0])(tree->root, 1);
+    }
+    if (tree->entries != nullptr) {
+        xmlTreeEntry_DeleteArray(tree->entries);
+    }
+    tree->entries = nullptr;
+    tree->count = 0;
+    tree->capacity = 0;
+    tree->vtable = reinterpret_cast<void**>(kVtable_datBase);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// atArray<u32>::Realloc. The original inlines rage_free.
+// ─────────────────────────────────────────────────────────────────────────────
+
+extern "C" void* xe_EC88(uint32_t size);  // operator new
+
+struct atArrayU32View {
+    uint32_t* data;     // +0x00
+    int32_t count;      // +0x04
+    int32_t capacity;   // +0x08
+};
+
+// @ 0x821322B0
+void* datArray_Grow(void* obj, uint32_t newCapacity)
+{
+    auto* array = static_cast<atArrayU32View*>(obj);
+    const int32_t capacity = static_cast<int32_t>(newCapacity);
+    uint32_t* data = nullptr;
+    if (capacity > 0) {
+        data = static_cast<uint32_t*>(
+            xe_EC88(newCapacity > 0x3FFFFFFFu ? 0xFFFFFFFFu : newCapacity * 4));
+    }
+    const int32_t keep = capacity < array->count ? capacity : array->count;
+    for (int32_t i = 0; i < keep; ++i) {
+        data[i] = array->data[i];
+    }
+    uint32_t* old = array->data;
+    array->capacity = capacity;
+    array->count = keep;
+    if (old != nullptr) {
+        rage_free(old);
+    }
+    array->data = data;
+    return data;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// String duplication and the 16-byte registry entries (name + three words)
+// appended through atSingletonPool_AllocEntry.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// @ 0x820C29E0
+void* rage_strDuplicate(const char* text)
+{
+    if (text == nullptr) {
+        return nullptr;
+    }
+    uint32_t size = 0;
+    while (text[size] != '\0') {
+        ++size;
+    }
+    ++size;
+    void* copy = xe_EC88(size);
+    return memcpy(copy, text, size);
+}
+
+extern "C" void* rage_strDuplicate_c(const char* text) __asm__("_rage_strDuplicate");
+extern "C" void* rage_strDuplicate_c(const char* text) { return rage_strDuplicate(text); }
+
+struct atRegistryEntry {
+    char* name;
+    uint32_t value4;
+    uint32_t value8;
+    uint32_t valueC;
+};
+
+struct atRegistryPool {
+    atRegistryEntry* data;
+    uint16_t count;
+    uint16_t capacity;
+};
+
+// @ 0x82618550
+extern atRegistryPool g_atRegistryPool;
+
+// delete[] for atRegistryEntry (the original inlines rage_free for each name).
+// @ 0x821A9370
+void* atRegistryEntry_DeleteArray(atRegistryEntry* entries)
+{
+    uint32_t* block = reinterpret_cast<uint32_t*>(entries) - 1;
+    for (int32_t i = static_cast<int32_t>(*block) - 1; i >= 0; --i) {
+        if (entries[i].name != nullptr) {
+            rage_free(entries[i].name);
+        }
+    }
+    rage_free(block);
+    return block;
+}
+
+// Appends a slot to the global registry, growing it by 16. Callers pass an
+// argument the original never reads.
+// @ 0x821A91E0
+void* atSingletonPool_AllocEntry(uint32_t /*unused*/)
+{
+    atRegistryPool& pool = g_atRegistryPool;
+    if (pool.count == pool.capacity) {
+        const uint16_t capacity = static_cast<uint16_t>(pool.capacity + 16);
+        pool.capacity = capacity;
+        atRegistryEntry* fresh = nullptr;
+        uint32_t* block = static_cast<uint32_t*>(xe_EC88(capacity * 16u + 4));
+        if (block != nullptr) {
+            block[0] = capacity;
+            fresh = reinterpret_cast<atRegistryEntry*>(block + 1);
+            for (uint32_t i = 0; i < capacity; ++i) {
+                fresh[i].name = nullptr;
+            }
+        }
+        for (uint16_t i = 0; i < pool.count; ++i) {
+            atRegistryEntry& src = pool.data[i];
+            atRegistryEntry& dst = fresh[i];
+            char* name = static_cast<char*>(rage_strDuplicate(src.name));
+            if (dst.name != nullptr) {
+                rage_free(dst.name);
+            }
+            dst.name = name;
+            dst.value4 = src.value4;
+            dst.value8 = src.value8;
+            dst.valueC = src.valueC;
+        }
+        if (pool.data != nullptr) {
+            atRegistryEntry_DeleteArray(pool.data);
+        }
+        pool.data = fresh;
+    }
+    const uint16_t index = pool.count;
+    pool.count = static_cast<uint16_t>(index + 1);
+    return &pool.data[index];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// atHashMap<const char*, T>: string-keyed buckets of {key, value, next}.
+// ─────────────────────────────────────────────────────────────────────────────
+
+struct atHashMapEntry {
+    const char* key;
+    uint32_t value;             // +0x04, Find returns its address
+    atHashMapEntry* next;       // +0x08
+};
+
+struct atHashMapView {
+    atHashMapEntry** buckets;
+    uint16_t bucketCount;       // +0x04
+};
+
+// PJW hash over signed chars.
+// @ 0x8223A818
+uint32_t rage_atStringHash(const char* text)
+{
+    uint32_t hash = 0;
+    for (int32_t c = static_cast<signed char>(*text); c != 0;
+         c = static_cast<signed char>(*++text)) {
+        hash = (hash << 4) + static_cast<uint32_t>(c);
+        const uint32_t high = hash & 0xF0000000u;
+        if (high != 0) {
+            hash ^= (high >> 24) ^ high;
+        }
+    }
+    return hash;
+}
 
 // All symbols below use C linkage — C source files (src/rage/core/app_init.c,
 // src/rage/render_loop.c, src/xam/*) reach them through underscore-prefixed
@@ -81,46 +278,29 @@ extern "C" {
 //                    animation blend-clip caches (pcr_anim_blenders.cpp).
 // ─────────────────────────────────────────────────────────────────────────────
 void atHashMap_Clear(void* container) { (void)container; }
+// @ 0x8234C208
 void* atHashMap_Find(void* table, const void* key) {
-    if (table == nullptr) {
-        return nullptr;
-    }
-
-    const char* searchKey = static_cast<const char*>(key);
-    const uint16_t bucketCount = *reinterpret_cast<uint16_t*>(
-        static_cast<uint8_t*>(table) + 4);
+    auto* map = static_cast<atHashMapView*>(table);
+    const char* name = static_cast<const char*>(key);
+    const uint16_t bucketCount = map->bucketCount;
     if (bucketCount == 0) {
         return nullptr;
     }
-
-    void*** bucketArray = *reinterpret_cast<void****>(table);
-    if (bucketArray == nullptr) {
-        return nullptr;
-    }
-
-    const uint32_t bucketIndex = ComputeHashString(searchKey) % bucketCount;
-    void** entry = static_cast<void**>(bucketArray[bucketIndex]);
-
-    while (entry != nullptr) {
-        const char* entryKey = static_cast<const char*>(entry[0]);
-        if (StringsMatch(searchKey, entryKey)) {
-            return static_cast<uint8_t*>(static_cast<void*>(entry)) + 4;
+    for (atHashMapEntry* entry = map->buckets[rage_atStringHash(name) % bucketCount];
+         entry != nullptr; entry = entry->next) {
+        const char* a = name;
+        const char* b = entry->key;
+        while (*a != '\0' && *a == *b) {
+            ++a;
+            ++b;
         }
-
-        entry = static_cast<void**>(entry[2]);
+        if (*a == *b) {
+            return &entry->value;
+        }
     }
-
     return nullptr;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// atArray — flat dynamic-array base surface.
-//   atArray_Clear      @ ~0x821A8070 (gameObject base dtor).
-//   atArray_Destructor @ 0x820C2980  (weak body here; an address-backed
-//                                     version lives in src/rage/memory/
-//                                     atArray.cpp when that file is linked).
-// ─────────────────────────────────────────────────────────────────────────────
-void atArray_Clear(void* obj) { (void)obj; }
 void* atArray_Destructor(void* pArray) { (void)pArray; return nullptr; }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -168,15 +348,9 @@ void atFactory_GetFactory(void* a) { (void)a; }
 // datRef_Release — reference-count release (real @ rage_6A90 0x82126A90).
 // datResource_Load — blocking load dispatch; ph_physics.cpp calls this.
 // ─────────────────────────────────────────────────────────────────────────────
-void datArray_Grow(void* a, uint32_t b)             { (void)a; (void)b; }
 void datRef_Release(void* ref)                      { (void)ref; }
 void datResource_Load(void* a, const char* b)       { (void)a; (void)b; }
 
 } // extern "C"
 
-
-// sub_821A8F58 — data registration helper (moved from stubs.cpp)
-void sub_821A8F58(void* registry, const char* name, void* data, void* schema, int flags) {
-    (void)registry; (void)name; (void)data; (void)schema; (void)flags;
-}
 

@@ -956,34 +956,7 @@ void msgMsgSink_A970_2h(void* self, void* rttiArg, void* bucket,
  * counter (+1 for D168, -1 for D1D8), then dispatch vtable slot 6 to
  * advance the iterator. Loop terminates on sentinel 0xFFFF.
  */
-static void msgMsgSink_RefCounterWalk(void* self, uint16_t startKey, int32_t delta)
-{
-    uint8_t* s = static_cast<uint8_t*>(self);
-    uint32_t key = startKey;
-    while (key != 0xFFFFu) {
-        uint8_t* table = *reinterpret_cast<uint8_t**>(s + 104);
-        uint32_t off = (key & 0xFFFFu) * 4u;
-        int32_t& counter = *reinterpret_cast<int32_t*>(table + off);
-        counter += delta;
-        void** vt = *reinterpret_cast<void***>(s);
-        using Fn = uint32_t(*)(void*);
-        uint32_t next = reinterpret_cast<Fn>(vt[6])(self);
-        key = next & 0xFFFFu;
-    }
-}
-
-void msgMsgSink_D168_sp(void* self, uint16_t startKey = 0xFFFF)
-{
-    msgMsgSink_RefCounterWalk(self, startKey, +1);
-}
-void msgMsgSink_D1D8_sp(void* self, uint16_t startKey = 0xFFFF)
-{
-    msgMsgSink_RefCounterWalk(self, startKey, -1);
-}
-extern "C" {
-void msgMsgSink_D168_sp_c(void* self) { msgMsgSink_D168_sp(self, 0xFFFF); }
-void msgMsgSink_D1D8_sp_c(void* self) { msgMsgSink_D1D8_sp(self, 0xFFFF); }
-}
+// Defined in msg_msg_sink.cpp.
 
 
 /**
@@ -1149,11 +1122,13 @@ void netStream_ReadBlock(void* client, void* dst, short bitCount)
     // Fixed-size block reader; backing impl lives in pong_network.cpp.
 }
 
-/** netStream_ReadS16 — reads a signed 16-bit value (util_7970 @ 0x820D7970). */
-void netStream_ReadS16(void* client, void* dst, int bitCount)
+// pong_network.cpp's spelling of datBitBuffer::ReadSigned<s16> (0x820D7970,
+// lifted in dat_bit_buffer.cpp). The original reads 15 bits whatever r5 says.
+bool datBitBuffer_ReadS16(void* bb, int16_t* out);
+uint8_t netStream_ReadS16(void* client, void* dst, int bitCount)
 {
-    (void)client; (void)dst; (void)bitCount;
-    // Backing impl in pong_network.cpp.
+    (void)bitCount;
+    return datBitBuffer_ReadS16(client, static_cast<int16_t*>(dst));
 }
 
 /**

@@ -504,7 +504,7 @@ class Checker:
         sig = self.lift.signatures.get(a.target)
         regs = arg_registers(sig) if sig else [("r3", None)]
         forced = getattr(self._policy(a.target, t), "args", None)
-        if forced:
+        if forced is not None:  # () compares no arguments
             regs = [(r, None) for r in forced]
         name = self.call_name(a.target, t)
         for reg, ty in regs:

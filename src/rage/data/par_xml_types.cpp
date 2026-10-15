@@ -42,6 +42,19 @@
 #include <cstdint>
 #include <cstdarg>
 
+extern "C" void* g_sda_base;  // r13: word 0 is the thread's TLS block
+
+void* atSingletonPool_AllocEntry(uint32_t unused);  // @ 0x821A91E0
+void* rage_strDuplicate(const char* text);          // @ 0x820C29E0
+void rage_free(void* p);
+
+struct RegistryEntryView {
+    char* name;
+    void* field;
+    void* desc;
+    uint32_t extra;
+};
+
 extern "C" {
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -82,13 +95,7 @@ void xmlNodeStruct_Initialize(void* node)      { (void)node; }
 void xmlNodeStruct_vfn_2(void* node)           { (void)node; }
 void xmlNodeStruct_BaseInitialize(void* node)  { (void)node; }
 
-void xmlNodeStruct_SerializeField(void* obj,
-                                  const char* name,
-                                  void* target,
-                                  void* defaultVal,
-                                  uint32_t flags) {
-    (void)obj; (void)name; (void)target; (void)defaultVal; (void)flags;
-}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // xml_Read* — token-based XML config readers (pong_render effect buckets).
@@ -104,21 +111,59 @@ void xml_ReadString(const char* key, char* buf, int maxLen) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RegisterSerializationField / RegisterSerializedField
-//
-// Both names target the same @ 0x821A8F58 primitive. C callers use
-// underscore-prefixed aliases; C++ callers hit the unmangled name.
+// RegisterSerializationField @ 0x821A8F58: appends {strdup(name), field, desc, 0}
+// to the global registry while the thread's main allocator is current.
+// C callers use the C names; C++ callers reach the overloads below the block.
 // ─────────────────────────────────────────────────────────────────────────────
+
+// @ 0x821A8F58
 void RegisterSerializationField(void* obj, const char* name,
                                 void* fieldPtr, void* desc,
                                 int flags) {
-    (void)obj; (void)name; (void)fieldPtr; (void)desc; (void)flags;
+    (void)obj; (void)flags;
+    uint32_t* tls = *static_cast<uint32_t**>(g_sda_base);
+    // Make the main allocator (+8) current, or count a nested switch (+0xC).
+    if (tls[1] == tls[2]) {
+        tls[3]++;
+    } else {
+        tls[4] = tls[1];
+        tls[1] = tls[2];
+    }
+
+    auto* entry = static_cast<RegistryEntryView*>(atSingletonPool_AllocEntry(16));
+    char* copy = static_cast<char*>(rage_strDuplicate(name));
+    rage_free(entry->name);
+    entry->name = copy;
+    entry->field = fieldPtr;
+    entry->desc = desc;
+    entry->extra = 0;
+
+    if (tls[3] != 0) {
+        tls[3]--;
+    } else {
+        const uint32_t saved = tls[4];
+        tls[4] = 0;
+        tls[1] = saved;
+    }
 }
 
 void RegisterSerializedField(void* obj, const char* name,
                              void* fieldPtr, void* desc,
                              int flags) {
-    (void)obj; (void)name; (void)fieldPtr; (void)desc; (void)flags;
+    RegisterSerializationField(obj, name, fieldPtr, desc, flags);
+}
+
+void xmlNodeStruct_RegisterField(void* obj, const char* name,
+                                 void* fieldPtr, void* desc,
+                                 int flags) {
+    RegisterSerializationField(obj, name, fieldPtr, desc, flags);
+}
+
+// char_view.cpp's name for 0x821A8F58.
+void xmlNodeStruct_SerializeField(void* obj, const char* name,
+                                  void* fieldPtr, void* desc,
+                                  uint32_t flags) {
+    RegisterSerializationField(obj, name, fieldPtr, desc, static_cast<int>(flags));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -147,5 +192,15 @@ void rage_parStructure_Init_stub(void) {}
 void RegisterSerializedField(void* obj, const char* name,
                              void* fieldPtr, const void* desc,
                              int flags) {
-    (void)obj; (void)name; (void)fieldPtr; (void)desc; (void)flags;
+    RegisterSerializationField(obj, name, fieldPtr, const_cast<void*>(desc), flags);
+}
+
+// pong_network_classes.cpp's spelling.
+void RegisterSerializationField(void* obj, void* name, void* fieldPtr, void* desc, int flags) {
+    RegisterSerializationField(obj, static_cast<const char*>(name), fieldPtr, desc, flags);
+}
+
+// pong_misc.cpp's spelling.
+void sub_821A8F58(void* obj, const char* name, void* fieldPtr, void* desc, int flags) {
+    RegisterSerializationField(obj, name, fieldPtr, desc, flags);
 }

@@ -272,24 +272,9 @@ extern "C" const char* rage_StringFindChar(const char* str, char c) {
     return std::strchr(str, c);
 }
 
-/**
- * rage_atStringCopy — Safe string copy with size limit
- *
- * Copies src to dest, ensuring null termination within maxSize bytes.
- * Equivalent to strncpy + forced null terminator.
- */
-extern "C" void rage_atStringCopy(const char* src, char* dest, int maxSize) {
-    if (!dest || maxSize <= 0) return;
-    if (!src) {
-        dest[0] = '\0';
-        return;
-    }
-    int i = 0;
-    for (; i < maxSize - 1 && src[i] != '\0'; i++) {
-        dest[i] = src[i];
-    }
-    dest[i] = '\0';
-}
+// rage_atStringCopy (0x82228990) is defined in pong_network_io.cpp. It is not
+// a strncpy: it looks the key up in the string table (0x82408F08) and writes
+// the entry as UTF-8.
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SECTION 4: Reference Counting & Singleton Management
@@ -356,18 +341,15 @@ extern "C" uint8_t rage_FindSingleton(void* ptr) {
     return 0;
 }
 
-/**
- * atSingletonPool_AllocEntry — Allocate an entry from the singleton pool
- *
- * On Xbox 360, this allocated from a pre-allocated pool of fixed-size
- * singleton entries. On the host, we use standard malloc.
- */
-extern "C" void* atSingletonPool_AllocEntry(uint32_t a) {
-    (void)a;
-    // Allocate a generic singleton entry (typically 12 bytes: vtable + data + next)
-    void* entry = rage_malloc(64);
-    return entry;
-}
+// The registry atSingletonPool_AllocEntry (at_types.cpp) appends to.
+struct atRegistryEntry;
+struct atRegistryPool {
+    atRegistryEntry* data;
+    uint16_t count;
+    uint16_t capacity;
+};
+// @ 0x82618550
+atRegistryPool g_atRegistryPool = {};
 
 /**
  * sysCallback_Invoke — Invoke a system callback
@@ -649,19 +631,76 @@ extern "C" void rage_27C0(void* a) {
     }
 }
 
-/**
- * rage_C1A8 @ 0x8244C1A8 | size: 0x7C
- *
- * Adds a node to a doubly-linked list rooted at offsets +204/+208 of the
- * parent object. The node's vtable is set from parameter r4, and it's
- * inserted at the tail of the list. The list count at +212 is incremented.
- *
- * This is a linked-list insertion used by the message sink system.
- */
-extern "C" void rage_C1A8(void* a) {
-    (void)a;
-    // Complex linked-list insertion — no-op stub for now
-    // TODO: implement when message sink system is fully lifted
+// XACT's pooled doubly-linked list of 12-byte nodes. The list sits inside its
+// owner: the node pool at +0x00, head/tail/count at +0xCC/+0xD0/+0xD4.
+
+void* rage_01B8(uint32_t size, uint32_t attributes);
+
+struct xactListNode {
+    void* value;            // +0x00
+    xactListNode* next;     // +0x04 (also the pool's free-list link)
+    xactListNode* prev;     // +0x08
+};
+
+struct xactListNodeChunk {  // 0xC4 bytes on the game
+    xactListNodeChunk* next;
+    xactListNode nodes[16];
+};
+
+struct xactListNodePool {
+    xactListNode* freeList;      // +0x00
+    xactListNodeChunk* chunks;   // +0x04
+};
+
+struct xactList {
+    xactListNodePool pool;       // +0x00
+    uint8_t _08[0xCC - 0x08];
+    xactListNode* head;          // +0xCC
+    xactListNode* tail;          // +0xD0
+    uint32_t count;              // +0xD4
+};
+
+// @ 0x8244BDE0
+xactListNode* xactListNodePool_Alloc(xactListNodePool* pool)
+{
+    if (pool->freeList == nullptr) {
+        auto* chunk = static_cast<xactListNodeChunk*>(rage_01B8(0xC4, 0x20840001));
+        if (chunk != nullptr) {
+            for (xactListNode& node : chunk->nodes) {
+                node.next = pool->freeList;
+                pool->freeList = &node;
+            }
+            chunk->next = pool->chunks;
+            pool->chunks = chunk;
+        }
+        if (pool->freeList == nullptr) {
+            return nullptr;
+        }
+    }
+    xactListNode* node = pool->freeList;
+    pool->freeList = node->next;
+    return node;
+}
+
+// Appends `value` at the tail. msg_msg_sink.cpp's thunks into it drop r4.
+// @ 0x8244C1A8
+void* rage_C1A8(void* list, void* value)
+{
+    auto* self = static_cast<xactList*>(list);
+    xactListNode* node = xactListNodePool_Alloc(&self->pool);
+    if (node != nullptr) {
+        node->value = value;
+        node->next = nullptr;
+        node->prev = self->tail;
+        if (self->tail != nullptr) {
+            self->tail->next = node;
+        } else {
+            self->head = node;
+        }
+        self->tail = node;
+        self->count++;
+    }
+    return node;
 }
 
 /**
@@ -977,7 +1016,6 @@ extern "C" const FakeTypeInfo _ZTI8hsmState = { nullptr, "hsmState" };
 extern void atArray_Clear(void* arr);
 extern void audControl_Destructor(void* pControl);
 extern void hsmContext_SetNextState(void* ctx, int state);
-extern "C" void* atHashMap_Find(void* table, const char* key);
 extern void sysCallback_Invoke(void* callback, int code);
 
 extern "C" {
@@ -991,10 +1029,6 @@ void _c_audControl_Destructor(void* o) { audControl_Destructor(o); }
 void _c_hsmContext_SetNextState(void* c, int s) __asm__("_hsmContext_SetNextState_2800");
 void _c_hsmContext_SetNextState(void* c, int s) { hsmContext_SetNextState(c, s); }
 
-void _c_atHashMap_Find(void* a, const void* b) __asm__("_atHashMap_Find");
-void _c_atHashMap_Find(void* a, const void* b) {
-    atHashMap_Find(a, static_cast<const char*>(b));
-}
 
 // _c_sysCallback_Invoke not needed — sysCallback_Invoke already has extern "C" linkage
 

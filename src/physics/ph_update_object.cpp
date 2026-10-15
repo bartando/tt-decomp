@@ -679,11 +679,8 @@ void ph_EF40(void* self, void* node) {
 // ── ph_ForwardTarget — trivial forwarder used by camera target chain ──────
 void ph_ForwardTarget(void* /*target*/) {}
 
-// ── ph_Atan2 / ph_Normalize / ph_snprintf ─────────────────────────────────
-// These three appear only as externs in physics code; provide conforming
-// library-backed implementations so link stage resolves them.
-extern "C" float ph_Atan2(float y, float x) { return std::atan2(y, x); }
-extern "C" float ph_Normalize(float x) { return std::fabs(x); }
+// ── ph_snprintf ───────────────────────────────────────────────────────────
+// (ph_Atan2/ph_Normalize are defined once, in ph_physics.cpp.)
 void ph_snprintf(char* buf, int size, const char* fmt, const char* str,
                  int val) {
     if (buf && size > 0) {

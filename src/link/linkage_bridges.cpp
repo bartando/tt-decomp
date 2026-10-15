@@ -273,11 +273,11 @@ void* rage_alloc_aligned(unsigned int size, unsigned int alignment) {
 }
 }  // namespace rage
 
-// pong_drill.cpp passes the field name and type descriptor as char* / void*;
-// gd_data.cpp takes const void* / const void* / u32 flags.
+
+// pong_drill.cpp's C++ spelling of 0x821A8F58 (lifted in par_xml_types.cpp).
+extern "C" void RegisterSerializationField(void* obj, const char* name, void* fieldPtr, void* desc, int flags);
 void RegisterSerializedField(void* obj, const char* name, void* field, void* typeDesc, int flags) {
-    RegisterSerializedField(obj, static_cast<const void*>(name), field, static_cast<const void*>(typeDesc),
-                            static_cast<uint32_t>(flags));
+    RegisterSerializationField(obj, name, field, typeDesc, flags);
 }
 
 // msg_msg_sink.cpp declares the index as u16 in some places, u32 in others

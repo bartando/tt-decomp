@@ -245,21 +245,42 @@ void jumptable_3A48(void* slot, unsigned int kind,
 
 void hsmContext_Init(void* obj)        { (void)obj; }
 void hsmContext_InitTimers(void)       {}
-void hsmEvent_Init(void* e)            { (void)e; }
+// 0x823DDA08 is snEvent's constructor, lifted in sn_event.cpp.
+void* snEvent_Construct(void* event);
+void hsmEvent_Init(void* e)            { snEvent_Construct(e); }
 void HSM_QueueNotification(void* n)    { (void)n; }
 void PostStateTransitionRequest(void* m, int e) { (void)m; (void)e; }
 void SetTrainingState(int s)           { (void)s; }
-void gmLogic_StepFrame(void)           {}
 
-// hsmEvent_Init also appears inside namespace rage — callers
-// (snMigrateMachine, snSessionStates) invoke it from within a
-// `namespace rage {}` block, so the mangled name carries the rage:: prefix.
-// rage::hsmState_AttachChild is defined with its body further down.
-namespace rage {
-void hsmEvent_Init(void* event) { (void)event; }
-}  // namespace rage
 
-extern "C" void gmLogic_StepFrame_impl(void* ctx) { (void)ctx; }
+// gmLogic vtable slot 3: reset the state machine and every child state.
+// The game loop reaches it through the one-branch thunk 0x82229760, so r3 is
+// the game loop's own object (render_loop.c passes g_pGmLogic instead).
+struct gmLogicView {
+    void** vtable;
+    int32_t childCount;     // +0x04
+    void** children;        // +0x08
+    int32_t currentIndex;   // +0x0C
+    int32_t state;          // +0x10
+};
+
+// @ 0x82222A78
+extern "C" void gmLogic_StepFrame(void* obj) {
+    using Fn = void (*)(void*);
+    using IntFn = void (*)(void*, int32_t);
+    auto* self = static_cast<gmLogicView*>(obj);
+    self->state = -1;
+    reinterpret_cast<Fn>(self->vtable[10])(self);
+    for (int32_t i = 0; i < self->childCount; ++i) {
+        void* child = self->children[i];
+        reinterpret_cast<Fn>((*static_cast<void***>(child))[3])(child);
+    }
+    self->currentIndex = 0;
+    if (self->children != nullptr && self->children[0] != nullptr) {
+        void* root = self->children[0];
+        reinterpret_cast<IntFn>((*static_cast<void***>(root))[5])(root, -1);
+    }
+}
 
 // asm-alias wrapper for the C-side PostStateTransitionRequest symbol.
 extern "C" void _c_PostStateTransitionRequest(void* m, int e)
