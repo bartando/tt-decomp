@@ -421,7 +421,10 @@ class Checker:
         if isinstance(ret, tuple) or ret == "r3":
             size = ret[1] if isinstance(ret, tuple) else 4
             mask = (1 << (8 * size)) - 1
-            if (o.gpr[3] & mask) != (l.gpr[3] & mask):
+            same_str = (sig is not None and sig.ret.kind == "ptr"
+                        and self._cstring(o.gpr[3]) is not None
+                        and self._cstring(o.gpr[3]) == self._cstring(l.gpr[3]))
+            if (o.gpr[3] & mask) != (l.gpr[3] & mask) and not same_str:
                 raise Divergence(f"{fn} returns r3 = 0x{o.gpr[3] & mask:X} (original) vs "
                                  f"0x{l.gpr[3] & mask:X} (lift)", self.args_line(regs))
         if ret == "r3:r4":
