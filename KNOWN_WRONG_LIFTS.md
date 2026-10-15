@@ -5,24 +5,29 @@ before relying on any of these; fix and delete the entry when done.
 
 ## Systemic: explicit vtable member + C++ virtuals
 
-Many structs (likely hundreds; `rage_misc.hpp`, `pong_render.hpp`, `char_view.hpp`,
-`cm_operators.hpp`, `rage_grm.hpp`, …) declare a `void** vtable` / `m_vtable` field AND C++
-`virtual` methods. The compiler then adds its own hidden vptr in front, so every field sits
-one pointer late (4 bytes on the game's 32-bit layout). Found by lift-check on `grmModel`
-(+0xC read as +0x10), `hsmStateBase`/`hsmState`, `pongPlayer`, the camera classes in `pong_camera.hpp` (all fixed),
-and `msgMsgSink` in `pong_misc.hpp` (NOT fixed: ~85 virtuals and the struct is also 4 bytes
-short mid-way, so the dialogManager ctor 0x822EC7F8 fails lift-check; spec
-`misc_dialog_manager_ctor` documents it). Fix per class: drop one of the
-two (keep C++ virtuals only where nothing needs the vtable field by name, otherwise make the
-methods non-virtual), then re-verify its lifts.
+Structs that declare a `void** vtable` / `m_vtable` field AND C++ `virtual` methods get a
+hidden vptr in front, so every field sits one pointer late (4 bytes on the game's 32-bit
+layout). The sweep (2026-10-15) fixed every such struct in the built TUs: keep the explicit
+vtable member, make the methods non-virtual, dispatch through the game's slot numbers, and
+pin offsets with `static_assert`s that only apply when pointers are 4 bytes. Still mixed:
+`rage_audio.hpp` (21 fields wrong without the virtuals; `pong_audio*.cpp` uses them),
+`include/rage/swf.hpp` (uses `override`), `rage_sn.hpp`, `pong_hud.hpp`, both `pong_game.hpp`,
+`pong_misc.hpp`'s own `pongPlayer` (clashes with the real one), `CCalMoviePlayer`,
+`LoopObject`, and headers no built file includes (`fx_effects.hpp`, `rage_swf.hpp`,
+`rage_fi.hpp`, `rage_mf.hpp`, `rage_at.hpp`, `include/rage/rage_misc.hpp`,
+`pcr_anim_events.hpp`, `gd_cutscene.hpp`). The `grmShaderFx` lifts in `rage_grm.cpp` use raw
+offsets and have no specs.
 
 ## Systemic: C++ virtual slot numbers don't match the game's vtables
 
 Headers declare virtuals with gaps (Itanium's two destructor slots, undeclared slots), so a
 C++ virtual call lands in the wrong slot. Found in `pongPlayer` (slot 9 called as 5),
 `pongCreatureInst` (slots 47/48/53/10 called as 26/27/28/8) and `pongTrainingDrill` (every
-slot 1..25 one off; header fixed, drill subclasses other than Movement not re-verified). Lifted code calls through
-`VCALL` with the game's slot number where verified; other virtual calls are suspect.
+slot 1..25 one off; fixed, subclasses verified). Lifted code calls through `VCALL` with the
+game's slot number where verified; other virtual calls are suspect. Still C++-virtual with
+unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, and
+`include/rage/hsmState.hpp` (hsmState's C++ order doesn't match the game's vtable at
+0x8206E70C).
 
 ## Link blockers (from the link pass, 2026-10-15)
 
@@ -60,18 +65,10 @@ slot 1..25 one off; header fixed, drill subclasses other than Movement not re-ve
 
 ## Wrong lifts
 
-- `fiAsciiTokenizer` (`src/rage/io/fiAsciiTokenizer.cpp`) defines a virtual destructor, which
-  forces vtable emission; removing it shifts every slot.
 - `fiAsciiTokenizer_CC50_g` returns `void`; the original returns `this`.
-- `WriteBlockOpen` (`fiAsciiTokenizer.cpp`) loops on `n > 0`; the asm tests `!= 0`.
 - 0x82460718 is lifted twice: `ph_vt57D8_20_Constructor` (`ph_physics.cpp`, unused) and
   `ph_vt57D8_20_0718` (`ph_update_object.cpp`, wrong vtable constants). It is an XAudio
   scalar deleting destructor, not a constructor.
-- `msgMsgSink_A970_2h` (`pong_network_io.cpp`): the final virtual call should pass
-  `this+0xC`; the lift drops it, adds a null check the asm lacks, and calls it a destructor.
-- `msgMsgSink_84C0_gen` (`pong_network_io.cpp`): skips the call to 0x82566B78 and does the
-  compare-and-swap on `this+0x14` instead of a stack copy of that result. It returns
-  0x8AC70012 when the current thread matches the id at `+0x14`.
 - `msgMsgSink::vfn_126` (0x8244FF38, `msg_msg_sink.cpp`): same name lookup as
   `xactGlobalSettings::FindCategory`, but loses the name argument and treats chain indices
   as pointers.
@@ -80,17 +77,12 @@ slot 1..25 one off; header fixed, drill subclasses other than Movement not re-ve
   and 0x821350B8 (`memory.cpp`, `datPtrArray_DestroyAll`) are the strip list's constructor and
   destructor under unrelated names.
 - `pongCameraMgr_6280_g` treats a `grcViewport` as a `pongCameraMgr`.
-- `charViewCS` repeats `camBaseCS`'s fields (CameraFOV/Near/Far at +0xA4..+0xAC) as `m_axisHook*`.
 - `camViewCS` slot 9 is named `OnSourceChanged`, but `pongCameraMgr::Update` calls it every frame.
 - 0x82228EA0 reads gameLoop+0x204, which `game_loop_types.h` calls a target FPS; the result is
   an aspect ratio, so one of the two labels is wrong.
 - 0x82606750 has four names across the codebase (`lbl_82606750` among them).
 - `snJoinMachine.cpp` (not built) calls `rage::hsmState_AttachChild` as
   `snHsmState_AttachChild(void*, void*)`; the real one takes `(hsmStateBase*, hsmStateBase*)`.
-- `char_view.hpp`: `pongAttractState::OnEnter` (0x82305800) sits in slot 14 but overrides
-  `hsmState::OnEnter`, which is slot 5.
-- `rage_grm.hpp` still names `grmShader` slot 0 `IsOfType` (asm: scalar deleting destructor)
-  and slot 6 `IsOfTypeExt` (asm: stores `this` as the active shader, returns 1).
 - `rage_free` (0x820C00C0) is declared `extern "C"` in some files and with C++ linkage in others.
 - `FinalizeServeSetup` (0x8219F9C0) and `ResetSwingTrackingState` (0x8219FA40) are
   `shotTarget` methods still declared on `pongPlayer`; callers go through a cast.
@@ -113,7 +105,6 @@ slot 1..25 one off; header fixed, drill subclasses other than Movement not re-ve
   globals are invented names.
 - `fx_effects.hpp` calls fxBallSpinTex slot 1 `ScalarDtor`, but `gmBallNode::Draw` calls it
   every frame.
-- `sg_physical.hpp`: `+0x74` is the phInst, `+0x7C` a separate draw object.
 - `gd_data.cpp` passes XML field types by value (asm: by address); 0x825CAF90 is the Int
   handler, not an enum one.
 - `globals.c` swaps the pointer and type arrays at 0x825F3868/0x825F3968.
@@ -132,12 +123,8 @@ slot 1..25 one off; header fixed, drill subclasses other than Movement not re-ve
 - `message.cpp` calls 0x826063AC `g_gameStateMgr`; it's the practice-target set count.
 - `message.cpp` (`PostGameEvent`) and `ui_page_group.h` (`ProcessPageGroupInput`) declare
   0x8225E480 wrong; it's a variadic poster driven by a format string ("fff", "ff", …).
-- `gd_data.hpp`: `gdaiMeterLogic` slot 21 is named `Validate`; it registers fields.
-- `gmLogicSinglesMatch`/`gmLogicSpectator` header skeletons mix an explicit `vtable` member
-  with C++ virtuals.
-- 0x820F0E78, 0x820F0EE8 (grm ScalarDtors) and 0x8222CFA8 (`fiAsciiTokenizer_SetString`)
-  return `this` in r3; the lifts return void (`rage_par.cpp` declares SetString void).
-- `grmModelGeom::GetGeometryEntry` reads `this[1]`; probably off by the vtable-member bug.
+- 0x8222CFA8 (`fiAsciiTokenizer_SetString`) returns `this` in r3; the lift returns void
+  (`rage_par.cpp` declares SetString void).
 - `pongPlayer`'s C++ virtuals don't number like the game's vtable (the Itanium destructor
   takes two slots; slots 3–6 and 8 aren't declared), so any virtual call on it through C++
   is suspect; the serve code calls slot 9 through a helper for that reason.
@@ -170,9 +157,30 @@ slot 1..25 one off; header fixed, drill subclasses other than Movement not re-ve
 - `CheckButtonPressed` is commented as 0x8225FFF8; it's 0x821DFFF8.
 - `include/game/pong_network_io.hpp` gives `BeginNetworkWrite` as "0x822288AE0" (0x82238AE0).
 - `rage_grm.cpp` declares `rage_free_00C0(uint32_t)` (truncates host pointers).
-- `msg_msg_sink.cpp` 8B78/8B90 drop the slot argument in r4.
 - `globals.c`: `g_msgSinkTemplate` is at 0x8261A0C0, not 0x8241A0C0.
 - `ph_ctor_0460_Destructor` stores vtable 0x820014C8; the asm stores 0x82059FA8.
+- `ph_physics.hpp`: the phBoundCapsule/phInst/phArticulatedCollider/phJoint3Dof/phBoundGeometry
+  "+0x" annotations overlap; they're access maps, not layouts. Lifts reading them by name are
+  suspect.
+- `pongDrawBucket_AddEntry` 0x822278D8 is declared `extern "C"` in `sg_physical.cpp` and with
+  C++ linkage in `ph_update_object.cpp`.
+- `fragDrawable::ProcessGeometry` 0x820F1C00 is really grmModel's draw (its only caller is
+  rmcDrawable at 0x8225D9E4).
+- phUpdateObject slot 1 still has a FIXME body.
+- `msgMsgSink_84C0_gen` is fixed but unverified: lift-check can't run `mtmsrd`.
+- `gd_data_strings.hpp`: the `g_str_*` are probably arrays declared as pointers at wrong
+  addresses (`g_str_gdTier_unknownNodeType` was; it's the string at 0x82042844).
+- `_crt_tls_fiber_setup` (0x82566B78) is GetCurrentThreadId.
+- `sysMemAllocator_Free` is marked with two addresses (0x82186228, 0x820C00C0);
+  `rage::ReleaseSingleton` resolves to 0x8204E6FC.
+- `~pongNetMessageHolder` stores no vtables and doesn't free.
+- `globals.c`: `g_drillCleanupParam` (0x825C74FC) is gdDrillSoftShotData's class id.
+- `pong_states.hpp` and `char_view.hpp` both define `pongAttractState`; `pong_camera.hpp` and
+  `char_view.hpp` both define `charViewCS`. 0x8216DBB8 is lifted twice
+  (`charViewCS::RegisterXmlFields` in `char_view.cpp` is the wrong copy).
+- `pongHairData_7B60_g` takes 6 args (r3..r8); `fx_effects.cpp` declares 7.
+- `pong_creature.cpp`'s `field_0x` lifts now read the right offsets, but most look invented and
+  are unverified.
 - `ph_TokenizerReadInt`/`ReadFloat` (0x82430E88/E90) are CRT math wrappers taking a double in f1.
 - `math_Sqrt`, `Acos`, `Asin`, `Atan2`, `Sin` are labelled with mid-function addresses
   (0x8240D888…).
