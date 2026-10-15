@@ -12,22 +12,66 @@
 #pragma once
 #include <stdint.h>
 
+struct pongCMCamera;
+struct pongCineCamMgr;
+namespace rage { struct cmNamedValueSet; }  // RTTI: vtable @ 0x820373AC
+
+// 16-byte vector as the camera code stores it (xyz + w).
+struct CamVec4 {
+    float x, y, z, w;
+};
+
+// Four 16-byte rows: a = right, b = up, c = forward, d = position (row names from
+// the camera machine's value names, see CMtoCSAdapter::PublishCameraMatrix).
+// Used both as rage's Matrix34 (w ignored) and as a full 4x4.
+struct CamMatrix44 {
+    CamVec4 a, b, c, d;
+};
+
+// ── grcViewport (no vtable, 0x390 bytes) ──────────────────────────
+// Name inferred from RAGE: it holds the camera and view matrices, the
+// FOV/aspect/clip block at +0x338 (written by camViewCS::Update) and a
+// "current viewport" global (0x825EBAA0) that 0x82153070 re-uploads when this
+// viewport is current. pongCameraMgr owns three of them.
+struct grcViewport {
+    uint8_t     _pad_0x000[0x40];   // +0x000..+0x03F
+    CamMatrix44 m_cameraMtx;        // +0x040 - camera (world) matrix, copied verbatim
+    uint8_t     _pad_0x080[0x100];  // +0x080..+0x17F (composites rebuilt by 0x82153070)
+    CamMatrix44 m_cameraMtx44;      // +0x180 - camera matrix with w forced to (0, 0, 0, 1)
+    CamMatrix44 m_viewMtx;          // +0x1C0 - inverse of the camera matrix, w forced to (0, 0, 0, 1)
+    CamMatrix44 m_viewMtxFlipZ;     // +0x200 - m_viewMtx with its z column negated
+    uint8_t     _pad_0x240[0x150];  // +0x240..+0x38F (+0x338..+0x344 FOV/aspect/clip, +0x360 dirty flag)
+
+    void SetCameraMtx(const CamMatrix44& cameraMtx);  // @ 0x821539F0
+};
+static_assert(sizeof(grcViewport) == 0x390, "grcViewport is 912 bytes");
+
+// ── camBaseCS  [vtable @ 0x82036454] ──────────────────────────
+// Base of the camera sources (CMtoCSAdapter, charViewCS); ctor @ 0x8216D9B8.
+struct camBaseCS {
+    void**       vtable;           // +0x00
+    uint8_t      _pad_0x04[0x0C];  // +0x04..+0x0F
+    CamMatrix44  m_matrix;         // +0x10 - camera matrix of this source (identity in the ctor)
+    uint8_t      _pad_0x50[0x48];  // +0x50..+0x97
+    grcViewport* m_viewport;       // +0x98 - viewport this source renders through
+
+    // ── virtual methods ──
+    virtual ~camBaseCS();                  // [0] @ 0x8216daa0
+};
+
 // ── CMtoCSAdapter  [vtable @ 0x82036844] ──────────────────────────
-struct CMtoCSAdapter {
-    void**      vtable;           // +0x00
+// Camera source driven by the camera machine; ctor @ 0x8216EE68 (base ctor 0x8216D9B8 first).
+struct CMtoCSAdapter : camBaseCS {
+    uint8_t       _pad_0x9C[0x94];  // +0x9C..+0x12F
+    pongCMCamera* m_cmCamera;       // +0x130 - second ctor argument (pongCameraMgr::m_cmCamera)
 
     // ── virtual methods ──
     virtual ~CMtoCSAdapter();                  // [0] @ 0x8216e968
     virtual void vfn_8();  // [8] @ 0x8216f828
     virtual void vfn_9();  // [9] @ 0x821709f8
-};
 
-// ── camBaseCS  [vtable @ 0x82036454] ──────────────────────────
-struct camBaseCS {
-    void**      vtable;           // +0x00
-
-    // ── virtual methods ──
-    virtual ~camBaseCS();                  // [0] @ 0x8216daa0
+    // ── non-virtual methods ──
+    void PublishCameraMatrix(const CamMatrix44& cameraMtx);  // @ 0x821722F8
 };
 
 // ── camShot  [vtable @ 0x82035CFC] ──────────────────────────
@@ -70,7 +114,7 @@ struct camViewCS {
     float       m_timeAccumulator;    // +0x14 - reset to 0.0 by OnReset
     uint8_t     _pad_0x18[20];        // +0x18..+0x2B
     void*       m_cameraMgr;          // +0x28 - bound pongCameraMgr (receives FOV writes)
-    uint8_t     _pad_0x2C[4];         // +0x2C..+0x2F
+    camBaseCS*  m_source;             // +0x2C - camera source being viewed (pongCameraMgr::Update publishes its matrix)
     void*       m_boundCamera;        // +0x30 - bound camera/source object (supplies position at +164)
     uint8_t     _pad_0x34[4];         // +0x34..+0x37
     void*       m_activeSource;       // +0x38 - active camShot / source dispatched through vtable
@@ -176,17 +220,37 @@ struct gdCameraInst {
     virtual void PostLoadChildren();  // [22] @ 0x8220c180
 };
 
+// Camera machine instance owned by pongCMCamera, built by 0x82261748 from the
+// "PongCamera" definition. Only the field the camera manager reads is known.
+struct CameraMachineInstance {
+    uint8_t     _pad_0x00[0x3C];  // +0x00..+0x3B (+0x10 holds pongCMCamera::m_values)
+    void*       m_flagTable;      // +0x3C - name-hash table searched by 0x82274870 ("CameraHasSides")
+};
+
 // ── pongCMCamera  [vtable @ 0x82036508] ──────────────────────────
 struct pongCMCamera {
-    void**      vtable;           // +0x00
+    void**                 vtable;           // +0x00
+    CameraMachineInstance* m_machine;        // +0x04 - built from "PongCamera" (0x8216DF88)
+    uint8_t                _pad_0x08[0x10];  // +0x08..+0x17
+    rage::cmNamedValueSet* m_values;         // +0x18 - the 81 named camera values (ids set up by 0x82175248)
 
     // ── virtual methods ──
     virtual ~pongCMCamera();                  // [0] @ 0x8216dd08
 };
 
+// 8-byte block at pongCamGovernor+0x08. The shot-condition helpers take it by
+// address (0x821F7818, 0x821F78D8) or by value (0x82216F68, 0x82217278).
+struct CamShotKey {
+    float       field_0x00;   // +0x00 - set to max(tuning value, argument) by 0x82167110
+    float       field_0x04;   // +0x04 - zeroed by 0x82167110; copied to g_cineSampleInterval in mode 1
+};
+
 // ── pongCamGovernor  [vtable @ 0x82036064] ──────────────────────────
+// 0x28 bytes, ctor inlined in 0x82166EA0. pongCineCamMgr owns two.
 struct pongCamGovernor {
     void**      vtable;           // +0x00
+    void*       m_machine;        // +0x04 - camera machine stepped by 0x82167EA8 (its +0x08 is the node index)
+    CamShotKey  m_shotKey;        // +0x08 - both 0.0 in the ctor
 
     // ── virtual methods ──
     virtual ~pongCamGovernor();                  // [0] @ 0x82168890
@@ -201,15 +265,14 @@ struct pongCameraMgr {
     float       m_currentTime;      // +0x08 - current timing value
     uint32_t    field_0x0c;         // +0x0C
     uint32_t    field_0x10;         // +0x10 - MI vtable/child ptr region
-    uint32_t    field_0x14;         // +0x14
-    void*       m_slotsBase;        // +0x18 - base ptr to camera slot array
-    uint32_t    field_0x1c;         // +0x1C
-    uint32_t    field_0x20;         // +0x20
-    uint32_t    field_0x24;         // +0x24
-    void*       m_cameraObj;        // +0x28 - active camera object ptr
-    void*       m_subState;         // +0x2C - camera sub-state ptr
-    uint32_t    field_0x30;         // +0x30
-    uint32_t    field_0x34;         // +0x34
+    grcViewport* m_viewport;        // +0x14 - viewport of the camera-machine source (also camViewCS +0x28)
+    grcViewport* m_slotsBase;       // +0x18 - grcViewport[2] from new[] (16-byte count header before it)
+    int32_t     m_activeSourceIndex; // +0x1C - index into m_sources of the source that drives the view
+    camBaseCS*  m_sources[2];       // +0x20 - [0] CMtoCSAdapter, [1] charViewCS (built by vfn_23)
+    camViewCS*  m_cameraObj;        // +0x28 - camViewCS turning a source into the render viewport
+    pongCineCamMgr* m_subState;     // +0x2C - cinematic camera manager
+    uint32_t    field_0x30;         // +0x30 - same CMtoCSAdapter as m_sources[0]
+    pongCMCamera* m_cmCamera;       // +0x34 - camera-machine wrapper the adapter reads
     uint32_t    m_resetCounter;     // +0x38 - zeroed on reset (vfn_25)
 
     // Timing data array base (variable-length floats accessed via [index])
@@ -234,9 +297,9 @@ struct pongCameraMgr {
     virtual bool PostLoadProperties(uint32_t value);  // [20] @ 0x821657f8
     virtual const char* PostLoadChildren();  // [22] @ 0x82165830
     virtual void vfn_23();  // [23] @ 0x82165960
-    virtual void vfn_24();  // [24] @ 0x82165f30
+    virtual void Shutdown();  // [24] @ 0x82165f30 — frees what vfn_23 built
     virtual void vfn_25();  // [25] @ 0x82166068
-    virtual void vfn_27();  // [27] @ 0x82166118
+    virtual void Update();  // [27] @ 0x82166118 — per-frame camera update
 
     // ── non-virtual methods ──
     void ChangeCamera();
@@ -417,9 +480,19 @@ struct pongCameraState {
 };
 
 // ── pongCineCamMgr  [vtable @ 0x82036070] ──────────────────────────
+// 0x18 bytes, ctor @ 0x82166EA0.
 struct pongCineCamMgr {
-    void**      vtable;           // +0x00
+    void**           vtable;        // +0x00
+    uint32_t         field_0x04;    // +0x04 - zeroed by the ctor and by pongCameraMgr::vfn_25
+    int32_t          m_mode;        // +0x08 - 0 idle, 1 governor A drives, 2/3 governor B drives (set by 0x82167180)
+    uint8_t          field_0x0c;    // +0x0C - set by pongCameraMgr::vfn_23 when "InlineTestRoot" is missing
+    uint8_t          _pad_0x0d[3];  // +0x0D..+0x0F
+    pongCamGovernor* m_governorA;   // +0x10
+    pongCamGovernor* m_governorB;   // +0x14
 
     // ── virtual methods ──
     virtual ~pongCineCamMgr();                  // [0] @ 0x82166fd8
+
+    // ── non-virtual methods ──
+    void StepActiveGovernor();                  // @ 0x82167558
 };
