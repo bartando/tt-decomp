@@ -175,6 +175,7 @@ set(SOURCES
     src/link/linkage_bridges.cpp
     src/rage/net/dat_bit_buffer.cpp
     src/rage/core/debug_print_nops.cpp
+    src/rage/data/dat_parser_fields.cpp
 )
 
 # Create executable

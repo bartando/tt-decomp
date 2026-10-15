@@ -61,3 +61,7 @@ extern "C" void* g_grmShaderFactory_instance = nullptr;
 // @ 0x8271A320 (.data)
 extern "C" void* g_pGrcDevice_clear = nullptr;
 TT_DATA_ALIAS("g_pMatchResultData", "g_pGrcDevice_clear");
+
+// @ 0x82037494 (.rdata) — datParserRecord's vtable, 3 slots of PPC code
+// addresses in the image, null in the port. datParser_AddField stores it.
+extern "C" void* const datParserRecord_vtable[3] = {};
