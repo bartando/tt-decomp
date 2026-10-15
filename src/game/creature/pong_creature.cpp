@@ -2140,6 +2140,14 @@ void pongCreatureInst::SetLastMatrix(const float* matrix) {
     memcpy(Layout(this)->lastMatrix, matrix, sizeof(Layout(this)->lastMatrix));
 }
 
+// The game's slot 10 (ApplyAt). The header's virtuals have gaps, so a C++
+// virtual call to ApplyAt would go through slot 8.
+static void CallApplyAt(pongCreatureInst* inst, const float* vec, const float* point, int component,
+                        int element) {
+    VCALL(inst, 10, void (*)(pongCreatureInst*, const float*, const float*, int, int))(
+        inst, vec, point, component, element);
+}
+
 /**
  * pongCreatureInst::ApplyAtPosition @ 0x822C90B0 | size: 0x1C  [vtable slot 9]
  *
@@ -2147,7 +2155,7 @@ void pongCreatureInst::SetLastMatrix(const float* matrix) {
  * the point and component and element 0.
  */
 void pongCreatureInst::ApplyAtPosition(const float* vec) {
-    ApplyAt(vec, Layout(this)->matrix[3], 0, 0);  // vtable slot 10
+    CallApplyAt(this, vec, Layout(this)->matrix[3], 0, 0);
 }
 
 /**
@@ -2188,7 +2196,7 @@ void pongCreatureInst::ApplyToRope(const float* vec, const float* point, int com
  * rage::phInst's: tail-calls slot 10 with element 0.
  */
 void pongCreatureInst::ApplyAtComponent(const float* vec, const float* point, int component) {
-    ApplyAt(vec, point, component, 0);  // vtable slot 10
+    CallApplyAt(this, vec, point, component, 0);
 }
 
 /**
