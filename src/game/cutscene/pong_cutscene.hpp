@@ -13,6 +13,11 @@
  * pongCSActionWait : pongCSAction.)
  */
 #pragma once
+
+// Structs that carry the game's vtable as an explicit `vtable` member list
+// their slots as plain (non-virtual) methods: a C++ virtual would add a hidden
+// vptr in front of `vtable` and shift every member by 4. pong_cutscene.cpp
+// calls child actions through the game's slots (CS_SLOT_*).
 #include <stdint.h>
 
 // ── gdCSActionCamAnimData  [vtable @ 0x82077C4C] ──────────────────────────
@@ -21,9 +26,9 @@ struct gdCSActionCamAnimData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x8240f1b8
-    virtual void Validate();  // [21] @ 0x8240f210
-    virtual void PostLoadChildren();  // [22] @ 0x82347498
+    void PostLoadProperties();  // [20] @ 0x8240f1b8
+    void Validate();  // [21] @ 0x8240f210
+    void PostLoadChildren();  // [22] @ 0x82347498
 
 };
 
@@ -33,9 +38,9 @@ struct gdCSActionCharAmbAnimData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x8240fb50
-    virtual void Validate();  // [21] @ 0x8240fc10
-    virtual void PostLoadChildren();  // [22] @ 0x82347868
+    void PostLoadProperties();  // [20] @ 0x8240fb50
+    void Validate();  // [21] @ 0x8240fc10
+    void PostLoadChildren();  // [22] @ 0x82347868
 };
 
 // ── gdCSActionCharAnimData  [vtable @ 0x82077CB4] ──────────────────────────
@@ -44,9 +49,9 @@ struct gdCSActionCharAnimData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x8240f310
-    virtual void Validate();  // [21] @ 0x8240f368
-    virtual void PostLoadChildren();  // [22] @ 0x82347538
+    void PostLoadProperties();  // [20] @ 0x8240f310
+    void Validate();  // [21] @ 0x8240f368
+    void PostLoadChildren();  // [22] @ 0x82347538
 };
 
 // ── gdCSActionCharVisibleData  [vtable @ 0x82077D1C] ──────────────────────────
@@ -55,9 +60,9 @@ struct gdCSActionCharVisibleData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x8240f4d8
-    virtual void Validate();  // [21] @ 0x8240f530
-    virtual void PostLoadChildren();  // [22] @ 0x823475e8
+    void PostLoadProperties();  // [20] @ 0x8240f4d8
+    void Validate();  // [21] @ 0x8240f530
+    void PostLoadChildren();  // [22] @ 0x823475e8
 };
 
 // ── gdCSActionDoInOrderData  [vtable @ 0x82065504] ──────────────────────────
@@ -65,8 +70,8 @@ struct gdCSActionDoInOrderData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x8240ead0
-    virtual void PostLoadChildren();  // [22] @ 0x82347170
+    void PostLoadProperties();  // [20] @ 0x8240ead0
+    void PostLoadChildren();  // [22] @ 0x82347170
 };
 
 // ── gdCSActionDoTogetherData  [vtable @ 0x8206549C] ──────────────────────────
@@ -74,9 +79,9 @@ struct gdCSActionDoTogetherData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x8240ea78
-    virtual void Validate();  // [21] @ 0x8240e8d0
-    virtual void PostLoadChildren();  // [22] @ 0x823470d8
+    void PostLoadProperties();  // [20] @ 0x8240ea78
+    void Validate();  // [21] @ 0x8240e8d0
+    void PostLoadChildren();  // [22] @ 0x823470d8
 };
 
 // ── gdCSActionElseData  [vtable @ 0x8206556C] ──────────────────────────
@@ -84,8 +89,8 @@ struct gdCSActionElseData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x8240f0a0
-    virtual void PostLoadChildren();  // [22] @ 0x82347360
+    void PostLoadProperties();  // [20] @ 0x8240f0a0
+    void PostLoadChildren();  // [22] @ 0x82347360
 };
 
 // ── gdCSActionIfData  [vtable @ 0x82077B7C] ──────────────────────────
@@ -93,10 +98,10 @@ struct gdCSActionIfData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~gdCSActionIfData();                  // [0] @ 0x8240ec40
-    virtual void PostLoadProperties();  // [20] @ 0x8240ebe8
-    virtual void Validate();  // [21] @ 0x8240ecb0
-    virtual void PostLoadChildren();  // [22] @ 0x823472a8
+    ~gdCSActionIfData();                  // [0] @ 0x8240ec40
+    void PostLoadProperties();  // [20] @ 0x8240ebe8
+    void Validate();  // [21] @ 0x8240ecb0
+    void PostLoadChildren();  // [22] @ 0x823472a8
 };
 
 // ── gdCSActionLoopData  [vtable @ 0x82077B14] ──────────────────────────
@@ -108,9 +113,9 @@ struct gdCSActionLoopData {
     int         m_nMaxIterations; // +0x14
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x8240eb28
-    virtual void Validate();  // [21] @ 0x8240eb80
-    virtual void PostLoadChildren();  // [22] @ 0x82347208
+    void PostLoadProperties();  // [20] @ 0x8240eb28
+    void Validate();  // [21] @ 0x8240eb80
+    void PostLoadChildren();  // [22] @ 0x82347208
 };
 
 // ── gdCSActionLvlAmbAnimData  [vtable @ 0x82077DEC] ──────────────────────────
@@ -119,9 +124,9 @@ struct gdCSActionLvlAmbAnimData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x8240f948
-    virtual void Validate();  // [21] @ 0x8240fa08
-    virtual void PostLoadChildren();  // [22] @ 0x823477c8
+    void PostLoadProperties();  // [20] @ 0x8240f948
+    void Validate();  // [21] @ 0x8240fa08
+    void PostLoadChildren();  // [22] @ 0x823477c8
 };
 
 // ── gdCSActionLvlAnimData  [vtable @ 0x82065434] ──────────────────────────
@@ -130,9 +135,9 @@ struct gdCSActionLvlAnimData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x8240f818
-    virtual void Validate();  // [21] @ 0x8240f870
-    virtual void PostLoadChildren();  // [22] @ 0x82347730
+    void PostLoadProperties();  // [20] @ 0x8240f818
+    void Validate();  // [21] @ 0x8240f870
+    void PostLoadChildren();  // [22] @ 0x82347730
 };
 
 // ── gdCSActionPlayAudioData  [vtable @ 0x82077D84] ──────────────────────────
@@ -141,9 +146,9 @@ struct gdCSActionPlayAudioData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x8240f608
-    virtual void Validate();  // [21] @ 0x8240f660
-    virtual void PostLoadChildren();  // [22] @ 0x82347688
+    void PostLoadProperties();  // [20] @ 0x8240f608
+    void Validate();  // [21] @ 0x8240f660
+    void PostLoadChildren();  // [22] @ 0x82347688
 };
 
 // ── gdCSActionShowAllAmbientsData  [vtable @ 0x82077EBC] ──────────────────────────
@@ -151,9 +156,9 @@ struct gdCSActionShowAllAmbientsData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x8240fd90
-    virtual void Validate();  // [21] @ 0x8240fde8
-    virtual void PostLoadChildren();  // [22] @ 0x82347910
+    void PostLoadProperties();  // [20] @ 0x8240fd90
+    void Validate();  // [21] @ 0x8240fde8
+    void PostLoadChildren();  // [22] @ 0x82347910
 };
 
 // ── gdCSActionWaitData  [vtable @ 0x82077BE4] ──────────────────────────
@@ -165,9 +170,9 @@ struct gdCSActionWaitData {
     float       m_fDuration;      // +0x14 (seconds to wait)
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x8240f0f8
-    virtual void Validate();  // [21] @ 0x8240f150
-    virtual void PostLoadChildren();  // [22] @ 0x823473f8
+    void PostLoadProperties();  // [20] @ 0x8240f0f8
+    void Validate();  // [21] @ 0x8240f150
+    void PostLoadChildren();  // [22] @ 0x823473f8
 };
 
 // ── gdCSCamAnimNames  [vtable @ 0x8206521C] ──────────────────────────
@@ -175,10 +180,10 @@ struct gdCSCamAnimNames {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~gdCSCamAnimNames();                  // [0] @ 0x82346908
-    virtual void Init();  // [3] @ 0x8240e2d8
-    virtual void PostLoadProperties();  // [20] @ 0x8240e150
-    virtual void PostLoadChildren();  // [22] @ 0x8240e198
+    ~gdCSCamAnimNames();                  // [0] @ 0x82346908
+    void Init();  // [3] @ 0x8240e2d8
+    void PostLoadProperties();  // [20] @ 0x8240e150
+    void PostLoadChildren();  // [22] @ 0x8240e198
 };
 
 // ── gdCSCamAnimShotName  [vtable @ 0x82077024] ──────────────────────────
@@ -187,8 +192,8 @@ struct gdCSCamAnimShotName {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x8240dbc0
-    virtual void PostLoadChildren();  // [22] @ 0x8240dc08
+    void PostLoadProperties();  // [20] @ 0x8240dbc0
+    void PostLoadChildren();  // [22] @ 0x8240dc08
 };
 
 // ── gdCSCamAnimShotNameSeq  [vtable @ 0x820651B4] ──────────────────────────
@@ -197,11 +202,11 @@ struct gdCSCamAnimShotNameSeq {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~gdCSCamAnimShotNameSeq();                  // [0] @ 0x82346958
-    virtual void Init();  // [3] @ 0x8240e080
-    virtual void PostLoadProperties();  // [20] @ 0x8240deb8
-    virtual void Validate();  // [21] @ 0x8240dd18
-    virtual void PostLoadChildren();  // [22] @ 0x8240df10
+    ~gdCSCamAnimShotNameSeq();                  // [0] @ 0x82346958
+    void Init();  // [3] @ 0x8240e080
+    void PostLoadProperties();  // [20] @ 0x8240deb8
+    void Validate();  // [21] @ 0x8240dd18
+    void PostLoadChildren();  // [22] @ 0x8240df10
 };
 
 // ── gdCSCharAnimData  [vtable @ 0x82076D4C] ──────────────────────────
@@ -210,11 +215,11 @@ struct gdCSCharAnimData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~gdCSCharAnimData();                  // [0] @ 0x8240cae0
-    virtual void Init();  // [3] @ 0x8240cde8
-    virtual void PostLoadProperties();  // [20] @ 0x8240c990
-    virtual void Validate();  // [21] @ 0x8240cbd0
-    virtual void PostLoadChildren();  // [22] @ 0x8240c9d8
+    ~gdCSCharAnimData();                  // [0] @ 0x8240cae0
+    void Init();  // [3] @ 0x8240cde8
+    void PostLoadProperties();  // [20] @ 0x8240c990
+    void Validate();  // [21] @ 0x8240cbd0
+    void PostLoadChildren();  // [22] @ 0x8240c9d8
 };
 
 // ── gdCSCharAnimNames  [vtable @ 0x82076DB4] ──────────────────────────
@@ -223,10 +228,10 @@ struct gdCSCharAnimNames {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~gdCSCharAnimNames();                  // [0] @ 0x8240d230
-    virtual void Init();  // [3] @ 0x8240d340
-    virtual void PostLoadProperties();  // [20] @ 0x8240d130
-    virtual void PostLoadChildren();  // [22] @ 0x8240d178
+    ~gdCSCharAnimNames();                  // [0] @ 0x8240d230
+    void Init();  // [3] @ 0x8240d340
+    void PostLoadProperties();  // [20] @ 0x8240d130
+    void PostLoadChildren();  // [22] @ 0x8240d178
 
     // ── non-virtual methods (from debug strings) ──
     void FindRandAnimData();
@@ -238,9 +243,9 @@ struct gdCSCharCamShotName {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~gdCSCharCamShotName();                  // [0] @ 0x8240fba8
-    virtual void PostLoadProperties();  // [20] @ 0x8240c420
-    virtual void PostLoadChildren();  // [22] @ 0x8240c468
+    ~gdCSCharCamShotName();                  // [0] @ 0x8240fba8
+    void PostLoadProperties();  // [20] @ 0x8240c420
+    void PostLoadChildren();  // [22] @ 0x8240c468
 };
 
 // ── gdCSCharCamShotNameSeq  [vtable @ 0x82065284] ──────────────────────────
@@ -249,11 +254,11 @@ struct gdCSCharCamShotNameSeq {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~gdCSCharCamShotNameSeq();                  // [0] @ 0x823469a8
-    virtual void Init();  // [3] @ 0x8240c8c0
-    virtual void PostLoadProperties();  // [20] @ 0x8240c6f0
-    virtual void Validate();  // [21] @ 0x8240c510
-    virtual void PostLoadChildren();  // [22] @ 0x8240c748
+    ~gdCSCharCamShotNameSeq();                  // [0] @ 0x823469a8
+    void Init();  // [3] @ 0x8240c8c0
+    void PostLoadProperties();  // [20] @ 0x8240c6f0
+    void Validate();  // [21] @ 0x8240c510
+    void PostLoadChildren();  // [22] @ 0x8240c748
 };
 
 // ── gdCSNameData  [vtable @ 0x82077A44] ──────────────────────────
@@ -262,9 +267,9 @@ struct gdCSNameData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x8240e6d8
-    virtual void Validate();  // [21] @ 0x8240e7b8
-    virtual void PostLoadChildren();  // [22] @ 0x8240e720
+    void PostLoadProperties();  // [20] @ 0x8240e6d8
+    void Validate();  // [21] @ 0x8240e7b8
+    void PostLoadChildren();  // [22] @ 0x8240e720
 };
 
 // ── gdCutSceneData  [vtable @ 0x82077AAC] ──────────────────────────
@@ -273,9 +278,9 @@ struct gdCutSceneData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x8240e8f0
-    virtual void Validate();  // [21] @ 0x8240e9a8
-    virtual void PostLoadChildren();  // [22] @ 0x82347030
+    void PostLoadProperties();  // [20] @ 0x8240e8f0
+    void Validate();  // [21] @ 0x8240e9a8
+    void PostLoadChildren();  // [22] @ 0x82347030
 };
 
 // ── gdCutSceneNames  [vtable @ 0x820779DC] ──────────────────────────
@@ -283,8 +288,8 @@ struct gdCutSceneNames {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x8240e5f8
-    virtual void PostLoadChildren();  // [22] @ 0x8240e640
+    void PostLoadProperties();  // [20] @ 0x8240e5f8
+    void PostLoadChildren();  // [22] @ 0x8240e640
 };
 
 // ── pongCSAction  [vtable @ 0x82065674] ──────────────────────────
@@ -298,17 +303,17 @@ struct pongCSAction {
     uint16_t        _pad0E;        // +0x0E
 
     // ── virtual methods ──
-    virtual ~pongCSAction();                  // [0] @ 0x8234aca0
-    virtual void ScalarDtor(int flags); // [1] @ 0x82348930
-    virtual void Init();  // [3] @ 0x82348980
-    virtual void Update();  // [4] @ 0x82349200
-    virtual void Play();  // [5] @ 0x82349258
-    virtual void Stop();  // [6] @ 0x82349318
-    virtual void Pause(float dt);  // [7] @ 0x823492b0
-    virtual bool Resume();  // [8] @ 0x82349370
-    virtual void Seek(float t);  // [9] @ 0x823493f8
-    virtual void OnEnter();  // [11] @ 0x82349458
-    virtual void OnComplete();  // [12] @ 0x82349510
+    ~pongCSAction();                  // [0] @ 0x8234aca0
+    void ScalarDtor(int flags); // [1] @ 0x82348930
+    void Init();  // [3] @ 0x82348980
+    void Update();  // [4] @ 0x82349200
+    void Play();  // [5] @ 0x82349258
+    void Stop();  // [6] @ 0x82349318
+    void Pause(float dt);  // [7] @ 0x823492b0
+    bool Resume();  // [8] @ 0x82349370
+    void Seek(int tag);  // [9] @ 0x823493f8 — passes r4 through to every child
+    void OnEnter();  // [11] @ 0x82349458
+    void OnComplete();  // [12] @ 0x82349510
 };
 
 // ── pongCSActionCamAnim  [vtable @ 0x82065854] ──────────────────────────
@@ -317,9 +322,9 @@ struct pongCSActionCamAnim {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void Play();  // [5] @ 0x8234a1c0
-    virtual void Pause();  // [7] @ 0x8234a2f8
-    virtual void Resume();  // [8] @ 0x8234a420
+    void Play();  // [5] @ 0x8234a1c0
+    void Pause();  // [7] @ 0x8234a2f8
+    void Resume();  // [8] @ 0x8234a420
 };
 
 // ── pongCSActionCharAmbAnim  [vtable @ 0x820659BC] ──────────────────────────
@@ -327,8 +332,8 @@ struct pongCSActionCharAmbAnim {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void Stop();  // [6] @ 0x8234ad98
-    virtual void GetProgress();  // [10] @ 0x82348868
+    void Stop();  // [6] @ 0x8234ad98
+    void GetProgress();  // [10] @ 0x82348868
 };
 
 // ── pongCSActionCharAnim  [vtable @ 0x82065890] ──────────────────────────
@@ -336,14 +341,14 @@ struct pongCSActionCharAnim {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void Init();  // [3] @ 0x8234a4b8
-    virtual void Update();  // [4] @ 0x8234a590
-    virtual void Play();  // [5] @ 0x8234a648
-    virtual void Stop();  // [6] @ 0x8234a660
-    virtual void Pause();  // [7] @ 0x8234a9a0
-    virtual bool Resume();  // [8] @ 0x8234aaf8
-    virtual void Seek();  // [9] @ 0x8234ab28
-    virtual void OnComplete();  // [12] @ 0x8234abb0
+    void Init();  // [3] @ 0x8234a4b8
+    void Update();  // [4] @ 0x8234a590
+    void Play();  // [5] @ 0x8234a648
+    void Stop();  // [6] @ 0x8234a660
+    void Pause();  // [7] @ 0x8234a9a0
+    bool Resume();  // [8] @ 0x8234aaf8
+    void Seek();  // [9] @ 0x8234ab28
+    void OnComplete();  // [12] @ 0x8234abb0
 };
 
 // ── pongCSActionCharVisible  [vtable @ 0x820658CC] ──────────────────────────
@@ -351,7 +356,7 @@ struct pongCSActionCharVisible {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void Stop();  // [6] @ 0x8234abc8
+    void Stop();  // [6] @ 0x8234abc8
 };
 
 // ── pongCSActionDoInOrder  [vtable @ 0x82065728] ──────────────────────────
@@ -360,13 +365,13 @@ struct pongCSActionDoInOrder : pongCSAction {
     int         m_nCurrentChild;  // +0x10 (index of child currently playing)
 
     // ── virtual methods (overrides) ──
-    virtual void Init();  // [3] — forwards Init() to every child
-    virtual void Play();
-    virtual void Stop();
-    virtual void Pause(float dt);
-    virtual bool Resume();
-    virtual void Seek(float t);
-    virtual void OnComplete();
+    void Init();  // [3] — forwards Init() to every child
+    void Play();
+    void Stop();
+    void Pause(float dt);
+    bool Resume();
+    void Seek(int tag);
+    void OnComplete();
 };
 
 // ── pongCSActionDoTogether  [vtable @ 0x820656EC] ──────────────────────────
@@ -384,11 +389,11 @@ struct pongCSActionIf {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void Init();  // [3] @ 0x823499f0
-    virtual void Stop();  // [6] @ 0x82349ab0
-    virtual void Pause();  // [7] @ 0x82349cf8
-    virtual bool Resume();  // [8] @ 0x82349da8
-    virtual void Seek();  // [9] @ 0x82349e70
+    void Init();  // [3] @ 0x823499f0
+    void Stop();  // [6] @ 0x82349ab0
+    void Pause();  // [7] @ 0x82349cf8
+    bool Resume();  // [8] @ 0x82349da8
+    void Seek(int tag);  // [9] @ 0x82349e70
 };
 
 // ── pongCSActionLoop  [vtable @ 0x82065764] ──────────────────────────
@@ -402,11 +407,11 @@ struct pongCSActionLoop {
     int                     m_nCurrentIteration; // +0x14
 
     // ── virtual methods ──
-    virtual void Play();       // [5] @ 0x82349808
-    virtual void Stop();       // [6] @ 0x82349840
-    virtual void Pause();      // [7] @ 0x82349868
-    virtual bool Resume();     // [8] @ 0x82349998
-    virtual void OnComplete(); // [12] @ 0x823499e0
+    void Play();       // [5] @ 0x82349808
+    void Stop();       // [6] @ 0x82349840
+    void Pause();      // [7] @ 0x82349868
+    bool Resume();     // [8] @ 0x82349998
+    void OnComplete(); // [12] @ 0x823499e0
 };
 
 // ── pongCSActionLvlAmbAnim  [vtable @ 0x82065980] ──────────────────────────
@@ -414,7 +419,7 @@ struct pongCSActionLvlAmbAnim {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void Stop();  // [6] @ 0x8234ad10
+    void Stop();  // [6] @ 0x8234ad10
 };
 
 // ── pongCSActionLvlAnim  [vtable @ 0x82065944] ──────────────────────────
@@ -422,7 +427,7 @@ struct pongCSActionLvlAnim {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void Stop();  // [6] @ 0x8234ac88
+    void Stop();  // [6] @ 0x8234ac88
 };
 
 // ── pongCSActionPlayAudio  [vtable @ 0x82065908] ──────────────────────────
@@ -435,7 +440,7 @@ struct pongCSActionShowAllAmbients {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void Stop();  // [6] @ 0x8234ae88
+    void Stop();  // [6] @ 0x8234ae88
 };
 
 // ── pongCSActionWait  [vtable @ 0x82065818] ──────────────────────────
@@ -446,10 +451,10 @@ struct pongCSActionWait : pongCSAction {
     float       m_fElapsed;   // +0x14 (cumulative time since Play)
 
     // ── virtual methods (overrides) ──
-    virtual void Play();
-    virtual void Pause(float dt);
-    virtual bool Resume();
-    virtual void OnComplete();
+    void Play();
+    void Pause(float dt);
+    bool Resume();
+    void OnComplete();
 };
 
 // ── pongCSReplayDirector  [2 vtables — template/MI] ──────────────────────────
@@ -457,11 +462,11 @@ struct pongCSReplayDirector {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongCSReplayDirector();                  // [0] @ 0x824222c8
-    virtual void PostLoadProperties();  // [20] @ 0x82422460
-    virtual void PostLoadChildren();  // [22] @ 0x824223b0
-    virtual void PostLoadSetup();  // [23] @ 0x82422340
-    virtual void OnActivate();  // [24] @ 0x82422398
+    ~pongCSReplayDirector();                  // [0] @ 0x824222c8
+    void PostLoadProperties();  // [20] @ 0x82422460
+    void PostLoadChildren();  // [22] @ 0x824223b0
+    void PostLoadSetup();  // [23] @ 0x82422340
+    void OnActivate();  // [24] @ 0x82422398
 };
 
 // ── pongCutScene  [vtable @ 0x820656B0] ──────────────────────────
@@ -469,11 +474,11 @@ struct pongCutScene {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void QueryState();  // [2] @ 0x82349520
-    virtual void Play();  // [5] @ 0x82349a78
-    virtual void Resume();  // [8] @ 0x82349530
-    virtual void Seek();  // [9] @ 0x82349558
-    virtual void OnComplete();  // [12] @ 0x82349668
+    void QueryState();  // [2] @ 0x82349520
+    void Play();  // [5] @ 0x82349a78
+    void Resume();  // [8] @ 0x82349530
+    void Seek();  // [9] @ 0x82349558
+    void OnComplete();  // [12] @ 0x82349668
 };
 
 // ── pongCutSceneManager  [vtable @ 0x82065420] ──────────────────────────
@@ -482,7 +487,7 @@ struct pongCutSceneManager {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongCutSceneManager();                  // [0] @ 0x823479a8
+    ~pongCutSceneManager();                  // [0] @ 0x823479a8
 
     // ── non-virtual methods (from debug strings) ──
     void Load();
@@ -493,10 +498,10 @@ struct pongInlineCinematics {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongInlineCinematics();                  // [0] @ 0x82169658
-    virtual void PostLoadProperties();  // [20] @ 0x82169528
-    virtual void PostLoadChildren();  // [22] @ 0x821694b0
-    virtual void PostLoadSetup();  // [23] @ 0x821696d8
-    virtual void OnDeactivate();  // [25] @ 0x821699a0
-    virtual void GetDuration();  // [27] @ 0x82169818
+    ~pongInlineCinematics();                  // [0] @ 0x82169658
+    void PostLoadProperties();  // [20] @ 0x82169528
+    void PostLoadChildren();  // [22] @ 0x821694b0
+    void PostLoadSetup();  // [23] @ 0x821696d8
+    void OnDeactivate();  // [25] @ 0x821699a0
+    void GetDuration();  // [27] @ 0x82169818
 };
