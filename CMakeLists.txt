@@ -154,6 +154,24 @@ set(SOURCES
     src/scene/sg_drawable.cpp
     src/scene/sg_physical.cpp
     src/scene/sg_scene_graph.cpp
+
+    # Definitions the link was missing: data from the image, small lifts,
+    # and bridges between spellings of one symbol
+    src/game/ball/ball_data.cpp
+    src/game/camera/camera_data.cpp
+    src/game/char_view/char_view_data.cpp
+    src/game/creature/creature_data.cpp
+    src/game/match/match_data.cpp
+    src/game/misc/misc_data.cpp
+    src/game/network/net_data.cpp
+    src/game/player/player_data.cpp
+    src/graphics/grc_data.cpp
+    src/physics/ph_data.cpp
+    src/rage/animation/anim_data.cpp
+    src/rage/audio/aud_data.cpp
+    src/rage/network/sn_data.cpp
+    src/rage/rage_data.cpp
+    src/xam/xam_data.cpp
 )
 
 # Create executable
