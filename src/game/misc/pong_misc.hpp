@@ -13,16 +13,17 @@
  */
 #pragma once
 #include <stdint.h>
+#include <stddef.h>
 
 // ── NetMatchTimer  [vtable @ 0x8206C4B4] ──────────────────────────
 struct NetMatchTimer {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~NetMatchTimer();                  // [0] @ 0x8239c318
-    virtual void ScalarDtor(int flags); // [1] @ 0x8239c3d0
-    virtual void vfn_2();  // [2] @ 0x8239c4e8
-    virtual void vfn_3();  // [3] @ 0x8239c568
+    ~NetMatchTimer();                  // [0] @ 0x8239c318
+    void ScalarDtor(int flags); // [1] @ 0x8239c3d0
+    void vfn_2();  // [2] @ 0x8239c4e8
+    void vfn_3();  // [3] @ 0x8239c568
 };
 
 namespace Timer {
@@ -44,7 +45,7 @@ struct aiPlayer {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~aiPlayer();                  // [0] @ 0x821a02f0
+    ~aiPlayer();                  // [0] @ 0x821a02f0
 };
 
 // ── aiSpin  [vtable @ 0x8203A904] ──────────────────────────
@@ -61,10 +62,10 @@ struct assetVersions {
     uint8_t _pad[0xC];                 // +0x04  base-class fields (atSingleton)
     uint32_t m_versions[23];           // +0x10  version numbers, one per asset category
 
-    virtual ~assetVersions();                               // [0]  @ 0x82227FE8
-    virtual bool     IsSupported(uint32_t version) const;   // [20] @ 0x82228048
-    virtual void     RegisterFields();                      // [21] @ 0x82227D30
-    virtual const void* GetTypeDescriptor() const;          // [22] @ 0x82228090
+    ~assetVersions();                               // [0]  @ 0x82227FE8
+    bool     IsSupported(uint32_t version) const;   // [20] @ 0x82228048
+    void     RegisterFields();                      // [21] @ 0x82227D30
+    const void* GetTypeDescriptor() const;          // [22] @ 0x82228090
 };
 
 // ── assetVersionsChar  [vtable @ 0x8204E764] ──────────────────────────
@@ -74,10 +75,10 @@ struct assetVersionsChar {
     uint8_t _pad[0xC];                 // +0x04  base-class fields
     uint32_t m_version;                // +0x10  character-asset version number
 
-    virtual ~assetVersionsChar();                               // [0]  @ 0x82228198
-    virtual bool     IsSupported(uint32_t version) const;       // [20] @ 0x822281F8
-    virtual void     RegisterFields();                          // [21] @ 0x82228178
-    virtual const void* GetTypeDescriptor() const;              // [22] @ 0x82228240
+    ~assetVersionsChar();                               // [0]  @ 0x82228198
+    bool     IsSupported(uint32_t version) const;       // [20] @ 0x822281F8
+    void     RegisterFields();                          // [21] @ 0x82228178
+    const void* GetTypeDescriptor() const;              // [22] @ 0x82228240
 };
 
 // ── assetVersionsCharSpecific  [vtable @ 0x8204E7CC] ──────────────────────────
@@ -89,21 +90,21 @@ struct assetVersionsCharSpecific {
     uint32_t m_versionB;               // +0x14  version slot B
     uint32_t m_versionC;               // +0x18  version slot C
 
-    virtual ~assetVersionsCharSpecific();                               // [0]  @ 0x82228360
-    virtual bool     IsSupported(uint32_t version) const;               // [20] @ 0x822283C8
-    virtual void     RegisterFields();                                  // [21] @ 0x822282D0
-    virtual const void* GetTypeDescriptor() const;                      // [22] @ 0x82228410
+    ~assetVersionsCharSpecific();                               // [0]  @ 0x82228360
+    bool     IsSupported(uint32_t version) const;               // [20] @ 0x822283C8
+    void     RegisterFields();                                  // [21] @ 0x822282D0
+    const void* GetTypeDescriptor() const;                      // [22] @ 0x82228410
 };
 
 struct cellData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cellData();                  // [0] @ 0x8240f9a0
-    virtual void vfn_2();  // [2] @ 0x8240bfb0
-    virtual void PostLoadProperties();  // [20] @ 0x8240beb8
-    virtual void Validate();  // [21] @ 0x8240bf00
-    virtual void PostLoadChildren();  // [22] @ 0x8231f2a8
+    ~cellData();                  // [0] @ 0x8240f9a0
+    void vfn_2();  // [2] @ 0x8240bfb0
+    void PostLoadProperties();  // [20] @ 0x8240beb8
+    void Validate();  // [21] @ 0x8240bf00
+    void PostLoadChildren();  // [22] @ 0x8231f2a8
 };
 
 // ── ctxManager  [vtable @ 0x8204EB50] ──────────────────────────
@@ -116,15 +117,15 @@ struct fontData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x8240bdf0
-    virtual void PostLoadProperties();  // [20] @ 0x8240bcc0
-    virtual void Validate();  // [21] @ 0x8240bd08
-    virtual void PostLoadChildren();  // [22] @ 0x8231f1f8
+    void vfn_2();  // [2] @ 0x8240bdf0
+    void PostLoadProperties();  // [20] @ 0x8240bcc0
+    void Validate();  // [21] @ 0x8240bd08
+    void PostLoadChildren();  // [22] @ 0x8231f1f8
 
     // ── fontData::xmlNodeStructFaceType  [vtable @ 0x82076658] ──
     struct xmlNodeStructFaceType {
         void**      vtable;           // +0x00
-        virtual void vfn_5();  // [5] @ 0x8240bcb0
+        void vfn_5();  // [5] @ 0x8240bcb0
     };
 };
 
@@ -133,7 +134,7 @@ struct fsmMachine {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~fsmMachine();                  // [0] @ 0x82222758
+    ~fsmMachine();                  // [0] @ 0x82222758
 };
 
 // ── listData  [vtable @ 0x8204C434] ──────────────────────────
@@ -141,11 +142,11 @@ struct listData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~listData();                  // [0] @ 0x822184f0
-    virtual void vfn_3();  // [3] @ 0x822185e0
-    virtual void PostLoadProperties();  // [20] @ 0x822184a8
-    virtual void Validate();  // [21] @ 0x82218558
-    virtual void PostLoadChildren();  // [22] @ 0x821e0fc0
+    ~listData();                  // [0] @ 0x822184f0
+    void vfn_3();  // [3] @ 0x822185e0
+    void PostLoadProperties();  // [20] @ 0x822184a8
+    void Validate();  // [21] @ 0x82218558
+    void PostLoadChildren();  // [22] @ 0x821e0fc0
 };
 
 // ── listItemData  [vtable @ 0x8204C3A4] ──────────────────────────
@@ -153,17 +154,17 @@ struct listItemData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~listItemData();                  // [0] @ 0x822182f0
-    virtual void vfn_2();  // [2] @ 0x82218440
-    virtual void PostLoadProperties();  // [20] @ 0x822182a8
-    virtual void Validate();  // [21] @ 0x82218340
-    virtual void PostLoadChildren();  // [22] @ 0x821e0f00
+    ~listItemData();                  // [0] @ 0x822182f0
+    void vfn_2();  // [2] @ 0x82218440
+    void PostLoadProperties();  // [20] @ 0x822182a8
+    void Validate();  // [21] @ 0x82218340
+    void PostLoadChildren();  // [22] @ 0x821e0f00
 };
 
 // listItemData::xmlNodeStructColType is a nested class; declared separately to avoid name conflict
 struct listItemData_xmlNodeStructColType {
     void**      vtable;           // +0x00
-    virtual void vfn_5();  // [5] @ 0x82218298
+    void vfn_5();  // [5] @ 0x82218298
 };
 
 // ── msgEventHandler  [2 vtables — template/MI] ──────────────────────────
@@ -181,10 +182,10 @@ struct msgEventHandler {
     uint16_t    m_ownedFlag;      // +0x1A  if non-zero, m_pOwnedData is freed
 
     // ── virtual methods ──
-    virtual ~msgEventHandler();                  // [0] @ 0x8225eb50
-    virtual void vfn_3();  // [3] @ 0x8225ed50 — cleanup + dispatch
-    virtual void AcceptsMessage(uint32_t msgType); // [20] @ 0x8225ed08
-    virtual const char* GetName();  // [22] @ 0x8225ec58
+    ~msgEventHandler();                  // [0] @ 0x8225eb50
+    void vfn_3();  // [3] @ 0x8225ed50 — cleanup + dispatch
+    void AcceptsMessage(uint32_t msgType); // [20] @ 0x8225ed08
+    const char* GetName();  // [22] @ 0x8225ec58
 
     // ── non-virtual methods ──
     static msgEventHandler* Create();            // @ 0x8225ec68 — allocate + init
@@ -224,19 +225,19 @@ struct msgMsgSink {
     void**       vtable;              // +0x0000  runtime vtable (ctor: 0x8205B0D0)
     uint32_t     m_subVtable;         // +0x0004  secondary vtable / refcount
     uint8_t      m_controlByte;       // +0x0008  control flags (ctor: 0)
-    uint8_t      _pad0009[2];         // +0x0009
-    uint16_t     m_field0x0b;         // +0x000B
+    uint8_t      _pad0009[3];         // +0x0009
     uint32_t     m_pSubVtable;        // +0x000C  sub-object vtable region at +12
     uint32_t     m_field0x10;         // +0x0010
     uint32_t     m_field0x14;         // +0x0014  (ctor: 0)
     uint32_t     m_eventSink;         // +0x0018  event sink sub-object / network mgr (zeroed block start)
     uint32_t     m_field0x1c;         // +0x001C  in zeroed block w/ m_eventSink
-    uint32_t     m_field0x20;         // +0x0020
+    uint16_t     m_field0x20;         // +0x0020
     uint16_t     m_field0x22;         // +0x0022
     void*        m_pNestedObject;     // +0x0024  nested object ptr (dispatched via vtable)
     void*        m_pAttachedObject;   // +0x0028  attached object (released in SetActiveAndRelease)
-    uint32_t     m_field0x2c;         // +0x002C
+    uint8_t      m_field0x2c;         // +0x002C
     uint8_t      m_field0x2d;         // +0x002D
+    uint8_t      _pad002E[2];         // +0x002E
     void*        m_pStateObject;      // +0x0030  state object / message buffer base
     void*        m_pDelegate;         // +0x0034  delegate / message object
     void*        m_pSessionMgr;       // +0x0038  session mgr (has crit section at +144)
@@ -264,9 +265,10 @@ struct msgMsgSink {
     uint32_t     m_field0x90;         // +0x0090
     uint8_t      _pad0094[64];        // +0x0094
     uint8_t      m_flagsD4;           // +0x00D4  flag byte (upper 5 bits cleared in InitializeExtended)
-    uint8_t      _pad00D5[8];         // +0x00D5
+    uint8_t      _pad00D5[11];        // +0x00D5
     uint32_t     m_listHead2;         // +0x00E0  linked list head (vfn_79: +224)
     uint32_t     m_listHead3;         // +0x00E4  linked list head (vfn_125: +228)
+    uint8_t      _pad00E8[4];         // +0x00E8
     uint32_t     m_field0xec;         // +0x00EC
     void*        m_pConnectionData;   // +0x00F0  connection data
     uint32_t     m_field0xf4;         // +0x00F4
@@ -276,10 +278,13 @@ struct msgMsgSink {
     uint32_t     m_field0x104;        // +0x0104
     uint32_t     m_pLinkedList108;    // +0x0108  (vfn_43: +264 linked list)
     uint16_t     m_field0x10c;        // +0x010C
+    uint8_t      _pad010E[6];         // +0x010E
     uint32_t     m_field0x114;        // +0x0114
+    uint8_t      _pad0118[4];         // +0x0118
     uint32_t     m_connectionHandle;  // +0x011C  connection handle (vfn_36: +284)
     uint32_t     m_sessionId;         // +0x0120  session ID (+288)
     uint16_t     m_gamerIndex;        // +0x0124  gamer index (0xFFFF = invalid, +292)
+    uint8_t      _pad0126[2];         // +0x0126
     uint8_t      m_connectionFlags;   // +0x0128  connection flags byte (+296)
     uint8_t      _pad0129[3];         // +0x0129
     void*        m_pDataBuffer;       // +0x012C  data buffer ptr (+300)
@@ -287,33 +292,34 @@ struct msgMsgSink {
     uint32_t     m_pendingRequest;    // +0x0134  pending disconnect flag (+308)
     uint32_t     m_listSentinel;      // +0x0138  linked list sentinel (+312)
     uint32_t     m_listNext;          // +0x013C  linked list next (+316)
+    uint8_t      _pad0140[4];         // +0x0140
     void*        m_pSession;          // +0x0144  session pointer (+324)
     uint8_t      m_headerTag;         // +0x0148  header tag byte (+328)
     uint8_t      _pad0149[3];         // +0x0149
     void*        m_pMsgBuffer;        // +0x014C  message buffer (+332)
     uint32_t     m_dirtyFlag;         // +0x0150  dirty flag (+336)
     uint8_t      _pad0154[4];         // +0x0154
-    uint32_t     m_field0x158;           // +0x0158
-    uint32_t     m_field0x15c;           // +0x015C
-    uint32_t     m_field0x160;           // +0x0160
-    uint32_t     m_field0x164;           // +0x0164
-    uint32_t     m_field0x168;           // +0x0168
-    uint32_t     m_field0x16c;           // +0x016C
-    uint32_t     m_field0x170;           // +0x0170
-    uint32_t     m_field0x174;           // +0x0174
-    uint32_t     m_field0x178;           // +0x0178
-    uint32_t     m_field0x17c;           // +0x017C
-    uint32_t     m_field0x180;           // +0x0180
-    uint32_t     m_field0x184;           // +0x0184
-    uint32_t     m_field0x188;           // +0x0188
-    uint32_t     m_field0x18c;           // +0x018C
-    uint32_t     m_field0x190;           // +0x0190
+    uint32_t     m_field0x158;        // +0x0158
+    uint32_t     m_field0x15c;        // +0x015C
+    uint32_t     m_field0x160;        // +0x0160
+    uint32_t     m_field0x164;        // +0x0164
+    uint32_t     m_field0x168;        // +0x0168
+    uint32_t     m_field0x16c;        // +0x016C
+    uint32_t     m_field0x170;        // +0x0170
+    uint32_t     m_field0x174;        // +0x0174
+    uint32_t     m_field0x178;        // +0x0178
+    uint32_t     m_field0x17c;        // +0x017C
+    uint32_t     m_field0x180;        // +0x0180
+    uint32_t     m_field0x184;        // +0x0184
+    uint32_t     m_field0x188;        // +0x0188
+    uint32_t     m_field0x18c;        // +0x018C
+    uint32_t     m_field0x190;        // +0x0190
     uint16_t     m_field0x194;        // +0x0194
     uint16_t     m_field0x196;        // +0x0196
-    uint32_t     m_field0x198;           // +0x0198
-    uint32_t     m_field0x19c;           // +0x019C
-    uint32_t     m_field0x1a0;           // +0x01A0
-    uint32_t     m_field0x1a4;           // +0x01A4
+    uint32_t     m_field0x198;        // +0x0198
+    uint32_t     m_field0x19c;        // +0x019C
+    uint32_t     m_field0x1a0;        // +0x01A0
+    uint32_t     m_field0x1a4;        // +0x01A4
     uint8_t      _pad01A8[0x1B8];     // +0x01A8  padding to offset 0x360
     MsgSlot      m_slots[32];         // +0x0360  32 message slots (32 x 1152 = 36864 bytes)
     uint32_t     m_slotSentinel;      // +0x9360  sentinel after slot array
@@ -327,92 +333,95 @@ struct msgMsgSink {
     // ── constructor ──
     msgMsgSink();                               // @ 0x822ec7f8
 
-    // ── virtual methods ──
-    virtual ~msgMsgSink();                  // [0] @ 0x822808a0
-    virtual void ScalarDtor(int flags); // [1] @ 0x82430180
-    virtual int32_t vfn_3();  // [3] @ 0x82454b78
-    virtual void InitializeExtendedSink(uint32_t autoRegisterFlag = 0);      // [8]  @ 0x82455698
-    virtual int32_t BuildAllEvents(uint32_t userParam);                       // [9]  @ 0x824557c8
-    virtual void* GetPayloadPtr();                                            // [11] @ 0x82455688
-    virtual uint16_t GetPeerDataSize();                                       // [12] @ 0x82455630
-    virtual uint16_t GetFieldTypeCode();                                      // [13] @ 0x82455640  (was: GetName)
-    virtual void NotifySessionEvent();                                        // [14] @ 0x82455540
-    virtual void InitializeExtendedSinkAlt(uint32_t autoRegisterFlag = 0);    // [17] @ 0x824559f0
-    virtual int32_t CreateEvent(uint32_t userParam);                          // [18] @ 0x82455ab0
-    virtual uint32_t GetSerializedSize();                                     // [19] @ 0x82455a60
-    virtual void PostLoadProperties();  // [20] @ 0x8244ee88
-    virtual void Validate();  // [21] @ 0x8244ee90
-    virtual uint32_t CheckAndProcess();  // [22] @ 0x8244dd50
-    virtual uint32_t ProcessMessage(uint32_t messageFlags);  // [23] @ 0x8244ddf8
-    virtual int32_t GetStateFlagsLocked(uint32_t* outFlags);  // [24] @ 0x8244dff8
-    virtual int32_t GenerateAndCleanup();  // [25] @ 0x8244dcf0
-    virtual int32_t GetConnectionInfo(void* bufferOut, uint32_t sizeParam, uint32_t* totalSizeOut);  // [26] @ 0x8244e160
-    virtual int32_t vfn_27(void* evtParam);  // [27] @ 0x8244e3b0
-    virtual uint32_t UpdatePrioritiesLocked(void* priorityData);  // [28] @ 0x8244e4c0
-    virtual uint32_t ApplyPrioritiesLocked(void* priorityData);  // [29] @ 0x8244e568
-    virtual int32_t FindValidMessageSlot(uint32_t searchKey);  // [30] @ 0x8244e6d0
-    virtual uint32_t SetPropertyLocked(uint32_t key, float value);  // [31] @ 0x8244f268
-    virtual uint32_t GetPropertyLocked(uint32_t key, float* outValue);  // [32] @ 0x8244f330
-    virtual uint32_t ProcessWithLock(uint32_t param);  // [33] @ 0x8244dec0
-    virtual uint32_t SetMessageBuffer(void* param);  // [34] @ 0x8244e1d8
-    virtual int32_t vfn_35(void* evtParam);  // [35] @ 0x8244e2a0
-    virtual int32_t vfn_36(void* out);  // [36] @ 0x8244ea58
-    virtual int32_t vfn_37();  // [37] @ 0x8244ef20
-    virtual uint32_t GetStateFlags();  // [38] @ 0x8244df58
-    virtual void ProcessPendingMessages();  // [39] @ 0x8244e050
-    virtual void CleanupIfReady();  // [40] @ 0x8244e0c0
-    virtual void ForwardToMatchHandler();  // [41] @ 0x82456688
-    virtual uint32_t DispatchEventDefault();  // [42] @ 0x8244ed38
-    virtual void ClearPointers();  // [43] @ 0x8244e138
-    virtual int32_t vfn_44();  // [44] @ 0x82457b40
-    virtual int32_t vfn_45(uint32_t flag);  // [45] @ 0x824577d0
-    virtual uint32_t GetNestedObjectValue();  // [46] @ 0x8244e148
-    virtual void FlushAndDisconnect();  // [49] @ 0x8244e628
-    virtual void BeginDisconnect();  // [50] @ 0x8244e680
-    virtual void SendEvent();  // [52] @ 0x8244db58
-    virtual void* GetSessionPointer();  // [54] @ 0x8244ef38
-    virtual void ForwardProcessMessage();  // [55] @ 0x8244f8a8
-    virtual void vfn_56();  // [56] @ 0x82456e38
-    virtual void vfn_57();  // [57] @ 0x82456eb0
-    virtual void DispatchDefaultHandler();  // [59] @ 0x821efd10
-    virtual void vfn_60();  // [60] @ 0x824564c0
-    virtual void vfn_61();  // [61] @ 0x82457130
-    virtual void vfn_62();  // [62] @ 0x82457c10
-    virtual void vfn_63();  // [63] @ 0x82457540
-    virtual void vfn_65();  // [65] @ 0x82456810
-    virtual void vfn_66();  // [66] @ 0x82456920
-    virtual void vfn_67();  // [67] @ 0x82456968
-    virtual void ForwardMessageToSession(uint32_t param);  // [68] @ 0x82456f28
-    virtual void vfn_75();  // [75] @ 0x82456278
-    virtual void ForwardToLeaderboard();  // [77] @ 0x82457dd0
-    virtual void ForwardToRageHandler();  // [78] @ 0x824514e8
-    virtual void vfn_79();  // [79] @ 0x824513d0
-    virtual void ForwardDispatchMessage();  // [89] @ 0x8244f8b0
-    virtual void ForwardToStatsHandler();  // [95] @ 0x82457ff0
-    virtual void vfn_105();  // [105] @ 0x82457ff8
-    virtual void vfn_108();  // [108] @ 0x824580c0
-    virtual void vfn_109();  // [109] @ 0x82456378
-    virtual void vfn_113();  // [113] @ 0x82458218
-    virtual void vfn_114();  // [114] @ 0x82458708
-    virtual uint32_t GetNameLength();  // [115] @ 0x8244f7b8
-    virtual void ForwardToSessionSync();  // [116] @ 0x824584f0
-    virtual uint32_t Release();  // [118] @ 0x8246bc00
-    virtual void* SendPulseToConnection();  // [119] @ 0x8244f768
-    virtual void DispatchEventWithSessionInfo();  // [120] @ 0x824564a0
-    virtual void vfn_121();  // [121] @ 0x82458a88
-    virtual void vfn_122();  // [122] @ 0x824598a0
-    virtual void DisconnectMatchingHandlers(void* key);  // [123] @ 0x82450610
-    virtual void vfn_125();  // [125] @ 0x824505d0
-    virtual void vfn_126();  // [126] @ 0x8244ff38
-    virtual void vfn_128();  // [128] @ 0x8244fc80
-    virtual int32_t RegisterMessageHandler(void* handler, uint32_t flags);  // [129] @ 0x8244fe80
-    virtual uint32_t FlushPendingMessagesLocked();  // [130] @ 0x8244f9e8
-    virtual int32_t QueryConnectionState(uint32_t* outConnected);  // [131] @ 0x8244fee8
-    virtual void ForwardCleanupMessage();  // [147] @ 0x824505c8
-    virtual void ForwardFinalizeMessage();  // [148] @ 0x824508a8
+    // ── game vtable slots ──
+    // Declared non-virtual: `vtable` is the game's vtable pointer, and a C++
+    // virtual would put a second one in front of it and shift every field by 4.
+    // The [n] numbers are the game's slots; dispatch through them by hand.
+    ~msgMsgSink();                  // [0] @ 0x822808a0
+    void ScalarDtor(int flags); // [1] @ 0x82430180
+    int32_t vfn_3();  // [3] @ 0x82454b78
+    void InitializeExtendedSink(uint32_t autoRegisterFlag = 0);      // [8]  @ 0x82455698
+    int32_t BuildAllEvents(uint32_t userParam);                       // [9]  @ 0x824557c8
+    void* GetPayloadPtr();                                            // [11] @ 0x82455688
+    uint16_t GetPeerDataSize();                                       // [12] @ 0x82455630
+    uint16_t GetFieldTypeCode();                                      // [13] @ 0x82455640  (was: GetName)
+    void NotifySessionEvent();                                        // [14] @ 0x82455540
+    void InitializeExtendedSinkAlt(uint32_t autoRegisterFlag = 0);    // [17] @ 0x824559f0
+    int32_t CreateEvent(uint32_t userParam);                          // [18] @ 0x82455ab0
+    uint32_t GetSerializedSize();                                     // [19] @ 0x82455a60
+    void PostLoadProperties();  // [20] @ 0x8244ee88
+    void Validate();  // [21] @ 0x8244ee90
+    uint32_t CheckAndProcess();  // [22] @ 0x8244dd50
+    uint32_t ProcessMessage(uint32_t messageFlags);  // [23] @ 0x8244ddf8
+    int32_t GetStateFlagsLocked(uint32_t* outFlags);  // [24] @ 0x8244dff8
+    int32_t GenerateAndCleanup();  // [25] @ 0x8244dcf0
+    int32_t GetConnectionInfo(void* bufferOut, uint32_t sizeParam, uint32_t* totalSizeOut);  // [26] @ 0x8244e160
+    int32_t vfn_27(void* evtParam);  // [27] @ 0x8244e3b0
+    uint32_t UpdatePrioritiesLocked(void* priorityData);  // [28] @ 0x8244e4c0
+    uint32_t ApplyPrioritiesLocked(void* priorityData);  // [29] @ 0x8244e568
+    int32_t FindValidMessageSlot(uint32_t searchKey);  // [30] @ 0x8244e6d0
+    uint32_t SetPropertyLocked(uint32_t key, float value);  // [31] @ 0x8244f268
+    uint32_t GetPropertyLocked(uint32_t key, float* outValue);  // [32] @ 0x8244f330
+    uint32_t ProcessWithLock(uint32_t param);  // [33] @ 0x8244dec0
+    uint32_t SetMessageBuffer(void* param);  // [34] @ 0x8244e1d8
+    int32_t vfn_35(void* evtParam);  // [35] @ 0x8244e2a0
+    int32_t vfn_36(void* out);  // [36] @ 0x8244ea58
+    int32_t vfn_37();  // [37] @ 0x8244ef20
+    uint32_t GetStateFlags();  // [38] @ 0x8244df58
+    void ProcessPendingMessages();  // [39] @ 0x8244e050
+    void CleanupIfReady();  // [40] @ 0x8244e0c0
+    void ForwardToMatchHandler();  // [41] @ 0x82456688
+    uint32_t DispatchEventDefault();  // [42] @ 0x8244ed38
+    void ClearPointers();  // [43] @ 0x8244e138
+    int32_t vfn_44();  // [44] @ 0x82457b40
+    int32_t vfn_45(uint32_t flag);  // [45] @ 0x824577d0
+    uint32_t GetNestedObjectValue();  // [46] @ 0x8244e148
+    void FlushAndDisconnect();  // [49] @ 0x8244e628
+    void BeginDisconnect();  // [50] @ 0x8244e680
+    void SendEvent();  // [52] @ 0x8244db58
+    void* GetSessionPointer();  // [54] @ 0x8244ef38
+    void ForwardProcessMessage();  // [55] @ 0x8244f8a8
+    uint32_t vfn_56(void* param);  // [56] @ 0x82456e38 — SetMessageBuffer under the lock, then notify +0x188/+0x18C
+    int32_t vfn_57(void* param);   // [57] @ 0x82456eb0 — the same around slot 35
+    void DispatchDefaultHandler();  // [59] @ 0x821efd10
+    void vfn_60();  // [60] @ 0x824564c0
+    void vfn_61();  // [61] @ 0x82457130
+    void vfn_62();  // [62] @ 0x82457c10
+    void vfn_63();  // [63] @ 0x82457540
+    void vfn_65();  // [65] @ 0x82456810
+    void vfn_66();  // [66] @ 0x82456920
+    void vfn_67();  // [67] @ 0x82456968
+    void ForwardMessageToSession(uint32_t param);  // [68] @ 0x82456f28
+    void vfn_75();  // [75] @ 0x82456278
+    void ForwardToLeaderboard();  // [77] @ 0x82457dd0
+    void ForwardToRageHandler();  // [78] @ 0x824514e8
+    void vfn_79();  // [79] @ 0x824513d0
+    void ForwardDispatchMessage();  // [89] @ 0x8244f8b0
+    void ForwardToStatsHandler();  // [95] @ 0x82457ff0
+    void vfn_105();  // [105] @ 0x82457ff8
+    void vfn_108();  // [108] @ 0x824580c0
+    void vfn_109();  // [109] @ 0x82456378
+    void vfn_113();  // [113] @ 0x82458218
+    void vfn_114();  // [114] @ 0x82458708
+    uint32_t GetNameLength();  // [115] @ 0x8244f7b8
+    void ForwardToSessionSync();  // [116] @ 0x824584f0
+    uint32_t Release();  // [118] @ 0x8246bc00
+    void* SendPulseToConnection();  // [119] @ 0x8244f768
+    void DispatchEventWithSessionInfo();  // [120] @ 0x824564a0
+    void vfn_121();  // [121] @ 0x82458a88
+    void vfn_122();  // [122] @ 0x824598a0
+    void DisconnectMatchingHandlers(void* key);  // [123] @ 0x82450610
+    void vfn_125();  // [125] @ 0x824505d0
+    void vfn_126();  // [126] @ 0x8244ff38
+    void vfn_128();  // [128] @ 0x8244fc80
+    int32_t RegisterMessageHandler(void* handler, uint32_t flags);  // [129] @ 0x8244fe80
+    uint32_t FlushPendingMessagesLocked();  // [130] @ 0x8244f9e8
+    int32_t QueryConnectionState(uint32_t* outConnected);  // [131] @ 0x8244fee8
+    void ForwardCleanupMessage();  // [147] @ 0x824505c8
+    void ForwardFinalizeMessage();  // [148] @ 0x824508a8
     
     // ── non-virtual methods (implemented) ──
-    void InitializeExtended();  // @ 0x8245C078
+    msgMsgSink* InitializeExtended(void* rttiArg, void* bucket, uint16_t hdr16, void* callback);  // @ 0x8245C078
     void ProcessMessageWithIndex(uint32_t param1, uint16_t msgIndex, uint32_t param2);  // @ 0x8244E978
     void DispatchVirtualMethod();  // @ 0x824542D0 [related to vtable slot 12]
     uint16_t GetNestedValue(void* dataPtr);  // @ 0x8244F490
@@ -439,28 +448,41 @@ struct msgMsgSink {
     void ReplaceMessageObject(void* newObj);
 };
 
+#if __SIZEOF_POINTER__ == 4  // game layout; the 64-bit host build widens the pointers
+static_assert(offsetof(msgMsgSink, m_pSubVtable) == 0x0C, "msgMsgSink layout");
+static_assert(offsetof(msgMsgSink, m_eventSink) == 0x18, "msgMsgSink layout");
+static_assert(offsetof(msgMsgSink, m_pStateObject) == 0x30, "msgMsgSink layout");
+static_assert(offsetof(msgMsgSink, m_flagsD4) == 0xD4, "msgMsgSink layout");
+static_assert(offsetof(msgMsgSink, m_connectionHandle) == 0x11C, "msgMsgSink layout");
+static_assert(offsetof(msgMsgSink, m_pSession) == 0x144, "msgMsgSink layout");
+static_assert(offsetof(msgMsgSink, m_field0x1a4) == 0x1A4, "msgMsgSink layout");
+static_assert(offsetof(msgMsgSink, m_slots) == 0x360, "msgMsgSink layout");
+static_assert(offsetof(msgMsgSink, m_tailSentinel) == 0x9398, "msgMsgSink layout");
+#endif
+static_assert(sizeof(MsgSlot) == 0x480, "MsgSlot stride");
+
 // ── pongBinkMovie  [vtable @ 0x82060B94] ──────────────────────────
 struct pongBinkMovie {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x82317750
-    virtual void vfn_4();  // [4] @ 0x82317838
-    virtual void vfn_7();  // [7] @ 0x82317a10
-    virtual void vfn_8();  // [8] @ 0x82317a70
-    virtual void vfn_10();  // [10] @ 0x82317b28
-    virtual void OnEnter();  // [11] @ 0x82317b48
-    virtual void vfn_12();  // [12] @ 0x82317b68
-    virtual void GetName();  // [13] @ 0x82317b70
-    virtual void vfn_14();  // [14] @ 0x82317b80
-    virtual void vfn_15();  // [15] @ 0x82317b88
-    virtual void vfn_16();  // [16] @ 0x82317b90
-    virtual void vfn_17();  // [17] @ 0x82317bb0
-    virtual void vfn_18();  // [18] @ 0x82317ba0
-    virtual void vfn_19();  // [19] @ 0x82317bc0
-    virtual void PostLoadProperties();  // [20] @ 0x82317bc8
-    virtual void Validate();  // [21] @ 0x82317d20
-    virtual void PostLoadChildren();  // [22] @ 0x82317dd0
+    void vfn_2();  // [2] @ 0x82317750
+    void vfn_4();  // [4] @ 0x82317838
+    void vfn_7();  // [7] @ 0x82317a10
+    void vfn_8();  // [8] @ 0x82317a70
+    void vfn_10();  // [10] @ 0x82317b28
+    void OnEnter();  // [11] @ 0x82317b48
+    void vfn_12();  // [12] @ 0x82317b68
+    void GetName();  // [13] @ 0x82317b70
+    void vfn_14();  // [14] @ 0x82317b80
+    void vfn_15();  // [15] @ 0x82317b88
+    void vfn_16();  // [16] @ 0x82317b90
+    void vfn_17();  // [17] @ 0x82317bb0
+    void vfn_18();  // [18] @ 0x82317ba0
+    void vfn_19();  // [19] @ 0x82317bc0
+    void PostLoadProperties();  // [20] @ 0x82317bc8
+    void Validate();  // [21] @ 0x82317d20
+    void PostLoadChildren();  // [22] @ 0x82317dd0
 };
 
 // ── pongMovie  [vtable @ 0x82060A8C] ──────────────────────────
@@ -468,9 +490,9 @@ struct pongMovie {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongMovie();                  // [0] @ 0x82316e80
-    virtual void vfn_2();  // [2] @ 0x82316fa0
-    virtual void vfn_3();  // [3] @ 0x82316cd8
+    ~pongMovie();                  // [0] @ 0x82316e80
+    void vfn_2();  // [2] @ 0x82316fa0
+    void vfn_3();  // [3] @ 0x82316cd8
 };
 
 // ── pongPlayer  [3 vtables — template/MI] ──────────────────────────
@@ -879,11 +901,11 @@ struct pongPlayer {
     uint32_t     m_field0x525c; // +0x525c  R:1 W:0
 
     // ── virtual methods ──
-    virtual ~pongPlayer();                  // [0] @ 0x8218b3c0
-    virtual void ScalarDtor(int flags); // [1] @ 0x8218edb0
-    virtual void vfn_2();  // [2] @ 0x8218f958
-    virtual void vfn_7();  // [7] @ 0x8218ee10
-    virtual void vfn_9();  // [9] @ 0x821935b8
+    ~pongPlayer();                  // [0] @ 0x8218b3c0
+    void ScalarDtor(int flags); // [1] @ 0x8218edb0
+    void vfn_2();  // [2] @ 0x8218f958
+    void vfn_7();  // [7] @ 0x8218ee10
+    void vfn_9();  // [9] @ 0x821935b8
 
     // ── non-virtual methods (from debug strings) ──
     void Activate();
@@ -938,23 +960,23 @@ struct pongXMVMovie {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x82316fe8
-    virtual void vfn_5();  // [5] @ 0x82317168
-    virtual void vfn_6();  // [6] @ 0x82317258
-    virtual void vfn_7();  // [7] @ 0x823172a8
-    virtual void vfn_8();  // [8] @ 0x823172f8
-    virtual void vfn_9();  // [9] @ 0x823173b0
-    virtual void vfn_10();  // [10] @ 0x823173d0
-    virtual void OnEnter();  // [11] @ 0x823173d8
-    virtual void vfn_12();  // [12] @ 0x823173e0
-    virtual void GetName();  // [13] @ 0x823173e8
-    virtual void vfn_14();  // [14] @ 0x823173f8
-    virtual void vfn_15();  // [15] @ 0x82317410
-    virtual void vfn_16();  // [16] @ 0x82317428
-    virtual void vfn_19();  // [19] @ 0x82317438
-    virtual void PostLoadProperties();  // [20] @ 0x82317440
-    virtual void Validate();  // [21] @ 0x823174c8
-    virtual void PostLoadChildren();  // [22] @ 0x82317530
+    void vfn_4();  // [4] @ 0x82316fe8
+    void vfn_5();  // [5] @ 0x82317168
+    void vfn_6();  // [6] @ 0x82317258
+    void vfn_7();  // [7] @ 0x823172a8
+    void vfn_8();  // [8] @ 0x823172f8
+    void vfn_9();  // [9] @ 0x823173b0
+    void vfn_10();  // [10] @ 0x823173d0
+    void OnEnter();  // [11] @ 0x823173d8
+    void vfn_12();  // [12] @ 0x823173e0
+    void GetName();  // [13] @ 0x823173e8
+    void vfn_14();  // [14] @ 0x823173f8
+    void vfn_15();  // [15] @ 0x82317410
+    void vfn_16();  // [16] @ 0x82317428
+    void vfn_19();  // [19] @ 0x82317438
+    void PostLoadProperties();  // [20] @ 0x82317440
+    void Validate();  // [21] @ 0x823174c8
+    void PostLoadChildren();  // [22] @ 0x82317530
 };
 
 // ── io  [no vtable] ──────────────────────────

@@ -35,7 +35,7 @@ struct rageAllocator {
 };
 
 // Global state
-extern uint32_t g_plrPlayerMgr_state;  // @ 0x82066430
+extern uint32_t g_plrPlayerMgr_state;  // @ 0x82606430 (lis 0x8260 + 0x6430)
 extern uint32_t* g_sda_base;            // @ SDA:0x82600000 - Small Data Area base
 
 // Serialization / XML support
@@ -139,27 +139,21 @@ void plrPlayerMgr_ReleaseResourcePairs(void* subObjectArrayBase) {
  *   5. Call singleton cleanup
  *   6. Conditional free handled by caller based on flags
  */
+// @ 0x82188D40
 plrPlayerMgr::~plrPlayerMgr() {
-    // Set initial vtables for destruction phase
-    vtable = (void**)0x82039A24;    // m_vtable1   // Primary vtable
-    // m_vtable2 (secondary vtable at +16): 0x82039AB0   // Secondary vtable (at offset +16)
-    
-    // Clear global player manager state
-    g_plrPlayerMgr_state = 0;  // @ 0x82066430
-    
-    // Destroy sub-objects in reverse order
-    // Pass pointer to sub-object array base at offset +20
-    plrPlayerMgr_ReleaseResourcePairs(&m_subObjects[0]);
-    
-    // Restore base class vtables after sub-object destruction
-    m_vtable2 = (void**)0x82027B34;   // Base class vtable (secondary)
-    m_vtable1 = (void**)0x8203338C;   // Base class vtable (primary)
-    
-    // Call singleton cleanup
+    vtable    = (void**)0x82039A24;
+    m_vtable2 = (void**)0x82039AB0;
+    g_plrPlayerMgr_state = 0;
+
+    for (int i = 1; i >= 0; i--) {
+        plrPlayerMgr_ReleaseResourcePairs(m_subObjects[i]);
+    }
+
+    m_vtable2 = (void**)0x82027B34;
+    vtable    = (void**)0x8203338C;
     rage::ReleaseSingleton(this);
-    
-    // Note: Conditional free handled by caller
-    // If (flags & 1), caller will invoke rage_free(this)
+    // The original is the scalar deleting destructor: it frees this when bit 0
+    // of r4 is set, which a C++ destructor can't express.
 }
 
 
@@ -222,10 +216,10 @@ void gdTier::PostLoadChildren() {
     // Pass 1: count matching children (virtual IsType / GetTypeName).
     uint32_t matchCount = 0;
     for (xmlNodeStruct* pChild = m_pFirstChild; pChild; pChild = pChild->m_pNextSibling) {
-        if (pChild->IsType(g_gdTierMember_typeId)) {
+        if (pChild->DispatchIsType(g_gdTierMember_typeId)) {
             ++matchCount;
         } else {
-            rage_DebugLog(g_str_gdTier_unknownNodeType, pChild->GetTypeName());
+            rage_DebugLog(g_str_gdTier_unknownNodeType, pChild->DispatchTypeName());
         }
     }
 
@@ -241,7 +235,7 @@ void gdTier::PostLoadChildren() {
     // Pass 2: populate member array in source order.
     uint32_t writeIdx = 0;
     for (xmlNodeStruct* pChild = m_pFirstChild; pChild; pChild = pChild->m_pNextSibling) {
-        if (pChild->IsType(g_gdTierMember_typeId)) {
+        if (pChild->DispatchIsType(g_gdTierMember_typeId)) {
             m_pMembers[writeIdx++] = static_cast<gdTierMember*>(pChild);
         }
     }
@@ -308,7 +302,7 @@ void gdLadder::PostLoadChildren() {
 
     // Walk children; place each gdTier into the slot named by its tier level (+0x10).
     for (xmlNodeStruct* pChild = m_pFirstChild; pChild; pChild = pChild->m_pNextSibling) {
-        if (pChild->IsType(g_gdTier_typeId)) {
+        if (pChild->DispatchIsType(g_gdTier_typeId)) {
             gdTier* pTier = static_cast<gdTier*>(pChild);
             uint32_t tierIdx = pTier->m_tierLevel;  // union view of +0x10
             if (m_pTiers[tierIdx] != nullptr) {
@@ -317,7 +311,7 @@ void gdLadder::PostLoadChildren() {
                 m_pTiers[tierIdx] = pTier;
             }
         } else {
-            rage_DebugLog(g_str_gdLadder_unknownNodeType, pChild->GetTypeName());
+            rage_DebugLog(g_str_gdLadder_unknownNodeType, pChild->DispatchTypeName());
         }
     }
 
@@ -366,7 +360,7 @@ void gdRivalry::PostLoadChildren() {
 
     // Walk children and drop each gdRivalryData into its character's slot.
     for (xmlNodeStruct* pChild = m_pFirstChild; pChild; pChild = pChild->m_pNextSibling) {
-        if (pChild->IsType(g_gdRivalryData_typeId)) {
+        if (pChild->DispatchIsType(g_gdRivalryData_typeId)) {
             auto* pRivalry = static_cast<gdRivalryData*>(pChild);
             const int32_t charIdx = FindCharacterByName(static_cast<void*>(dataMgr),
                                                         pRivalry->m_characterName);
@@ -378,7 +372,7 @@ void gdRivalry::PostLoadChildren() {
                 m_pEntries[charIdx] = pRivalry;
             }
         } else {
-            rage_DebugLog(g_str_gdRivalry_unknownNodeType, pChild->GetTypeName());
+            rage_DebugLog(g_str_gdRivalry_unknownNodeType, pChild->DispatchTypeName());
         }
     }
 
@@ -749,7 +743,7 @@ const char* gdaiMeterLogic::GetTypeName() {
 ////////////////////////////////////////////////////////////////////////////////
 
 void plrPlayerMgr::PostLoadProperties() {}    // [vfn_20] @ 0x82188b38 — identity check
-void plrPlayerMgr::Validate() {}              // [vfn_21] @ 0x82189ad8 — two RegisterSerializationField calls
+void plrPlayerMgr::RegisterFields() {}            // [vfn_21] @ 0x82189ad8 — two RegisterSerializationField calls
 void plrPlayerMgr::PostLoadChildren() {}      // [vfn_22] @ 0x82188b70 — returns constant rdata ptr
 void plrPlayerMgr::vfn_23() {}                // @ 0x82188dd8 — 769 lines — character/anim array init
 void plrPlayerMgr::vfn_24() {}                // @ 0x821893d8 — teardown helper (msgEventHandler + pg_6F10 loop)

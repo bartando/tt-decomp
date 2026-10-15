@@ -30,6 +30,10 @@
  *   [4] DisableAll (iterates linked list, disables each controller)
  */
 #pragma once
+
+// Classes below that carry the game's vtable pointer as an explicit member
+// list their slot methods non-virtual: a C++ virtual would add a second
+// vtable pointer in front of it and shift every member by 4.
 #include <stdint.h>
 #include "../../rage/audio/rage_audio.hpp"
 
@@ -70,10 +74,10 @@ struct CBiquadFilterEffect {
     float       m_qFactor;        // +0x90  — param 4 (pre-pow10)
 
     // ── IXAPO virtual methods ──
-    virtual int  GetParameter(uint8_t paramIndex, void* outValue);   // [3] @ 0x821b22f0
-    virtual int  SetParameter(uint8_t paramIndex, const void* pValue); // [4] @ 0x821b2408
-    virtual void Process();                  // [6] @ 0x821b1fa0
-    virtual void CalcInputFrames();          // [7] @ 0x821b1f40
+    int  GetParameter(uint8_t paramIndex, void* outValue);   // [3] @ 0x821b22f0
+    int  SetParameter(uint8_t paramIndex, const void* pValue); // [4] @ 0x821b2408
+    void Process();                  // [6] @ 0x821b1fa0
+    void CalcInputFrames();          // [7] @ 0x821b1f40
 };
 
 // ── CCompEffect  [vtable @ 0x8203B54C] ──────────────────────────
@@ -83,9 +87,9 @@ struct CCompEffect {
     int32_t     m_refCount;       // +0x04
 
     // ── IXAPO virtual methods ──
-    virtual int  GetParameter(uint8_t paramIndex, void* outValue);   // [3] @ 0x821b1260
-    virtual int  SetParameter(uint8_t paramIndex, const void* pValue); // [4] @ 0x821b13a0
-    virtual void Process();                  // [6] @ 0x821b0fd8
+    int  GetParameter(uint8_t paramIndex, void* outValue);   // [3] @ 0x821b1260
+    int  SetParameter(uint8_t paramIndex, const void* pValue); // [4] @ 0x821b13a0
+    void Process();                  // [6] @ 0x821b0fd8
 };
 
 // ── CDelayEffect  [vtable @ 0x8203B570] ──────────────────────────
@@ -97,12 +101,12 @@ struct CDelayEffect {
     void*       m_pEffectData1;   // +0x1C
     void*       m_pEffectData2;   // +0x20
 
-    virtual void ScalarDtor(int flags);              // [1] @ 0x821b1e30
-    virtual void GetRegistrationProperties();        // [2] @ 0x821b1a30
-    virtual void GetParameter();                      // [3] @ 0x821b1a50
-    virtual void SetParameter();                      // [4] @ 0x821b1b28
-    virtual void Process();                           // [6] @ 0x821b1868
-    virtual void CalcInputFrames();                   // [7] @ 0x821b1808
+    void ScalarDtor(int flags);              // [1] @ 0x821b1e30
+    void GetRegistrationProperties();        // [2] @ 0x821b1a30
+    void GetParameter();                      // [3] @ 0x821b1a50
+    void SetParameter();                      // [4] @ 0x821b1b28
+    void Process();                           // [6] @ 0x821b1868
+    void CalcInputFrames();                   // [7] @ 0x821b1808
 };
 
 // ── CPeakMeterEffect  [vtable @ 0x8203B260] ─────────────────────
@@ -132,14 +136,14 @@ struct CPeakMeterEffect {
     float*      m_pInputBufC;     // +0x20
     float*      m_pInputBufD;     // +0x24
 
-    virtual ~CPeakMeterEffect();                     // [0] @ 0x821add88
-    virtual void ScalarDtor(int flags);              // [1] @ 0x821adda0
-    virtual void GetRegistrationProperties(void* outProps); // [2] @ 0x821ad9d8
-    virtual int  GetPeakValues(uint8_t channelMask, void* outPeaks);  // [3] @ 0x821ad9f8
-    virtual int  LockForProcess(uint8_t mode);       // [4] @ 0x821adc40
-    virtual int  UnlockForProcess(void* outFlags);   // [5] @ 0x82468980
-    virtual void Process(void* pInputBuffer);        // [6] @ 0x821ad788
-    virtual void CalcInputFrames();                   // [7] @ 0x821ad6b0
+    ~CPeakMeterEffect();                     // [0] @ 0x821add88
+    void ScalarDtor(int flags);              // [1] @ 0x821adda0
+    void GetRegistrationProperties(void* outProps); // [2] @ 0x821ad9d8
+    int  GetPeakValues(uint8_t channelMask, void* outPeaks);  // [3] @ 0x821ad9f8
+    int  LockForProcess(uint8_t mode);       // [4] @ 0x821adc40
+    int  UnlockForProcess(void* outFlags);   // [5] @ 0x82468980
+    void Process(void* pInputBuffer);        // [6] @ 0x821ad788
+    void CalcInputFrames();                   // [7] @ 0x821ad6b0
 };
 
 // ── CShelvingFilterEffect  [vtable @ 0x8203B288] ────────────────
@@ -167,20 +171,20 @@ struct CShelvingFilterEffect {
     float       m_highQ;          // +0xAC
     int32_t     m_mode;           // +0xB0 — 1=low, 2=high, 3=both
 
-    virtual ~CShelvingFilterEffect();                // [0] @ 0x821b26a8
-    virtual void ScalarDtor(int flags);              // [1] @ 0x821ae618
-    virtual void GetRegistrationProperties(void* outProps); // [2] @ 0x821ae198
-    virtual int  GetParameter(uint8_t paramIndex, void* outValue);   // [3] @ 0x821ae1b8
-    virtual int  SetParameter(uint8_t paramIndex, const void* pValue); // [4] @ 0x821ae2c8
-    virtual int  UnlockForProcess(void* outParam);   // [5] @ 0x821ae4e0
-    virtual void Process(void* pInputBuffer);        // [6] @ 0x821ade28
-    virtual void CalcInputFrames();                   // [7] @ 0x821addc8
+    ~CShelvingFilterEffect();                // [0] @ 0x821b26a8
+    void ScalarDtor(int flags);              // [1] @ 0x821ae618
+    void GetRegistrationProperties(void* outProps); // [2] @ 0x821ae198
+    int  GetParameter(uint8_t paramIndex, void* outValue);   // [3] @ 0x821ae1b8
+    int  SetParameter(uint8_t paramIndex, const void* pValue); // [4] @ 0x821ae2c8
+    int  UnlockForProcess(void* outParam);   // [5] @ 0x821ae4e0
+    void Process(void* pInputBuffer);        // [6] @ 0x821ade28
+    void CalcInputFrames();                   // [7] @ 0x821addc8
 };
 
 // ── audMsgSink  [vtable @ 0x8203C750] ───────────────────────────
 struct audMsgSink {
     void**      vtable;           // +0x00
-    virtual void ScalarDtor(int flags); // [1] @ 0x821bea98
+    void ScalarDtor(int flags); // [1] @ 0x821bea98
 };
 
 // ── pongAmbiencePlayer  [vtable @ 0x8203C36C] ──────────────────

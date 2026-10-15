@@ -7,6 +7,10 @@
 
 #pragma once
 
+// Classes below that carry the game's vtable pointer as an explicit member
+// list their slot methods non-virtual: a C++ virtual would add a second
+// vtable pointer in front of it and shift every member by 4.
+
 #include <cstdint>
 
 /**
@@ -19,19 +23,19 @@
 class gdVibEvent {
 public:
     // Virtual destructor @ 0x8220F8B0
-    virtual ~gdVibEvent();
+    ~gdVibEvent();
     
     // Match event type @ 0x8220FA50 (slot 20)
-    virtual bool MatchesType(uint32_t eventType);
+    bool MatchesType(uint32_t eventType);
     
     // Process event @ 0x8220FAA8 (slot 21)
-    virtual void Process();
+    void Process();
     
     // Stub function @ 0x8220F9B0 (slot 22)
-    virtual void Stub22();
+    void Stub22();
     
     // Trigger vibration @ 0x8220F918 (slot 23)
-    virtual void TriggerVibration(void* playerContext);
+    void TriggerVibration(void* playerContext);
     
     // Post-load property setup @ 0x8220FB18
     void PostLoadProperties();

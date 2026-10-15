@@ -35,7 +35,7 @@ const char* g_str_gdLadderMatch_unknownRowdiness  = "gdLadderMatch::PostLoadProp
 const char* g_str_gdDifficultyLadder_invalidLevel = "gdDifficultyLadder::PostLoadProperties() - invalid level value '%d'";
 
 // PostLoadChildren strings (verified from binary — several differ from what was in source)
-const char* g_str_gdTier_unknownNodeType              = "gdTier::PostLoadChildren() - unknown node type '%s'";
+const char g_str_gdTier_unknownNodeType[]             = "gdTier::PostLoadChildren() - unknown node type '%s'";
 const char* g_str_gdLadder_duplicateLevel             = "gdLadder::PostLoadChildren() - duplicate entries for level '%d'";
 const char* g_str_gdLadder_unknownNodeType            = "gdLadder::PostLoadChildren() - unknown node type '%s'";
 const char* g_str_gdLadder_missingLadder              = "gdLadder::PostLoadChildren() - level '%d' does not have a ladder";

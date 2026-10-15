@@ -48,7 +48,7 @@ extern void RtlLeaveCriticalSection(void*);
 
 // External dependencies
 extern void rage_free(void* ptr);
-extern void msgMsgSink_A970_2h(void*);
+extern void* msgMsgSink_A970_2h(void* self, void* rttiArg, void* bucket, uint16_t hdr16, void* callback);
 extern void* msgMsgSink_F518_wrh(uint32_t);
 extern void msgMsgSink_E860_g(void*, uint32_t, uint32_t, uint32_t);
 
@@ -152,10 +152,9 @@ msgMsgSink::~msgMsgSink()
  *   5. Zeros fields at +68, +72, +76, +80, +84, +88, +92, +96
  *   6. Zeros 22 uint32 array starting at +112
  */
-void msgMsgSink::InitializeExtended() {
-    // Call base initialization
-    extern void msgMsgSink_A970_2h(void*);
-    msgMsgSink_A970_2h(this);
+// @ 0x8245C078
+msgMsgSink* msgMsgSink::InitializeExtended(void* rttiArg, void* bucket, uint16_t hdr16, void* callback) {
+    msgMsgSink_A970_2h(this, rttiArg, bucket, hdr16, callback);
     
     // Set vtables
     *(void**)((char*)this + 0) = kVtable_54E8;    // Primary vtable (0x820054E8)
@@ -177,6 +176,7 @@ void msgMsgSink::InitializeExtended() {
     for (int i = 0; i < 22; i++) {
         array[i] = 0;
     }
+    return this;
 }
 
 /**
@@ -293,7 +293,7 @@ void msgMsgSink::DispatchVirtualMethod() {
  * The nested object's vtable slot 29 (offset +116) is invoked with the
  * nested object as the 'this' pointer.
  * ═══════════════════════════════════════════════════════════════════════════ */
-void msgMsgSink_8DE0_sp(msgMsgSink* pThis)
+void msgMsgSink_8DE0_sp(msgMsgSink* pThis, const void* arg)
 {
     /* Load nested object pointer from offset +36 */
     void* pNestedObject = *(void**)((uint8_t*)pThis + 36);
@@ -304,10 +304,10 @@ void msgMsgSink_8DE0_sp(msgMsgSink* pThis)
     }
     
     /* Call vtable slot 29 on the nested object */
-    typedef void (*VtableSlot29Fn)(void*);
+    typedef void (*VtableSlot29Fn)(void*, const void*);
     void** vtable = *(void***)pNestedObject;
     VtableSlot29Fn slot29 = (VtableSlot29Fn)vtable[29];
-    slot29(pNestedObject);
+    slot29(pNestedObject, arg);  // r4 passes through untouched
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -669,8 +669,8 @@ extern void msgMsgSink_6138_2hr(void*);
 extern void grc_2CC8(void*, uint32_t, uint32_t);
 extern void atSingleton_8E88_p42(void*, void*, uint32_t, uint32_t, uint32_t);
 extern void ph_EF40(void*, void*);
-extern void game_9CF8_h(void*, uint32_t);
-extern void game_9D10_h(void*, uint32_t);
+extern void game_9CF8_h(void*, const void*);
+extern void game_9D10_h(void*, const void*);
 extern void game_9D28_h(void*, uint32_t);
 
 // Vtable constants (from .rdata)
@@ -771,22 +771,6 @@ void msgMsgSink_DA10_p46(void* self) {
  * Pattern: load ptr from +124, if null return, else tail-call target
  * ─────────────────────────────────────────────────────────────────────────── */
 
-// msgMsgSink_8B78_g @ 0x82448B78 | size: 0x14
-// Null-guard +124, tail-calls msgMsgSink_D168_sp
-void msgMsgSink_8B78_g(void* self) {
-    void* obj = *(void**)((uint8_t*)self + 124);
-    if (obj == nullptr) return;
-    msgMsgSink_D168_sp(obj);
-}
-
-// msgMsgSink_8B90_g @ 0x82448B90 | size: 0x14
-// Null-guard +124, tail-calls msgMsgSink_D1D8_sp
-void msgMsgSink_8B90_g(void* self) {
-    void* obj = *(void**)((uint8_t*)self + 124);
-    if (obj == nullptr) return;
-    msgMsgSink_D1D8_sp(obj);
-}
-
 /* ───────────────────────────────────────────────────────────────────────────
  * GROUP 6: Null-guard + tail-call through field_0x007C, returns 0 on null
  * ─────────────────────────────────────────────────────────────────────────── */
@@ -819,12 +803,12 @@ void msgMsgSink_DispatchNested(void* self) {
 
 // msgMsgSink_8E00_sp @ 0x82458E00 | size: 0x20
 // Forwards to nested->vtable[30] (offset 120 in vtable)
-void msgMsgSink_8E00_sp(void* self) {
+void msgMsgSink_8E00_sp(void* self, const void* arg) {
     void* nested = *(void**)((uint8_t*)self + 36);
     if (nested == nullptr) return;
-    typedef void (*Fn)(void*);
+    typedef void (*Fn)(void*, const void*);
     void** vt = *(void***)nested;
-    ((Fn)vt[30])(nested);
+    ((Fn)vt[30])(nested, arg);  // r4 passes through untouched
 }
 
 // msgMsgSink_8E20_sp @ 0x82458E20 | size: 0x20
@@ -1122,7 +1106,7 @@ void* msgMsgSink_E758_p33(void* self, uint32_t param) {
 
 // msgMsgSink_3E68_g @ 0x82453E68 | size: 0x40
 // Iterates list from +40, sentinel +36, calls game_9CF8_h on each node
-void msgMsgSink_3E68_g(void* self, uint32_t param) {
+void msgMsgSink_3E68_g(void* self, const void* param) {
     void* sentinel = (uint8_t*)self + 36;
     void* node = *(void**)((uint8_t*)self + 40);
     while (node != sentinel) {
@@ -1133,7 +1117,7 @@ void msgMsgSink_3E68_g(void* self, uint32_t param) {
 
 // msgMsgSink_3EA8_g @ 0x82453EA8 | size: 0x40
 // Iterates list from +40, sentinel +36, calls game_9D10_h on each node
-void msgMsgSink_3EA8_g(void* self, uint32_t param) {
+void msgMsgSink_3EA8_g(void* self, const void* param) {
     void* sentinel = (uint8_t*)self + 36;
     void* node = *(void**)((uint8_t*)self + 40);
     while (node != sentinel) {
@@ -2127,7 +2111,7 @@ uint32_t msgMsgSink::SetMessageBuffer(void* param) {
 
     // Notify session
     void* session = *(void**)((uint8_t*)this + 52);
-    msgMsgSink_3E68_g(session, *(uint32_t*)((uint8_t*)this + 328));
+    msgMsgSink_3E68_g(session, (uint8_t*)this + 328);
 
     // Set dirty flag
     *(uint32_t*)((uint8_t*)this + 336) = 1;
@@ -2581,11 +2565,9 @@ void msgMsgSink::DisconnectMatchingHandlers(void* key) {
  *  and .26.cpp for the full PPC traces.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-extern void msgMsgSink_vfn_34(void*, void*);                          // 0x8244E1D8
-extern void msgMsgSink_vfn_35(void*, void*);                          // 0x8244E2A0
+extern uint32_t msgMsgSink_vfn_34(void*, void*);                      // 0x8244E1D8
+extern int32_t  msgMsgSink_vfn_35(void*, void*);                      // 0x8244E2A0
 extern void msgMsgSink_vfn_36_5FD0_1(void*);                          // 0x82455FD0
-extern void msgMsgSink_3E68_g(void*, void*);                          // 0x82453E68
-extern void msgMsgSink_3EA8_g(void*, void*);                          // 0x82453EA8
 extern void msgMsgSink_42D0_v12(void*, int32_t);                      // 0x824542D0
 extern void* atSingleton_64D8_g(void*);                               // 0x824564D8
 extern void* atSingleton_6F98_g();                                    // 0x82566F98
@@ -2621,12 +2603,13 @@ extern void msgMsgSink_vfn_3(void*);
 // ---------------------------------------------------------------------------
 // Slot 56 @ 0x82456E38 — locked invoke of vfn_34, cleanup via 3E68 on 2 subs
 // ---------------------------------------------------------------------------
-void msgMsgSink::vfn_56() {
+// @ 0x82456E38
+uint32_t msgMsgSink::vfn_56(void* param) {
     uint8_t* self = reinterpret_cast<uint8_t*>(this);
     void* cs = *reinterpret_cast<uint8_t**>(self + 56) + 144;
     RtlEnterCriticalSection(cs);
 
-    msgMsgSink_vfn_34(this, nullptr);
+    uint32_t result = msgMsgSink_vfn_34(this, param);
 
     void* sub1 = *reinterpret_cast<void**>(self + 392);
     if (sub1 != nullptr) {
@@ -2638,28 +2621,31 @@ void msgMsgSink::vfn_56() {
     }
 
     RtlLeaveCriticalSection(cs);
+    return result;
 }
 
 // ---------------------------------------------------------------------------
 // Slot 57 @ 0x82456EB0 — mirror of slot 56, but routed via vfn_35 + 3EA8
 // ---------------------------------------------------------------------------
-void msgMsgSink::vfn_57() {
+// @ 0x82456EB0
+int32_t msgMsgSink::vfn_57(void* param) {
     uint8_t* self = reinterpret_cast<uint8_t*>(this);
     void* cs = *reinterpret_cast<uint8_t**>(self + 56) + 144;
     RtlEnterCriticalSection(cs);
 
-    msgMsgSink_vfn_35(this, nullptr);
+    int32_t result = msgMsgSink_vfn_35(this, param);
 
     void* sub1 = *reinterpret_cast<void**>(self + 392);
     if (sub1 != nullptr) {
-        msgMsgSink_3EA8_g(sub1, nullptr);
+        msgMsgSink_3EA8_g(sub1, param);
     }
     void* sub2 = *reinterpret_cast<void**>(self + 396);
     if (sub2 != nullptr) {
-        msgMsgSink_3EA8_g(sub2, nullptr);
+        msgMsgSink_3EA8_g(sub2, param);
     }
 
     RtlLeaveCriticalSection(cs);
+    return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -3669,18 +3655,19 @@ int32_t msgMsgSink::BuildAllEvents(uint32_t userParam)
  * game_9CF8_h @ 0x82459CF8 | size: 0x14
  * Loads this->field_24 and tail-calls msgMsgSink method if non-null.
  */
-void game_9CF8_h(void* self, uint32_t param) {
+// @ 0x82459CF8
+void game_9CF8_h(void* self, const void* param) {
     void* inner = *reinterpret_cast<void**>(static_cast<uint8_t*>(self) + 24);
     if (!inner) return;
-    // TODO: tail-call msgMsgSink_8DE0_sp(inner, param)
-    (void)param;
+    msgMsgSink_8DE0_sp(static_cast<msgMsgSink*>(inner), param);
 }
 
 /** game_9D10_h @ 0x82459D10 | size: 0x14 */
-void game_9D10_h(void* self, uint32_t param) {
+// @ 0x82459D10
+void game_9D10_h(void* self, const void* param) {
     void* inner = *reinterpret_cast<void**>(static_cast<uint8_t*>(self) + 24);
     if (!inner) return;
-    (void)param;
+    msgMsgSink_8E00_sp(inner, param);
 }
 
 /** game_9D28_h @ 0x82459D28 | size: 0x14 */
