@@ -102,24 +102,22 @@
 struct pcrCreature;
 struct pongTimingState;
 // pongTimingSubState: swing timing sub-state (large struct, ~342+ bytes)
+// +0x20 is not a pointer but an embedded object: IsInReturnPosition (0x820CDE98)
+// passes its address to 0x820D6AA0 and reads its +0x10, +0x134 and +0x138,
+// which are m_pVelRecord, m_swingSubFrame and m_swingSubFlags below.
 struct pongTimingSubState {
     void*       vtable;           // +0x00
-    uint8_t     _pad04[12];       // +0x04..+0x0F
-    void*       m_pBodyData;      // +0x10  body data (float at +12 = speed)
-    uint8_t     _pad14[12];       // +0x14..+0x1F
-    void*       m_pSubObject;     // +0x20 (32)  sub-object pointer (loco sub-state)
-    uint8_t     _pad24[12];       // +0x24..+0x2F
-    void*       m_pVelRecord;     // +0x30 (48)  velocity record pointer
+    uint8_t     _pad04[28];       // +0x04..+0x1F
+    uint8_t     m_clip[16];       // +0x20 (32)  start of the embedded object 0x820D6AA0 takes
+    void*       m_pVelRecord;     // +0x30 (48)  clip+0x10; its float at +0xC is a playback speed
     uint8_t     _pad34[108];      // +0x34..+0x9F
     float       m_swingProgress;  // +0xA0 (160) — cumulative swing progress
     uint8_t     _padA4[4];        // +0xA4..+0xA7
     uint32_t    m_frameId;        // +0xA8 (168) — frame counter / animation frame reference
-    uint8_t     _padAC[136];      // +0xAC..+0x133
-    uint16_t    m_locoFrameCount; // +0x134 (308) — frame count for normalised fraction
-    uint8_t     _pad136[2];       // +0x136..+0x137
-    uint8_t     m_locoFlags;      // +0x138 (312) — loco flags (bit 3=0x8, bit 2=0x4)
-    uint8_t     _pad139[27];      // +0x139..+0x153
-    int16_t     m_swingSubFrame;  // +0x154 (340) — frame ID for apex fraction computation
+    uint8_t     _padAC[168];      // +0xAC..+0x153
+    int16_t     m_swingSubFrame;  // +0x154 (340) clip+0x134; frame count for the fraction checks
+    uint8_t     _pad156[2];       // +0x156..+0x157
+    uint8_t     m_swingSubFlags;  // +0x158 (344) clip+0x138; bits 0x8 and 0x4 tested by IsInReturnPosition
 };
 struct pongRecoveryState;
 struct pongAnimState;
@@ -135,24 +133,28 @@ struct vec3 {
 // ── Sub-struct: pongTimingState ──────────────────────────────────────────
 struct pongTimingState {
     uint8_t     _pad0[12];       // +0x00..+0x0B
-    float       m_targetX;       // +0x0C  zero-filled by CancelSwing
+    float       m_targetX;       // +0x0C  zeroed by CancelSwing
     float       m_targetY;       // +0x10
     float       m_targetZ;       // +0x14
-    uint8_t     _pad1[4];        // +0x18..+0x1B
-    float       m_currentTime;   // +0x1C (28) elapsed swing time
-    float       m_currentTime2;  // +0x20 (32)
-    float       m_peakX;         // +0x24 (36) position component / velocity data
-    float       m_peakY;         // +0x28 (40) confirmed: compared vs normalised fraction
-    float       m_peakTime;      // +0x2C (44)
-    float       m_targetTime;    // +0x30 (48) full swing duration
+    float       m_field18;       // +0x18  set to 1.0 by CancelSwing
+    float       m_currentTime;   // +0x1C (28) set to 1.0 by CancelSwing
+    float       m_currentTime2;  // +0x20 (32) zeroed by CancelSwing
+    float       m_peakTime;      // +0x24 (36) IsBeforeSwingPeak: true while this > m_currentTime
+    float       m_peakY;         // +0x28 (40)
+    float       m_field2C;       // +0x2C (44)
+    float       m_targetTime;    // +0x30 (48) the timer runs while m_currentTime is not >= this
     uint8_t     _pad2[12];       // +0x34..+0x3F
     float       m_vel0;          // +0x40 (64)
     float       m_vel1;          // +0x44 (68)
     float       m_vel2;          // +0x48 (72)
     uint8_t     _pad3[4];        // +0x4C..+0x4F
-    vec3        m_swingTargetVec;// +0x50 (80) 16-byte aligned swing target vector
+    vec3        m_swingTargetVec;// +0x50 (80) 16-byte aligned; CancelSwing zeroes x, y, z only
     uint8_t     _pad4[45];       // +0x60..+0x8C
     uint8_t     m_bComplete;     // +0x8D (141) cleared by CancelSwing
+
+    // The test 0x820CD550 makes and its callers inline: fcmpu, then "not >=",
+    // so a NaN time counts as running.
+    bool IsRunning() const { return !(m_currentTime >= m_targetTime); }
 };
 
 // ── Sub-struct: pongRecoveryState ────────────────────────────────────────
@@ -291,22 +293,16 @@ struct pongPlayer {
     bool IsCreatureStateReady()   const;  // @ 0x820CD660
     bool IsCreatureState2Active() const;  // @ 0x820CD6B8
     bool CanAcceptSwingInput()    const;  // @ 0x820CC3C8
-    bool IsBeforeSwingPeak()      const;  // @ 0x820CDCD8
     bool IsSwingApexReached(float threshold) const;  // @ 0x820CDA58
-    bool IsSwingSystemIdle()       const;  // @ 0x820CDC98
-    bool IsInReturnPosition()     const;                 // @ 0x820CDE98
     bool IsActionComplete()       const;                 // @ 0x820C7890
     bool CheckOpponentSwingApex() const;                 // @ 0x820C5890 (approx)
 
 
     // ── Swing execution ─────────────────────────────────────────────────
-    void CancelSwing();                                   // @ 0x820CD908
     void ProcessSwingDecision(int r4, int r5,
                               bool cancelFirst,
                               const vec3* pTargetVec,
                               int r7);                   // @ 0x820C7038
-    void SetupRecoverySlots(const vec3* pSlotA,
-                            const vec3* pSlotB);          // @ 0x820C7248
     void SetSwingActiveState(bool active);                // @ 0x820C7C78
 
     // ── Per-frame update ────────────────────────────────────────────────
@@ -336,7 +332,6 @@ struct pongPlayer {
     void UpdateCreatureSlotAnims(uint8_t resetFlag);
     void InitMovementAndContact();
     void ResetSwingSlotEntries(void* slotsBase);
-    void ComputeShotSpeedForType(float inputPower);
     void NotifySlotChangeAndSync(void* slotsBase, uint32_t slotIndex,
                                  uint32_t columnIndex);
     void UpdateServeSpeed();
@@ -391,18 +386,17 @@ struct pongPlayer {
 };
 
 // ── Inner heap state: pongPlayerState ────────────────────────────────────
-// Same layout as pongPlayer; used for the heap-allocated state sub-object.
-// NOTE: get_class_context reports pongPlayer has 3 vtables (multiple
-//       inheritance or virtual-base) and rtti_classes.txt has no distinct
-//       `pongPlayerState` RTTI entry — consistent with pongPlayerState being
-//       a re-use of pongPlayer's layout at +0xBC, treated as inheritance
-//       here for compile-time typing. The methods below are apex/ready-check
-//       overrides that run against the inner state's own m_pTimingState etc.
+// The object at pongCreature+0xBC (the header's pongPlayer+0xBC, m_pPlayerState).
+// It is modelled with pongPlayer's layout because the 0x820CD550..0x820CDE98
+// predicates read it at the same +0x7C/+0x80/+0x88/+0x94 offsets as the
+// fields declared there; rtti has no class of this name. Every caller of the
+// functions below reaches them through m_pPlayerState, so they live here only.
 struct pongPlayerState : pongPlayer {
     bool IsSwingApexReached(float threshold) const;  // @ 0x820CDA58 (pongPlayerState override)
-    bool IsBeforeSwingPeak()                const;  // @ 0x820CDCD8 (pongPlayerState override)
-    bool IsSwingSystemIdle()                const;  // @ 0x820CDC98 (pongPlayerState override)
-    bool IsInReturnPosition()               const;  // @ 0x820CDE98 (pongPlayerState override)
+    void CancelSwing();                              // @ 0x820CD908
+    bool IsBeforeSwingPeak()                const;  // @ 0x820CDCD8
+    bool IsSwingSystemIdle()                const;  // @ 0x820CDDC0
+    bool IsInReturnPosition()               const;  // @ 0x820CDE98
 };
 
 

@@ -62,9 +62,10 @@ extern void pongPlayer_ProcessSwingInput(pongPlayer* p, float f);
 extern void pongPlayer_ComputeSwingStrength(void* swingData, vec3* outStrength, vec3* outTarget, float alpha);
 extern void game_D468(void* obj, vec3* v);               // geometry helper
 extern bool pongPlayer_IsLocoStateReady(void* locoState);          // loco check
+// @ 0x820D6AA0 (pong_player_swing.cpp) — takes the clip embedded at pongTimingSubState+0x20.
+extern "C" bool pongPlayer_6AA0_g(void* clip);
 extern int  io_Input_poll_9D68(void* inputObj);           // 0=active input
 extern void pongLerpQueue_Update(void* queue);            // lerp queue update
-extern void game_D060(void* recoveryState);              // finalise serve recovery
 
 struct pongSwingData {
     uint32_t vtable_ptr;  // +0   (32-bit game ptr kept as uint32 for layout)
@@ -204,7 +205,7 @@ bool pongPlayer::IsSwingTimerActive() const {
     if (!m_pTimingState) {
         return false;
     }
-    return m_pTimingState->m_currentTime < m_pTimingState->m_targetTime;
+    return m_pTimingState->IsRunning();
 }
 
 /**
@@ -496,86 +497,6 @@ bool pongPlayer::CanAcceptSwingInput() const
 
 
 // ===========================================================================
-// SECTION 5 — D908: CancelSwing  @ 0x820CD908 | size: 0x150
-// ===========================================================================
-/**
- * pongPlayer::CancelSwing()  @ 0x820CD908
- *
- * Aborts the currently-pending swing and resets all associated state.
- * Safe to call even when no swing is active (guards protect all paths).
- *
- * Three independent cleanup paths (each only runs if the relevant subsystem
- * is currently active):
- *
- *  PATH A — Timing state active (timer running):
- *    Zero-fills the timing state's position/velocity data (12 floats across
- *    three vector slots), restores currentTime fields to g_kZero, clears the
- *    global "swing in flight" flag, and clears the m_bComplete byte.
- *    Debug-logs the creature pointer.
- *
- *  PATH B — In recovery (IsRecovering):
- *    Calls game_CD20 on the recovery state to flush queued recovery callbacks,
- *    then debug-logs the creature pointer.
- *
- *  PATH C — Swing phase blocked (IsSwingPhaseBlocked):
- *    Loads the anim state, calls crAnimBlenderState_Init at anim+16 (resets the anim
- *    "phase blocked" sub-system), zeroes the swing-phase float (m_swingPhase
- *    at +412), then debug-logs the creature pointer.
- *
- * All three paths are independent — multiple can fire in one call if several
- * subsystems are simultaneously active.
- */
-void pongPlayer::CancelSwing()
-{
-    const float kZero = g_kZero;
-
-    // ── PATH A: abort active swing timer ────────────────────────────────
-    if (m_pTimingState)
-    {
-        bool timerRunning = !(m_pTimingState->m_currentTime < m_pTimingState->m_targetTime);
-
-        if (timerRunning) {
-            // Zero the three vector slots and velocity fields.
-            m_pTimingState->m_targetX   = kZero;
-            m_pTimingState->m_targetY   = kZero;
-            m_pTimingState->m_targetZ   = kZero;
-            m_pTimingState->m_peakX     = kZero;
-            m_pTimingState->m_peakY     = kZero;
-            m_pTimingState->m_currentTime  = g_kZero; // the "start" float (g_kZero+8 in const block)
-            m_pTimingState->m_currentTime2 = g_kZero;
-            g_swingInFlightFlag          = 0;          // global @ lis(-32160)+25404
-            m_pTimingState->m_vel0      = kZero;
-            m_pTimingState->m_vel1      = kZero;
-            m_pTimingState->m_vel2      = kZero;
-            m_pTimingState->m_swingTargetVec.x = kZero;  // +80
-            m_pTimingState->m_swingTargetVec.y = kZero;  // +84
-            g_swingCountFlag            = 0;           // stw r10,25408(r9) @ lis(-32160)
-            m_pTimingState->m_swingTargetVec.z = kZero;  // +88
-            m_pTimingState->m_bComplete = 0;           // byte +141
-            rage_debugLog("pongPlayer::CancelSwing() timing reset", (uintptr_t)m_pCreature);
-        }
-    }
-
-    // ── PATH B: flush recovery callbacks ────────────────────────────────
-    if (IsRecovering())
-    {
-        game_CD20(m_pRecoveryState);     // flush recovery state @ 0x820DCD20
-        rage_debugLog("pongPlayer::CancelSwing() recovery flush", (uintptr_t)m_pCreature);
-    }
-
-    // ── PATH C: reset anim phase-blocked state ───────────────────────────
-    if (IsSwingPhaseBlocked())
-    {
-        pongAnimState* anim = m_pAnimState;
-        // pongAnimState::m_pAnimSubState lives at +16 — pass its address.
-        crAnimBlenderState_Init(&anim->m_pAnimSubState);   // reset phase-blocked sub-system @ 0x8224C810
-        anim->m_swingPhase = kZero;        // clear swing phase progress (+412)
-        rage_debugLog("pongPlayer::CancelSwing() anim reset", (uintptr_t)m_pCreature);
-    }
-}
-
-
-// ===========================================================================
 // SECTION 6 — DA58: IsSwingApexReached  @ 0x820CDA58 | size: 0x27C
 // ===========================================================================
 /**
@@ -655,7 +576,7 @@ bool pongPlayer::IsSwingApexReached(float threshold) const
                 fraction = g_kZero;
             }
 
-            float currentPos = m_pTimingState->m_peakX;  // +28 = recorded position component
+            float currentPos = m_pTimingState->m_peakTime;  // +0x24
             return currentPos > fraction;
         }
 
@@ -713,210 +634,6 @@ bool pongPlayer::IsSwingApexReached(float threshold) const
 
     return false;
 }
-
-
-// ===========================================================================
-// SECTION 7 — DCD8: IsBeforeSwingPeak  @ 0x820CDCD8 | size: 0xE8
-// ===========================================================================
-/**
- * pongPlayer::IsBeforeSwingPeak()  @ 0x820CDCD8
- *
- * Returns true when a swing is active AND the timing has not yet reached
- * the swing apex (peak time).
- *
- * Two-phase check:
- *
- *  PHASE 1 — Timer active gate:
- *    m_pTimingState must exist AND currentTime < targetTime.
- *    If the timer is not running, proceed to phase 2 (recovery path).
- *
- *  PHASE 2a — Pre-peak check (timer IS running):
- *    Re-read currentTime and compare against peakTime (+36).
- *    Returns true if peakTime > currentTime (haven't hit the apex yet).
- *    Returns false if peakTime <= currentTime (at or past apex).
- *
- *  PHASE 2b — Recovery fallback (timer NOT running):
- *    If IsRecovering, delegate to pongPlayer_CheckAnimTimeInRange on the recovery state.
- *    Otherwise return false.
- *
- * Called from pongPlayer_5800_h (the per-frame swing state machine tick).
- * Used to gate the "swing ascending" phase of animation — actions are
- * allowed before the peak, suppressed after.
- */
-bool pongPlayer::IsBeforeSwingPeak() const
-{
-    // ── PHASE 1: is the swing timer running? ────────────────────────────
-    bool timerRunning = false;
-    if (m_pTimingState) {
-        timerRunning = !(m_pTimingState->m_currentTime < m_pTimingState->m_targetTime);
-    }
-
-    if (timerRunning) {
-        // ── PHASE 2a: pre-peak test ──────────────────────────────────────
-        // First re-confirm timer is still running (redundant but matches asm).
-        bool stillRunning = !(m_pTimingState->m_currentTime < m_pTimingState->m_targetTime);
-
-        if (stillRunning) {
-            // True if we are before the peak: peakTime > currentTime.
-            float currentTime = m_pTimingState->m_currentTime;   // +28
-            float peakTime    = m_pTimingState->m_peakTime;       // +36
-            return peakTime > currentTime;
-        }
-        return false;
-    }
-
-    // ── PHASE 2b: recovery fallback ─────────────────────────────────────
-    // NOTE: the scaffold delegates to pongPlayer_D298_2hr (lifted here as
-    //       pongPlayer_IsWithinTimingWindow) on m_pRecoveryState — the same
-    //       "anim time within [lower, upper] frame fraction" predicate used
-    //       everywhere else in the recovery pipeline.
-    if (IsRecovering() && m_pRecoveryState) {
-        return pongPlayer_IsWithinTimingWindow(m_pRecoveryState);
-    }
-
-    return false;
-}
-
-
-// ===========================================================================
-// SECTION 8 — DDC0: IsSwingSystemIdle  @ 0x820CDDC0 | size: 0xD4
-// ===========================================================================
-/**
- * pongPlayer::IsSwingSystemIdle()  @ 0x820CDDC0
- *
- * Returns true when the entire swing subsystem is completely at rest and
- * no residual state is blocking the next action.
- *
- * This is a stricter version of CanAcceptSwingInput(): it requires ALL
- * subsystems to be inactive simultaneously, with NO exceptions.
- *
- * Returns false (not idle) if ANY of:
- *   - IsSwingPhaseBlocked()         — anim phase window still open
- *   - Swing timer running           — m_pTimingState current < target
- *   - IsCreatureStateReady()        — creature in post-action "ready" state
- *   - IsCreatureState2Active()      — secondary creature state is active
- *   - IsRecovering()                — recovery timer still counting
- *
- * Returns true only when ALL return false.
- *
- * Used as a pre-condition for serve/reset operations where the player
- * must be fully neutral before any new sequence begins.
- */
-bool pongPlayer::IsSwingSystemIdle() const
-{
-    // Any blocked phase → not idle.
-    if (IsSwingPhaseBlocked())
-        return false;
-
-    // Timer still running → not idle.
-    if (m_pTimingState) {
-        bool timerRunning = !(m_pTimingState->m_currentTime < m_pTimingState->m_targetTime);
-        if (timerRunning)
-            return false;
-    }
-
-    // Creature state in post-action resolution → not idle.
-    if (IsCreatureStateReady())
-        return false;
-
-    // Secondary creature state still active → not idle.
-    if (IsCreatureState2Active())
-        return false;
-
-    // Still in recovery window → not idle.
-    if (IsRecovering())
-        return false;
-
-    return true;
-}
-
-
-// ===========================================================================
-// SECTION 9 — DE98: IsInReturnPosition  @ 0x820CDE98 | size: 0x168
-// ===========================================================================
-/**
- * pongPlayer::IsInReturnPosition()  @ 0x820CDE98
- *
- * Determines whether the player is correctly positioned and oriented to
- * execute a return stroke. This combines timer state, locomotion flags,
- * and a distance/angle check against the target position.
- *
- * Called from pcrPostPointBlender_vfn_5, which controls the "post point"
- * blending animation — suggesting this gate fires between rallies when
- * deciding if the player has reached their return stance.
- *
- * Two main branches:
- *
- *  BRANCH A — Swing timer running (currentTime < targetTime):
- *    Read locomotion sub-state flags at `(*m_pSwingSubState + 32) + 312`.
- *    Check bit 3 (0x8): if set → return true (player is in swing-committed zone).
- *    Check bit 2 (0x4): if set → return true.
- *    Call pongPlayer_IsLocoStateReady on the locomotion state to evaluate positioning.
- *    If not positioned, compute the angular distance:
- *      - Load m_pBody->speed (float at +12 relative to m_playerIndex ptr)
- *      - Load frame count from locomotion state uint16 at +308
- *      - If speed > 0: fraction = float(frameCount) * g_kSwingScaleFactor / speed
- *      - Compare m_pTimingState->m_currentTime against fraction
- *      - Return !(currentTime < fraction) — true when timer has passed the threshold
- *
- *  BRANCH B — Swing phase blocked OR in recovery (fallback):
- *    Check IsSwingPhaseBlocked → if blocked, also check IsRecovering.
- *    Return true if IsRecovering (the player is in a valid return-ready state).
- *
- * NOTE: the "speed * g_kSwingScaleFactor / denominator" is a normalised TIME
- *       fraction (frameCount × framesToSeconds / swingSpeed), not an angle.
- *       Cross-checked against pongPlayer_D298_2hr (IsWithinTimingWindow),
- *       which uses the same idiom with the same g_kFloatConst_79BB8 constant.
- */
-bool pongPlayer::IsInReturnPosition() const
-{
-    // ── BRANCH A: swing timer active ────────────────────────────────────
-    bool timerRunning = false;
-    if (m_pTimingState) {
-        timerRunning = !(m_pTimingState->m_currentTime < m_pTimingState->m_targetTime);
-    }
-
-    if (timerRunning) {
-        // The locomotion sub-state lives via m_pSwingSubState->m_pSubObject (+0x20).
-        uint8_t* locoState = static_cast<uint8_t*>(m_pSwingSubState->m_pSubObject);
-        uint8_t  flags     = m_pSwingSubState->m_locoFlags;  // +0x138 (312)
-
-        // Bit 3: player already committed to swing zone.
-        if (flags & 0x8)
-            return true;
-
-        // Bit 2: alternate commitment flag.
-        if (flags & 0x4)
-            return true;
-
-        // Check whether the player has reached the return position spatially.
-        // pongPlayer_6AA0_g is the "IsLocoStateReady" predicate (see alias in
-        // pong_player_swing.cpp line 282: IsPlayerReadyToSwing).
-        if (pongPlayer_IsLocoStateReady(locoState))
-            return true;
-
-        // Compute normalised arrival fraction from frame count and body speed.
-        uint16_t frameCount = m_pSwingSubState->m_locoFrameCount;  // +0x134 (308)
-        float    speed      = static_cast<float*>(m_pSwingSubState->m_pBodyData)[3];  // bodyData+12 / 4 = speed
-
-        float fraction;
-        if (speed > g_kZero) {
-            fraction = (float)(int16_t)frameCount * g_kSwingScaleFactor / speed;
-        } else {
-            fraction = g_kZero;
-        }
-
-        float currentTime = m_pTimingState->m_currentTime;
-        return !(currentTime < fraction);
-    }
-
-    // ── BRANCH B: phase/recovery fallback ───────────────────────────────
-    if (!IsSwingPhaseBlocked())
-        return false;
-
-    return IsRecovering();
-}
-
 
 
 // ===========================================================================
@@ -1139,80 +856,6 @@ void pongPlayer::ProcessSwingDecision(int r4, int r5,
         SetSwingActiveState(false);
     }
     // result == other: no-op
-}
-
-
-// ===========================================================================
-// SECTION 13 — SetupRecoverySlots  @ 0x820C7248 | size: 0x19C
-// Called from: pongPlayer_StartServe, ServeStartedMessage_5728
-//
-// Configures the recovery system with two target "slot" vectors — the
-// positions the player should move through during a serve recovery arc.
-//
-// @param pSlotA  First 16-byte target vector (serve aim or return start)
-// @param pSlotB  Second 16-byte target vector (serve aim or return end)
-//
-// Logic:
-//  1. Check if the timing state is running (currentTime < targetTime).
-//     If so, check whether m_swingInputSlot (+14 in some lookup table)
-//     maps to button state == 2 (held). If it does, cancel swing.
-//
-//  2. Re-check if timer is running.
-//     If NOT running: predict position via pongPlayer_GetRacketPosition, then:
-//       - Read swing data result codes (+28, +36, +32) from m_pPlayerState
-//       - Verify the match conditions (state == 0 and sub-state == 3,
-//         and server flag == 1)
-//       - Copy pSlotA (16 bytes) to m_pPlayerState->m_pRecoveryState+80
-//       - Copy pSlotB (16 bytes) to m_pPlayerState->m_pRecoveryState+96
-//       - Call game_D060 to finalise the serve recovery setup.
-// ===========================================================================
-void pongPlayer::SetupRecoverySlots(const vec3* pSlotA, const vec3* pSlotB)
-{
-    pongPlayerState* ps = m_pPlayerState;
-
-    // ── Step 1: cancel swing if timer running and button is "held" ───────
-    if (ps->m_pTimingState) {
-        bool timerRunning = !(ps->m_pTimingState->m_currentTime
-                               < ps->m_pTimingState->m_targetTime);
-        if (timerRunning) {
-            // Check if the player's input slot (at offset +14 in table) is "held" (== 2).
-            uint32_t inputEntry = ((int32_t*)g_pButtonStateTable)[m_inputSlotIdx + 14];
-            if (inputEntry == 2)
-                ps->CancelSwing();
-        }
-    }
-
-    // ── Step 2: if timer no longer running, set up serve recovery slots ──
-    if (ps->m_pTimingState) {
-        bool timerRunning2 = !(ps->m_pTimingState->m_currentTime
-                                < ps->m_pTimingState->m_targetTime);
-        if (timerRunning2)
-            return;  // timer still active after cancel attempt — abort
-    }
-
-    // Predict current position into a local buffer.
-    vec3 predictedPos = {};
-    pongPlayer_GetRacketPosition(&predictedPos, m_pPhysicsBound);
-
-    // Read swing data state codes from recovery state.
-    pongRecoveryState* rstate = ps->m_pRecoveryState;
-    int32_t stateCode  = rstate->m_stateCode;      // +0x1C (28)
-    int32_t serverFlag = rstate->m_serverFlag;      // +0x20 (32)
-    // m_pFollowAction at +0x24 doubles as subState int32 here
-    int32_t subState   = static_cast<int32_t>(reinterpret_cast<intptr_t>(rstate->m_pFollowAction));  // +0x24 (36)
-
-    // Qualify: stateCode == 0 OR subState == 3, AND serverFlag == 1.
-    bool slotOk = (stateCode == 0) ? (subState == 3) : false;
-    bool serverOk = (serverFlag == 1);
-    if (!slotOk || !serverOk)
-        return;
-
-    // Copy 16-byte target vectors into the recovery slot area.
-    rstate->m_vec0 = *pSlotA;   // +0x50 (80)
-    rstate->m_vec1 = *pSlotB;   // +0x60 (96)
-
-    // Finalise serve recovery state.
-    game_D060(ps->m_pRecoveryState);
 }
 
 
@@ -1627,203 +1270,154 @@ path_b:
 
 
 // ===========================================================================
-// SECTION 7 — DCD8: IsBeforeSwingPeak  @ 0x820CDCD8 | size: 0xE8
-// Called from: pongPlayer_5800_h
-//
-// Returns true when either the swing timing is in its "before peak" window
-// OR the player is recovering and a recovery transition check passes.
-//
-// Two independent paths:
-//
-//  PATH A — Timing state exists (m_pTimingState != nullptr):
-//    Step 1: timer-NOT-running check (currentTime >= targetTime → timerRunning=false)
-//            Python: cntlzw(1)+rlwinm(27,31,31)=0, cntlzw(0)+rlwinm(27,31,31)=1
-//            so r5 = (currentTime < targetTime) = timerRunning
-//    If timerRunning (r5 != 0):
-//      Step 2: re-check currentTime < targetTime (redundant guard, as-per-asm)
-//      If still running:
-//        Check if m_peakTime (+36) > currentTime (+28) → true = "before peak"
-//
-//  PATH B — Timer not running (r5 == 0):
-//    Call IsRecovering. If recovering: call pongPlayer_CheckAnimTimeInRange on m_pRecoveryState
-//    and return its result.  If not recovering: return false.
-//
-// NOTE: m_peakTime at timing[+36] is the swing's peak point in time;
-//       the function returns true when currentTime hasn't reached it yet.
+// SECTION 7 — pongPlayerState swing-blender queries and CancelSwing
+//   0x820CD908 CancelSwing, 0x820CDCD8 IsBeforeSwingPeak,
+//   0x820CDDC0 IsSwingSystemIdle, 0x820CDE98 IsInReturnPosition
 // ===========================================================================
-bool pongPlayerState::IsBeforeSwingPeak() const
+//
+// All four inline 0x820CD550 (IsSwingTimerActive), whose test is
+// "!(m_currentTime >= m_targetTime)": the timer is running while the time is
+// short of the target (or NaN). Earlier lifts on pongPlayer read it the other
+// way round; they are gone, these are the only copies.
+
+/**
+ * pongPlayerState::CancelSwing  @ 0x820CD908 | size: 0x150
+ * (called by ProcessSwingDecision 0x820C7038 and pongCreature_StartSwingWithCallbacks)
+ *
+ * Interrupts whichever of the three blenders is running, each independently,
+ * logging "Interrupting Player %d ... Blender" with the blender's +0x08:
+ *  - swing timer running: resets the timing state (positions, times, the
+ *    target vector), and clears the two globals at 0x8260633C/0x82606340;
+ *  - recovering (the serve blender): game_CD20 clears it;
+ *  - phase blocked (the junk-swing blender): resets the anim blender at
+ *    m_pAnimState+0x10 and zeroes its phase.
+ */
+void pongPlayerState::CancelSwing()
 {
-    if (!m_pTimingState)
-        goto path_b;
+    const float kZero = 0.0f;  // @ 0x8202D110
+    const float kOne  = 1.0f;  // @ 0x8202D108
 
-    {
-        float currentTime = m_pTimingState->m_currentTime;  // +28
-        float targetTime  = m_pTimingState->m_targetTime;   // +48
-
-        // timerRunning = (currentTime < targetTime)
-        // Python-verified: cntlzw+rlwinm idiom is bool NOT, so:
-        // r11=1 when expired, r11=0 when running → NOT gives timerRunning
-        bool timerRunning = (currentTime < targetTime);
-
-        if (timerRunning) {
-            // Re-check (the asm does two fcmpu/cntlzw passes — keep the guard).
-            bool stillRunning = (currentTime < targetTime);
-            if (!stillRunning)
-                return false;
-
-            // Are we before the peak time?
-            float peakTime = m_pTimingState->m_peakTime;  // +0x2C (44)
-            return peakTime > currentTime;
-        }
+    pongTimingState* timing = m_pTimingState;
+    if (IsSwingTimerActive()) {
+        timing->m_targetX = kZero;
+        timing->m_targetY = kZero;
+        timing->m_targetZ = kZero;
+        timing->m_currentTime2 = kZero;
+        timing->m_peakTime = kZero;
+        timing->m_field18 = kOne;
+        timing->m_currentTime = kOne;
+        // globals.c declares both as uint32_t; the asm stores one byte to
+        // 0x8260633C (0x8260633D.. are separate labels) and a word to 0x82606340.
+        *reinterpret_cast<uint8_t*>(&g_swingInFlightFlag) = 0;
+        timing->m_vel0 = kZero;
+        timing->m_vel1 = kZero;
+        timing->m_vel2 = kZero;
+        timing->m_swingTargetVec.x = kZero;
+        timing->m_swingTargetVec.y = kZero;
+        g_swingCountFlag = 0;
+        timing->m_swingTargetVec.z = kZero;
+        timing->m_bComplete = 0;
+        // +0x08 of this object is printed as the player number.
+        nop_8240E6D0("Interrupting Player %d Swing Blender", m_pCreature);
     }
 
-path_b:
-    // Timer expired or no timing state: check recovery transition.
-    if (!IsRecovering())
-        return false;
+    if (IsRecovering()) {
+        game_CD20(m_pRecoveryState);
+        nop_8240E6D0("Interrupting Player %d Serve Blender", m_pCreature);
+    }
 
-    // Delegate to the recovery "anim time in range" predicate (D298_2hr).
-    if (!m_pRecoveryState)
-        return false;
-    return pongPlayer_IsWithinTimingWindow(m_pRecoveryState);
+    if (IsSwingPhaseBlocked()) {
+        pongAnimState* anim = m_pAnimState;
+        crAnimBlenderState_Init(&anim->m_pAnimSubState);  // anim+0x10
+        anim->m_swingPhase = kZero;
+        nop_8240E6D0("Interrupting Player %d Junk Swing Blender", m_pCreature);
+    }
 }
 
 
-// ===========================================================================
-// SECTION 8 — DDC0: IsSwingSystemIdle  @ 0x820CDDC0 | size: 0xD4
-// Called from: pongPlayer_vfn_2 (the main Process() virtual)
-//
-// Returns true only when ALL swing subsystems are simultaneously idle/clear:
-//   1. NOT swing-phase-blocked
-//   2. Timing state: timer NOT running (currentTime >= targetTime), or absent
-//   3. NOT creature-state-ready
-//   4. NOT creature-state-2-active
-//   5. NOT recovering
-//
-// Any single active subsystem causes an immediate return of false.
-// This is the "may I accept a new serve/swing?" master gate used by Process().
-//
-// Note the asymmetry with CanAcceptSwingInput: that function has the same 5
-// gates but returns true = "ready to swing".  This function returns true =
-// "the whole system is at rest" — same semantics, slightly different call
-// context.
-// ===========================================================================
-bool pongPlayerState::IsSwingSystemIdle() const
+/**
+ * pongPlayerState::IsBeforeSwingPeak  @ 0x820CDCD8 | size: 0xE8
+ * (called by pongPlayer_5800_h)
+ *
+ * While the swing timer runs: true when the timing state's +0x24 is still
+ * ahead of the current time. Otherwise, while recovering, defers to the
+ * recovery blender's window check (0x820DD298).
+ */
+bool pongPlayerState::IsBeforeSwingPeak() const
 {
-    // Gate 1: swing phase must be clear.
-    if (IsSwingPhaseBlocked())
-        return false;
-
-    // Gate 2: timing state timer must be expired (or absent).
-    if (m_pTimingState) {
-        float currentTime = m_pTimingState->m_currentTime;  // +28
-        float targetTime  = m_pTimingState->m_targetTime;   // +48
-        // timerRunning = (currentTime < targetTime)
-        bool timerRunning = (currentTime < targetTime);
-        if (timerRunning)
+    if (IsSwingTimerActive()) {
+        const pongTimingState* timing = m_pTimingState;
+        // The asm reloads both times and tests them again, without the
+        // negation; it can only fail here for a NaN time.
+        if (timing->m_currentTime >= timing->m_targetTime)
             return false;
+        return timing->m_peakTime > timing->m_currentTime;
     }
 
-    // Gate 3: primary creature state must not be "ready" (= mid-resolution).
+    if (IsRecovering())
+        return pongPlayer_IsWithinTimingWindow(m_pRecoveryState);
+    return false;
+}
+
+
+/**
+ * pongPlayerState::IsSwingSystemIdle  @ 0x820CDDC0 | size: 0xD4
+ * (called by pongPlayer_vfn_2)
+ *
+ * True only when none of the blenders is busy: phase not blocked, swing timer
+ * not running, creature state not ready, second creature state not active,
+ * not recovering.
+ */
+bool pongPlayerState::IsSwingSystemIdle() const
+{
+    if (IsSwingPhaseBlocked())
+        return false;
+    if (IsSwingTimerActive())
+        return false;
     if (IsCreatureStateReady())
         return false;
-
-    // Gate 4: secondary creature state must not be active.
     if (IsCreatureState2Active())
         return false;
-
-    // Gate 5: recovery window must be clear.
     if (IsRecovering())
         return false;
-
     return true;
 }
 
 
-// ===========================================================================
-// SECTION 9 — DE98: IsInReturnPosition  @ 0x820CDE98 | size: 0x168
-// Called from: pcrPostPointBlender_vfn_5
-//
-// Returns true when the player is in the correct "return position" ready to
-// receive the ball — used by the post-point blender to decide whether to
-// start blending back to the ready stance.
-//
-// Two execution paths depending on whether the timing state is "running":
-//
-//  PATH A — Timing state running (currentTime < targetTime):
-//    Reads a sub-object: swingSubBase = *(m_pSwingSubState + 32)
-//    Checks two flag bits in swingSubBase[+312]:
-//      - bit 0x8 (rlwinm ,0,28,28) → "in position flag A"
-//      - bit 0x4 (rlwinm ,0,29,29) → "in position flag B"
-//    If neither flag: calls pongPlayer_IsLocoStateReady (checks animation condition).
-//    If 6AA0 also false: computes a normalised fraction from the timing
-//    state's velocity and frame count, compares m_pTimingState[+28] (currentTime)
-//    against it. Returns true if currentTime >= fraction (i.e. past the point).
-//
-//  PATH B — Timer NOT running:
-//    Returns true if IsSwingPhaseBlocked OR (NOT IsRecovering).
-//    i.e. returns true when the swing anim is past its window OR there is no
-//    recovery pending.
-//
-// Python-verified: bit masks 0x8=rlwinm(0,28,28), 0x4=rlwinm(0,29,29).
-// ===========================================================================
+/**
+ * pongPlayerState::IsInReturnPosition  @ 0x820CDE98 | size: 0x168
+ * (called by pcrPostPointBlender_vfn_5 through pongPlayer_DE98_g)
+ *
+ * While the swing timer runs: false when the swing clip's flags have 0x8 or
+ * 0x4 set or 0x820D6AA0 says the clip is done; otherwise true once the current
+ * time has reached frameCount / 30 / speed seconds (0 when the speed isn't
+ * positive). With no swing running: true unless the phase is blocked or the
+ * player is recovering.
+ */
 bool pongPlayerState::IsInReturnPosition() const
 {
-    if (!m_pTimingState)
-        goto path_b;
+    const pongTimingState* timing = m_pTimingState;
+    if (!IsSwingTimerActive())
+        return !IsSwingPhaseBlocked() && !IsRecovering();
 
-    {
-        float currentTime = m_pTimingState->m_currentTime;  // timing[+28]
-        float targetTime  = m_pTimingState->m_targetTime;   // timing[+48]
-        bool  timerRunning = (currentTime < targetTime);
+    pongTimingSubState* clip = m_pSwingSubState;
+    uint8_t flags = clip->m_swingSubFlags;
+    if (flags & 0x8)
+        return false;
+    if (flags & 0x4)
+        return false;
+    if (pongPlayer_6AA0_g(clip->m_clip))
+        return false;
 
-        if (timerRunning) {
-            if (!m_pSwingSubState)
-                return false;
+    float currentTime = timing->m_currentTime;
+    int16_t frameCount = clip->m_swingSubFrame;
+    float speed = static_cast<const float*>(clip->m_pVelRecord)[3];  // +0xC
 
-            // Sub-object via m_pSubObject (+0x20)
-            uint8_t* swingSubBase = static_cast<uint8_t*>(m_pSwingSubState->m_pSubObject);
-            if (!swingSubBase)
-                return false;
-
-            // Check position flag bits.
-            uint8_t flags = m_pSwingSubState->m_locoFlags;  // +0x138 (312)
-            if (flags & 0x8)
-                return true;  // flag A: already in position
-            if (flags & 0x4)
-                return true;  // flag B: in return position
-
-            // Ask the animation system if we've cleared the swing gate.
-            // pongPlayer_6AA0_g is "IsLocoStateReady" — see alias in
-            // pong_player_swing.cpp line 282 (IsPlayerReadyToSwing).
-            if (pongPlayer_IsLocoStateReady(swingSubBase))
-                return true;
-
-            // Compute normalised timing fraction.
-            float   speedFloat = static_cast<float*>(m_pSwingSubState->m_pBodyData)[3];  // bodyData+12 / 4
-            int16_t frameCount = m_pSwingSubState->m_locoFrameCount;  // +0x134 (308)
-
-            float fraction = g_kZero;
-            if (speedFloat > g_kZero) {
-                fraction = (float)(int32_t)frameCount * g_kFrameToSecScale / speedFloat;
-            }
-
-            // Return true if currentTime has reached the normalised fraction.
-            return currentTime >= fraction;
-        }
-    }
-
-path_b:
-    // Timer not running — check anim and recovery state.
-    if (IsSwingPhaseBlocked())
-        return true;   // Anim past window → trivially in return position.
-
-    if (IsRecovering())
-        return false;  // Still in recovery → not yet in return position.
-
-    return true;       // Default: no active system → in position.
+    float endTime = 0.0f;  // @ 0x8202D110
+    if (speed > 0.0f)
+        endTime = (float)frameCount * (1.0f / 30.0f) / speed;  // 1/30 @ 0x82079BB8
+    return currentTime >= endTime;
 }
-
 
 
 // ===========================================================================
@@ -2327,7 +1921,7 @@ bool pongPlayer::IsSwingTimerInActiveWindow() const {
     // Check if timer has expired
     if (!(currentTime < targetTime)) {
         // Timer expired - check if we're in the secondary window
-        float secondaryThreshold = m_pTimingState->m_peakTime;  // +0x2C (44, labeled as +36 in scaffold)
+        float secondaryThreshold = m_pTimingState->m_field2C;  // +0x2C (44, labeled as +36 in scaffold)
         
         // Must be between targetTime and secondaryThreshold
         if (currentTime < secondaryThreshold) {
@@ -2536,7 +2130,6 @@ extern void pg_E6E0(int code, uint8_t mask, int p3, int p4);
 extern void pongPlayer_9108_g(void* target, void* syncData);
 
 // g_pMatchState @ 0x8271A318 and g_pMatchConfig @ 0x8271A32C declared at file scope
-extern float g_kSpeedTable[];     // @ 0x825D7600
 
 
 /**
@@ -2729,39 +2322,6 @@ void pongPlayer::ResetSwingSlotEntries(void* slotsBase) {  // pongPlayer_6080_p3
 
     *reinterpret_cast<uint32_t*>(base + 800) = 0;
     *reinterpret_cast<uint32_t*>(base + 804) = 0;
-}
-
-
-/**
- * pongPlayer::ComputeShotSpeedForType  @ 0x821D6100 | size: 0xA8 (168 bytes)
- *
- * Computes shot speed based on shot type (+156) and input power (f1).
- * Input is clamped to [0, 1], then used to lerp between base and max
- * speed from a lookup table. Result stored at this+148.
- *
- * Shot types 8, 9, 10 all fall through to the same computation.
- * Called from pongPlayer_SetupServe and pongPlayer_0780_g.
- */
-void pongPlayer::ComputeShotSpeedForType(float inputPower) {  // pongPlayer_6100_g @ 0x821D6100
-    extern const float g_kShotSpeedClampZero;  // @ 0x82079D30
-    extern const double g_kShotSpeedClampMax;  // @ 0x82079CE8
-
-    // Clamp to [0, max] via fsel pattern
-    float clamped = inputPower - g_kShotSpeedClampZero;
-    float safeVal = (clamped >= 0.0f) ? inputPower
-                                      : static_cast<float>(g_kShotSpeedClampMax);
-    float excess = safeVal - static_cast<float>(g_kShotSpeedClampMax);
-    float finalVal = (excess >= 0.0f) ? static_cast<float>(g_kShotSpeedClampMax)
-                                      : safeVal;
-
-    float absVal = fabsf(finalVal);
-
-    // Lerp between base speed and max speed
-    float baseSpeed = g_kSpeedTable[1];  // @ 0x825D7604
-    float maxSpeed  = g_kSpeedTable[0];  // @ 0x825D7600
-
-    float range = maxSpeed - baseSpeed;
-    m_shotSpeed = range * absVal + baseSpeed;  // +148
 }
 
 
@@ -5735,50 +5295,6 @@ extern "C" void pongPlayer_AB48_g(void* outVec, void* playerLike);
 extern "C" float pongPlayer_94F8_wrh();
 
 /**
- * pongPlayer_DDC0_g @ 0x820CDDC0 | size: 0xD4 (212 bytes)
- *
- * Compound gate: returns true iff the anim phase is NOT blocked
- * (IsSwingPhaseBlocked == false) AND timing state exists with currentTime
- * already past targetTime AND neither creature state is active AND not
- * recovering.  This is the "ready to enter swing" test used by
- * pongPlayer_DE98_g (IsInReturnPosition) and pongPlayer_BF18_g.
- *
- * Fully lifted version is trivial — waiting on the companion DA58
- * IsSwingApexReached rewrite before landing to avoid churn in the
- * IsSwingPhaseBlocked / IsRecovering predicate chain.
- */
-extern "C" bool pongPlayer_DDC0_g(pongPlayer* self);
-
-/**
- * pongPlayer_D908_g @ 0x820CD908 | size: 0x150 (336 bytes) —
- *    CancelSwing full variant (already declared in header at hpp:303).
- *
- * Body performs: if IsSwingPhaseBlocked → reset anim state floats at
- * +12/+16/+20/+24/+28/+32/+36, clear two globals (g_swingInFlightFlag,
- * g_swingCountFlag), clear inner flag at +141, call nop_8240E6D0.
- * Then if IsRecovering → call game_CD20 on recovery state.  Finally if
- * IsSwingPhaseBlocked (again) → reset the m_pShotState->m_phase chain and
- * stamp float at +412.
- *
- * NOTE: the method-level CancelSwing() above (SECTION 5) already implements
- *       the three hit-cancel paths (timer / recovery / phase).  The free-function
- *       extern kept here for binary-name parity with the scaffold — it is not
- *       a separate implementation.
- */
-extern "C" void pongPlayer_D908_g(pongPlayer* self);
-
-/**
- * pongPlayer_DCD8_g @ 0x820CDCD8 | size: 0xE8 (232 bytes) —
- *    IsBeforeSwingPeak (declared in hpp:294).
- *
- * Conjunction of four predicates: IsSwingPhaseBlocked, IsSwingTimerActive,
- * IsCreatureStateReady, IsRecovering — plus a sign check on
- * m_pAnimState->m_phase relative to g_swingPhaseThreshold.  Method-level
- * IsBeforeSwingPeak (SECTION 7) already expresses this as structured
- * conditionals; no further merging needed.
- */
-
-/**
  * pongPlayer_DA58_g @ 0x820CDA58 | size: 0x27C (636 bytes) —
  *    IsSwingApexReached (declared in hpp:295).
  *
@@ -5838,8 +5354,11 @@ void pongPlayer_UpdateLocomotionState(pongPlayer* state) {
     pongPlayer_C678_g(state);
 }
 
-// pongPlayer_DE98_g @ 0x820CDE98 | size: 0x168 — IsInReturnPosition (bool query).
-extern "C" bool pongPlayer_DE98_g(void* /*self*/) { return false; }
+// pongPlayer_DE98_g @ 0x820CDE98 — the by-address name pcr_anim_blenders.cpp
+// calls; it passes the pongCreature's +0xBC, the pongPlayerState.
+extern "C" bool pongPlayer_DE98_g(void* state) {
+    return static_cast<pongPlayerState*>(state)->IsInReturnPosition();
+}
 
 // pongPlayer_FD20_g @ 0x821EFD20 | size: 0x1A4
 // Court bounds + interpolation helper invoked by E7B0_g.
@@ -6751,16 +6270,6 @@ void game_CD20(void* recoveryState) {
 }
 
 /**
- * game_D060 @ 0x820DD060 | size: 0x160
- * Serve recovery finalization — complex state machine transition
- * for completing a serve recovery sequence.
- * TODO: Full lift (352 bytes, state machine logic).
- */
-void game_D060(void* playerState) {
-    (void)playerState;
-}
-
-/**
  * game_D468 @ 0x820CD468 | size: 0xE4
  * Player target vector update — sets the target position on the
  * player's creature slots for movement interpolation.
@@ -6891,29 +6400,8 @@ struct pongAnimClipView {
     int32_t hitFrame;  // +0x1C  inferred: Serve times the toss to land on this frame (30 fps)
 };
 
-// The creature's swing animation state; the header calls it pongRecoveryState.
-// game_CD20 (0x820DCD20) clears the same fields.
-struct pongSwingAnimView {
-    uint8_t           _pad00[0x24];
-    pongAnimClipView* clip;       // +0x24
-    uint8_t           _pad28[0x08];
-    float             startTime;  // +0x30  match-clock time the clip started
-};
-
-// The object at pongCreature+0xBC that the 0x820CD550..0x820CD6B8 predicates
-// take (the header's pongPlayerState).
-struct pongServeBlenderView {
-    uint8_t            _pad00[0x80];
-    pongSwingAnimView* swingAnim;  // +0x80  header: m_pRecoveryState
-};
-
-struct pongCreatureServeView {
-    uint8_t               _pad00[0xBC];
-    pongServeBlenderView* blender;  // +0xBC
-};
-
 // The 16-byte callback StartServe gives the creature; 0x820C7248 copies the two
-// of them into the swing animation at +0x50 and +0x60. game_3860 builds one of
+// of them into the serve blender at +0x50 and +0x60. game_3860 builds one of
 // the same shape (rage::datCallback-like: target, function, data, kind).
 typedef void (*pongCallbackFn)();
 struct pongCallback {
@@ -6923,16 +6411,79 @@ struct pongCallback {
     int32_t        kind;      // +0x0C  1: function(target); 4: function(target, int* answer)
 };
 
+struct pongCreatureServeView;
+
+// One clip list of the serve blender: an atArray (pointer, 16-bit count).
+struct pongAnimClipList {
+    pongAnimClipView** items;  // +0x00
+    uint16_t           count;  // +0x04
+    uint16_t           _pad06;
+};
+
+// The serve blender (CancelSwing logs it as "Serve Blender"); the header calls
+// it pongRecoveryState and pongPlayerState::IsRecovering reads its +0x2C/+0xAC.
+// game_CD20 (0x820DCD20) clears the same fields.
+struct pongSwingAnimView {
+    uint8_t                _pad00[0x04];
+    int32_t                field_04;   // +0x04  Start posts message 0x1002 to bit (1 << this)
+    pongCreatureServeView* creature;   // +0x08  Start reads the player index at its +0xCC
+    pongAnimClipList       clips;      // +0x0C  Start plays the last one
+    pongAnimClipList       altClips;   // +0x14  ...or the last of these
+    uint8_t                _pad1C[0x08];
+    pongAnimClipView*      clip;       // +0x24
+    uint8_t                _pad28[0x04];
+    uint8_t                pending;    // +0x2C  set when Start can't play yet; counts as busy (IsRecovering)
+    uint8_t                _pad2D[0x03];
+    float                  startTime;  // +0x30  match-clock time the clip started
+    uint8_t                _pad34[0x0C];
+    vec3                   position;   // +0x40  where Start was asked to play the clip
+    pongCallback           action;     // +0x50  StartServe: pongPlayer_Serve
+    pongCallback           query;      // +0x60  StartServe: io_8A48
+    uint8_t                _pad70[0x38];
+    float                  fieldA8;    // +0xA8  zeroed by Start
+    float                  progress;   // +0xAC  zeroed by Start; idle (not recovering) at >= 1.0
+};
+
+// What the blender manager's +0x94 points at, as far as 0x820C7248 reads it.
+struct pongBlenderSub94View {
+    uint8_t _pad00[0x1C];
+    int32_t field_1C;  // +0x1C  the serve blender may start only when this is 0...
+    int32_t field_20;  // +0x20  1 selects the serve blender's second clip list
+    int32_t field_24;  // +0x24  ...and this is 3
+};
+
+// The object at pongCreature+0xBC that the 0x820CD550..0x820CDE98 predicates
+// take: the header's pongPlayerState, which holds the swing blender (timing
+// state, +0x7C), the serve blender (+0x80) and the junk-swing blender (+0x88).
+struct pongServeBlenderView {
+    uint8_t               _pad00[0x7C];
+    pongTimingState*      timing;     // +0x7C  header: m_pTimingState
+    pongSwingAnimView*    swingAnim;  // +0x80  header: m_pRecoveryState
+    uint8_t               _pad84[0x10];
+    pongBlenderSub94View* sub94;      // +0x94  header: m_pSwingData
+
+    pongPlayerState* State() { return reinterpret_cast<pongPlayerState*>(this); }
+};
+
+struct pongCreatureServeView {
+    uint8_t               _pad00[0xA8];
+    void*                 fieldA8;      // +0xA8  header: m_pPhysicsBound; 0x820CAB48 reads it
+    uint8_t               _padAC[0x10];
+    pongServeBlenderView* blender;      // +0xBC
+    uint8_t               _padC0[0x0C];
+    int32_t               playerIndex;  // +0xCC  indexes the settings' playerMode
+};
+
 // @ 0x820DD1C0 — world position of the swing animation's hit point.
 extern void game_D1C0(vec3* outPos, pongSwingAnimView* swingAnim);
 // @ 0x820CE090 — a bone matrix from the creature's skeleton (bone id at +0x1C
 // of the blender), translation pushed a little along the bone's motion.
 extern void game_E090(pongServeBlenderView* blender, pongMatrix34* outMatrix);
-// @ 0x820C7248 — lifted above as pongPlayer::SetupRecoverySlots, but that lift
-// doesn't match the asm: `this` is a pongCreature and the two arguments are
-// pongCallbacks, stored unconditionally before game_D060 runs.
-extern void pongPlayer_7248_g(pongCreatureServeView* creature, const pongCallback* serveCallback,
-                              const pongCallback* queryCallback);
+// @ 0x820DD060 — starts the serve blender; a stub until it is lifted.
+bool game_D060(pongSwingAnimView* /*blender*/, const vec3* /*position*/, bool /*canStart*/,
+               bool /*useAltClips*/) {
+    return false;
+}
 
 // ── Player side ────────────────────────────────────────────────────────────
 
@@ -7008,7 +6559,9 @@ struct pongShotRecord {
     vec3     targetPos;    // +0x20  world point the shot aims at (Serve mirrors its z)
     uint8_t  _pad30[0x10];
     vec3     vec40;        // +0x40  zeroed by SetupServe unless shotType is 3
-    uint8_t  _pad50[0x4C];
+    uint8_t  _pad50[0x44];
+    float    gravity;      // +0x94  inferred: 0x821D6100 sets it between the ball's gravity and -11.85
+    uint8_t  _pad98[0x04];
     int32_t  shotType;     // +0x9C  pg_9A70's 5, 9 or 3
     uint8_t  _padA0[0x26];
     uint16_t flagsC6;      // +0xC6  SetupServe sets the high byte to 0x10
@@ -7097,13 +6650,82 @@ extern void PostGameMessage(uint32_t messageId, uint32_t flags, uint32_t param1,
 extern void io_8A48(pongPlayer* player, int32_t* answer);
 // @ 0x82199A70 — picks the serve's shot type from the flags (see pongServeTypeFlags).
 extern int32_t pg_9A70(pongServeTypeFlags* flags, int32_t playerIndex);
-// @ 0x821D6100 — lifted above as pongPlayer::ComputeShotSpeedForType, but its
-// `this` is the shot record (it reads shotType at +0x9C and writes +0x94).
-extern void pongPlayer_6100_g(pongShotRecord* shot, float input);
-
 // Flags argument of PostGameMessage: one bit per player.
 static uint32_t PlayerMessageBit(int32_t playerIndex) {
     return playerIndex != 0 ? 2u : 1u;
+}
+
+/**
+ * pongCreature_StartServeBlender  (pongPlayer_7248_g @ 0x820C7248 | size: 0x19C)
+ * (called by pongPlayer_StartServe and ServeStartedMessage_5728)
+ *
+ * A pongCreature function. If a swing is running and the player's mode is 2,
+ * interrupts it first; if one is still running, does nothing. Otherwise
+ * gives the serve blender the two callbacks (unconditionally) and starts it at
+ * the position 0x820CAB48 works out, letting it play only when the blender
+ * manager's +0x94 record has +0x1C == 0 and +0x24 == 3.
+ */
+void pongCreature_StartServeBlender(pongCreatureServeView* creature, const pongCallback* action,
+                                    const pongCallback* query)
+{
+    pongServeBlenderView* blender = creature->blender;
+    if (blender->State()->IsSwingTimerActive() &&
+        MatchSettings()->playerMode[creature->playerIndex] == 2)
+        blender->State()->CancelSwing();
+
+    if (creature->blender->State()->IsSwingTimerActive())
+        return;
+
+    // 0x820CAB48 returns its first argument; the asm passes that return value on.
+    vec3 position;
+    pongPlayer_AB48_g(&position, creature->fieldA8);
+
+    blender = creature->blender;
+    const pongBlenderSub94View* sub94 = blender->sub94;
+    bool canStart = sub94->field_1C == 0 && sub94->field_24 == 3;
+    bool useAltClips = sub94->field_20 == 1;
+    blender->swingAnim->action = *action;
+    blender->swingAnim->query = *query;
+    game_D060(blender->swingAnim, &position, canStart, useAltClips);
+}
+
+
+extern float lbl_825C7600;  // @ 0x825C7600  -11.85 in the image (.data)
+
+/**
+ * pongShotRecord_SetGravity  (pongPlayer_6100_g @ 0x821D6100 | size: 0xA8)
+ * (called by pongPlayer_SetupServe and 0x82190780)
+ *
+ * Runs on the per-player shot record. Sets +0x94 between the ball's gravity
+ * and -11.85 (0x825C7600) by |input| clamped to [-0.9, -0.9]: both bounds are
+ * -0.9 in the image (the float at 0x82079D50 and the double at 0x82079D48), so
+ * any non-NaN input gives g + (-11.85 - g) * 0.9. Shot types 8, 9 and 10 run
+ * the same store two to four times (switch fall-through in the asm).
+ */
+void pongShotRecord_SetGravity(pongShotRecord* shot, float input)
+{
+    const float kLow  = -0.9f;  // @ 0x82079D50
+    const float kHigh = -0.9f;  // @ 0x82079D48 (double)
+
+    // fsel clamp; the low branch already selects the double.
+    float raised = (input - kLow >= 0.0f) ? input : kHigh;
+    float clamped = (raised - kHigh >= 0.0f) ? kHigh : raised;
+
+    const float heavy = lbl_825C7600;
+    switch (shot->shotType) {
+    case 8:
+        shot->gravity = (heavy - g_ballGravity) * fabsf(clamped) + g_ballGravity;
+        // fall through
+    case 9:
+        shot->gravity = (heavy - g_ballGravity) * fabsf(clamped) + g_ballGravity;
+        // fall through
+    case 10:
+        shot->gravity = (heavy - g_ballGravity) * fabsf(clamped) + g_ballGravity;
+        // fall through
+    default:
+        shot->gravity = (heavy - g_ballGravity) * fabsf(clamped) + g_ballGravity;
+        break;
+    }
 }
 
 
@@ -7303,7 +6925,7 @@ void pongPlayer_Serve(pongPlayer* player)
 /**
  * pongPlayer_StartServe  @ 0x82193190 | size: 0x104
  *
- * Gives the creature two callbacks for its swing animation (via 0x820C7248):
+ * Gives the creature's serve blender two callbacks (pongCreature_StartServeBlender):
  * pongPlayer_Serve, and the query io_8A48. Then posts message 0x380B and
  * clears the player's two serve bytes in the shot table.
  */
@@ -7321,7 +6943,7 @@ void pongPlayer_StartServe(pongPlayer* player)
         player, reinterpret_cast<pongCallbackFn>(&pongPlayer_Serve), nullptr, 1 };
     pongCallback queryCallback = {
         player, reinterpret_cast<pongCallbackFn>(&io_8A48), nullptr, 4 };
-    pongPlayer_7248_g(self->creature, &serveCallback, &queryCallback);
+    pongCreature_StartServeBlender(self->creature, &serveCallback, &queryCallback);
 
     self->field_18C8 = 1;
     PostGameMessage(0x380B, PlayerMessageBit(self->playerIndex) | 0x40, 0, 0);
@@ -7358,7 +6980,7 @@ void pongPlayer_SetupServe(pongPlayer* player)
     self->serveTypeFlags.flag4 = 0;
     self->serveTypeFlags.flag6 = 0;
     shot.shotType = pg_9A70(&self->serveTypeFlags, self->playerIndex);
-    pongPlayer_6100_g(&shot, MatchSettings()->field_9C[self->playerIndex]);
+    pongShotRecord_SetGravity(&shot, MatchSettings()->field_9C[self->playerIndex]);
 
     shot.flagsC6 = (uint16_t)((shot.flagsC6 & 0x00FF) | 0x1000);
     self->field_18C8 = 1;
