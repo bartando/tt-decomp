@@ -3516,7 +3516,7 @@ extern "C" void rage_C668(void* unk, int flag);                         // @ 0x8
 extern "C" void pongShadowMap_EC70_g(void* a, void* b,
                                      void* c, void* d,
                                      void* e, int flags);               // @ 0x8213EC70
-extern "C" void LocomotionState_CD70_g(void* self);                     // @ 0x8214CD70
+extern "C" void LocomotionState_CD70_g(void* skeleton, void* poseSnapshot);  // @ 0x8214CD70
 
 // Physics-frame ring-buffer cursors used by the rollback / shadow hooks.
 // Both are declared in include/globals.h — redeclared here as C++-linkage
@@ -3566,50 +3566,43 @@ void pongCreature::DestroyThunk() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// pongCreature::RestorePoseFromRollback()
+// pongCreature::SavePoseSnapshot()
 //                                [vtable 0x82027B08 slot 1 @ 0x820C67C0 | size: 0x80]
 //
-// (Previously misnamed "ScalarDtor" — it is NOT a scalar destructor. The
-// body does not delete and does not call operator delete.)
+// (Was RestorePoseFromRollback; earlier misnamed "ScalarDtor".)
 //
-// Invoked by the physics rollback path every tick. Reads the per-player
-// pose-snapshot pointer from a 50-slot circular buffer embedded in the
-// creature (indexed by g_phFrameIndex). If a snapshot exists:
+// `this` is the phUpdateObject base (creature + 0x10). Picks the pose
+// snapshot for the current frame from the word table at this + 50*4, indexed
+// by g_phFrameIndex, and writes the skeleton's pose into it:
 //
-//   • If the anim descriptor at +0 has bit 0 of byte +17 set, the bone
-//     buffer is still resident — hand off to LocomotionState_CD70_g to
-//     flip the locomotion state's cached pointer in place.
-//   • Otherwise, the pose is cold — rebuild m_pCharCtx's pose cache by
-//     memcpy'ing `count*64` bytes (one 64-byte bone row per entry) from
-//     the snapshot buffer into (m_pCharCtx +20).
+//   • If bit 0 of the byte at +0x11 of the descriptor reached through
+//     character (+0x90) → +0x14 → +0x40 → [0] → [0] is set, the
+//     skeleton and the snapshot go to LocomotionState_CD70_g (tail call).
+//   • Otherwise the skeleton's bone matrices (count * 64 bytes from its
+//     +0x14) are copied into the snapshot.
 // ─────────────────────────────────────────────────────────────────────────────
-void pongCreature::RestorePoseFromRollback() {
-    // Per-frame snapshot slot: byte offset (g_phFrameIndex + 50) * 4.
-    uint32_t slot = g_phFrameIndex + 50;
-    uint32_t snapshot = *((uint32_t*)((char*)this + (slot << 2)));
-    if (snapshot == 0) return;
+void pongCreature::SavePoseSnapshot() {
+    void* const* snapshots = (void* const*)((char*)this + 50 * 4);
+    void* snapshot = snapshots[g_phFrameIndex];
+    if (snapshot == nullptr) return;
 
-    // m_pChar (+144) → collider sub-object (+20) → primary emitter (+64)
-    // → anim descriptor (deref) → flags byte at +17.
-    void*   charObj   = *(void**)((char*)this + 144);
-    void*   sub       = *(void**)((char*)charObj + 20);
-    void*   anim      = *(void**)((char*)sub + 64);
-    void*   descRef   = *(void**)anim;
-    uint8_t animFlags = *(uint8_t*)((char*)descRef + 17);
+    void*   charObj   = *(void**)((char*)this + 0x90);   // creature +0xA0
+    void*   charData  = *(void**)((char*)charObj + 0x14);
+    void*   emitter   = *(void**)((char*)charData + 0x40);
+    void*   holder    = *(void**)emitter;
+    void*   desc      = *(void**)holder;
+    uint8_t animFlags = *(uint8_t*)((char*)desc + 0x11);
 
-    void* charCtx = *(void**)((char*)this + 156);
+    void* skeleton = *(void**)((char*)this + 0x9C);      // creature +0xAC
     if ((animFlags & 0x1) != 0) {
-        // Fast path — bone buffer still live; just retarget the pointer.
-        LocomotionState_CD70_g(charCtx);
+        LocomotionState_CD70_g(skeleton, snapshot);
         return;
     }
 
-    // Cold path — full bone-row memcpy into the locomotion pose cache.
-    void*    dst   = *(void**)((char*)charCtx + 20);
-    void*    meta  = *(void**)((char*)charCtx + 4);
-    uint16_t count = *(uint16_t*)((char*)meta + 12);
-    size_t   bytes = (size_t)count << 6;  // 64 bytes per bone row
-    memcpy(dst, (void*)(uintptr_t)snapshot, bytes);
+    void*    matrices = *(void**)((char*)skeleton + 0x14);
+    void*    data     = *(void**)((char*)skeleton + 0x04);
+    uint16_t count    = *(uint16_t*)((char*)data + 0x0C);
+    memcpy(snapshot, matrices, (size_t)count << 6);  // 64 bytes per bone matrix
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3813,8 +3806,8 @@ struct pongCreatureSkeletonData {
 static const uint32_t SKELETON_FLAG_APPLY_C288 = 0x1;  // animations go through 0x8224C288, not 0x8224C128
 
 // The skeleton at pongCreature+0xAC, and the one a fragment cache entry keeps
-// at +0x1E4 (inferred: RestorePoseFromRollback copies boneCount 64-byte rows
-// into +0x14, and 0x8224C128 indexes 0x50-byte records at +0x0C).
+// at +0x1E4 (inferred: SavePoseSnapshot copies boneCount 64-byte rows
+// from +0x14, and 0x8224C128 indexes 0x50-byte records at +0x0C).
 struct pongCreatureSkeleton {
     uint8_t                   _pad00[0x04];
     pongCreatureSkeletonData* data;          // +0x04

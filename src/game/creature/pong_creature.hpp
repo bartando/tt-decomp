@@ -820,7 +820,7 @@ struct pongCreature {
     // rage::phUpdateObject base at +0x10, whose slots get that base as `this`
     // (slot 2 subtracts 16 before deleting):
     //   [0] 0x820C6358 — calls slot 6 of the object's own vtable
-    //   [1] RestorePoseFromRollback          @ 0x820C67C0
+    //   [1] SavePoseSnapshot                 @ 0x820C67C0
     //   [2] DestroyThunk                     @ 0x820C8618 — this-16, scalar delete
     //   [3] Reset(...)                       @ 0x820C6840
     //   [4] phUpdateObject's                 @ 0x8227D768
@@ -831,7 +831,7 @@ struct pongCreature {
     //
     // The declarations below don't reproduce that order.
     virtual ~pongCreature();                                       // [0] @ 0x820C6358
-    virtual void RestorePoseFromRollback();                        // [1] @ 0x820C67C0
+    virtual void SavePoseSnapshot();                               // [1] @ 0x820C67C0
     virtual void DestroyThunk();                                   // [2] @ 0x820C8618
     virtual void Reset(void* world, void* scene);                  // [3] @ 0x820C6840
     virtual void RegisterShadowCasters(bool useSecondaryEmitter);  // [5] @ 0x820C60C8
