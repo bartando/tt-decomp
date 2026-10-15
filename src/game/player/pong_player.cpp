@@ -45,7 +45,7 @@ extern const vec3  g_kZero_vec3;         // zero vector constant
 extern const float g_kZero;              // zero float constant
 
 // ── Additional external stubs for pong_player.cpp ───────────────────────
-extern void* g_pInputScoreTable;         // global input score table (float array)
+extern float g_pInputScoreTable[];       // @ 0x825EAB40  float per input slot
 extern void* g_pLerpQueue;               // lerp queue global
 extern void* g_pInputObj;               // input object global
 extern void* g_pButtonStateTable;        // button state table (int32_t array)
@@ -3171,7 +3171,7 @@ void* pongPlayer::LookupElementByFloatKey(void* table, float key) {  // pongPlay
  */
 void pongPlayer::RegisterDebugDrawEntries() {  // pongPlayer_BB38_g @ 0x8218BB38
     extern uint32_t  g_debugDrawCount;        // @ SDA+14436
-    extern uint32_t  g_debugDrawPtrs[];       // @ SDA+14440  (pointer array)
+    extern uintptr_t g_debugDrawPtrs[];       // @ SDA+14440  (pointer array)
     extern uint32_t  g_debugDrawTypes[];      // @ SDA+14696  (type ID array)
     extern uint8_t   g_debugDrawPriority[];   // @ SDA+14952  (priority array)
 

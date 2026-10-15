@@ -204,7 +204,7 @@ uint32_t g_hsmMgr_flags = 0;
 
 void* g_input_obj_ptr = NULL;
 void* g_pInputObj = NULL;
-void* g_pInputScoreTable = NULL;
+float g_pInputScoreTable[2] = {0};  // @ 0x825EAB40  per input slot; the asm indexes it in place (lfsx)
 void* g_pButtonStateTable = NULL;
 void* g_controllerArrayBase = NULL;
 
@@ -682,7 +682,7 @@ const float g_kQuantScale1         = 0.0f;  // @ 0x82079FFC
 const float g_kQuantScale2         = 0.0f;  // @ 0x82079FF8
 const float g_kSpecialThreshold    = 0.0f;  // @ 0x825C8A50
 float       g_kTimingConstant      = 0.9f;  // @ 0x825C4930 (image: 0.9)
-const float g_kZeroThreshold       = 0.0f;  // @ 0x8202D108
+const float g_kZeroThreshold       = 1.0f;  // @ 0x8202D108
 
 // Local user pointer
 void* g_localUserPtr = NULL;
@@ -892,6 +892,12 @@ TT_DATA_ALIAS("g_eventQueueIndex", "g_ui_state_counter");                    /* 
 TT_DATA_ALIAS("g_eventQueuePtrs", "g_ui_object_ptrs");
 TT_DATA_ALIAS("g_eventQueueMasks", "g_ui_object_types");
 TT_DATA_ALIAS("g_eventQueueFlags", "g_ui_object_flags");
+TT_DATA_ALIAS("g_debugDrawCount", "g_ui_state_counter");
+TT_DATA_ALIAS("g_debugDrawPtrs", "g_ui_object_ptrs");
+TT_DATA_ALIAS("g_debugDrawTypes", "g_ui_object_types");
+TT_DATA_ALIAS("g_debugDrawPriority", "g_ui_object_flags");
+TT_DATA_ALIAS("g_inputScoreByPlayer", "g_pInputScoreTable");                  /* 0x825EAB40 */
+TT_DATA_ALIAS("g_kGeomOffset", "g_pInputArrayTable");                         /* 0x825EAB28 */
 TT_DATA_ALIAS("g_shotType3_825C8038", "g_aiTypeId_3");  /* 0x825C8038 */
 TT_DATA_ALIAS("g_attrHash_SwingType1", "g_aiTypeId_3");
 TT_DATA_ALIAS("g_character_type_id_3", "g_aiTypeId_3");
