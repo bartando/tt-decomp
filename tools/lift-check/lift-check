@@ -1,0 +1,8 @@
+#!/bin/sh
+# Checks a lifted function against the original PowerPC. See README.md.
+here="$(cd "$(dirname "$0")" && pwd)"
+if [ ! -x "$here/.venv/bin/python" ]; then
+    echo "lift-check: no venv; run: cd $here && uv venv --python 3.13 .venv && uv pip install --python .venv/bin/python unicorn" >&2
+    exit 2
+fi
+PYTHONPATH="$here${PYTHONPATH:+:$PYTHONPATH}" exec "$here/.venv/bin/python" -m liftcheck "$@"

@@ -84,12 +84,17 @@ before relying on any of these; fix and delete the entry when done.
 - `gmLogicSinglesMatch`/`gmLogicSpectator` header skeletons mix an explicit `vtable` member
   with C++ virtuals.
 - `globals.c`: `g_msgSinkTemplate` is at 0x8261A0C0, not 0x8241A0C0.
+- `pongPlayer_TossServeBall` (0x821934A0): the impulse's w lane (`_pad`) should be 0. The asm's
+  1/t comes from the (1, 1, 1, 0) constant at 0x825CB7C0; the lift computes
+  `(hit.w - pos.w) / t * mass`. Found by `tools/lift-check` (`lift-check pong_player_toss_serve_ball`).
 
 ## The recomp is not ground truth
 
 `recomp/structured_pass5_final` has codegen bugs (dropped `li`, reordered checks, wrong
 register tested, no stack frames). Trust `disasm/sections/.text.s` when they disagree; see
-`tools/lift-check/tristrip-poc/README.md`.
+`tools/lift-check/tristrip-poc/README.md`. Except for VMX128: `.text.s` mangles it
+(`lvx128 v10,r0,r8` at 0x82193514 reads `vmaddfp128 v10, v0, v8, v3`), and the recomp's
+comments name those instructions right.
 
 ## Disassembly caveat
 

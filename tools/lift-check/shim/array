@@ -1,0 +1,17 @@
+#pragma once
+/* Minimal std::array for lift-check's freestanding build. */
+#include <stddef.h>
+namespace std {
+template <class T, size_t N> struct array {
+    T _elems[N ? N : 1];
+    T& operator[](size_t i) { return _elems[i]; }
+    const T& operator[](size_t i) const { return _elems[i]; }
+    constexpr size_t size() const { return N; }
+    T* data() { return _elems; }
+    const T* data() const { return _elems; }
+    T* begin() { return _elems; }
+    T* end() { return _elems + N; }
+    const T* begin() const { return _elems; }
+    const T* end() const { return _elems + N; }
+};
+}

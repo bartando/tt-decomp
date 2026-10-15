@@ -157,3 +157,7 @@ build_main/
 xex_excavation_tt/*.py
 xex_excavation_tt/flirt_labeled*.txt
 xex_excavation_tt/*.i64
+
+# lift-check: its venv and build outputs
+tools/lift-check/.venv/
+tools/lift-check/build/
