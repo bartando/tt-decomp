@@ -57,11 +57,11 @@ struct sgTraverseBase {
 
     // Apply the visitor to a single scene-graph node.
     // Implemented as a tail-call through pNode->vtable[slotN](pNode).
-    virtual void Apply(sgNode* pNode) = 0;
+    void Apply(sgNode* pNode);
 };
 
 struct sgTraverseInitialize  : sgTraverseBase {  // vtable @ 0x82071D4C
-    void Apply(sgNode* pNode) override;           // @ 0x823D9F10
+    void Apply(sgNode* pNode);           // @ 0x823D9F10
 
     // @ 0x823D9E90 — drive a typed iterator, calling Apply() on each node
     // whose current position passes the cmSimple type filter. Loops until
@@ -69,25 +69,25 @@ struct sgTraverseInitialize  : sgTraverseBase {  // vtable @ 0x82071D4C
     void Traverse(sgTypedIterator* pIter);
 };
 struct sgTraverseTerminate   : sgTraverseBase {  // vtable @ 0x82071DBC
-    void Apply(sgNode* pNode) override;           // @ 0x823D9FB8
+    void Apply(sgNode* pNode);           // @ 0x823D9FB8
 };
 struct sgTraverseReset       : sgTraverseBase {  // vtable @ 0x82071D5C
-    void Apply(sgNode* pNode) override;           // @ 0x823D9F28
+    void Apply(sgNode* pNode);           // @ 0x823D9F28
 };
 struct sgTraverseRestart     : sgTraverseBase {  // vtable @ 0x82071D6C
-    void Apply(sgNode* pNode) override;           // @ 0x823D9F40
+    void Apply(sgNode* pNode);           // @ 0x823D9F40
 };
 struct sgTraverseUpdate      : sgTraverseBase {  // vtable @ 0x82071D7C
-    void Apply(sgNode* pNode) override;           // @ 0x823D9F58
+    void Apply(sgNode* pNode);           // @ 0x823D9F58
 };
 struct sgTraversePostUpdate  : sgTraverseBase {  // vtable @ 0x82071D8C
-    void Apply(sgNode* pNode) override;           // @ 0x823D9F70
+    void Apply(sgNode* pNode);           // @ 0x823D9F70
 };
 struct sgTraverseDraw        : sgTraverseBase {  // vtable @ 0x82071D9C
-    void Apply(sgNode* pNode) override;           // @ 0x823D9F88
+    void Apply(sgNode* pNode);           // @ 0x823D9F88
 };
 struct sgTraverseDrawDebug   : sgTraverseBase {  // vtable @ 0x82071DAC
-    void Apply(sgNode* pNode) override;           // @ 0x823D9FA0
+    void Apply(sgNode* pNode);           // @ 0x823D9FA0
 };
 
 // ---------------------------------------------------------------------------
@@ -138,7 +138,7 @@ struct sgTypedIterator {
 // ---------------------------------------------------------------------------
 struct sgSceneGraph {
     void*  vtable;              // +0x00  (rage::gameObject base)
-    void*  m_pGameObjectBase;   // +0x04..+0x0F  (gameObject fields, size TBD)
+    uint8_t _gameObject04[0x0C]; // +0x04..+0x0F  (gameObject fields)
 
     void*  m_pTraverseList1;    // +0x10
     void*  m_pTraverseList2;    // +0x14
@@ -153,5 +153,5 @@ struct sgSceneGraph {
     //   Calls sgSceneGraph_FreeLists (@ 0x823D9AF8) to free all 7 traverse
     //   list pointers (+0x10..+0x2C, skipping +0x1C), then invokes the
     //   rage::gameObject base destructor. Conditional rage_free(this) follows.
-    virtual ~sgSceneGraph();
+    ~sgSceneGraph();
 };

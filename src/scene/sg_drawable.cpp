@@ -27,15 +27,15 @@ static const char* const s_sgRMDrawable_name = "sgRMDrawable";  // @ 0x82071B5C
  * sgRMDrawable::~sgRMDrawable
  * @ 0x823D8E30 | size: 0x74
  *
- * Resets vtable, frees the mesh/material resource pointed to by m_pResource,
+ * Resets vtable, frees the mesh/material resource pointed to by m_pName,
  * then calls the atSingleton base destructor to tear down the node's
  * child list.  The scalar-dtor wrapper (recomp ABI) handles the optional
  * rage_free(this) after this body returns.
  */
 sgRMDrawable::~sgRMDrawable() {
-    if (m_pResource) {
-        rage_free(m_pResource);
-        m_pResource = nullptr;
+    if (m_pName) {
+        rage_free(m_pName);
+        m_pName = nullptr;
     }
     rage::ReleaseSingleton(this);
 }
@@ -68,14 +68,13 @@ int sgRMDrawable::IsType(uint32_t typeId) {
  * sgRMDrawable::RegisterFields
  * @ 0x823D8F18 | size: 0x64
  *
- * Registers m_pResource (offset +0x50) and m_transform (offset +0x10) with
+ * Registers m_pName (offset +0x50) and m_transform (offset +0x10) with
  * the RAGE serialization (parStructure) framework for streaming save/load.
  */
 void sgRMDrawable::RegisterFields() {
-    // Register m_pResource (+0x50) for serialization
-    RegisterSerializationField(this, "Mesh", &m_pResource, g_resourceFieldType, 0);
-    // Register m_transform (+0x10) for serialization
-    RegisterSerializationField(this, "Matrix", m_transform, g_matrixFieldType, 0);
+    // The type descriptors are passed by address.
+    RegisterSerializationField(this, "name", &m_pName, &g_resourceFieldType, 0);
+    RegisterSerializationField(this, "matrix", m_transform, &g_matrixFieldType, 0);
 }
 
 /**
