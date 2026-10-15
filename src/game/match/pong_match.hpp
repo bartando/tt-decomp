@@ -61,9 +61,6 @@ struct gdDifficultyLadder {
     virtual ~gdDifficultyLadder();                  // [0] @ 0x821f1c58
     virtual void PostLoadProperties();  // [20] @ 0x821f1b70
     virtual void Validate();  // [21] @ 0x821f1d10
-
-    // ── non-virtual methods (from debug strings) ──
-    void PostLoadProperties();
 };
 
 // ── gdGameData  [vtable @ 0x8203CDF4] ──────────────────────────
@@ -126,9 +123,6 @@ struct gdRivalryData {
     virtual void PostLoadProperties();  // [20] @ 0x821f0650
     virtual void Validate();  // [21] @ 0x821f0738
     virtual void PostLoadChildren();  // [22] @ 0x821f0698
-
-    // ── non-virtual methods (from debug strings) ──
-    void PostLoadProperties();
 };
 
 // ── gdTier  [vtable @ 0x82032614] ──────────────────────────
@@ -141,9 +135,6 @@ struct gdTier {
     virtual void PostLoadProperties();  // [20] @ 0x821f0d28
     virtual void Validate();  // [21] @ 0x821f0e80
     virtual void PostLoadChildren();  // [22] @ 0x821f0d70
-
-    // ── non-virtual methods (from debug strings) ──
-    void PostLoadProperties();
 };
 
 // ── gdTierMember  [vtable @ 0x82042E5C] ──────────────────────────
@@ -155,9 +146,6 @@ struct gdTierMember {
     virtual void PostLoadProperties();  // [20] @ 0x821f0b88
     virtual void Validate();  // [21] @ 0x821f0c68
     virtual void PostLoadChildren();  // [22] @ 0x821f0bd0
-
-    // ── non-virtual methods (from debug strings) ──
-    void PostLoadProperties();
 };
 
 // ── gmLogic  [vtable @ 0x820300EC] ──────────────────────────
@@ -227,9 +215,9 @@ struct gmLogicSinglesMatch {
 
     // ── non-virtual methods (from debug strings) ──
     void MidGame();
-};
 
-namespace gmLogicSinglesMatch {
+
+    // ── nested HSM states (gmLogicSinglesMatch::stateX) ──
 
 // ── gmLogicSinglesMatch::stateAnticipationCam  [vtable @ 0x82030E8C] ──────────────────────────
 struct stateAnticipationCam {
@@ -627,7 +615,7 @@ struct stateUnlockDialog {
     virtual void vfn_15();  // [15] @ 0x8210c278
 };
 
-} // namespace gmLogicSinglesMatch
+}; // gmLogicSinglesMatch
 
 // ── gmLogicSpectator  [vtable @ 0x8206B8C4] ──────────────────────────
 // Confirmed methods: stateReplay
@@ -660,10 +648,10 @@ struct gmLogicSpectator {
     virtual void PostLoadProperties();  // [20] @ 0x8238d990
 
     // ── non-virtual methods (from debug strings) ──
-    void stateReplay();
-};
+    // ("stateReplay" in the debug strings is the nested state below, not a method)
 
-namespace gmLogicSpectator {
+
+    // ── nested HSM states (gmLogicSpectator::stateX) ──
 
 // ── gmLogicSpectator::stateAwaitReturnHit  [vtable @ 0x8206BBFC] ──────────────────────────
 struct stateAwaitReturnHit {
@@ -886,32 +874,61 @@ struct stateServeToss {
     virtual void vfn_16();  // [16] @ 0x82107e38
 };
 
-} // namespace gmLogicSpectator
+}; // gmLogicSpectator
 
-// ── gmLogicSwingPractice  [vtable @ 0x820303F4] ──────────────────────────
-struct gmLogicSwingPractice {
-    void**      vtable;           // +0x00
+struct hsmState;           // HSM state (vtable slot 15 = CanTransitionTo, 16 = OnMessage)
+struct gmPracticeTarget;
+struct gmBallRobot;        // ball machine; its methods sit at 0x821120A8..0x821129C8
+struct gmLogicChild;       // the 11 owned objects at gmLogicSwingPractice+0x28 (type unknown)
 
-    // ── virtual methods ──
-    virtual ~gmLogicSwingPractice();                  // [0] @ 0x82101f80
-    virtual void vfn_8();  // [8] @ 0x821020d8
-    virtual void vfn_10();  // [10] @ 0x82102a58
-    virtual void OnEnter();  // [11] @ 0x82102a90
-    virtual void GetName();  // [13] @ 0x82102b60
-    virtual void vfn_15();  // [15] @ 0x82102bc0
-    virtual void vfn_18();  // [18] @ 0x82102bf0
+// Message handed to gmLogic/hsmState OnMessage: a 16-bit id comes first.
+struct gmMessage {
+    uint16_t m_id;  // +0x00
 };
 
-namespace gmLogicSwingPractice {
+// ── gmLogicSwingPractice  [vtable @ 0x820303F4] ──────────────────────────
+// Layout from slots 0, 8, 10, 11, 13, 15, 18 and the destructor body
+// 0x82101FD0. Offsets in the comments are the Xbox 360 ones.
+struct gmLogicSwingPractice {
+    void**         vtable;              // +0x00  0x820303F4
+    int32_t        m_stateCount;        // +0x04  8, set by slot 8 (BuildStates)
+    hsmState**     m_states;            // +0x08  statePreInit .. statePostPoint
+    int32_t        m_currentState;      // +0x0C  -1 = none
+    int32_t        m_nextState;         // +0x10  -1 = no transition pending
+    uint8_t        _pad14[0x14];        // +0x14  (+0x18 is torn down by 0x821A8070)
+    gmLogicChild*  m_children[11];      // +0x28  deleted through slot 0 by the destructor
+    int32_t        m_activeChild;       // +0x54  valid when 0..10
+    uint8_t        m_targetEnabled;     // +0x58
+    uint8_t        m_hasAimPoint;       // +0x59
+    uint8_t        _pad5A[0x16];
+    float          m_aimPoint[3];       // +0x70  posted as "fff" (message 0x1017) by stateAim
+    uint8_t        _pad7C[0x18];
+    gmBallRobot*   m_pBallRobot;        // +0x94  updated every frame, deleted by the destructor
+    gmPracticeTarget* m_pTarget;        // +0x98  deleted by the destructor
+    uint8_t        m_awaitingConfirm;   // +0x9C  set by message 0x500C, cleared by 0x500D
+
+    gmLogicSwingPractice* ScalarDeletingDtor(uint32_t flags);  // [0]  @ 0x82101F80
+    void ResetTarget();                                         // [10] @ 0x82102A58
+    void Update();                                              // [11] @ 0x82102A90
+    bool CanTransitionTo(int32_t stateId);                      // [13] @ 0x82102B60
+    void AddToDrawBuckets();                                    // [15] @ 0x82102BC0
+    void OnMessage(const gmMessage* msg);                       // [18] @ 0x82102BF0
+
+    bool HasActiveChild() const { return m_activeChild > -1 && m_activeChild < 11; }
+
+    // ── nested HSM states (gmLogicSwingPractice::stateX) ──
 
 // ── gmLogicSwingPractice::stateAim  [vtable @ 0x8203054C] ──────────────────────────
+// 0x14 bytes, built by gmLogicSwingPractice slot 8 (0x821020D8).
 struct stateAim {
-    void**      vtable;           // +0x00
+    void**                vtable;       // +0x00  0x8203054C
+    int32_t               field_04;     // +0x04  0 on construction
+    gmLogicSwingPractice* m_pLogic;     // +0x08
+    float                 m_timeInState;// +0x0C  slot 10 adds the frame time every update
+    uint8_t               field_10;     // +0x10
 
-    // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x821039d8
-    virtual void GetName();  // [13] @ 0x82101f30
-    virtual void vfn_15();  // [15] @ 0x82103ca0
+    void OnEnter();   // [11] @ 0x82103878  "gmLogicSwingPractice::stateAim::onEnterState"
+    // [10] @ 0x821039D8 (Update), [13] @ 0x82101F30 (GetName), [15] @ 0x82103CA0
 };
 
 // ── gmLogicSwingPractice::stateAwaitReturnHit  [vtable @ 0x820305EC] ──────────────────────────
@@ -1008,16 +1025,84 @@ struct stateShoot {
     virtual void vfn_16();  // [16] @ 0x82103d60
 };
 
-} // namespace gmLogicSwingPractice
+}; // gmLogicSwingPractice
 
-// ── gmPracticeTarget  [2 vtables — template/MI] ──────────────────────────
+// ── gmPracticeTarget  [vtables @ 0x82032414 (datBase) / 0x82032428 (pongRenderable)] ──
+// The target swing practice aims at (gmLogicSwingPractice+0x98). Bases are
+// rage::datBase at +0x00 and pongRenderable at +0x04; the constructor
+// (0x82112B58) writes pongRenderable's own vtable 0x82032404 to +0x04 first.
+// Offsets in the comments are the Xbox 360 ones.
+//
+// Primary vtable 0x82032414:
+//   [0] 0x82112C70  scalar deleting destructor (body 0x82112CC0)
+//   [1] 0x82112DF8  loads "$/fx" fx_target, fx_target2 and practice_targets
+//   [2] 0x82113448  adds the pongRenderable part to the draw bucket
+// Secondary vtable 0x82032428 (pongRenderable): [0] 0x82113490 (draw), [1] nop.
+
+// One look of the target, read from "$/fx/fx_target(2)" by 0x82113DF8; 16 bytes.
+struct gmPracticeTargetFx {
+    char*  m_textureName;   // +0x00  "TextureName", strdup'd
+    float  m_heightOffset;  // +0x04  "HeightOffset", 0.001 by default
+    float* m_color;         // +0x08  "Color", 4 floats, zeroed by the constructor
+    float* m_altColor;      // +0x0C  "AltColor", 4 floats, zeroed by the constructor
+
+    gmPracticeTargetFx* Construct();  // @ 0x82113D10 (cmOperatorCtor_3D10_w)
+};
+
+// One "Set" block of "$/fx/practice_targets", read by 0x82113F20; 8 bytes.
+struct gmPracticeTargetSet {
+    int32_t m_numTargets;   // +0x00  "NumTargets"
+    void*   m_targets;      // +0x04  m_numTargets entries of 0x44 bytes
+};
+
+// new gmPracticeTargetSet[NumSets]: the count is stored in front of the array
+// (at -4 on the 360; on the host the array starts at its own alignment).
+struct gmPracticeTargetSetBlock {
+    int32_t             m_count;
+    gmPracticeTargetSet m_sets[1];
+};
+
+// The 0x14-byte word array the target allocates at +0x18: data, count and
+// capacity, flags in the byte at +0x10. 0x821B2A58 sizes it, 0x821B29F8 frees it.
+struct gmPracticeTargetWordArray {
+    uint32_t* m_data;       // +0x00
+    int32_t   m_count;      // +0x04
+    int32_t   m_capacity;   // +0x08
+    uint32_t  field_0C;     // +0x0C
+    uint8_t   m_flags;      // +0x10  bit 7 and bit 6 come from 0x821B2A58's last two arguments
+};
+
+// pongRenderable sub-object (vtable 0x82032404, overridden by 0x82032428).
+struct gmPracticeTargetRenderable {
+    void**  vtable;         // +0x04
+    float   field_08;       // +0x08  0.0, reset before every draw-bucket add
+    int32_t field_0C;       // +0x0C  0, reset before every draw-bucket add
+    int32_t field_10;       // +0x10  -1
+};
+
 struct gmPracticeTarget {
-    void**      vtable;           // +0x00
+    void**                     vtable;        // +0x00  0x82032414
+    gmPracticeTargetRenderable m_renderable;  // +0x04
+    uint8_t                    m_visible;     // +0x14  1; vfn_2 draws only while this and +0x15 are set
+    uint8_t                    m_drawEnabled; // +0x15  1
+    uint8_t                    field_16;      // +0x16  0; gmLogicSwingPractice slot 10 clears it
+    uint8_t                    field_17;      // +0x17  1; set again with m_spinStopped cleared
+    gmPracticeTargetWordArray* m_wordArray;   // +0x18
+    uint32_t                   field_1C;      // +0x1C  0
+    uint32_t                   field_20;      // +0x20  0
+    gmPracticeTargetFx         m_fx;          // +0x24  "fx_target"
+    gmPracticeTargetFx         m_fx2;         // +0x34  "fx_target2"
+    uint32_t                   field_44;      // +0x44  0
+    gmPracticeTargetSet*       m_sets;        // +0x48  new[NumSets], see gmPracticeTargetSetBlock
+    uint32_t                   field_4C;      // +0x4C
+    float                      m_position[4]; // +0x50  (0, 0, 0, 1)
+    float                      m_spinAngle;   // +0x60  advanced 2*pi per second, wrapped to [-pi, pi]
+    uint8_t                    m_spinStopped; // +0x64  while set, gmLogicSwingPractice::Update leaves m_spinAngle alone
 
-    // ── virtual methods ──
-    virtual ~gmPracticeTarget();                  // [0] @ 0x82112c70
-    virtual void ScalarDtor(int flags); // [1] @ 0x82112df8
-    virtual void vfn_2();  // [2] @ 0x82113448
+    gmPracticeTarget* Construct();                         // @ 0x82112B58 (cmOperatorCtor_2B58_w)
+    gmPracticeTarget* ScalarDeletingDtor(uint32_t flags);  // [0] @ 0x82112C70
+    void LoadData();                                       // [1] @ 0x82112DF8
+    void AddToDrawBucket();                                // [2] @ 0x82113448
 };
 
 // ── powerZoneAttr  [vtable @ 0x82049A44] ──────────────────────────
