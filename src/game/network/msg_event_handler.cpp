@@ -11,10 +11,7 @@ extern "C" void atFreeList_Alloc(void* queue, uint32_t size);
 
 // Global event state
 uint32_t g_messageEventType = 0;
-uint32_t g_eventQueueIndex = 0;
-uint8_t g_eventQueueFlags[256] = {0};
-void* g_eventQueuePtrs[256] = {nullptr};
-uint32_t g_eventQueueMasks[256] = {0};
+// g_eventQueue* are defined in globals.c (as the message-sink registry).
 
 /**
  * msgEventHandler::msgEventHandler (constructor)

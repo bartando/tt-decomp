@@ -48,10 +48,8 @@ extern uint8_t  lbl_826064CC;     /* SDA+25804 — UI input enable flag */
 extern uint8_t  lbl_826063B8[8];  /* SDA+25528 — creature manager slot */
 
 /* .data — UI/system singleton pointer slots */
-extern void* lbl_8271A81C;  /* grcDevice / ui_context pointer slot */
 extern void* lbl_8271A328;  /* network timing / atSingleton / gameState ptr alias */
 extern void* lbl_8271A7B0;  /* network base/state ptr alias */
-extern void* lbl_8271A358;  /* UI manager pointer slot */
 extern void* lbl_8271A344;  /* rage::cmSampleCamActions ptr (RTTI name nearby) */
 extern void* lbl_8271A2E4;  /* game data manager slot */
 extern void* lbl_8271A2F0;  /* char view data slot */
@@ -69,7 +67,6 @@ extern uint8_t        lbl_820176C0[];       /* 0x82017888 = +0x1C8 into this sym
 // Graphics System
 // ============================================================================
 
-void* g_grcDevice = (void*)&lbl_8271A81C;  /* was 0x8271A81C */
 
 /* grcDevice instances — the two device pointers used by the rendering pipeline */
 // REMOVED: g_pGrcDevice_beginScene (in globals_extended.c)  /* full device for beginScene */
@@ -141,8 +138,9 @@ void* g_display_obj_ptr = NULL;
 // UI System
 // ============================================================================
 
-void* g_uiManager = (void*)&lbl_8271A358;  /* was 0x8271A358 */
-void* g_uiManagerPtr = NULL;
+/* Page-group manager (credits roll, fades): a 64-byte object gameLoop_Init
+ * (0x82228F30) allocates; null until then. */
+void* g_uiManager = NULL;  // @ 0x8271A358
 void* g_pHudOverlay = NULL;
 void* g_pStencilMgrObj = NULL;
 
@@ -240,7 +238,6 @@ void* g_singles_network_client = NULL;
 // Physics System Globals
 // ============================================================================
 
-void* g_pPhysicsWorld = NULL;
 uint32_t g_phFrameCounter = 0;      /* @ 0x825C4898 — per-tick ring cursor */
 uint32_t g_phFrameIndex = 0;        /* @ 0x826065DC — rollback frame cursor */
 void* g_matMgrGuard = NULL;
@@ -299,7 +296,6 @@ uint32_t g_doexit_type = 0;
 // Credits/Dialog System Globals
 // ============================================================================
 
-void* g_creditsRoll = NULL;
 uint8_t g_creditsRollVisible = 0;
 void* g_pCreditsRollObj = NULL;
 uint32_t g_creditsAssetId_A = 0;
@@ -842,11 +838,14 @@ void** g_tls_base = NULL;                 // @ 0x82600000
 void* g_uiListManager = NULL;             // @ 0x825D16AC
 
 // UI context / objects
+/* Set by 0x822BE268 at startup; pong_logos passes it to the page-group calls. */
 void*    g_ui_context         = NULL;      // @ 0x8271A81C
-uint8_t  g_ui_object_flags[64]  = {0};     // @ 0x825F3A68
-void*    g_ui_object_ptrs[256]  = {0};     // @ 0x825F3968
-uint32_t g_ui_object_types[256] = {0};     // @ 0x825F3868
+/* Message-sink registry, 64 entries: registrations (e.g. 0x82101810) store
+ * flags[i] = 0x80, ptrs[i] = the sink, types[i] = its id, then bump the count. */
 uint32_t g_ui_state_counter     = 0;       // @ 0x825F3864
+void*    g_ui_object_ptrs[64]   = {0};     // @ 0x825F3868
+uint32_t g_ui_object_types[64]  = {0};     // @ 0x825F3968
+uint8_t  g_ui_object_flags[64]  = {0};     // @ 0x825F3A68
 
 // Vibration system
 void*    g_vibrationMgr        = NULL;     // @ 0x8271A3A8
@@ -890,6 +889,16 @@ TT_DATA_ALIAS("lbl_8260641C", "g_rendererState");
 TT_DATA_ALIAS("g_eventHash_BallCollision", "g_sgNode_typeId");                /* 0x825C93D0 */
 TT_DATA_ALIAS("g_eventHash_BallSpin", "g_sgRMDrawable_typeId");               /* 0x825C2D78 */
 TT_DATA_ALIAS("g_pGrcDevice_beginScene", "g_ui_context");                     /* 0x8271A81C */
+TT_DATA_ALIAS("g_grcDevice", "g_ui_context");
+TT_DATA_ALIAS("g_uiManagerPtr", "g_ui_context");
+TT_DATA_ALIAS("lbl_8271A81C", "g_ui_context");
+TT_DATA_ALIAS("g_creditsRoll", "g_uiManager");                               /* 0x8271A358 */
+TT_DATA_ALIAS("g_pPhysicsWorld", "g_uiManager");
+TT_DATA_ALIAS("lbl_8271A358", "g_uiManager");
+TT_DATA_ALIAS("g_eventQueueIndex", "g_ui_state_counter");                    /* 0x825F3864 */
+TT_DATA_ALIAS("g_eventQueuePtrs", "g_ui_object_ptrs");
+TT_DATA_ALIAS("g_eventQueueMasks", "g_ui_object_types");
+TT_DATA_ALIAS("g_eventQueueFlags", "g_ui_object_flags");
 TT_DATA_ALIAS("lbl_826064F4", "g_drawBucket");                                /* 0x826064F4 */
 TT_DATA_ALIAS("lbl_82606600", "g_globalStreamer");                            /* 0x82606600 */
 TT_DATA_ALIAS("lbl_825C4930", "g_kTimingConstant");                           /* 0x825C4930 */
