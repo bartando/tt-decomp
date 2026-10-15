@@ -23,7 +23,6 @@ extern void rage_free(void* ptr);
 extern void rage_DebugLog(const char* msg, ...);
 extern void rage_DebugLogNop(const char* msg, ...);  // @ 0x8240E6D0 — debug logger (no-op in retail)
 extern "C" int _stricmp(const char* s1, const char* s2);
-extern void pongCreature_ApplyMatrix(void* creature, void* matrix, int param1, int param2, int param3, int param4);
 extern void* pongGame_GetCreatureInfo(void* player, int index);  // @ 0x82019C00 — returns creature info ptr
 extern void pongPlayer_GetCreatureMatrices(void* player, int index, void* outMatrix1, void* outMatrix2);
 
@@ -64,10 +63,6 @@ extern "C" void rage_Release(void* obj);
 extern "C" void pongCreature_BaseDtor(void* obj);  // @ 0x820C53E8
 extern "C" void pongCreature_Fixup(void* obj, void* relocator);
 extern "C" void pongCreatureInst_Cleanup(void* obj);  // @ 0x822C8FD0
-extern "C" void pongCreatureInst_SetMatrixImpl(void* obj, const void* matrix);
-extern "C" float pongCreatureInst_ComputeHeading(void* obj);
-extern "C" void pongCreatureInst_ApplyHeading(void* obj, float heading);
-extern "C" void pongCreatureInst_NotifyHeadingChanged(void* obj);
 extern "C" void LocomotionStateAnim_SetSpeed(void* obj, float speed);
 extern "C" void LocomotionStateAnim_ApplySpeed(void* obj);
 extern "C" void LocomotionStateAnim_InitCapsuleImpl(void* obj, float radius, const void* center);
@@ -159,7 +154,9 @@ void pongMover::Reset(void* creatureData) {
     
     // Apply matrix to creature if valid
     if (m_pCreature && subEntry != 0) {
-        pongCreature_ApplyMatrix(m_pCreature, initMatrix, 0, 1, 0, 0);
+        static_cast<pongCreature*>(m_pCreature)->RequestTeleport(
+            "pongMover::Reset", reinterpret_cast<const pongCreatureMatrix*>(initMatrix),
+            false, true, false);  // @ 0x820C7CE8, immediately
     } else {
         rage_DebugLog("pongMover::Reset() - no creature to reset");  /* UNVERIFIED — string not found in binary */
     }
@@ -1757,11 +1754,15 @@ struct fragCachePool {
     CacheKeyMap* keyCounts;     // +0x1C
 };
 
+struct pongCreatureSkeleton;  // defined with the pongCreature lifts below
+
 // Entry of that pool, reduced to what these methods read.
 struct fragCacheEntry {
     uint8_t               _pad000[0x0C];
     uint32_t              lastUsedStamp;  // +0x0C  fragCachePool::currentStamp when last used
-    uint8_t               _pad010[0x1F0];
+    uint8_t               _pad010[0x1D4];
+    pongCreatureSkeleton* skeleton;       // +0x1E4  pongCreature::SyncFragmentPose copies its pose here
+    uint8_t               _pad1E8[0x18];
     rage::phInstBehavior* behavior;       // +0x200  ApplyToRope casts it to phRope
 };
 
@@ -1792,14 +1793,24 @@ struct fragInstManager {
 // SetCentroidOffset (0x8228D178) stores the vector at +0x30; +0x08 is the
 // radius of the bounding sphere around that centroid.
 struct phBoundView {
-    uint8_t  _pad00[0x08];
+    void**   vtable;                // +0x00
+    uint8_t  _pad04[0x04];
     float    radiusAroundCentroid;  // +0x08
     uint8_t  _pad0C[0x24];
     float    centroidOffset[4];     // +0x30  w unused
     uint8_t  _pad40[0x30];
     void**   parts;                 // +0x70  part pointers, null for an empty slot
-    uint8_t  _pad74[0x0E];          // +0x78: 64-byte part matrices (GetEntityByIndex)
+    uint8_t  _pad74[0x04];
+    void*    partMatrices;          // +0x78  64-byte part matrices (GetEntityByIndex)
+    uint8_t  _pad7C[0x06];
     uint16_t partCount;             // +0x82
+
+    // Slots 2 and 3, called by pongCreature::SyncFragmentPose: slot 3 gets the
+    // instance's world matrix, but only when slot 2 says yes.
+    bool vfn_2() { return reinterpret_cast<bool (*)(phBoundView*)>(vtable[2])(this); }
+    void vfn_3(const void* worldMatrix) {
+        reinterpret_cast<void (*)(phBoundView*, const void*)>(vtable[3])(this, worldMatrix);
+    }
 };
 
 struct phArchetypeView {
@@ -1827,7 +1838,8 @@ static const uint32_t FRAG_INST_FLAG_ATTACHED = 0x1;  // set by AttachToScene, c
 struct pongCreatureInstLayout {
     void**                  vtable;            // +0x00
     phArchetypeView*        archetype;         // +0x04  rage::phInst; released by ~phInst (0x822C8FD0)
-    uint8_t                 _pad08[0x08];      // +0x08  phInst level index (u16)
+    uint16_t                levelIndex;        // +0x08  slot in the physics level
+    uint8_t                 _pad0A[0x06];
     float                   matrix[4][4];      // +0x10  world matrix, translation in row 3 (+0x40)
     uint32_t                flags;             // +0x50  FRAG_INST_FLAG_*
     fragCacheEntry*         cacheEntry;        // +0x54  set when ph_A700 (0x8212A700) binds an entry
@@ -1844,7 +1856,8 @@ struct pongCreatureInstLayout {
     void*                   managerHandle;     // +0xC0  returned by the manager's create callback
     uint8_t                 _padC4[0x1C];
     float                   lastMatrix[4][4];  // +0xE0  pongCreatureInst's; Get/SetLastMatrix
-    uint8_t                 _pad120[0x04];
+    uint8_t                 flag120;           // +0x120  pongCreature::StepLocomotion does nothing while clear
+    uint8_t                 _pad121[0x03];
     void*                   bounds;            // +0x124  atArray of 0x100-byte phBound objects
     uint16_t                boundCount;        // +0x128
     uint16_t                boundCapacity;     // +0x12A
@@ -2252,34 +2265,9 @@ void pongCreature::Relocate(void* relocator) {  // 8858_p46
 
 // ── COMPUTATION: Matrix/Vector Operations ──────────────────────────────────
 
-/**
- * pongCreatureInst::SetMatrix @ 0x820D5040 | size: 0x60
- *
- * Copies a 4×4 matrix (64 bytes, 4 vec128s) from the source to a
- * stack-local buffer, then calls the internal SetMatrix helper.
- */
-void pongCreatureInst::SetMatrix(const void* srcMatrix) {  // 5040
-    // Original copies 4 lvx128/stvx128 pairs to align the matrix on stack
-    pongCreatureInst_SetMatrixImpl(this, srcMatrix);
-}
-
-/**
- * pongCreatureInst::UpdateHeading @ 0x8228E828 | size: 0x60
- *
- * Updates creature heading: calls two helpers to compute the heading
- * angle, stores it at this+8, then conditionally calls a third helper
- * if the heading changed significantly.
- */
-void pongCreatureInst::UpdateHeading() {  // E828_v12
-
-    float heading = pongCreatureInst_ComputeHeading(this);
-    float prevHeading = *(float*)&this->field_0x0008;
-    *(float*)&this->field_0x0008 = heading;
-
-    if (heading != prevHeading) {
-        pongCreatureInst_NotifyHeadingChanged(this);
-    }
-}
+// pongCreatureInst::SetMatrix (0x820D5040) and UpdateHeading (0x8228E828) were
+// duplicate lifts: 0x820D5040 is CopyAndBuildTranslationMatrix below, and
+// 0x8228E828 is pongCreatureInst_E828_v12, a rage::phBound function.
 
 // ── LocomotionStateAnim ────────────────────────────────────────────────────
 
@@ -2622,8 +2610,10 @@ extern void LocomotionStateAnim_6E90_w(void* self, float weight);
 extern bool LocomotionStateAnim_04F0_g(void* animData, uint16_t animID_high, uint16_t* outIndex);
 extern void util_BBB0(void* dst, float* src, float* work);
 extern void util_B9A8(void* dst, void* quat, void* axis);
-extern void LocomotionStateAnim_C128_g(void* anim, void* animData, float weight);
-extern void LocomotionStateAnim_C288_g(void* anim, void* animData, float weight);
+// @ 0x8224C128 / 0x8224C288 — apply one animation entry to a skeleton. Both read
+// the skeleton from r5 and never read r4; callers leave junk there.
+extern void LocomotionStateAnim_C128_g(void* entry, void* unusedR4, void* skeleton, float weight);
+extern void LocomotionStateAnim_C288_g(void* entry, void* unusedR4, void* skeleton, float weight);
 extern void LocomotionStateAnim_BEF8_g(void* self, uint16_t animID_high, uint8_t animID_low);
 extern void LocomotionStateAnim_C358_g(void* animList, int p1, int p2, int p3, float* outVec);
 
@@ -2915,7 +2905,7 @@ bool LocomotionStateAnim_C4A8_g(void* self, uint16_t animID1, uint16_t animID2, 
 // LocomotionStateAnim_6380_g @ 0x82386380
 void LocomotionStateAnim_6380_g(void* self, void* animList) {
     LocomotionStateAnim* lsa = (LocomotionStateAnim*)self;
-    typedef void (*AnimCallback)(void* anim, void* animData, float weight);
+    typedef void (*AnimCallback)(void* entry, void* unusedR4, void* skeleton, float weight);
 
     void* animData = (void*)lsa->field_0x0024;
 
@@ -2933,7 +2923,7 @@ void LocomotionStateAnim_6380_g(void* self, void* animList) {
     if (count > 0) {
         void** animArray = (void**)*(void**)((char*)animList + 8);
         for (int i = 0; i < count; i++) {
-            callback(animArray[i], animData, 0.0f);
+            callback(animArray[i], nullptr, animData, 0.0f);
         }
     }
 
@@ -3262,16 +3252,14 @@ void pongCreatureInst::BuildTranslationMatrix(float* outMatrix, const float* src
 
 // ─────────────────────────────────────────────────────────────────────────────
 // pongCreatureInst::CopyAndBuildTranslationMatrix @ 0x820D5040 | size: 0x60
-// Copies a 4x4 matrix (64 bytes) onto the stack and then delegates to
-// BuildTranslationMatrix to compute the inverse-translation form.
+// Replaces matrix with BuildTranslationMatrix's inverse of itself: r3 is the
+// matrix (not an instance), copied to the stack first because
+// BuildTranslationMatrix can't read and write the same rows.
 // ─────────────────────────────────────────────────────────────────────────────
-void pongCreatureInst::CopyAndBuildTranslationMatrix(float* outMatrix, const float* srcMatrix) {
-    // Copy the full 4x4 matrix to a local buffer (stack copy)
-    float localMatrix[16];
-    memcpy(localMatrix, srcMatrix, 64);
-
-    // Build the translation matrix from the local copy
-    BuildTranslationMatrix(outMatrix, localMatrix);
+void pongCreatureInst::CopyAndBuildTranslationMatrix(float* matrix) {
+    float copy[16];
+    memcpy(copy, matrix, sizeof(copy));
+    BuildTranslationMatrix(matrix, copy);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3464,11 +3452,6 @@ void pongCreature_UpdateReplay(void* a) { (void)a; }
 
 } // extern "C"
 
-// pongCreature_7CE8_g @ 0x820C7CE8 | size: 0xCC — no pseudocode available
-void pongCreature_7CE8_g(void* a, void* b, int c, int d, int e, int f) {
-    (void)a; (void)b; (void)c; (void)d; (void)e; (void)f;
-}
-
 // pongCreatureInst helpers — synthetic linker bridges (no binary symbol)
 void pongCreatureInst_RegisterPhysics(void* a, void* b) { (void)a; (void)b; }
 
@@ -3482,21 +3465,34 @@ void pongCreatureInst_EDC0_g(void* a, void* b, void* c) {
 // Referenced from player/network/creature translation units; no binary symbol
 // matches the name. Emitted as no-op stubs until lifted.
 // ─────────────────────────────────────────────────────────────────────────────
-void pongCreature_59C0_g(void* creature) { (void)creature; }
 void pongCreatureInst_9030_g(void* creatureInst, void* srcPayload) {
     (void)creatureInst; (void)srcPayload;
-}
-void pongCreature_ApplyMatrix(void* creature, void* matrix,
-                              int p1, int p2, int p3, int p4) {
-    (void)creature; (void)matrix; (void)p1; (void)p2; (void)p3; (void)p4;
 }
 void pongCreatureInst_CopyTransform(void* dst, void* src, void* helper) {
     (void)dst; (void)src; (void)helper;
 }
 
-// C-linkage vfn 12 trampoline referenced from rage::phArticulatedCollider.
+// @ 0x8228E888 / 0x8228ECB0 / 0x8228F3E0 — rage::phBound helpers, unlifted.
+extern "C" void util_E888(phBoundView* bound);
+extern "C" float util_ECB0(phBoundView* bound, void* partMatrices, const float* centroid);
+extern "C" void pongCreatureInst_F3E0_v12(phBoundView* bound);
+
+/**
+ * pongCreatureInst_E828_v12 @ 0x8228E828 | size: 0x60
+ *
+ * Not a pongCreatureInst function: phBoundComposite's slot 37 (0x8228E820)
+ * tail-calls it with flags 0. It runs 0x8228E888 on the bound, stores what
+ * 0x8228ECB0 returns for the part matrices (+0x78) and the centroid (+0x30)
+ * as the radius around the centroid (+0x08), and runs 0x8228F3E0 when the low
+ * byte of flags is set. (pongCreatureInst::UpdateHeading was a wrong second
+ * lift of this address.)
+ */
 extern "C" void pongCreatureInst_E828_v12(void* self, unsigned int flags) {
-    (void)self; (void)flags;
+    phBoundView* bound = static_cast<phBoundView*>(self);
+    util_E888(bound);
+    bound->radiusAroundCentroid = util_ECB0(bound, bound->partMatrices, bound->centroidOffset);
+    if (static_cast<uint8_t>(flags) != 0)
+        pongCreatureInst_F3E0_v12(bound);
 }
 
 // ── pongCreature vtable slots (batch 2) ────────────────────────────────────
@@ -3534,13 +3530,11 @@ extern "C" uint32_t g_phFrameIndex;    // @ 0x826065DC
 extern "C" void* g_phShadowAtlasSlot;  // @ 0x82606350
 
 // ─────────────────────────────────────────────────────────────────────────────
-// pongCreature::~pongCreature()  [dispatcher stub @ 0x820C6358 | size: 0x1C]
+// pongCreature::~pongCreature()  [vtable 0x82027B08 slot 0 @ 0x820C6358 | size: 0x1C]
 //
-// This is NOT actually in the pongCreature vtable (0x82027884) — it is a
-// free-standing stub whose sole job is to look up the owning object's vtable
-// and indirect-jump to slot 6 (the real teardown) of whatever concrete class
-// the `this` pointer ultimately resolves to. Lifted here because a number of
-// lifted callers bind directly to this stub.
+// Slot 0 of the phUpdateObject-base vtable (see the header): looks up the
+// object's own vtable and jumps to its slot 6. Lifted as the destructor
+// because a number of lifted callers bind to it.
 // ─────────────────────────────────────────────────────────────────────────────
 pongCreature::~pongCreature() {
     // The stub loads slot index 6 from the object's own vtable and tail-calls
@@ -3551,7 +3545,7 @@ pongCreature::~pongCreature() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// pongCreature::DestroyThunk()  [vtable slot 1 @ 0x820C8618 | size: 0x8]
+// pongCreature::DestroyThunk()  [vtable 0x82027B08 slot 2 @ 0x820C8618 | size: 0x8]
 //
 // (Previously named "vfn_2" — renamed for clarity.)
 //
@@ -3568,13 +3562,10 @@ void pongCreature::DestroyThunk() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // pongCreature::RestorePoseFromRollback()
-//                                [vtable slot 0 @ 0x820C67C0 | size: 0x80]
+//                                [vtable 0x82027B08 slot 1 @ 0x820C67C0 | size: 0x80]
 //
 // (Previously misnamed "ScalarDtor" — it is NOT a scalar destructor. The
-// body does not delete, does not call operator delete, and is registered at
-// the canonical pongCreature vtable's FIRST slot (0x82027884 [0]) which —
-// unlike most RAGE classes — is not a teardown slot. The MCP tool's
-// `scalar_destructor` annotation is spurious for this particular class.)
+// body does not delete and does not call operator delete.)
 //
 // Invoked by the physics rollback path every tick. Reads the per-player
 // pose-snapshot pointer from a 50-slot circular buffer embedded in the
@@ -3618,7 +3609,7 @@ void pongCreature::RestorePoseFromRollback() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // pongCreature::RegisterShadowCasters(bool useSecondaryEmitter)
-//                                [vtable slot 4 @ 0x820C60C8 | size: 0xB4]
+//                                [vtable 0x82027B08 slot 5 @ 0x820C60C8 | size: 0xB4]
 //
 // (Previously named "vfn_5" — renamed for clarity.)
 //
@@ -3668,7 +3659,7 @@ void pongCreature::RegisterShadowCasters(bool useSecondaryEmitter) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // pongCreature::Reset(void* world, void* scene)
-//                                [vtable slot 2 @ 0x820C6840 | size: 0x160]
+//                                [vtable 0x82027B08 slot 3 @ 0x820C6840 | size: 0x160]
 //
 // Per-activation reset entry point. Runs the superclass phUpdateObject::Reset
 // to rebind world/scene pointers, fixes up the locomotion state's transform
@@ -3789,6 +3780,582 @@ void pongCreature::Reset(void* world, void* scene) {
 
 
 // ═════════════════════════════════════════════════════════════════════════════
+// pongCreature — replay, teleport requests and the per-frame pose
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// The header's pongCreature fields don't match the binary, so these functions
+// read the object through pongCreatureLayout, which holds only offsets their
+// asm proves. Offsets in comments are the game's 32-bit ones, counted from the
+// start of the object; vtable slot functions (StepLocomotion here) get the
+// phUpdateObject base at +0x10 as `this` instead.
+
+// 4x4 floats, 16-byte aligned in the game: rows a, b, c and the translation d.
+struct pongCreatureMatrix {
+    float a[4];
+    float b[4];
+    float c[4];
+    float d[4];
+};
+
+// Bone count and flags of a skeleton; 0x8224C128 reads the same fields.
+struct pongCreatureSkeletonData {
+    uint8_t  _pad00[0x0C];
+    uint16_t boneCount;  // +0x0C
+    uint8_t  _pad0E[0x06];
+    uint32_t flags;      // +0x14  SKELETON_FLAG_*
+};
+
+static const uint32_t SKELETON_FLAG_APPLY_C288 = 0x1;  // animations go through 0x8224C288, not 0x8224C128
+
+// The skeleton at pongCreature+0xAC, and the one a fragment cache entry keeps
+// at +0x1E4 (inferred: RestorePoseFromRollback copies boneCount 64-byte rows
+// into +0x14, and 0x8224C128 indexes 0x50-byte records at +0x0C).
+struct pongCreatureSkeleton {
+    uint8_t                   _pad00[0x04];
+    pongCreatureSkeletonData* data;          // +0x04
+    uint8_t                   _pad08[0x04];
+    uint8_t*                  bones;         // +0x0C  BONE_RECORD_SIZE records, each starting with a 4x4
+    uint8_t                   _pad10[0x04];
+    pongCreatureMatrix*       boneMatrices;  // +0x14  one 4x4 per bone
+};
+
+static const uint32_t BONE_RECORD_SIZE = 0x50;
+
+// pongCreature+0x24, inside the phUpdateObject base. RefreshBallSlot reads
+// only its +0x04 → +0x14 flags word, the same path as the skeleton's.
+struct pongCreatureObject24 {
+    uint8_t                   _pad00[0x04];
+    pongCreatureSkeletonData* data;  // +0x04
+};
+
+// Animation entries applied to a skeleton one by one (0x82386380 walks the
+// same shape).
+struct pongAnimEntryList {
+    uint8_t  _pad00[0x08];
+    void**   entries;  // +0x08
+    uint16_t count;    // +0x0C
+};
+
+// The two objects at pongCreatureCharData+0xD8/+0xDC. KickWorkers gives each
+// the frame's time step and the skeleton and sets its event, so they are
+// taken to run on another thread (what they simulate is unproven).
+struct pongCreatureWorker {
+    uint8_t               _pad00[0x24];
+    void*                 field24;    // +0x24  passed to RefreshBallSlot, which doesn't read it
+    uint8_t               _pad28[0x2C];
+    void*                 wakeEvent;  // +0x54  set through 0x82566C40 (NtSetEvent)
+    uint8_t               _pad58[0x04];
+    float                 timeStep;   // +0x5C
+    uint8_t               kicked;     // +0x60
+    uint8_t               _pad61[0x1B];
+    pongCreatureSkeleton* skeleton;   // +0x7C
+};
+
+// pongCreature+0xA0 → +0x14. RegisterShadowCasters reads its shadow emitters
+// at +0x40/+0x48; Teleport (0x820C7A28) also checks the workers.
+struct pongCreatureCharData {
+    uint8_t             _pad00[0xD8];
+    pongCreatureWorker* workers[2];  // +0xD8, +0xDC
+};
+
+struct pongCreatureChar {
+    uint8_t               _pad00[0x14];
+    pongCreatureCharData* data;     // +0x14
+    void*                 field18;  // +0x18  SyncFragmentPose does nothing while null
+};
+
+// pongCreature+0xBC: the header's pongPlayerState (pong_player.cpp lifts its
+// predicates 0x820CD550..0x820CD6B8 and its update 0x820CD228).
+struct pongPlayerStateView {
+    uint8_t _pad00[0x20];
+    float   lookAtTarget[4];  // +0x20  inferred: UpdateAnimation hands it to the look-at controller
+    uint8_t _pad30[0x80];
+    float   field_B0;         // +0xB0  UpdateReplay and 0x820CD228 test it for [0, 1]
+};
+
+// rage::phInst, as far as the physics level needs it.
+struct phInstLevelView {
+    void**   vtable;      // +0x00
+    void*    archetype;   // +0x04
+    uint16_t levelIndex;  // +0x08
+};
+
+// The cell pongCreature+0x160 points at; RefreshBallSlot copies the ball's
+// instance into it.
+struct pongBallInstSlot {
+    phInstLevelView* inst;  // +0x00
+};
+
+// rage::phLevel and rage::phSimulator, reduced to the calls made here (the
+// same reading as pong_player.cpp's phLevelView).
+struct phLevelCreatureView {
+    void**   vtable;        // +0x00
+    uint8_t  _pad04[0x18];
+    uint8_t* objectStates;  // +0x1C  one byte per level index; low 3 bits 0 = active
+
+    bool IsActive(uint16_t index) const { return (objectStates[index] & 7) == 0; }
+
+    // Slot 4: the body of an active object, or null.
+    void* GetActiveBody(uint16_t index) {
+        return reinterpret_cast<void* (*)(phLevelCreatureView*, uint16_t)>(vtable[4])(this, index);
+    }
+
+    // Slot 11: called after an instance's matrix was changed by hand.
+    void UpdateObjectLocation(uint16_t index) {
+        reinterpret_cast<void (*)(phLevelCreatureView*, uint16_t)>(vtable[11])(this, index);
+    }
+};
+
+struct phSimulatorCreatureView {
+    void*                vtable;  // +0x00
+    phLevelCreatureView* level;   // +0x04
+};
+
+extern phSimulatorCreatureView* g_pPhysicsSim;    // @ 0x825F5BD0
+extern phLevelCreatureView*     g_pPhysicsLevel;  // @ 0x826065E4
+extern phInstLevelView**        lbl_8271A2F4;     // @ 0x8271A2F4  *it is the ball's instance
+
+// The replay data at *lbl_8271A2EC, as UpdateReplay and ReplayStarting read it
+// (pong_game.cpp calls the same pointer a shadow/mode table root).
+struct pongReplayFrame {
+    uint8_t _pad00[0x10];
+    float   position[4];  // +0x10  ReplayStarting turns the matrix by pi about y when z < 0
+    float   field_20;     // +0x20  clamped to [0, 1] into pongReplayValues
+};
+
+struct pongReplayPlayerBlock {
+    uint8_t         _pad0000[0xA8D0];
+    pongReplayFrame frame;  // +0xA8D0
+    uint8_t         _padA8F4[0x0C];
+};  // 0xA900 bytes
+
+struct pongReplayAnimSlot {
+    pongAnimEntryList list;  // +0x00
+    uint8_t           _pad10[0x20];
+};  // 0x30 bytes
+
+struct pongReplayData {
+    uint8_t               _pad00000[0x11370];
+    pongReplayPlayerBlock players[2];    // +0x11370  picked by playerIndex == 0 / != 0
+    uint8_t               _pad26570[0x426FC];
+    pongReplayAnimSlot    animLists[2];  // +0x68C6C  indexed by playerIndex
+    uint8_t               _pad68CCC[0x24];
+    uint32_t              field_68CF0;   // +0x68CF0  see UpdateAnimation
+};
+
+// *lbl_8271A2F0: one 16-byte record per player from +0x04.
+struct pongReplayValueRecord {
+    uint8_t _pad00[0x08];
+    float   current;   // +0x08
+    float   previous;  // +0x0C  ReplayStarting moves current here before writing it
+};
+
+struct pongReplayValues {
+    uint8_t               _pad00[0x04];
+    pongReplayValueRecord players[2];  // +0x04
+};
+
+extern void* lbl_8271A2EC;  // @ 0x8271A2EC
+extern void* lbl_8271A2F0;  // @ 0x8271A2F0
+
+// The .data block at 0x825CAEB8 (hud.cpp); +0x54 holds the 1/60 s tick.
+struct frameTimingBlockView {
+    uint8_t _pad00[0x54];
+    float   tickSeconds;  // +0x54
+};
+extern const uint8_t g_hudShell_UpdateBlock[0x60];  // @ 0x825CAEB8
+
+// rage::fragType's byte at +0x1AF, past what rage_grm.hpp's fragType covers.
+struct fragTypeFlagsView {
+    uint8_t _pad000[0x1AF];
+    uint8_t flags1AF;  // +0x1AF  bit 2: SyncFragmentPose copies bone records instead of matrices
+};
+
+extern uint32_t lbl_825C9F3C[5];  // @ 0x825C9F3C  UpdateAnimation skips the look-at while [1] is nonzero
+extern uint8_t  lbl_82606325;     // @ 0x82606325  ... or while this is set
+
+struct pongCreatureLayout {
+    void**                 vtable;                      // +0x000  0x82027AFC
+    uint8_t                _pad004[0x0C];
+    void**                 updateVtable;                // +0x010  rage::phUpdateObject base, 0x82027B08
+    uint8_t                _pad014[0x10];
+    pongCreatureObject24*  object24;                    // +0x024
+    uint8_t                _pad028[0x78];
+    pongCreatureChar*      character;                   // +0x0A0
+    pongCreatureInst*      inst;                        // +0x0A4  rage::fragInst
+    void*                  swingState;                  // +0x0A8  0x820CB208 gets it with the swing target
+    pongCreatureSkeleton*  skeleton;                    // +0x0AC
+    uint8_t                _pad0B0[0x0C];
+    pongPlayerStateView*   state;                       // +0x0BC
+    uint8_t                _pad0C0[0x0C];
+    int32_t                playerIndex;                 // +0x0CC
+    uint8_t                _pad0D0[0x15];
+    uint8_t                teleportPending;             // +0x0E5  a deferred RequestTeleport waits
+    uint8_t                _pad0E6[0x0A];
+    uint8_t                lookAtEnabled;               // +0x0F0
+    uint8_t                _pad0F1[0x07];
+    pongLookAtController*  lookAt;                      // +0x0F8  inferred from the callees' addresses
+    uint8_t                _pad0FC[0x14];
+    pongCreatureMatrix     teleportMatrix;              // +0x110
+    uint8_t                teleportResetWorkers;        // +0x150
+    uint8_t                teleportKeepInstanceMatrix;  // +0x151  only UpdateReplay passes it on
+    uint8_t                teleportHoldFrame;           // +0x152  UpdateReplay waits one call while set
+    uint8_t                _pad153[0x0D];
+    pongBallInstSlot*      ballSlot;                    // +0x160
+};
+
+// @ 0x820C7A28 — logs "pongCreature::Teleport() - teleporting player[%d] to
+// [%f,%f,%f]"; with resetWorkers and a worker present it runs UpdateAnimation
+// first (when updatePoseFirst) and resets the workers to the skeleton (0x820FAB78);
+// unless keepInstanceMatrix it moves the instance there (0x820C8FA8).
+extern void pongCreature_Teleport(pongCreature* creature, const pongCreatureMatrix* matrix,
+                                  bool resetWorkers, bool updatePoseFirst, bool keepInstanceMatrix);
+// @ 0x820C3F98 — rotation by angle about y into rows a, b, c (cos at [0] and [10])
+extern void phBoundCapsule_3F98_g(pongCreatureMatrix* outRotation, float angle);
+// @ 0x820C3BC8 — matrix's 3x3 = matrix's 3x3 * rotation's 3x3; row d untouched
+extern void phJoint_3BC8_g(pongCreatureMatrix* matrix, const pongCreatureMatrix* rotation);
+// @ 0x820CC5A8 — the player state's list for the replay list it is given
+extern pongAnimEntryList* game_C5A8(pongPlayerStateView* state, pongAnimEntryList* replayList);
+// @ 0x8214C8F8 (defined in locomotion.cpp)
+extern void LocomotionStateAnim_C8F8_g(void* skeleton);
+// @ 0x82566C40 — NtSetEvent(handle, 0); returns whether it worked
+extern "C" void pg_6C40_g(void* handle);
+
+// pongPlayerState's update and predicates (pong_player.cpp lifts them as
+// pongPlayer members).
+extern "C" void pongPlayer_D228_g(pongPlayerStateView* state);  // @ 0x820CD228
+extern "C" bool pongPlayer_D550_g(pongPlayerStateView* state);  // @ 0x820CD550
+extern "C" bool pongPlayer_D598_g(pongPlayerStateView* state);  // @ 0x820CD598
+extern "C" bool pongPlayer_D5F0_g(pongPlayerStateView* state);  // @ 0x820CD5F0
+extern "C" bool pongPlayer_D660_g(pongPlayerStateView* state);  // @ 0x820CD660
+// @ 0x820CD7B0 — writes the swing's target position to outTarget and returns it
+extern float* pongPlayer_D7B0_g(float* outTarget, pongPlayerStateView* state);
+// @ 0x820CB208
+extern void pongPlayer_B208_g(void* swingState, const float* target, uint8_t flag);
+
+// pongLookAtController (vtable 0x82027AEC, whose slot 1 is 0x820D28E0) calls.
+extern void game_2950(pongLookAtController* lookAt);                                 // @ 0x820D2950
+extern void game_28F0(pongLookAtController* lookAt, const float* target, int which);  // @ 0x820D28F0
+extern void game_2A40(pongLookAtController* lookAt);                                 // @ 0x820D2A40
+
+static pongCreatureLayout* CreatureLayout(pongCreature* creature) {
+    return reinterpret_cast<pongCreatureLayout*>(creature);
+}
+
+// Vtable 0x82027B08's slots get the phUpdateObject base at +0x10.
+static pongCreature* CreatureFromUpdateBase(pongCreature* updateBase) {
+    return reinterpret_cast<pongCreature*>(reinterpret_cast<char*>(updateBase) - 0x10);
+}
+
+static pongReplayData* ReplayData() {
+    return static_cast<pongReplayData*>(lbl_8271A2EC);
+}
+
+static const pongReplayFrame& ReplayFrame(int32_t playerIndex) {
+    return ReplayData()->players[playerIndex == 0 ? 0 : 1].frame;
+}
+
+static pongReplayValueRecord& ReplayValue(int32_t playerIndex) {
+    return static_cast<pongReplayValues*>(lbl_8271A2F0)->players[playerIndex];
+}
+
+static float FrameTickSeconds() {
+    return reinterpret_cast<const frameTimingBlockView*>(g_hudShell_UpdateBlock)->tickSeconds;
+}
+
+// The asm's fsel pair against the doubles 0.0 (0x82079B00) and 1.0
+// (0x82079B08): NaN and negatives give 0, anything from 1 up gives 1.
+static float ClampUnit(float value) {
+    const float floored = value >= 0.0f ? value : 0.0f;
+    return floored - 1.0f >= 0.0f ? 1.0f : floored;
+}
+
+// Inlined in UpdateReplay (and in 0x82386380): every entry goes through
+// 0x8224C128, or 0x8224C288 for skeletons flagged so, with weight 0.
+static void ApplyAnimEntries(const pongAnimEntryList* list, pongCreatureSkeleton* skeleton) {
+    typedef void (*ApplyFn)(void* entry, void* unusedR4, void* skeleton, float weight);
+    const ApplyFn apply = (skeleton->data->flags & SKELETON_FLAG_APPLY_C288) != 0
+                              ? LocomotionStateAnim_C288_g
+                              : LocomotionStateAnim_C128_g;
+    for (int i = 0; i < list->count; ++i)
+        apply(list->entries[i], nullptr, skeleton, 0.0f);
+}
+
+// Inlined in UpdateReplay and StepLocomotion once a deferred teleport ran.
+// Rows a, b, c get only x, y and z; d is cleared whole.
+static void ClearTeleportRequest(pongCreatureLayout* self) {
+    self->teleportPending = 0;
+    pongCreatureMatrix& m = self->teleportMatrix;
+    m.a[0] = 1.0f; m.a[1] = 0.0f; m.a[2] = 0.0f;
+    m.b[0] = 0.0f; m.b[1] = 1.0f; m.b[2] = 0.0f;
+    m.c[0] = 0.0f; m.c[1] = 0.0f; m.c[2] = 1.0f;
+    memset(m.d, 0, sizeof(m.d));
+    self->teleportResetWorkers = 0;
+    self->teleportKeepInstanceMatrix = 0;
+    self->teleportHoldFrame = 0;
+}
+
+// Inlined in UpdateReplay and StepLocomotion (two unrolled copies each).
+static void KickWorkers(pongCreature* creature) {
+    pongCreatureLayout* self = CreatureLayout(creature);
+    pongCreatureCharData* data = self->character->data;
+    for (int i = 0; i < 2; ++i) {
+        pongCreatureWorker* worker = data->workers[i];
+        if (worker == nullptr)
+            continue;
+        worker->timeStep = FrameTickSeconds();
+        worker->skeleton = self->skeleton;
+        pg_6C40_g(worker->wakeEvent);
+        worker->kicked = 1;
+        creature->RefreshBallSlot(data->workers[i]->field24, 0);
+    }
+}
+
+/**
+ * pongCreature::ReplayStarting @ 0x820C5780 | size: 0x138
+ * (was pongCreature_ReplayStarting_5780)
+ *
+ * Called from 0x82196348. Builds a matrix at this player's replay frame
+ * position, turned by pi about y when the frame's z is negative, records the
+ * frame's [0, 1] value and asks for a deferred teleport there.
+ */
+void pongCreature::ReplayStarting(bool keepInstanceMatrix) {
+    pongCreatureLayout* self = CreatureLayout(this);
+    const pongReplayFrame& frame = ReplayFrame(self->playerIndex);
+
+    pongCreatureMatrix matrix;
+    memcpy(&matrix, g_identityMatrixRef, sizeof(matrix));
+    if (frame.position[2] < 0.0f) {
+        pongCreatureMatrix turn;
+        phBoundCapsule_3F98_g(&turn, 3.14159274f);  // 0x82079B30
+        phJoint_3BC8_g(&matrix, &turn);
+    }
+    memcpy(matrix.d, frame.position, sizeof(matrix.d));
+
+    pongReplayValueRecord& value = ReplayValue(self->playerIndex);
+    value.previous = value.current;
+    value.current = ClampUnit(frame.field_20);
+
+    RequestTeleport("pongCreature::ReplayStarting", &matrix, true, false, keepInstanceMatrix);
+}
+
+/**
+ * pongCreature::RefreshBallSlot @ 0x820C58B8 | size: 0x108
+ * (was pongCreature_58B8_g)
+ *
+ * When bit 1 of object24's flags is set, copies the ball's instance into the
+ * cell at +0x160 and, if the ball is active in the physics level, asks the
+ * level for its body; if there is one, it checks and asks once more and drops
+ * that answer. The asm stores both arguments to the caller's frame and never
+ * reads them.
+ */
+void pongCreature::RefreshBallSlot(void* /*unusedArg*/, int /*unusedFlag*/) {
+    pongCreatureLayout* self = CreatureLayout(this);
+    if ((self->object24->data->flags & 0x2) == 0)
+        return;
+
+    self->ballSlot->inst = *lbl_8271A2F4;
+    phInstLevelView* ball = self->ballSlot->inst;
+    if (ball == nullptr)
+        return;
+
+    phLevelCreatureView* level = g_pPhysicsSim->level;
+    if (!level->IsActive(ball->levelIndex))
+        return;
+    if (level->GetActiveBody(ball->levelIndex) == nullptr)
+        return;
+
+    ball = self->ballSlot->inst;
+    level = g_pPhysicsSim->level;
+    if (level->IsActive(ball->levelIndex))
+        level->GetActiveBody(ball->levelIndex);
+}
+
+/**
+ * pongCreature::UpdateReplay @ 0x820C59C0 | size: 0x358
+ * (was pongCreature_59C0_g)
+ *
+ * Called from pongPlayer::UpdateReplay. Puts the instance at this player's
+ * replay frame position, applies the replay animations to the skeleton (through
+ * the player state's list while its +0xB0 is in [0, 1]), syncs the fragment
+ * pose, records the frame's [0, 1] value, runs a deferred teleport unless
+ * teleportHoldFrame asks to wait one more call, and wakes the workers.
+ */
+void pongCreature::UpdateReplay() {
+    pongCreatureLayout* self = CreatureLayout(this);
+    const pongReplayFrame& frame = ReplayFrame(self->playerIndex);
+
+    // Slot 3 (SetLastMatrix) keeps the old matrix before it is overwritten.
+    VCALL(self->inst, 3, void (*)(pongCreatureInst*, const float*))(self->inst, Layout(self->inst)->matrix[0]);
+    pongCreatureInstLayout* inst = Layout(self->inst);
+    memcpy(inst->matrix[3], frame.position, sizeof(inst->matrix[3]));
+    g_pPhysicsLevel->UpdateObjectLocation(inst->levelIndex);
+
+    pongAnimEntryList* list = &ReplayData()->animLists[self->playerIndex].list;
+    pongPlayerStateView* state = self->state;
+    if (state->field_B0 >= 0.0f && state->field_B0 <= 1.0f)
+        list = game_C5A8(state, list);
+    ApplyAnimEntries(list, self->skeleton);
+
+    LocomotionStateAnim_C8F8_g(self->skeleton);
+    SyncFragmentPose();
+
+    ReplayValue(self->playerIndex).current = ClampUnit(frame.field_20);
+
+    if (self->teleportPending) {
+        if (self->teleportHoldFrame) {
+            self->teleportHoldFrame = 0;
+        } else {
+            pongCreature_Teleport(this, &self->teleportMatrix, self->teleportResetWorkers, false,
+                                  self->teleportKeepInstanceMatrix);
+            ClearTeleportRequest(self);
+        }
+    }
+
+    KickWorkers(this);
+}
+
+// pongPlayer::UpdateReplay (pong_player.cpp) declares 0x820C59C0 by its symbol name.
+void pongCreature_59C0_g(void* creature) {
+    static_cast<pongCreature*>(creature)->UpdateReplay();
+}
+
+/**
+ * pongCreature::StepLocomotion @ 0x820C5D18 | size: 0x150  [vtable 0x82027B08 slot 7]
+ * (was pongCreature_vfn_7)
+ *
+ * Per-frame step, skipped while the instance's +0x120 byte is clear: updates
+ * the animation and the fragment pose, then either runs a deferred teleport
+ * or wakes the workers.
+ */
+void pongCreature::StepLocomotion() {
+    pongCreature* creature = CreatureFromUpdateBase(this);
+    pongCreatureLayout* self = CreatureLayout(creature);
+    if (Layout(self->inst)->flag120 == 0)
+        return;
+
+    creature->UpdateAnimation();
+    creature->SyncFragmentPose();
+
+    if (self->teleportPending) {
+        pongCreature_Teleport(creature, &self->teleportMatrix, self->teleportResetWorkers, true, false);
+        ClearTeleportRequest(self);
+        return;
+    }
+
+    KickWorkers(creature);
+}
+
+/**
+ * pongCreature::UpdateAnimation @ 0x820C69A0 | size: 0x1C8
+ * (was pongPlayer_69A0_g)
+ *
+ * Called by StepLocomotion and Teleport. Updates the player state and, while
+ * it reports a swing (0x820CD550, 0x820CD598 or 0x820CD5F0) for a creature
+ * with a player index and swing state, hands the swing target to the swing
+ * state. Then runs 0x8214C8F8 on the skeleton and, when the look-at is
+ * enabled and neither global blocks it, aims the look-at controller at the
+ * player state's target twice (which 0 and 1).
+ */
+void pongCreature::UpdateAnimation() {
+    pongCreatureLayout* self = CreatureLayout(this);
+    pongPlayerStateView* state = self->state;
+    pongCreatureSkeleton* skeleton = self->skeleton;
+
+    if (state != nullptr) {
+        pongPlayer_D228_g(state);
+
+        if (self->swingState != nullptr && self->playerIndex >= 0 && !pongPlayer_D660_g(self->state)) {
+            pongPlayerStateView* current = self->state;
+            if (pongPlayer_D550_g(current) || pongPlayer_D598_g(current) || pongPlayer_D5F0_g(current)) {
+                const bool flag = pongPlayer_D5F0_g(current);
+                float target[4];
+                const float* aim = pongPlayer_D7B0_g(target, current);
+                pongPlayer_B208_g(self->swingState, aim, flag);
+            }
+        }
+
+        // The asm tests ReplayData()->field_68CF0 == 0 && playerIndex >= 0
+        // here, but both outcomes run the code below (duplicated tails).
+    }
+
+    LocomotionStateAnim_C8F8_g(skeleton);
+
+    if (self->lookAtEnabled && lbl_825C9F3C[1] == 0 && lbl_82606325 == 0) {
+        const float* target = self->state->lookAtTarget;  // not null-checked here in the asm either
+        game_2950(self->lookAt);
+        game_28F0(self->lookAt, target, 0);
+        game_2A40(self->lookAt);
+        game_28F0(self->lookAt, target, 1);
+    }
+}
+
+/**
+ * pongCreature::SyncFragmentPose @ 0x820C6B68 | size: 0x18C
+ * (was pongCreature_6B68_g)
+ *
+ * Copies the skeleton's pose into the fragment cache entry's skeleton (the
+ * leading 4x4 of every bone record when the fragType's flag asks for it,
+ * otherwise all bone matrices in one memcpy), has the instance sync its bone
+ * matrices (fragInst slot 47) and gives the archetype's bound the instance's
+ * matrix when the bound's slot 2 says so. Does nothing without the character's
+ * +0x18 object.
+ */
+void pongCreature::SyncFragmentPose() {
+    pongCreatureLayout* self = CreatureLayout(this);
+    if (self->character == nullptr || self->character->field18 == nullptr)
+        return;
+
+    pongCreatureInstLayout* inst = Layout(self->inst);
+    pongCreatureSkeleton* source = self->skeleton;
+    pongCreatureSkeleton* target = inst->cacheEntry->skeleton;
+    const fragType* type = inst->ResolvedType();
+    if (type != nullptr && (reinterpret_cast<const fragTypeFlagsView*>(type)->flags1AF & 0x4) != 0) {
+        for (int i = 0; i < source->data->boneCount; ++i) {
+            memcpy(target->bones + i * BONE_RECORD_SIZE, source->bones + i * BONE_RECORD_SIZE,
+                   sizeof(pongCreatureMatrix));
+        }
+    } else {
+        memcpy(target->boneMatrices, source->boneMatrices,
+               static_cast<size_t>(source->data->boneCount) * sizeof(pongCreatureMatrix));
+    }
+
+    VCALL(self->inst, 47, void (*)(pongCreatureInst*))(self->inst);  // SyncBoneMatrices
+
+    phBoundView* bound = Layout(self->inst)->archetype->bound;
+    if (bound->vfn_2())
+        bound->vfn_3(Layout(self->inst)->matrix);
+}
+
+/**
+ * pongCreature::RequestTeleport @ 0x820C7CE8 | size: 0xCC
+ * (was pongCreature_7CE8_g, and pongCreature_ApplyMatrix in pongMover::Reset)
+ *
+ * Logs "Function calling Teleport is %s (player %d)%s". Immediately: teleports
+ * now (with updatePoseFirst set) and returns. Otherwise stores the request for
+ * UpdateReplay or StepLocomotion; keepInstanceMatrix also sets the hold flag.
+ */
+void pongCreature::RequestTeleport(const char* caller, const pongCreatureMatrix* matrix,
+                                   bool resetWorkers, bool immediately, bool keepInstanceMatrix) {
+    pongCreatureLayout* self = CreatureLayout(this);
+    rage_DebugLogNop("Function calling Teleport is %s (player %d)%s", caller, self->playerIndex,
+                     immediately ? " (IMMEDIATELY)" : "(deferred)");
+
+    if (immediately) {
+        pongCreature_Teleport(this, matrix, resetWorkers, true, false);
+        return;
+    }
+
+    self->teleportPending = 1;
+    self->teleportMatrix = *matrix;
+    self->teleportResetWorkers = resetWorkers;
+    self->teleportKeepInstanceMatrix = keepInstanceMatrix;
+    self->teleportHoldFrame = keepInstanceMatrix;
+}
+
+
+
+// ═════════════════════════════════════════════════════════════════════════════
 // Stub implementations — lifted from stubs.cpp into correct partition
 // ═════════════════════════════════════════════════════════════════════════════
 
@@ -3822,68 +4389,4 @@ extern "C" void pongCreatureInst_Cleanup(void* obj) {
 
     // Set vtable to rage::datBase @ 0x820276C4
     *(void**)self = (void*)0x820276C4;
-}
-
-/**
- * pongCreatureInst::ComputeHeading @ 0x822C90B0 → vtable slot 9
- *
- * This is actually a vtable thunk that calls slot 10 with default
- * parameters (this+64 as data, 0, 0). The real heading computation
- * happens in the slot 10 implementation.
- *
- * For the stub linkage, we return 0.0f as a safe default since the
- * full heading computation requires the creature's transform matrix.
- */
-extern "C" float pongCreatureInst_ComputeHeading(void* obj) {
-    if (!obj) return 0.0f;
-
-    // The real implementation would extract the heading angle from
-    // the creature's forward vector in its transform matrix.
-    // vtable slot 9 → calls slot 10 with (this, this+64, 0, 0)
-    // slot 10 → calls slot 15 which does the actual atan2 computation
-    //
-    // For now, return the cached heading at +8 if available
-    float cachedHeading = *(float*)((uint8_t*)obj + 8);
-    return cachedHeading;
-}
-
-/**
- * pongCreatureInst::NotifyHeadingChanged @ 0x822C90A0 → vtable slot 10
- *
- * Vtable thunk that forwards to slot 15 on self. The slot 15
- * implementation updates dependent systems when the creature's
- * heading angle changes (e.g., updating shadow orientation,
- * animation facing direction).
- */
-extern "C" void pongCreatureInst_NotifyHeadingChanged(void* obj) {
-    if (!obj) return;
-
-    // Forward to vtable slot 15
-    void** vt = *(void***)obj;
-    if (vt && vt[15]) {
-        ((void(*)(void*))vt[15])(obj);
-    }
-}
-
-/**
- * pongCreatureInst::SetMatrixImpl @ 0x822C9200 → vtable slot 31
- *
- * Copies a 4x4 identity-like matrix (from a global constant) into
- * the destination buffer at r4. The scaffold loads a single vec128
- * from a global address and stores it 4 times — effectively filling
- * 64 bytes with the same 16-byte pattern. This is used to reset
- * the creature's transform to a default state.
- */
-extern "C" void pongCreatureInst_SetMatrixImpl(void* obj, const void* matrix) {
-    if (!obj || !matrix) return;
-
-    // The scaffold copies 4 x 16-byte vectors from a global constant
-    // into the destination buffer (r4+0, r4+16, r4+32, r4+48).
-    // This effectively fills 64 bytes of the matrix buffer.
-    //
-    // The source is a global at lis(-32160)+26448 = 0x82606750
-    // which is a 16-byte aligned constant (likely zeros or identity row).
-    //
-    // For the real implementation, copy the source matrix to the destination
-    memcpy((void*)matrix, (const void*)((uint8_t*)obj + 32), 64);
 }

@@ -761,6 +761,8 @@ struct pongBlender {
     virtual ~pongBlender();                  // [0] @ 0x820cb910
 };
 
+struct pongCreatureMatrix;  // 4x4 floats, rows a, b, c and the translation d (pong_creature.cpp)
+
 // ── pongCreature  [2 vtables — template/MI] ──────────────────────────
 // Confirmed methods: Activate, Draw, StartEmote, Teleport
 // Field hints: m_pCreature:ptr, m_playerIndex:int, m_position:Vector3
@@ -813,25 +815,28 @@ struct pongCreature {
 
     // ── virtual methods ──
     //
-    // Canonical vtable layout (0x82027884, 8 entries):
-    //   [0] RestorePoseFromRollback          @ 0x820C67C0 — physics rewind
-    //   [1] DestroyThunk                     @ 0x820C8618 — MI-adjust + scalar delete
-    //   [2] Reset(...)                       @ 0x820C6840 — per-frame physics reset
-    //   [3] AddToRenderBucket (inherited)    @ 0x8227D768 — from phUpdateObject
-    //   [4] RegisterShadowCasters(bool)      @ 0x820C60C8 — shadow-map binding
-    //   [5] UpdateShadowAndAnimState         @ 0x820C6378 — larger shadow/anim update
-    //   [6] StepLocomotion                   @ 0x820C5D18 — locomotion step
-    //   [7] nullsub                                         — unused
+    // pongCreature has two vtables in the image: 0x82027AFC (one slot, the
+    // scalar deleting destructor 0x820C5398) and 0x82027B08 for the
+    // rage::phUpdateObject base at +0x10, whose slots get that base as `this`
+    // (slot 2 subtracts 16 before deleting):
+    //   [0] 0x820C6358 — calls slot 6 of the object's own vtable
+    //   [1] RestorePoseFromRollback          @ 0x820C67C0
+    //   [2] DestroyThunk                     @ 0x820C8618 — this-16, scalar delete
+    //   [3] Reset(...)                       @ 0x820C6840
+    //   [4] phUpdateObject's                 @ 0x8227D768
+    //   [5] RegisterShadowCasters(bool)      @ 0x820C60C8
+    //   [6] UpdateShadowAndAnimState         @ 0x820C6378
+    //   [7] StepLocomotion                   @ 0x820C5D18
+    //   [8] nullsub                          @ 0x8240E6D0
     //
-    // 0x820C6358 is NOT a vtable entry; it is a free-standing "call vt[6]"
-    // stub lifted as ~pongCreature() because several callers bind to it.
-    virtual ~pongCreature();                                       // dispatcher stub @ 0x820C6358
-    virtual void RestorePoseFromRollback();                        // [0] @ 0x820C67C0
-    virtual void DestroyThunk();                                   // [1] @ 0x820C8618
-    virtual void Reset(void* world, void* scene);                  // [2] @ 0x820C6840
-    virtual void RegisterShadowCasters(bool useSecondaryEmitter);  // [4] @ 0x820C60C8
-    virtual void UpdateShadowAndAnimState(int updateMode);         // [5] @ 0x820C6378  (TODO-body)
-    virtual void StepLocomotion();                                 // [6] @ 0x820C5D18  (TODO-body)
+    // The declarations below don't reproduce that order.
+    virtual ~pongCreature();                                       // [0] @ 0x820C6358
+    virtual void RestorePoseFromRollback();                        // [1] @ 0x820C67C0
+    virtual void DestroyThunk();                                   // [2] @ 0x820C8618
+    virtual void Reset(void* world, void* scene);                  // [3] @ 0x820C6840
+    virtual void RegisterShadowCasters(bool useSecondaryEmitter);  // [5] @ 0x820C60C8
+    virtual void UpdateShadowAndAnimState(int updateMode);         // [6] @ 0x820C6378  (TODO-body)
+    virtual void StepLocomotion();                                 // [7] @ 0x820C5D18
 
     // ── non-virtual methods (from debug strings) ──
     void Teleport();
@@ -842,6 +847,15 @@ struct pongCreature {
     void FindIndexByKey(void* outPtr, void* keyPtr);    // @ 0x820Cxxxx
     void ScalarDeletingDtor(int flags);  // @ 0x820C5398
     void Relocate(void* relocator);      // @ 0x820C8858
+
+    // ── lifted from the asm; pong_creature.cpp reads `this` as pongCreatureLayout ──
+    void ReplayStarting(bool skipInstanceMove);          // @ 0x820C5780
+    void RefreshBallSlot(void* unusedArg, int unusedFlag);  // @ 0x820C58B8
+    void UpdateReplay();                                 // @ 0x820C59C0
+    void UpdateAnimation();                              // @ 0x820C69A0
+    void SyncFragmentPose();                             // @ 0x820C6B68
+    void RequestTeleport(const char* caller, const pongCreatureMatrix* matrix, bool resetWorkers,
+                         bool immediately, bool skipInstanceMove);  // @ 0x820C7CE8
 };
 
 struct fragCacheEntry;  // fragment cache entry handed out by the pool at g_creatureManager+0x2F0
@@ -1067,10 +1081,9 @@ struct pongCreatureInst {
     void SetRefPtr(void* newObj);    // @ 0x822C9030
     void SetArraySlot(int index, void* newObj);  // @ 0x8228E7B8
     void FragInstDtor();        // @ 0x8211D470 — rage::fragInst destructor body
-    void SetMatrix(const void* srcMatrix);  // @ 0x820D5040
-    void UpdateHeading();       // @ 0x8228E828
-    void BuildTranslationMatrix(float* outMatrix, const float* srcBasis);  // @ 0x820D50A0
-    void CopyAndBuildTranslationMatrix(float* outMatrix, const float* srcMatrix);  // @ 0x820D5040
+    // Plain matrix helpers: r3 is a matrix, not an instance.
+    static void BuildTranslationMatrix(float* outMatrix, const float* srcBasis);  // @ 0x820D50A0
+    static void CopyAndBuildTranslationMatrix(float* matrix);  // @ 0x820D5040 — in place
     void CopyBoneMatrix(int boneIndex, float* outMatrix);  // @ 0x821183B0
     void FindBonePairByName(int mappingIndex, const char* boneName1, const char* boneName2);  // @ 0x82118C58
     void ReadBoneNamesAndMap(void* xmlNode);  // @ 0x821190F8
