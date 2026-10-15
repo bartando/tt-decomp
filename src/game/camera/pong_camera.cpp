@@ -1007,9 +1007,9 @@ extern float    g_cameraTransitionTime;   // @ 0x826064BC (.data, 4B)
 extern uint32_t g_cameraDataPtr;          // @ 0x8271A2EC (.data, 4B - pointer to game data)
 
 // Float thresholds in .rdata used by each variant:
-extern float g_cameraElapsedThreshold1;   // @ 0x825F8080 (.rdata)
-extern float g_cameraElapsedThreshold2;   // @ 0x825F9E78 (.rdata)
-extern float g_cameraElapsedThreshold3;   // @ 0x825FD10C (.rdata)
+extern float g_cameraElapsedThreshold1;   // @ 0x825C8080 (.data, 0.25)
+extern const float g_cameraElapsedThreshold2;   // @ 0x82079E78 (.rdata, 0.375)
+extern const float g_cameraElapsedThreshold3;   // @ 0x8202D10C (.rdata, 0.5)
 
 static const uint32_t CAMERA_DATA_ELAPSED_OFFSET = 0x68CE4;
 
@@ -1585,10 +1585,9 @@ extern void pongCameraMgr_8CB0_2hr(void* selfPtr);                              
 
 // Globals referenced by address
 extern uint32_t g_cameraMgrSingleton;   // @ 0x8260641C  (lis r7,-32160 + 25628)
-extern uint32_t g_cameraActiveIndex;    // @ 0x8260645C  (lis r10,-32160 + 26076)
-extern uint8_t  g_cameraResetFlag;      // @ 0x8260640A  (lis r8,-32160 + 25626)
-extern uint32_t g_cameraLerpCounter;    // @ 0x826064A0  (lis r10,-32160 + 25792)
-extern uint32_t g_cameraLerpState;      // @ 0x826064A4  (lis r10,-32160 + 25796)
+extern uint32_t g_phFrameIndex;         // @ 0x826065DC  (lis r10,-32160 + 26076)
+extern uint8_t  g_cameraResetFlag;      // @ 0x8260641A  (lis r8,-32160 + 25626)
+extern uint32_t g_cameraLerpState;      // @ 0x826064C4  (lis r10,-32160 + 25796)
 extern float    g_cameraLerpValue;      // @ 0x826064BC  (lis r10,-32160 + 25788)
 extern uint32_t g_cameraLerpFlags;      // @ 0x826064D0  (lis r10,-32160 + 25808)
 extern uint32_t g_cameraDataBasePtr;    // @ 0x8271A2EC  (global data base)
@@ -1775,7 +1774,7 @@ void pongCameraMgr::vfn_25() {
     subState[2] = 0;  // +8
 
     // Load default float value from data table
-    extern float g_cameraDefaultFOV;  // @ const table
+    extern const float g_cameraDefaultFOV;  // @ 0x8202D110 (0.0f)
     float defVal = g_cameraDefaultFOV;
 
     // Write default to sub-state->field_16->+8,+12 and sub-state->field_20->+8,+12
@@ -1790,8 +1789,8 @@ void pongCameraMgr::vfn_25() {
     // Update global camera pointer from camObj->+44->+16
     void* camObj2 = m_cameraObj;  // +0x28
     uint32_t* camData = *(uint32_t**)((char*)camObj2 + 44);
-    extern uint32_t* g_globalCamPtr1;  // @ global
-    extern uint32_t* g_globalCamPtr2;  // @ global
+    extern uint32_t* g_globalCamPtr1;  // @ 0x8271A32C
+    extern uint32_t* g_globalCamPtr2;  // @ 0x8271A318
     *g_globalCamPtr1 = (uint32_t)(uintptr_t)((char*)camData + 16);
 
     // Virtual call slot 3 on g_globalCamPtr2
@@ -1816,9 +1815,9 @@ void pongCameraMgr_6280_g(void* selfPtr) {
     // Get aspect ratio (result returned in f1)
     pongCameraMgr_3E98_g(activeCamera);
 
-    // Compute destination slot: self->m_slotsBase + g_cameraActiveIndex * 912
+    // Compute destination slot: self->m_slotsBase + g_phFrameIndex * 912
     pongCameraMgr* slotsBase = (pongCameraMgr*)self->m_slotsBase;  // +0x18
-    int idx = (int)g_cameraActiveIndex;
+    int idx = (int)g_phFrameIndex;
     char* dest = (char*)slotsBase + idx * 912;
     pongCameraMgr* destSlot = (pongCameraMgr*)dest;
 
@@ -1832,7 +1831,7 @@ void pongCameraMgr_6280_g(void* selfPtr) {
     phBoundCapsule_3598_g(dest);
 
     // Copy matrix: activeCamera+64 -> dest (recomputed slot)
-    idx = (int)g_cameraActiveIndex;
+    idx = (int)g_phFrameIndex;
     slotsBase = (pongCameraMgr*)self->m_slotsBase;
     dest = (char*)slotsBase + idx * 912;
     ((grcViewport*)dest)->SetCameraMtx(*(const CamMatrix44*)((char*)activeCamera + 64));
@@ -2039,7 +2038,7 @@ void pongCameraMgr_7C18(void* selfPtr, void* nodePtr, void* statePtr, uint8_t im
     float lerpVal = *(float*)(g_cameraDataBasePtr + 0x68CE4);
 
     // Clear transition globals
-    g_cameraLerpCounter = 0;
+    g_cameraTransitionState = 0;
     g_cameraLerpState = 0;
     g_cameraLerpValue = lerpVal;
     g_cameraLerpFlags = 0;
@@ -2126,7 +2125,7 @@ void pongCameraMgr_8C10(void* selfPtr) {
     *(int*)((char*)self + 24) = -1;   // +0x18
 
     // Clear lerp globals
-    g_cameraLerpCounter = 0;
+    g_cameraTransitionState = 0;
     g_cameraLerpState = 0;
     g_cameraLerpFlags = 0;
     g_cameraLerpValue = lerpVal;
@@ -2159,7 +2158,7 @@ void pongCameraMgr_8CB0_2hr(void* selfPtr) {
         // Copy a block of float params from the const table into the data region
         // Destination: g_cameraDataBasePtr + 0x78CE4 (offset 7*65536 - 29404)
         char* destBase = (char*)(g_cameraDataBasePtr + 0x78CE4 - 29404);
-        extern float g_cameraConstTable[];  // base of float constants
+        extern const float g_cameraConstTable[];  // @ 0x8202D10C
 
         // Copy 7 float values
         *(float*)(destBase + 0)  = g_cameraConstTable[0];   // f10
@@ -2177,7 +2176,7 @@ void pongCameraMgr_8CB0_2hr(void* selfPtr) {
     }
 
     // Store a float value at g_cameraDataBasePtr + 0x68D04 (offset 36100)
-    extern float g_cameraFinalFloat;  // @ const table offset -3112
+    extern const float g_cameraFinalFloat;  // @ 0x8202C4E4 (const table -3112)
     *(float*)(g_cameraDataBasePtr + 0x68D04) = g_cameraFinalFloat;
 
     // Tail-call: game_85F0 with self->+4 (node table ptr)
@@ -2573,7 +2572,7 @@ void* pongCameraMgr_9DE8_g(void* owner, uint32_t param1, uint32_t /*unused*/,
     xe_main_thread_init_0038();
 
     // Navigate SDA to get allocator: SDA[0] → globalPtr → globalPtr+4 → allocator
-    extern void* g_sdaBase;     // @ 0x82600000 (r13+0)
+    extern void* g_sdaBase;     // r13+0: the thread's TLS block, not a global
     void* globalPtr = g_sdaBase;
     void* allocator = *(void**)((char*)globalPtr + 4);
 
@@ -2739,7 +2738,7 @@ extern void* rage_sysMemAllocator_Get();
 extern void  rage_sysMemAllocator_Free(void* ptr);    // wraps rage_free_00C0
 
 // Vtable address of the camShot class (annotated at lbl_82035CFC in pass5_final).
-extern void* const kCamShotVTable;
+extern void* kCamShotVTable[];  // @ 0x82035CFC
 
 /**
  * camShotMgr::OnEnter  [vtable slot 4]  @ 0x82165458
@@ -2844,36 +2843,36 @@ extern "C" {
 }
 
 // Externally-owned string table slots (for GetTypeName / GetDebugLabel).
-// Their exact addresses are 0x82036E40 and 0x82045380 — filled at link time.
-extern const char  charViewCS_typeName[];   // @ 0x82036E40 — "charViewCS"
-extern const char  charViewCS_debugLabel[]; // @ 0x82045380 — debug-name text
+// Defined in ld_cam_data.cpp.
+extern const char  charViewCS_typeName[];   // @ 0x820363F8 "tune/camera"
+extern const char  charViewCS_debugLabel[]; // @ 0x82037440 "parFileIO"
 
 // Static parameter names used by RegisterAxisHooks.
 // These are fixed .rdata literals whose layout is dictated by PPC addi-strides
 // of 12 bytes between successive literal slots.
-extern const char  charViewCS_paramName0[]; // @ 0x82036E44 slot 0
-extern const char  charViewCS_paramName1[]; // @ 0x82036E50 slot 1
-extern const char  charViewCS_paramName2[]; // @ 0x82036E5C slot 2
-extern const char  charViewCS_paramName3[]; // @ 0x82036E68 slot 3
-extern const char  charViewCS_paramName4[]; // @ 0x82036E74 slot 4
-extern const char  charViewCS_paramName5[]; // @ 0x82036E80 slot 5 (last, kind=1 instead of 6)
+extern const char  charViewCS_paramName0[]; // @ 0x82036404 "BlendTime" slot 0
+extern const char  charViewCS_paramName1[]; // @ 0x82036410 "BlendGoal" slot 1
+extern const char  charViewCS_paramName2[]; // @ 0x8203641C "CameraFOV" slot 2
+extern const char  charViewCS_paramName3[]; // @ 0x82036428 "CameraNear" slot 3
+extern const char  charViewCS_paramName4[]; // @ 0x82036434 "CameraFar" slot 4
+extern const char  charViewCS_paramName5[]; // @ 0x82036440 "IgnoreTimeWarp" slot 5 (last, kind=1 instead of 6)
 
 // Tuning-table base used by vfn_9 / ApplyAxisScaled to pick a scale factor.
 // When m_enableModeB4 is set, we pick the secondary entry (offset +84 from base);
-// otherwise the primary entry (offset +8). Base is at 0x8204A5F8 (big data blob).
-extern const float charViewCS_scaleTable[]; // @ 0x8204A5F8 — 100-byte tuning struct
+// otherwise the primary entry (offset +8). Both hold 1/60 s in the image.
+extern const float charViewCS_scaleTable[]; // @ 0x825CAEB8 (rage::sysTimeManager)
 
 // Misc scalar constants used by ProcessAxisInputs:
-//   -25676 → bias for byte→signed conversion (= 127.0f)
-//   -25680 → inverse-range divisor (= 1/127.5f)
+//   -25676 → bias for byte→signed conversion (= 127.5f)
+//   -25680 → inverse-range divisor (= 1/127)
 //   @ -8 and +0 near 0x8202D160 → vector-lerp "zero" and "one" sentinels
-extern const float charViewCS_byteBias;     // = 127.0f
-extern const float charViewCS_byteScale;    // = 1.0f / 127.5f
-extern const float charViewCS_oneF;         // = 1.0f
+extern const float charViewCS_byteBias;     // @ 0x82079BB4 = 127.5f
+extern const float charViewCS_byteScale;    // @ 0x82079BB0 = 1.0f / 127
+extern const float charViewCS_oneF;         // @ 0x8202D108 = 1.0f
 extern const float charViewCS_zeroF;        // = 0.0f
 
 // Vtable stamped by the destructor (back-fill after base-dtor chain).
-extern void** charViewCS_vtable;            // @ 0x820362C0
+extern void* charViewCS_vtable[];           // @ 0x82036454 (camBaseCS vtable)
 
 // ── Layout assumptions used below ────────────────────────────────────────
 // +0x04..+0x0F are unused pad. The 6 axis hooks live at bytes 156/160/164/168/172/180,

@@ -45,26 +45,26 @@ extern "C" {
 
 // Global string tables (XML field names) referenced by RegisterXmlFields.
 // Addresses in the original binary, content from .rdata lookup.
-extern const char g_str_charViewCS_field_9C[];   // +156 field
-extern const char g_str_charViewCS_field_A0[];   // +160 field
-extern const char g_str_charViewCS_field_A4[];   // +164 field
-extern const char g_str_charViewCS_field_A8[];   // +168 field
-extern const char g_str_charViewCS_field_AC[];   // +172 field
-extern const char g_str_charViewCS_Shadows[];    // +180 field ("Shadows")
+extern const char g_str_charViewCS_field_9C[];   // @ 0x82036404 "BlendTime" (+156)
+extern const char g_str_charViewCS_field_A0[];   // @ 0x82036410 "BlendGoal" (+160)
+extern const char g_str_charViewCS_field_A4[];   // @ 0x8203641C "CameraFOV" (+164)
+extern const char g_str_charViewCS_field_A8[];   // @ 0x82036428 "CameraNear" (+168)
+extern const char g_str_charViewCS_field_AC[];   // @ 0x82036434 "CameraFar" (+172)
+extern const char g_str_charViewCS_Shadows[];    // @ 0x82036440 "IgnoreTimeWarp" (+180)
 
 // Linked-list sentinels used by PurgeFilteredNodes (at 0x825CA938/944/93C/948).
 struct charViewCS_Node { void* field_00; charViewCS_Node* next; charViewCS_Node* prev; void* info; };
 extern charViewCS_Node g_charViewCS_freeListHead;    // @ 0x825CA938 (free-list sentinel)
 extern charViewCS_Node g_charViewCS_activeListHead;  // @ 0x825CA944 (active-list sentinel)
-extern charViewCS_Node* g_charViewCS_activeTail;     // @ 0x825CA948
-extern charViewCS_Node* g_charViewCS_freeTail;       // @ 0x825CA93C
+extern charViewCS_Node* g_charViewCS_activeTail;     // @ 0x825CA948 (= activeListHead.next)
+extern charViewCS_Node* g_charViewCS_freeTail;       // @ 0x825CA93C (= freeListHead.next)
 
 // Math constants used by bound clamping (from .data / .rdata constant pool).
-extern const float g_charViewCS_boundHalfExtent;     // +84 when flag set / +8 otherwise
+extern const float g_charViewCS_boundHalfExtent;     // @ 0x825CAEC0 (sysTimeManager +8)
 extern const float g_charViewCS_scale;               // lbl_825C5938
 
 // Error/label strings.
-extern const char g_str_many_bounds_specified[];   // "many bounds specified (Max=%d)"
+extern const char g_str_many_bounds_specified[];   // @ 0x820363F8 "tune/camera"
 
 // ResetCharViewData is declared in char_view.hpp and defined below.
 
@@ -1073,13 +1073,11 @@ pongCharViewContext::~pongCharViewContext() {
 
 // Globals referenced by the scene methods (their addresses verified via MCP).
 extern uint32_t g_sceneSlotCounter;          // @ 0x825C9FA4 (bumped by RegisterSceneSlot)
-extern uint8_t  g_sceneSlotTagTable[];       // @ base 0x825CA130-ish (byte per slot)
-extern void*    g_sceneSlotPtrTable[];       // @ base 0x825C9A68-ish (4 bytes per slot)
-extern uint32_t g_sceneSlotTypeTable[];      // @ base 0x825C9D28-ish (4 bytes per slot)
-extern void*    g_pauseMgr;                  // @ 0x82606490 — +495 holds pause/hold-for-demo byte
+extern uint8_t  g_sceneSlotTagTable[];       // @ 0x825F3A68 (byte per slot)
+extern void*    g_sceneSlotPtrTable[];       // @ 0x825F3868 (4 bytes per slot)
+extern uint32_t g_sceneSlotTypeTable[];      // @ 0x825F3968 (4 bytes per slot)
 extern void*    g_gameDataMgr;               // @ 0x82645A44 — +24 holds select-gate byte
 extern void*    g_selectionKillSignal;       // @ 0x825C9F28 — +4 non-zero = force deactivate
-extern uint32_t g_charEntryTable;            // @ 0x825CA130 — per-slot entry base used by UpdateMountedChars
 
 /**
  * pongCharViewContext::RegisterSceneSlot (vfn_11)
@@ -1102,7 +1100,7 @@ bool pongCharViewContext::RegisterSceneSlot() {
     // Base pointer to the scene slot tables lives at SDA-relative -32161|14952.
     // For the lift we treat the three tables as independent extern arrays; the
     // counter word is read, indexed into each, then written back +1.
-    extern uint32_t g_sceneSlot_count;   // @ 0x825C9F64
+    extern uint32_t g_sceneSlot_count;   // @ 0x825F3864
     const uint32_t index = g_sceneSlot_count;
 
     g_sceneSlotTagTable[index]  = 128;   // active tag
@@ -1172,7 +1170,7 @@ void pongCharViewContext::TickScene() {
  * pongCharViewContext::UpdateMountedChars (vfn_17)
  * @ 0x8230AF50 | size: 0xAC
  *
- * Shared guard: tick only when paused flag at g_pauseMgr[+495] is set, or
+ * Shared guard: tick only when paused flag at g_loop_obj_ptr[+495] is set, or
  * when the game-data-manager gate byte at g_gameDataMgr[+24] is set. When
  * open, walk the two mounted-char slot bytes at this[+77..+78]. For each
  * set byte, locate the character entry in the global char entry table:
@@ -1186,13 +1184,13 @@ void pongCharViewContext::UpdateMountedChars() {
     uint8_t* self = reinterpret_cast<uint8_t*>(this);
 
     // Compound guard matching the original 'if (pauseByte || gateByte)'.
-    const uint8_t pauseByte = ((const uint8_t*)g_pauseMgr)[495];
+    const uint8_t pauseByte = ((const uint8_t*)g_loop_obj_ptr)[495];
     const uint8_t gateByte  = ((const uint8_t*)g_gameDataMgr)[24];
     if (!pauseByte && !gateByte) {
         return;
     }
 
-    uint32_t* charTable = &g_charEntryTable;
+    uint32_t* charTable = static_cast<uint32_t*>(g_sceneRenderObj);  // @ 0x82606430
     uint8_t*  slotBytes = self + 77;
     uint32_t* slotIndex = reinterpret_cast<uint32_t*>(self + 132);
 
@@ -1221,7 +1219,7 @@ void pongCharViewContext::UpdateMountedChars() {
  *      hand back the char (mirrors UpdateMountedChars slot 6 but with a
  *      "release" flag implicit in the object state).
  *   2. Dispatch the camera-manager's slot 29 to fade/freeze the scene
- *      using either its +76 (when g_pauseMgr[+576] is set) or +64 handler.
+ *      using either its +76 (when g_loop_obj_ptr[+576] is set) or +64 handler.
  *   3. For each of the two char slots, honour the global kill signal at
  *      g_selectionKillSignal[+4]: if non-zero or the slot byte was set,
  *      clear entry[+212] ("active") and entry[+288] ("visible") on the
@@ -1383,7 +1381,7 @@ void AdvanceCharSlot(void* ctxPtr, int slot) {
 
         void* poseCtx = *reinterpret_cast<void**>(self + 44);
         extern void SinglesNetworkClient_1118_g(void*, const char*, int);  // 0x82321118
-        extern const char g_str_charview_finalize[];  // lbl_8205EFD4
+        extern const char g_str_charview_finalize[];  // @ 0x8205EFB4 "CMD_SHOW_FADE"
         SinglesNetworkClient_1118_g(poseCtx, g_str_charview_finalize, 0);
         return;
     }
@@ -1399,11 +1397,10 @@ void AdvanceCharSlot(void* ctxPtr, int slot) {
 
     (void)*reinterpret_cast<const int32_t*>(self + 64);  // secondary index, consumed by helper
     extern bool SinglesNetworkClient_82F0_g(void* mgr, int slotIsFirst);  // 0x821882F0
-    extern void* g_gameDataMgr_arg;  // @ 0x825C9DC0 (mgr pointer for filter)
     extern void ref_gdDrillMovementData_B960(void* ctx, int slot);  // 0x8230B960
 
     const bool slotIsFirst = (slot != 0);
-    if (!SinglesNetworkClient_82F0_g(&g_gameDataMgr_arg, slotIsFirst ? 1 : 0)) return;
+    if (!SinglesNetworkClient_82F0_g(g_sceneRenderObj, slotIsFirst ? 1 : 0)) return;
 
     ref_gdDrillMovementData_B960(ctxPtr, slot);
 }

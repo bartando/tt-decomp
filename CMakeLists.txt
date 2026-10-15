@@ -159,6 +159,7 @@ set(SOURCES
     # and bridges between spellings of one symbol
     src/game/ball/ball_data.cpp
     src/game/camera/camera_data.cpp
+    src/game/camera/ld_cam_data.cpp
     src/game/char_view/char_view_data.cpp
     src/game/creature/creature_data.cpp
     src/game/match/match_data.cpp
