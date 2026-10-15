@@ -44,6 +44,18 @@ before relying on any of these; fix and delete the entry when done.
 - `rage_grm.hpp` still names `grmShader` slot 0 `IsOfType` (asm: scalar deleting destructor)
   and slot 6 `IsOfTypeExt` (asm: stores `this` as the active shader, returns 1).
 - `rage_free` (0x820C00C0) is declared `extern "C"` in some files and with C++ linkage in others.
+- `pongPlayer::CancelSwing`, `IsBeforeSwingPeak`, `IsSwingSystemIdle`, `IsInReturnPosition`
+  have the swing-timer test inverted (their `pongPlayerState::` duplicates at the same
+  addresses are right); `CancelSwing` also writes the wrong constants.
+- `SetupRecoverySlots` (0x820C7248): `this` is a `pongCreature`, the two arguments are 16-byte
+  callbacks, not `vec3`s; it copies them unconditionally, then passes a position and two bools
+  to `game_D060`. Its timer test is inverted too.
+- `ComputeShotSpeedForType` (0x821D6100) runs on the per-player shot record, not `pongPlayer`;
+  `FinalizeServeSetup` (0x8219F9C0) is a `shotTarget` method.
+- `PostPageGroupMessage`: `pg_E6E0` takes 4 arguments, the declaration has 5.
+- `pong_player.hpp`: the `pongPlayer` layout below +0x100 is really `pongCreature`'s;
+  `m_pOpponent` (+0x1C4) is the player's own creature, `m_pActionState` (+0x1F0) is an
+  `aiPlayer`, +0x1C0 is the ball's physics instance.
 - `globals.c`: `g_msgSinkTemplate` is at 0x8261A0C0, not 0x8241A0C0.
 
 ## The recomp is not ground truth
@@ -59,6 +71,8 @@ register tested, no stack frames). Trust `disasm/sections/.text.s` when they dis
 | 0x8271A318 | `g_pMatchState` | `atSingleton<camShotMgr>` instance |
 | 0x8271A32C | `g_pMatchConfig` | shared camera state |
 | 0x825EBAA0 | `g_pHudOverlay` | current `grcViewport` |
+| 0x8271A304 | `g_pGlobalClock` | table dimensions |
+| 0x8202D10C | `g_kZero` | 0.5 (0.0 is at 0x8202D110) |
 
 ## Not game code
 
