@@ -51,6 +51,12 @@ protected:
     void** m_vtable;              // +0x00
 };
 
+/**
+ * hsmState_AttachChild @ 0x823EF850 | size: 0x60
+ * Hooks an embedded child state into its parent's machine (see hsm.cpp).
+ */
+void hsmState_AttachChild(hsmStateBase* parent, hsmStateBase* child);
+
 } // namespace rage
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -94,7 +100,11 @@ public:
     
     /**
      * OnEnter @ slot 5
-     * Called when entering this state
+     * Every lifted slot-5 body (snRoot @ 0x823E49E0, snMigrateMachine
+     * @ 0x823E2448, snJoinMachine @ 0x823E0358) attaches the state's
+     * embedded sub-states by calling hsmState_AttachChild on each, and
+     * hsmState_AttachChild runs it on the child it attaches, so a tree
+     * attaches top-down. snCreateMachine.hpp calls it InitializeChildStates.
      */
     virtual void OnEnter() = 0;
     
@@ -116,12 +126,18 @@ public:
      */
     virtual void Update(float deltaTime) = 0;
 
+    friend void rage::hsmState_AttachChild(rage::hsmStateBase* parent,
+                                           rage::hsmStateBase* child);
+
 protected:
     void** m_vtable;              // +0x00
     void* m_pManager;             // +0x04 - State manager/context
     hsmState* m_pParentState;     // +0x08 - Parent state in hierarchy
     hsmState* m_pChildState;      // +0x0C - Active child state
-    uint32_t m_field_10;          // +0x10
-    uint32_t m_field_14;          // +0x14
+    // +0x10/+0x14 hold addresses: hsmState_AttachChild copies +0x10 into a
+    // child's +0x04 as well, and snJoining's OnEnter (0x823E3F50) stores the
+    // child's own address in its +0x14.
+    void* m_field_10;             // +0x10 - context, shared down the tree
+    void* m_field_14;             // +0x14 - passed down by hsmState_AttachChild
 };
 

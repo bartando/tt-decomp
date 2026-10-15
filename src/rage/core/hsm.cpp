@@ -332,8 +332,8 @@ char* hsmState::GetFullStatePath(char* buffer, uint32_t bufferSize) const {
  * Resets this state to its initial condition. First calls the virtual
  * OnExit() method (vtable slot 6) to perform any cleanup, then zeros
  * out all state fields:
- *   +0x10: m_field_10 (flags/timer)
- *   +0x14: m_field_14 (flags/timer)
+ *   +0x10: m_field_10 (context)
+ *   +0x14: m_field_14
  *   +0x04: m_pManager
  *   +0x08: m_pParentState
  *   +0x0C: m_pChildState
@@ -345,33 +345,32 @@ void hsmState::Reset() {
     OnExit();
 
     // Zero all state fields
-    m_field_10 = 0;
-    m_field_14 = 0;
+    m_field_10 = nullptr;
+    m_field_14 = nullptr;
     m_pManager = nullptr;
     m_pParentState = nullptr;
     m_pChildState = nullptr;
 }
 
 /**
- * hsmState_AttachChild — Attach a child state to a parent
+ * rage::hsmState_AttachChild @ 0x823EF850 | size: 0x60
  *
- * Links a child state into the parent's hierarchy by setting the
- * child's parent pointer and the parent's child pointer.
- * This is used during HSM construction to build the state tree.
- *
- * No binary address — link anchor for HSM construction code.
+ * Hooks an embedded child state into its parent's machine. The child takes
+ * the parent's +0x10 (into both its +0x04 and +0x10) and +0x14, then runs
+ * its own slot 5, where a state attaches its sub-states through this same
+ * function. Only after that does the child's parent link (+0x08) point at
+ * `parent`. Nothing is null-checked, and the parent's active-child pointer
+ * (+0x0C) is left alone.
  */
 namespace rage {
-void hsmState_AttachChild(void* parent, void* child) {
-    if (!parent || !child)
-        return;
+void hsmState_AttachChild(hsmStateBase* parent, hsmStateBase* child) {
+    ::hsmState* p = static_cast<::hsmState*>(parent);
+    ::hsmState* c = static_cast<::hsmState*>(child);
 
-    // Set child's parent pointer (offset +0x08)
-    uint8_t* childPtr = static_cast<uint8_t*>(child);
-    *reinterpret_cast<void**>(childPtr + 0x08) = parent;
-
-    // Set parent's child pointer (offset +0x0C)
-    uint8_t* parentPtr = static_cast<uint8_t*>(parent);
-    *reinterpret_cast<void**>(parentPtr + 0x0C) = child;
+    c->m_pManager = p->m_field_10;
+    c->m_field_10 = p->m_field_10;
+    c->m_field_14 = p->m_field_14;
+    c->OnEnter();  // slot 5
+    c->m_pParentState = p;
 }
 }  // namespace rage
