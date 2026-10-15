@@ -33,6 +33,13 @@ struct snLinkedList;
 struct hsmEventNode;
 struct hsmContext;
 struct hsmStateBase;
+struct snSessionData;
+struct snListNode;
+namespace snSession_States {
+void snSession_InsertConnectionNode(snSessionData* session, snListNode* node);   // snSessionStates.cpp
+void snSession_RemoveConnectionNode(snSessionData* session, snListNode* node);
+}  // namespace snSession_States
+void atSingleton_8068_h(void* obj);                                  // rage_core_utils.cpp
 }  // namespace rage
 
 void audSystem_Configure(void* self, void* config);                  // rage_audio.cpp
@@ -52,6 +59,15 @@ void RegisterSerializedField(void* obj, const void* fieldKey, void* fieldPtr, co
 void msgMsgSink_03B8_g(void* self, uint32_t index);                  // msg_msg_sink.cpp
 void* msgMsgSink_8D10_g(void* self, uint32_t slotIndex);
 void jumptable_3A48(void* slot, unsigned int kind, unsigned int channel, unsigned int payload);  // hsm.cpp
+void phBoundGeometry_Constructor(void* self);                        // ph_physics.cpp
+void phBoundSphere_Constructor(void* self);
+void phBoundOctree_Constructor(void* self);
+void phBoundOTGrid_Constructor(void* self);
+void phBoundRibbon_Constructor(void* self);
+void phBoundComposite_Constructor(void* self);
+void ph_CleanupCompositePhInst(void* obj);
+void pongNetMessageHolder_DestroyHitMessagePool(void* self);         // pong_network_classes.cpp
+void pongNetMessageHolder_vfn_2_FD70(void* self);
 
 namespace c_linkage {
 extern "C" {
@@ -70,6 +86,7 @@ void* rage_AllocInternal(uint32_t size, uint32_t flags);             // heap.c
 void rage_free(void* ptr);                                           // heap.c
 void util_PackColorRGBA(uint32_t* out, const float* rgba);           // rage_core_utils.cpp
 void* xam_singleton_init_8D60(void* arg);                            // xam_shims.c
+void grmShaderGroup_ArrayDtor64(void* arrayBase, int mode);          // rage_engine_dtors.cpp
 }
 }  // namespace c_linkage
 
@@ -110,6 +127,21 @@ void atSingleton_DCE8_gen(void* data, int) { ::atSingleton_DCE8_gen(data); }
 // char_view.cpp, pong_network.cpp and rage_par.cpp declare it C (u32 size);
 // rage_core_utils.cpp defines it C++.
 void* rage_Alloc(uint32_t size) { return ::rage_Alloc(static_cast<unsigned int>(size)); }
+
+// ph_physics.cpp declares the phBound constructors by their map names
+// (0x82290F78, 0x822954C8, 0x822971A8, 0x8229B4E0, 0x8229D8D0, 0x8228DE80)
+// extern "C" and defines them under readable names with C++ linkage. The
+// sphere's radius argument isn't read (0x822954C8 never touches f1).
+void ph_0F78(void* self) { ::phBoundGeometry_Constructor(self); }
+void ph_54C8(void* self, float) { ::phBoundSphere_Constructor(self); }
+void ph_71A8(void* self) { ::phBoundOctree_Constructor(self); }
+void ph_B4E0(void* self) { ::phBoundOTGrid_Constructor(self); }
+void ph_D8D0(void* self) { ::phBoundRibbon_Constructor(self); }
+void ph_DE80(void* self) { ::phBoundComposite_Constructor(self); }
+
+// 0x820EEA18: pong_network.cpp calls it rage_EA18; rage_engine_dtors.cpp
+// defines it as grmShaderGroup_ArrayDtor64.
+void rage_EA18(void* arrayBase, int mode) { c_linkage::grmShaderGroup_ArrayDtor64(arrayBase, mode); }
 
 // ── Address-suffixed names for functions the port defines under another ─────
 
@@ -177,6 +209,46 @@ void util_PackColorRGBA(uint32_t* out, const float* rgba) { c_linkage::util_Pack
 
 // pong_network.cpp (C++, one spelling of two) vs xam_shims.c (C).
 void* xam_singleton_init_8D60(void* arg) { return c_linkage::xam_singleton_init_8D60(arg); }
+
+// pong_states.cpp calls 0x820C0038 rage_AssertMainThread (C++);
+// rage_core_utils.cpp's C rage_AssertMainThread is an empty placeholder,
+// entry.c's sysMemAllocator_InitMainThread is the function.
+void rage_AssertMainThread() { c_linkage::sysMemAllocator_InitMainThread(); }
+
+// msg_msg_sink.cpp calls 0x820C01B8 (the tagged allocation XMemFree's
+// counterpart) rage_01B8 and rage_01B8_alloc; heap.c defines it as
+// rage_AllocInternal.
+void* rage_01B8(uint32_t size, uint32_t attributes) { return c_linkage::rage_AllocInternal(size, attributes); }
+void* rage_01B8_alloc(uint32_t size, uint32_t attributes) { return c_linkage::rage_AllocInternal(size, attributes); }
+
+// ── Map names for C++ functions defined under another name ──────────────────
+
+// 0x8246FC68: ph_physics.cpp declares ph_FC68_h and defines
+// ph_CleanupCompositePhInst.
+void ph_FC68_h(void* obj) { ph_CleanupCompositePhInst(obj); }
+
+// 0x823C0928 and 0x823BFD70: pong_network.cpp calls them by map name with a
+// typed holder; pong_network_classes.cpp defines them with void*.
+struct pongNetMessageHolder;
+void pongNetMessageHolder_vfn_2_0928_1(pongNetMessageHolder* holder) { pongNetMessageHolder_DestroyHitMessagePool(holder); }
+void pongNetMessageHolder_vfn_2_FD70_1(pongNetMessageHolder* holder) { pongNetMessageHolder_vfn_2_FD70(holder); }
+
+// 0x823EDD10 and 0x823EDDB8: pong_network_io.cpp calls them by map name;
+// snSessionStates.cpp defines them in rage::snSession_States.
+void snSession_DD10_w(void* session, void* node) {
+    rage::snSession_States::snSession_InsertConnectionNode(static_cast<rage::snSessionData*>(session),
+                                                           static_cast<rage::snListNode*>(node));
+}
+void snSession_DDB8_w(void* session, void* node) {
+    rage::snSession_States::snSession_RemoveConnectionNode(static_cast<rage::snSessionData*>(session),
+                                                           static_cast<rage::snListNode*>(node));
+}
+
+// 0x82408068: swf.cpp calls it swfPlaceObject2ClipEvent_Cleanup in namespace
+// rage; rage_core_utils.cpp defines it as rage::atSingleton_8068_h.
+namespace rage {
+void swfPlaceObject2ClipEvent_Cleanup(void* obj) { atSingleton_8068_h(obj); }
+}  // namespace rage
 
 // ── C++ spellings that differ in namespace or parameter types ───────────────
 
