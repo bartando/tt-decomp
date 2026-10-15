@@ -172,8 +172,20 @@ slot 1..25 one off; header fixed, drill subclasses other than Movement not re-ve
 - 0x8271A2F8 +0x10/+0x14 are two `gdBallPredictData*`, swapped per shot by 0x82282A50.
 - 0x821CD0F8 (`util_D0F8`) records a replay ball sample into a 900-entry ring; 0x8225FFF8
   invokes a 16-byte functor.
-- 0x82288368 `phBoundCapsule_8368_g` is the ball predictor's step and 0x822832D0
-  `phBoundCapsule_32D0_g` its flight model (`ComputeAccel` in `ball_predict.cpp`).
+- Symbol-map misnames around the ball: `phBoundCapsule_32D0_g`/`30E0_w` are the ball's flight
+  acceleration and bounce (`ball_flight.cpp`); `phBoundCapsule_8368_g` (0x82288368) is the
+  predictor's step; `pongBallInstance_1FA0`/`2B08`/`2E18` are phSimulator collision broadphase;
+  `pongBallInstance_4E10`/`51B8`/`5400` sit inside RAGE's contact solver;
+  `fiAsciiTokenizer_2628_g` (0x82432628) is CRT math, probably `tan`.
+- `pong_ball.cpp` `ProcessCollisionAndActivate` (0x8227FA48) is fabricated: the real function
+  classifies the impact (0x82280070), posts messages and plays audio, and never touches
+  velocity. The `pongBallInstance` fields at +0x42A0 and up are reads of the impact object.
+- `pong_player.cpp` `pongShotRecord` is `pongBallHitData`: +0x8C Elasticity,
+  +0x90 ExtraCornerBounceAngle, +0x94 Gravity, +0x9C SwingType, +0x40 SpinAxis,
+  +0xA0/+0xB0 ServeHitVel/ServeHitAngVel.
+- `phArchetypePhys`: +0x1C mass, +0x20 inverse mass, +0x24 gravity factor (slot 12 gets it,
+  slot 15 sets it). `phCollider` slot 22 applies gravity, slot 23 damps motion, slot 32
+  applies force (+0x120).
 - `pong_match.cpp` calls an undefined `BallPredictData_Reset`; it's `gdBallPredictData::Reset`
   (0x821D7750, lifted in `ball_predict.cpp`).
 
@@ -181,7 +193,8 @@ slot 1..25 one off; header fixed, drill subclasses other than Movement not re-ve
 ## The recomp is not ground truth
 
 `recomp/structured_pass5_final` has codegen bugs (dropped `li`, reordered checks, wrong
-register tested, no stack frames). Trust `disasm/sections/.text.s` when they disagree; see
+register tested, no stack frames; it drops the `cmpwi r11,10; bne` at 0x822833C4, which
+makes the ball's 0.011 drag look like it applies to every swing type but 8 and 9). Trust `disasm/sections/.text.s` when they disagree; see
 `tools/lift-check/tristrip-poc/README.md`. Except for VMX128: `.text.s` mangles it
 (`lvx128 v10,r0,r8` at 0x82193514 reads `vmaddfp128 v10, v0, v8, v3`), and the recomp's
 comments name those instructions right.
