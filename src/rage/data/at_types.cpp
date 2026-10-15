@@ -26,6 +26,7 @@
  */
 
 #include <cstdint>
+#include <cstring>
 
 namespace {
 
@@ -180,6 +181,99 @@ void* datArray_Grow(void* obj, uint32_t newCapacity)
     }
     array->data = data;
     return data;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// String duplication and the 16-byte registry entries (name + three words)
+// appended through atSingletonPool_AllocEntry.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// @ 0x820C29E0
+void* rage_strDuplicate(const char* text)
+{
+    if (text == nullptr) {
+        return nullptr;
+    }
+    uint32_t size = 0;
+    while (text[size] != '\0') {
+        ++size;
+    }
+    ++size;
+    void* copy = xe_EC88(size);
+    return memcpy(copy, text, size);
+}
+
+extern "C" void* rage_strDuplicate_c(const char* text) __asm__("_rage_strDuplicate");
+extern "C" void* rage_strDuplicate_c(const char* text) { return rage_strDuplicate(text); }
+
+struct atRegistryEntry {
+    char* name;
+    uint32_t value4;
+    uint32_t value8;
+    uint32_t valueC;
+};
+
+struct atRegistryPool {
+    atRegistryEntry* data;
+    uint16_t count;
+    uint16_t capacity;
+};
+
+// @ 0x82618550
+extern atRegistryPool g_atRegistryPool;
+
+// delete[] for atRegistryEntry (the original inlines rage_free for each name).
+// @ 0x821A9370
+void* atRegistryEntry_DeleteArray(atRegistryEntry* entries)
+{
+    uint32_t* block = reinterpret_cast<uint32_t*>(entries) - 1;
+    for (int32_t i = static_cast<int32_t>(*block) - 1; i >= 0; --i) {
+        if (entries[i].name != nullptr) {
+            rage_free(entries[i].name);
+        }
+    }
+    rage_free(block);
+    return block;
+}
+
+// Appends a slot to the global registry, growing it by 16. Callers pass an
+// argument the original never reads.
+// @ 0x821A91E0
+void* atSingletonPool_AllocEntry(uint32_t /*unused*/)
+{
+    atRegistryPool& pool = g_atRegistryPool;
+    if (pool.count == pool.capacity) {
+        const uint16_t capacity = static_cast<uint16_t>(pool.capacity + 16);
+        pool.capacity = capacity;
+        atRegistryEntry* fresh = nullptr;
+        uint32_t* block = static_cast<uint32_t*>(xe_EC88(capacity * 16u + 4));
+        if (block != nullptr) {
+            block[0] = capacity;
+            fresh = reinterpret_cast<atRegistryEntry*>(block + 1);
+            for (uint32_t i = 0; i < capacity; ++i) {
+                fresh[i].name = nullptr;
+            }
+        }
+        for (uint16_t i = 0; i < pool.count; ++i) {
+            atRegistryEntry& src = pool.data[i];
+            atRegistryEntry& dst = fresh[i];
+            char* name = static_cast<char*>(rage_strDuplicate(src.name));
+            if (dst.name != nullptr) {
+                rage_free(dst.name);
+            }
+            dst.name = name;
+            dst.value4 = src.value4;
+            dst.value8 = src.value8;
+            dst.valueC = src.valueC;
+        }
+        if (pool.data != nullptr) {
+            atRegistryEntry_DeleteArray(pool.data);
+        }
+        pool.data = fresh;
+    }
+    const uint16_t index = pool.count;
+    pool.count = static_cast<uint16_t>(index + 1);
+    return &pool.data[index];
 }
 
 // All symbols below use C linkage — C source files (src/rage/core/app_init.c,
