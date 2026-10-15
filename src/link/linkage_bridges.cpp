@@ -68,6 +68,8 @@ void sysMemAllocator_InitMainThread(void);                           // entry.c
 int rage_main_stub(void* startupParams, void* base);                 // main.c
 void* rage_AllocInternal(uint32_t size, uint32_t flags);             // heap.c
 void rage_free(void* ptr);                                           // heap.c
+void util_PackColorRGBA(uint32_t* out, const float* rgba);           // rage_core_utils.cpp
+void* xam_singleton_init_8D60(void* arg);                            // xam_shims.c
 }
 }  // namespace c_linkage
 
@@ -169,6 +171,12 @@ int rage_main_stub(void* startupParams, void* base) { return c_linkage::rage_mai
 
 // msg_msg_sink.cpp (C++) vs heap.c (C).
 void* rage_AllocInternal(uint32_t size, uint32_t allocatorId) { return c_linkage::rage_AllocInternal(size, allocatorId); }
+
+// pong_render.cpp (C++) vs rage_core_utils.cpp (extern "C").
+void util_PackColorRGBA(uint32_t* out, const float* rgba) { c_linkage::util_PackColorRGBA(out, rgba); }
+
+// pong_network.cpp (C++, one spelling of two) vs xam_shims.c (C).
+void* xam_singleton_init_8D60(void* arg) { return c_linkage::xam_singleton_init_8D60(arg); }
 
 // ── C++ spellings that differ in namespace or parameter types ───────────────
 
