@@ -78,3 +78,15 @@ struct gdBallPredictData {
 static_assert(__builtin_offsetof(gdBallPredictData, m_head) == 0x25A0, "gdBallPredictData layout");
 static_assert(__builtin_offsetof(gdBallPredictData, m_onPop) == 0x27E8, "gdBallPredictData layout");
 #endif
+
+// Per-player shot tuning (0x1A0 bytes each, two at 0x8261A3D0); only the field the
+// flight model reads is named.
+struct bpShotParams {
+    uint8_t _pad00[0xCC];
+    int32_t spinType;     // +0xCC  10 drags harder (0.011 instead of 0.010)
+};
+
+namespace ballPredict {
+// Acceleration of a ball moving at vel with spin angVel: Magnus + drag + gravity.
+void ComputeAccel(bpVec4* out, const bpShotParams* params, const bpVec4* vel, const bpVec4* angVel);
+}
