@@ -674,8 +674,8 @@ bool pongCameraMgr::QueryC_13() { return pongCameraMgr_QueryC(this, 13); }  // 7
  * other flag bytes. Used for player-dependent camera flags.
  */
 extern uint8_t g_cameraSelector;  // @ SDA+25804
-extern uint8_t g_cameraFlagA;     // @ SDA+25805
-extern uint8_t g_cameraFlagB;     // @ SDA+25806
+extern uint8_t g_cameraFlagA;     // @ 0x826064CD (SDA+25805)
+extern uint8_t g_cameraFlagB;     // @ 0x826064CE (SDA+25806)
 
 bool pongCameraMgr::GetConditionalFlagA() {  // 3700 @ 0x821F3700
     return g_cameraSelector != 0 ? g_cameraFlagB : g_cameraFlagA;

@@ -2130,58 +2130,37 @@ void pongNetMessageHolder::CleanupNestedArrays()
 //
 // Original symbol: pongNetMessageHolder_4350_wrh
 //
-// Removes an element from the holder's pointer array by comparing against
-// the provided pointer value. When found, frees the element's internal
-// buffers (at offsets +8 and +16), frees the element itself, then compacts
-// the array by shifting remaining elements down.
-//
-// Parameters:
-//   targetPtr - Pointer to the element to remove
-//
-// This is used to remove message handlers from the active handler list.
+// Really the triangle stripifier's strip-list erase (TriStripList::Erase in
+// cm_operators.cpp): `this` is the list {items, count}, and `targetPtr` is
+// the address of a slot in it, not a strip. The asm compares slot addresses.
+// The matching slot's strip (if any) has its arrays at +8 and +0x10 freed,
+// then itself; the count drops and the later slots move down one.
 // ===========================================================================
 void pongNetMessageHolder::RemoveElementByPointer(void* targetPtr)
 {
-    uint32_t elementCount = *(uint32_t*)((uint8_t*)this + 4);
-    if (elementCount == 0) {
+    uint32_t* count = reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(this) + 4);
+    void***   items = reinterpret_cast<void***>(this);
+
+    uint32_t index = 0;
+    if (*count == 0) {
         return;
     }
-    
-    void** arrayBase = *(void***)this;
-    
-    // Search for the target pointer in the array
-    uint32_t foundIndex = 0;
-    void** currentSlot = arrayBase;
-    
-    for (foundIndex = 0; foundIndex < elementCount; foundIndex++) {
-        if (*currentSlot == targetPtr) {
-            // Found the target - free its internal buffers
-            void* element = *currentSlot;
-            if (element != nullptr) {
-                // Free buffer at offset +8
-                void* buffer1 = *(void**)((uint8_t*)element + 8);
-                sysMemAllocator_Free(buffer1);
-                
-                // Free buffer at offset +16
-                void* buffer2 = *(void**)((uint8_t*)element + 16);
-                sysMemAllocator_Free(buffer2);
-                
-                // Free the element itself
-                sysMemAllocator_Free(element);
-            }
-            
-            // Decrement count
-            elementCount--;
-            *(uint32_t*)((uint8_t*)this + 4) = elementCount;
-            
-            // Compact the array by shifting remaining elements down
-            for (uint32_t i = foundIndex; i < elementCount; i++) {
-                arrayBase[i] = arrayBase[i + 1];
-            }
-            
+    for (void** slot = *items; slot != targetPtr; ++slot) {
+        if (++index >= *count) {
             return;
         }
-        currentSlot++;
+    }
+
+    void* strip = (*items)[index];
+    if (strip != nullptr) {
+        sysMemAllocator_Free(*reinterpret_cast<void**>(static_cast<uint8_t*>(strip) + 8));
+        sysMemAllocator_Free(*reinterpret_cast<void**>(static_cast<uint8_t*>(strip) + 16));
+        sysMemAllocator_Free(strip);
+    }
+
+    *count -= 1;
+    for (; index < *count; ++index) {
+        (*items)[index] = (*items)[index + 1];
     }
 }
 
