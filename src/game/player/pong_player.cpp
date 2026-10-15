@@ -2708,30 +2708,25 @@ void pongPlayer::ComputePositionWithOffset() {  // pongPlayer_6308_g @ 0x821D630
 }
 
 
+// 0x821E0270 maps a button id through a pad record's flags.
+extern int pongPad_RemapButton(void* pad, int32_t button);  // @ 0x821E0270
+
 // ===========================================================================
-// SECTION 33 — CheckHandednessDifference  @ 0x821E04B0 | size: 0x54 (84 bytes)
+// SECTION 33 — pongPlayer_04B0_g  @ 0x821E04B0 | size: 0x54 (84 bytes)
 // ===========================================================================
 /**
- * pongPlayer::CheckHandednessDifference()
+ * pongPlayer_04B0_g(pad, button)  (was pongPlayer::CheckHandednessDifference)
  *
- * Calls pongPlayer_GetInputStepIndex to get an index, uses it to look up a 4-byte
- * entry in the table at this+796.  XORs byte[0] with byte[3] of that entry;
- * if the XOR result > 127, returns true (significant difference), else false.
+ * A pad-record function, not pongPlayer's: it takes the pad in r3 and a
+ * button id in r4, which 0x821E0270 remaps through the pad's flags at
+ * +0x04..+0x07. The result indexes the 4-byte entries at pad+0x31C; true when
+ * bit 7 differs between bytes 0 and 3 of that entry.
  */
-extern int pongPlayer_GetInputStepIndex(pongPlayer* p);
-
-bool pongPlayer::CheckHandednessDifference() {  // pongPlayer_04B0_g @ 0x821E04B0
-    int index = pongPlayer_GetInputStepIndex(this);
-
-    uint8_t* base = reinterpret_cast<uint8_t*>(this);
-    uint8_t* tableBase = *reinterpret_cast<uint8_t**>(base + 796);
-    uint8_t* entry = tableBase + (index * 4);
-
-    uint8_t byte3 = entry[3];
-    uint8_t byte0 = entry[0];
-    uint8_t diff = byte3 ^ byte0;
-
-    return diff > 127;
+bool pongPlayer_04B0_g(void* pad, int32_t button) {
+    int index = pongPad_RemapButton(pad, button);
+    const uint8_t* entries = *reinterpret_cast<uint8_t* const*>(static_cast<uint8_t*>(pad) + 0x31C);
+    const uint8_t* entry = entries + index * 4;
+    return static_cast<uint8_t>(entry[3] ^ entry[0]) > 127;
 }
 
 
@@ -6700,8 +6695,7 @@ static void* PlayerPad(int32_t playerIndex) {
 }
 
 // @ 0x821E04B0 — true when bit 7 differs between bytes 0 and 3 of the button's
-// entry in the pad record. The lift above as pongPlayer::CheckHandednessDifference
-// takes a pongPlayer and drops the button argument.
+// entry in the pad record (lifted in SECTION 33).
 extern bool pongPlayer_04B0_g(void* pad, int32_t button);
 // @ 0x821921D0 — 0, or the stick's direction as 1..8; going by how
 // ReadSwingDirectionInput maps it, 1 is up and they run clockwise.

@@ -344,7 +344,6 @@ struct pongPlayer {
     int GetFrameIndexDelta(void* frameData);
     void ComputePositionWithOffsets(void* inputData);
     void ComputePositionWithOffset();
-    bool CheckHandednessDifference();
     void SyncByteField(void* target, void* source);
     void SyncFloatField(void* target, void* source);
     void UpdateDirtyFlags(void* obj, uint8_t forceReset);
