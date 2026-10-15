@@ -106,14 +106,14 @@ struct grmModel {
     uint8_t     pad_04[0x08];     // +0x04
     void*       m_pGeometry;      // +0x0C  heap-allocated geometry buffer
 
-    // ── virtual methods ──
+    // ── vtable slots (not C++ virtuals: the explicit vtable member above is
+    //    the vptr, and a C++ virtual would add a hidden one in front of it) ──
     // [0] The PPC vtable slot 0 is the scalar-deleting-dtor idiom:
     //   free(m_pGeometry); *vtable = rage::datBase vtable (0x820276C4);
     //   if (r4 & 1) free(this);
     // Host C++ cannot express dtor-with-params, so the body lives in
-    // ScalarDtor(flags); the plain ~grmModel() is the no-free leg.
-    virtual ~grmModel();                            // [0] @ 0x820f0e78  size 0x6c
-    virtual void ScalarDtor(int flags);             // [0] PPC scalar-deleting-dtor body
+    // ScalarDtor(flags).
+    void ScalarDtor(int flags);                     // [0] @ 0x820f0e78  size 0x6c
 };
 
 // ── rage::grmModelFactory  [vtable @ 0x8202F5A8] ──────────────────────────
