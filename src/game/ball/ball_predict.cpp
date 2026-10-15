@@ -32,6 +32,8 @@ struct bpBallInstView {
 };
 extern "C" bpBallInstView** g_ppBallInst;           // @ 0x8271A2F4
 
+extern "C" const uint32_t g_vectorComparisonMask[4];   // @ 0x82619BE0
+
 struct bpMatchTiming {
     uint8_t _pad00[0x30];
     float   now;          // +0x30
@@ -45,6 +47,33 @@ extern "C" const bpFunctor g_defaultData16;        // @ 0x8261A0C0
 namespace {
 // *(u32*)(replay + 0x68CF0) != 0 while the replay is playing back rather than recording.
 constexpr uint32_t kReplayPlayingOffset = 0x68CF0;
+
+// vcmpeqfp. on both vectors ANDed with the comparison mask: every lane equal as floats.
+// VMX flushes denormals to zero before comparing.
+bool MaskedEqual(const bpVec4& a, const bpVec4& b) {
+    const float* pa = &a.x;
+    const float* pb = &b.x;
+    for (int i = 0; i < 4; ++i) {
+        uint32_t ua, ub;
+        __builtin_memcpy(&ua, pa + i, 4);
+        __builtin_memcpy(&ub, pb + i, 4);
+        ua &= g_vectorComparisonMask[i];
+        ub &= g_vectorComparisonMask[i];
+        if ((ua & 0x7F800000u) == 0) {
+            ua = 0;
+        }
+        if ((ub & 0x7F800000u) == 0) {
+            ub = 0;
+        }
+        float fa, fb;
+        __builtin_memcpy(&fa, &ua, 4);
+        __builtin_memcpy(&fb, &ub, 4);
+        if (!(fa == fb)) {
+            return false;
+        }
+    }
+    return true;
+}
 
 float Dist2(const bpVec4& a, const bpVec4& b) {
     float dx = a.x - b.x;
@@ -263,6 +292,43 @@ void ComputeAccel(bpVec4* out, const bpShotParams* params, const bpVec4* vel, co
     a.z += 0.0f * g;
     a.w += 0.0f * g;
     *out = a;
+}
+
+
+// @ 0x821D4F80
+bool VecPairEqual(const bpVec4* a, const bpVec4* b) {
+    return MaskedEqual(a[0], b[0]) && MaskedEqual(a[1], b[1]);
+}
+
+// @ 0x821D5290
+bool ShotEqual(const bpShot* a, const bpShot* b) {
+    for (int i = 0; i < 3; ++i) {
+        if (b->f00[i] != a->f00[i]) {
+            return false;
+        }
+    }
+    if (!MaskedEqual(a->v10, b->v10) || b->i20 != a->i20) {
+        return false;
+    }
+    if (!VecPairEqual(b->v30, a->v30)) {
+        return false;
+    }
+    if (!MaskedEqual(a->v50, b->v50) || !MaskedEqual(a->v60, b->v60)) {
+        return false;
+    }
+    for (int i = 0; i < 6; ++i) {
+        if (b->f70[i] != a->f70[i]) {
+            return false;
+        }
+    }
+    if (b->i88 != a->i88 || b->i8C != a->i8C) {
+        return false;
+    }
+    if (!MaskedEqual(a->v90, b->v90) || !MaskedEqual(a->vA0, b->vA0)) {
+        return false;
+    }
+    return b->hB0 == a->hB0 && b->hB2 == a->hB2 && b->bB4 == a->bB4 &&
+           ((b->hB6 ^ a->hB6) & 0xF000) == 0;
 }
 
 }  // namespace ballPredict

@@ -90,3 +90,32 @@ namespace ballPredict {
 // Acceleration of a ball moving at vel with spin angVel: Magnus + drag + gravity.
 void ComputeAccel(bpVec4* out, const bpShotParams* params, const bpVec4* vel, const bpVec4* angVel);
 }
+
+// The shot a prediction was made for (0xB8 bytes); kept at gdBallPredictData+0x2630
+// and compared to decide whether a new hit needs a new prediction. Field meanings
+// aren't known yet.
+struct bpShot {
+    float    f00[3];      // +0x00
+    uint32_t _pad0C;
+    bpVec4   v10;         // +0x10
+    int32_t  i20;         // +0x20
+    uint32_t _pad24[3];
+    bpVec4   v30[2];      // +0x30  compared as a pair (0x821D4F80)
+    bpVec4   v50;         // +0x50
+    bpVec4   v60;         // +0x60
+    float    f70[6];      // +0x70
+    int32_t  i88;         // +0x88
+    int32_t  i8C;         // +0x8C
+    bpVec4   v90;         // +0x90
+    bpVec4   vA0;         // +0xA0
+    uint16_t hB0;         // +0xB0
+    uint16_t hB2;         // +0xB2
+    uint8_t  bB4;         // +0xB4
+    uint8_t  _padB5;
+    uint16_t hB6;         // +0xB6  low 11 bits: shot id (0x82282A50); top 4 compared here
+};
+
+namespace ballPredict {
+bool VecPairEqual(const bpVec4* a, const bpVec4* b);
+bool ShotEqual(const bpShot* a, const bpShot* b);
+}
