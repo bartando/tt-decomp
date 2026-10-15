@@ -406,7 +406,7 @@ extern const float g_kZero;                  // @ 0x8202D110
 extern const float g_kSwingScaleFactor;      // @ 0x8204A3B8
 extern const vec3  g_hitVectorFlip;
 extern void*       g_geomSingleton;
-extern uint32_t    g_swingInFlightFlag;      // @ lis(-32160)+25404
+extern uint8_t     g_swingInFlightFlag;      // @ 0x8260633C
 extern uint32_t    g_swingCountFlag;         // @ lis(-32160)+25408
 
 // ── Batch: NetSyncFloat record helpers (0x82199Cxx family) ─────────────

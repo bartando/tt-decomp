@@ -402,7 +402,7 @@ float g_hitVectorFlip = 1.0f;
 // ============================================================================
 
 uint32_t g_swingCountFlag = 0;
-uint32_t g_swingInFlightFlag = 0;
+uint8_t g_swingInFlightFlag = 0;  // @ 0x8260633C  the asm only does lbz/stb
 float g_swingPhaseThreshold = 0.0f;
 const char** g_shotTypeNames = NULL;
 const char* g_szServeStartedTypeName = "ServeStarted";

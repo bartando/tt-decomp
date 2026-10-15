@@ -1306,9 +1306,8 @@ void pongPlayerState::CancelSwing()
         timing->m_peakTime = kZero;
         timing->m_field18 = kOne;
         timing->m_currentTime = kOne;
-        // globals.c declares both as uint32_t; the asm stores one byte to
-        // 0x8260633C (0x8260633D.. are separate labels) and a word to 0x82606340.
-        *reinterpret_cast<uint8_t*>(&g_swingInFlightFlag) = 0;
+        // The asm stores a byte to 0x8260633C and a word to 0x82606340.
+        g_swingInFlightFlag = 0;
         timing->m_vel0 = kZero;
         timing->m_vel1 = kZero;
         timing->m_vel2 = kZero;
