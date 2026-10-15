@@ -66,6 +66,7 @@ class Options:
     verbose: bool = False
     quiet: bool = False
     workdir: Path | None = None
+    fp_contract: str | None = None
 
 
 class Checker:
@@ -86,7 +87,9 @@ class Checker:
         workdir = opts.workdir or (Path(__file__).resolve().parent.parent / "build")
         self.lift = build_lift(self.repo, self.syms, source, self.spec.FUNCTION, orig_addr=self.addr,
                                workdir=workdir, opt=opts.opt, patches=tuple(opts.patches),
-                               externs_override=getattr(self.spec, "EXTERNS", None))
+                               externs_override=getattr(self.spec, "EXTERNS", None),
+                               fp_contract=opts.fp_contract or getattr(self.spec, "FP_CONTRACT", "on"),
+                               tag=self.name)
         rng = self.syms.func_range(self.addr)
         if rng is None:
             raise SystemExit(f"lift-check: 0x{self.addr:08X} isn't a function in the symbol map")

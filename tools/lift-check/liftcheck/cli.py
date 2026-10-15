@@ -29,6 +29,8 @@ def main(argv=None) -> int:
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--ftol", type=float, help="relative float tolerance (default: spec FTOL or 0)")
     ap.add_argument("--opt", default="-O2", help="clang optimisation level for the lift")
+    ap.add_argument("--fp-contract", choices=("on", "off", "fast"),
+                    help="fuse a*b+c into fmadd (default: spec FP_CONTRACT or on)")
     ap.add_argument("--source", help="compile this file instead of the spec's SOURCE")
     ap.add_argument("--only", type=int, metavar="N", help="run just trial N (with -v: dump both sides)")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -41,7 +43,8 @@ def main(argv=None) -> int:
     for name in args.spec:
         path = find_spec(name)
         opts = Options(trials=args.trials, seed=args.seed, ftol=args.ftol, opt=args.opt,
-                       source=args.source, verbose=args.verbose, only=args.only)
+                       source=args.source, verbose=args.verbose, only=args.only,
+                       fp_contract=args.fp_contract)
         try:
             rc = Checker(path, opts).run()
         except BuildError as e:

@@ -90,6 +90,11 @@ emulator, the example specs, and nine mutated lifts that must all fail (about 40
 - `EXTERNS`, `FTOL` (relative float tolerance, default 0), `TRIALS`, `RET` (`"r3"`, `"f1"`,
   `None`; default from the lift's return type), `EXTRA_RANGES` (more code ranges that belong
   to the original function).
+- `FP_CONTRACT = "off"` (or `--fp-contract off`): compile the lift without fusing `a*b + c`
+  into fmadd. The default, `"on"`, fuses within one expression, which is what MSVC did for
+  most of the game (5 specs fail with `off`); use `off` where the asm rounds the product
+  first (`fmuls` then `fadds`) instead of raising `FTOL`. Lifts always build with
+  `-fno-math-errno`, so `sqrtf` is an `fsqrt`, not a libm call.
 
 ## How it works
 
