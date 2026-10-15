@@ -56,6 +56,17 @@ before relying on any of these; fix and delete the entry when done.
 - `pong_player.hpp`: the `pongPlayer` layout below +0x100 is really `pongCreature`'s;
   `m_pOpponent` (+0x1C4) is the player's own creature, `m_pActionState` (+0x1F0) is an
   `aiPlayer`, +0x1C0 is the ball's physics instance.
+- `pongBallHitData::LoadProperties` (0x821D6608) uses made-up field names; the real first
+  three are `Quality`, `Force`, `HitForce`.
+- `gmBallNode::IsEventHandled` (slot 20) is really a type check; its four "ball event hash"
+  globals are invented names.
+- `fx_effects.hpp` calls fxBallSpinTex slot 1 `ScalarDtor`, but `gmBallNode::Draw` calls it
+  every frame.
+- `sg_physical.hpp`: `+0x74` is the phInst, `+0x7C` a separate draw object.
+- `gd_data.cpp` passes XML field types by value (asm: by address); 0x825CAF90 is the Int
+  handler, not an enum one.
+- `globals.c` swaps the pointer and type arrays at 0x825F3868/0x825F3968.
+- 0x825EBC54 (`boundContext` in `rage_grm.cpp`) behaves like a write counter.
 - `globals.c`: `g_msgSinkTemplate` is at 0x8261A0C0, not 0x8241A0C0.
 
 ## The recomp is not ground truth
@@ -63,6 +74,11 @@ before relying on any of these; fix and delete the entry when done.
 `recomp/structured_pass5_final` has codegen bugs (dropped `li`, reordered checks, wrong
 register tested, no stack frames). Trust `disasm/sections/.text.s` when they disagree; see
 `tools/lift-check/tristrip-poc/README.md`.
+
+## Disassembly caveat
+
+`disasm/sections/.text.s` mis-decodes some AltiVec loads as `vmaddfp128`; cross-check those
+against the recomp or the raw bytes in the game image.
 
 ## Misnamed globals (shared across files, rename together)
 
