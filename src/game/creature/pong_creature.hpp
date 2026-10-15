@@ -821,7 +821,7 @@ struct pongCreature {
     // (slot 2 subtracts 16 before deleting):
     //   [0] UpdateWithIdentity(int)          @ 0x820C6358 — slot 6 with the identity matrix
     //   [1] SavePoseSnapshot                 @ 0x820C67C0
-    //   [2] DestroyThunk                     @ 0x820C8618 — this-16, scalar delete
+    //   [2] DestroyThunk(int)                @ 0x820C8618 — this-16, scalar delete
     //   [3] Reset(...)                       @ 0x820C6840
     //   [4] phUpdateObject's                 @ 0x8227D768
     //   [5] RegisterShadowCasters(bool)      @ 0x820C60C8
@@ -832,7 +832,7 @@ struct pongCreature {
     // The declarations below don't reproduce that order.
     virtual void UpdateWithIdentity(int updateMode);               // [0] @ 0x820C6358
     virtual void SavePoseSnapshot();                               // [1] @ 0x820C67C0
-    virtual void DestroyThunk();                                   // [2] @ 0x820C8618
+    virtual void DestroyThunk(int flags);                          // [2] @ 0x820C8618
     virtual void Reset(void* world, void* scene);                  // [3] @ 0x820C6840
     virtual void RegisterShadowCasters(bool useSecondaryEmitter);  // [5] @ 0x820C60C8
     virtual void UpdateShadowAndAnimState(const float* matrix, int updateMode);  // [6] @ 0x820C6378  (TODO-body)

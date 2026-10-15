@@ -3546,19 +3546,20 @@ void pongCreature::UpdateWithIdentity(int updateMode) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// pongCreature::DestroyThunk()  [vtable 0x82027B08 slot 2 @ 0x820C8618 | size: 0x8]
+// pongCreature::DestroyThunk(int flags)
+//                                [vtable 0x82027B08 slot 2 @ 0x820C8618 | size: 0x8]
 //
 // (Previously named "vfn_2" — renamed for clarity.)
 //
-// Multiple-inheritance adjust-and-dispatch thunk. In the retail binary this is
-// 8 bytes: `addi r3,r3,-16; b 0x820C5398`. The pattern rewinds the secondary-
-// subobject `this` pointer to the primary subobject (16-byte MI offset) and
-// tail-calls the scalar-deleting destructor (pongCreature::ScalarDeletingDtor
-// @ 0x820C5398) with flags=0 left over from the caller's r4.
+// Multiple-inheritance adjust-and-dispatch thunk: `addi r3,r3,-16;
+// b 0x820C5398`. Rewinds the phUpdateObject-base `this` to the object's start
+// and tail-calls the scalar deleting destructor
+// (pongCreature::ScalarDeletingDtor @ 0x820C5398) with the caller's flags,
+// which stay in r4.
 // ─────────────────────────────────────────────────────────────────────────────
-void pongCreature::DestroyThunk() {
+void pongCreature::DestroyThunk(int flags) {
     pongCreature* primary = (pongCreature*)((char*)this - 16);
-    primary->ScalarDeletingDtor(0);
+    primary->ScalarDeletingDtor(flags);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
