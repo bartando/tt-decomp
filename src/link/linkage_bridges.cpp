@@ -67,6 +67,7 @@ void sysMemAllocator_PlatformFree(void* ptr, unsigned int flags);
 void sysMemAllocator_InitMainThread(void);                           // entry.c
 int rage_main_stub(void* startupParams, void* base);                 // main.c
 void* rage_AllocInternal(uint32_t size, uint32_t flags);             // heap.c
+void rage_free(void* ptr);                                           // heap.c
 }
 }  // namespace c_linkage
 
@@ -107,6 +108,23 @@ void atSingleton_DCE8_gen(void* data, int) { ::atSingleton_DCE8_gen(data); }
 // char_view.cpp, pong_network.cpp and rage_par.cpp declare it C (u32 size);
 // rage_core_utils.cpp defines it C++.
 void* rage_Alloc(uint32_t size) { return ::rage_Alloc(static_cast<unsigned int>(size)); }
+
+// ── Address-suffixed names for functions the port defines under another ─────
+
+// 0x820DEC88, operator new. pong_match.cpp, pong_network.cpp and
+// ph_physics.cpp call it xe_EC88; pong_network.cpp also calls it rage_Alloc
+// ("Memory allocator @ 0x820DEC88"), which the port defines.
+void* xe_EC88(uint32_t size) { return ::rage_Alloc(static_cast<unsigned int>(size)); }
+
+// 0x820C00C0. fiAsciiTokenizer.cpp, rage_grm.cpp, pong_network.cpp and
+// sysMemSimpleAllocator.cpp call it rage_free_00C0; heap.c defines it as
+// rage_free and notes the two were merged. (rage_grm.cpp declares the
+// argument uint32_t, which truncates a host pointer.)
+void rage_free_00C0(void* ptr) { c_linkage::rage_free(ptr); }
+
+// 0x820C0038 (gd_data.cpp: "sysMemAllocator_InitMainThread @ 0x820C0038").
+// pong_camera.cpp, rage_grm.cpp and atSingleton.cpp call it by its map name.
+void xe_main_thread_init_0038(void) { c_linkage::sysMemAllocator_InitMainThread(); }
 
 }  // extern "C"
 }  // namespace c_bridges
