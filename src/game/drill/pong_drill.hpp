@@ -346,40 +346,63 @@ enum pongDrillTypeIndex : int {
  * timing, and common drill state.
  */
 /**
- * pongTrainingDrillConfig
- * Configuration data loaded from XML for each training drill.
- * Fields confirmed from OnBallHit (+16/+20) and OnRallyEnd (+24/+28) scaffolds.
+ * pongTrainingDrillConfig — really gdTrainingDrillData (vtable 0x82040F8C).
+ * Field names are the XML names its field registration (0x821DE3C0) uses.
  */
 struct pongTrainingDrillConfig {
     void**   vtable;                // +0x00
     uint8_t  _pad04[12];            // +0x04..0x0F
-    uint32_t m_nMaxSuccesses;       // +0x10 (16) — total achievable successes (cap)
-    uint32_t m_nRequiredSuccesses;  // +0x14 (20) — successes required to pass drill
-    float    m_fRangeMin;           // +0x18 (24) — min value for rally-end random range
-    float    m_fRangeMax;           // +0x1C (28) — max value for rally-end random range
-    uint8_t  _pad20[12];            // +0x20..0x2B
-    int32_t  m_nScoreThreshold;     // +0x2C (44) — score threshold (negative = unlimited)
-    uint8_t  m_nDifficulty;         // +0x30 (48) — drill difficulty level
+    int32_t  m_totalNumTries;       // +0x10 (16) "TotalNumTries"
+    int32_t  m_minNumSuccesses;     // +0x14 (20) "MinNumSuccesses"
+    float    m_minBallSpeed;        // +0x18 (24) "MinBallSpeed"
+    float    m_maxBallSpeed;        // +0x1C (28) "MaxBallSpeed"
+    float    m_minBallSpin;         // +0x20 (32) "MinBallSpin"
+    float    m_maxBallSpin;         // +0x24 (36) "MaxBallSpin"
+    uint32_t m_kickPitchOffset;     // +0x28 (40) "KickPitchOffset" (type not checked)
+    int32_t  m_tableTargetSetID;    // +0x2C (44) "TableTargetSetID"
+    uint8_t  m_enableReticle;       // +0x30 (48) "EnableReticle"
     uint8_t  _pad31[3];             // +0x31..0x33
-    float    m_fTimeLimit;          // +0x34 (52) — time limit for drill
-    float    m_fMaxTime;            // +0x38 (56) — maximum allowed time
-    uint8_t  _pad3C[8];             // +0x3C..0x43
-    uint32_t m_nProgressTarget;     // +0x44 (68) — target progress value
+    float    m_aimDelay;            // +0x34 (52) "AimDelay"
+    float    m_postPointDelay;      // +0x38 (56) "PostPointDelay"
+    int32_t  m_numEasyShots;        // +0x3C (60) "NumEasyShots"
+    float    m_probSameShot;        // +0x40 (64) "ProbSameShot"
+    uint32_t m_unlockDrillName;     // +0x44 (68) "UnlockDrillName" (storage type not checked)
+    // +0x48.. unchecked
+    //
+    // virtual slot 20 (IsOfType, 0x821DE898 for gdDrillMovementData) takes a class
+    // id and says whether this object is of that class or derives from it.
+};
+
+/**
+ * gdDrillMovementData (vtable 0x82040FF4), as far as pongDrillMovement reads it.
+ * Field names from its registration at 0x821DE9C8 and the checks at 0x821DEAC8.
+ */
+struct pongDrillMovementConfig : pongTrainingDrillConfig {
+    uint8_t  _pad48[0x18];          // +0x48..0x5F
+    float    m_targetRadius;        // +0x60 "TargetRadius" (0 < r <= 0.8)
+    float    m_detectRadius;        // +0x64 "DetectRadius" (<= TargetRadius)
+    float    m_verticalOffset;      // +0x68 "VerticalOffset"
+    float    m_drillTime;           // +0x6C "DrillTime"
+    float    m_highestRankTime;     // +0x70 "HighestRankTime" (<= DrillTime)
+    float    m_urgentTime;          // +0x74 "UrgentTime" (<= DrillTime)
+    float    m_targetHitTime;       // +0x78 "TargetHitTime"
 };
 
 class pongTrainingDrill {
 public:
-    // Virtual functions
-    virtual ~pongTrainingDrill() {}                          // vfn_0
+    // Virtual functions. Slot order matches the vtable at 0x82031C3C (33 slots).
+    // No C++ destructor here: slot 0 is the scalar deleting destructor, and a
+    // virtual destructor would take two Itanium slots and shift every other one.
+    virtual void ScalarDtor(int flags);                       // vfn_0  @ 0x82111750
     virtual void SetConfig(pongTrainingDrillConfig* pConfig);  // vfn_1 @ 0x8210CDA0
     virtual void CallInit();                                  // vfn_2 @ 0x8210CDA8 — thunk to Init()
     virtual void Init();                                     // vfn_3 @ 0x8210CDB8
-    virtual void Update() {}                                 // vfn_4
-    virtual void OnStart();                                   // vfn_5  @ 0x8210CFF0
-    virtual void OnEnd(float fDelta);                         // vfn_6  @ 0x8210D098
-    virtual int  OnReset(uint8_t* pOut);                      // vfn_7  @ 0x8210D0E8
+    virtual void Start();                                    // vfn_4  @ 0x8210CDE8 — HUD set-up, posts 0x5003
+    virtual void Finish();                                   // vfn_5  @ 0x8210CFF0 — posts 0x5004, saves the rank
+    virtual void Update(float dt);                           // vfn_6  @ 0x8210D098 — per-frame tick
+    virtual bool IsFinished(bool* pPassed);                  // vfn_7  @ 0x8210D0E8
     virtual void ProcessEvent(void* pEvent) {}               // vfn_8 (Overridden by subclasses)
-    virtual void Process() {}                                // vfn_9
+    virtual void NextAttempt(int count);                     // vfn_9  @ 0x8210D128 — adds tries, refreshes the HUD
     virtual void Render(void* pEvent);                        // vfn_10 @ 0x8210D290
     virtual void OnSuccess();                                 // vfn_11 @ 0x8210D310
     virtual bool IsScoreValid();                              // vfn_12 @ 0x8210D320
@@ -392,26 +415,28 @@ public:
     virtual void vfn_19() {}
     virtual void vfn_20() {}
     virtual bool HasActiveTarget() { return false; }         // vfn_21
-    virtual bool vfn_22() { return false; }                  // vfn_22 — secondary active-state probe (byte read)
-    virtual uint32_t GetScore();                              // vfn_23 @ 0x8210CBD8
-    virtual uint8_t GetDifficulty();                          // vfn_24 @ 0x8210D370
-    virtual void SetDifficulty();                             // vfn_25 @ 0x8210D380
-    virtual void OnBallHit(int bUpdateSaveData);             // vfn_27 @ 0x8210D488
+    virtual bool IsOver() { return false; }                  // vfn_22 — pongDrillMovement: its finished byte
+    virtual uint32_t GetScore();                              // vfn_23 @ 0x8210CBD8 — returns m_rank
+    virtual uint8_t GetDifficulty();                          // vfn_24 @ 0x8210D370 — config EnableReticle
+    virtual void ApplyTargetSet();                            // vfn_25 @ 0x8210D380
+    virtual void IncreaseNumSuccesses(int increment);         // vfn_26 @ 0x8210D400
+    virtual void UpdateRank(bool saveBest);                   // vfn_27 @ 0x8210D488
     virtual void OnBallMiss() {}                             // vfn_28
     virtual void OnRallyEnd(void* pRallyEvent);              // vfn_29 @ 0x8210D660
     virtual void OnPointScored() {}                          // vfn_30
 
-    // @ 0x8210D400 | size: 0x84
-    void IncreaseNumSuccesses(int increment);
-
 protected:
+    // Inline in the original's subclasses too, so no addresses of their own.
+    void ResetCounters();                // body of Init
+    void TickTimeLimit(float dt);        // body of Update
+
     // +0x00: vtable (implicit)
-    uint32_t m_numAttempts;              // +0x04 - Total number of attempts
-    uint32_t m_numSuccesses;             // +0x08 - Number of successful attempts
-    uint32_t m_prevSuccesses;            // +0x0C - Previous success count (for change detection)
-    uint32_t m_numFailures;              // +0x10 - Number of failed attempts
-    float m_timeRemaining;               // +0x14 - Time remaining for drill
-    uint8_t m_completionFlag;            // +0x18 - Completion event flag
+    int32_t  m_numAttempts;              // +0x04 - tries started (NextAttempt adds to it)
+    int32_t  m_numSuccesses;             // +0x08 - successful tries
+    int32_t  m_prevSuccesses;            // +0x0C - m_numSuccesses when the current try began
+    int32_t  m_rank;                     // +0x10 - rank 0..5 (UpdateRank); saved per drill if better
+    float m_timeRemaining;               // +0x14 - optional time limit, -1 = none
+    uint8_t m_completionFlag;            // +0x18 - NextAttempt: miss already posted (0x5009) this try
     uint8_t m_padding19[3];              // +0x19 - Padding
     uint32_t m_targetIndex;              // +0x1C - Current target index (-1 = none)
     pongTrainingDrillConfig* m_pConfig;  // +0x20 - Pointer to drill configuration
@@ -425,29 +450,37 @@ protected:
  */
 class pongDrillMovement : public pongTrainingDrill {
 public:
+    virtual void SetConfig(pongTrainingDrillConfig* pConfig) override;  // vfn_1 @ 0x8210DAE0
     virtual void Init() override;                      // vfn_3 @ 0x8210DB48
-    virtual void Update() override {}                  // vfn_4
-    virtual void OnStart() override {}                 // vfn_5
-    virtual void Process() override {}                 // vfn_9
+    virtual void Start() override;                     // vfn_4 @ 0x8210DBA0
+    virtual void Finish() override;                    // vfn_5 @ 0x8210DC48
+    virtual void Update(float dt) override;            // vfn_6 @ 0x8210DC78
+    virtual bool IsFinished(bool* pPassed) override;   // vfn_7 @ 0x8210DE88
+    virtual void NextAttempt(int count) override;      // vfn_9 @ 0x8210DEC0 — places the next target
     virtual const char* GetConfigName() override;      // vfn_18 @ 0x8210CBE0 — "Movement"
-    virtual bool vfn_22() override;                    // vfn_22 thunk @ 0x8210CBF0 — m_movementFlag
+    virtual bool IsOver() override;                    // vfn_22 @ 0x8210CBF0 — m_finished
+    virtual void UpdateRank(bool saveBest) override;   // vfn_27 @ 0x8210E208
+
+    void UpdateTimeDisplay();                          // @ 0x8210E378
 
 private:
-    enum MovementState {
-        MOVEMENT_STATE_0 = 0,
-        MOVEMENT_STATE_1 = 1,
-        MOVEMENT_STATE_2 = 2,
-        MOVEMENT_STATE_3 = 3,
-        MOVEMENT_STATE_4 = 4
+    // Where NextAttempt put the target, relative to the player.
+    enum TargetSide {
+        TARGET_NONE    = 0,
+        TARGET_NEAR_Z  = 1,  // along the min-z edge
+        TARGET_FAR_Z   = 2,  // along the max-z edge
+        TARGET_LOW_X   = 3,  // between the min-x edge and the player
+        TARGET_HIGH_X  = 4   // between the player and the max-x edge
     };
 
-    uint8_t m_movementFlag;              // +0x24 - Movement state flag
-    uint8_t m_padding25[3];              // +0x25 - Padding
-    float m_targetDistance;              // +0x28 - Distance to target position
-    float m_moveTimer;                   // +0x2C - Movement timer (counts down)
-    MovementState m_movementState;       // +0x30 - Current movement state (0-4)
-    uint8_t m_isComplete;                // +0x34 - Drill completion flag
-    uint8_t m_padding35[3];              // +0x35 - Padding
+    bool     m_finished;                     // +0x24 - time ran out or every try was used
+    uint8_t  m_padding25[3];                 // +0x25
+    float    m_timeLeft;                     // +0x28 - counts down from DrillTime
+    float    m_hitHoldTimer;                 // +0x2C - TargetHitTime after a hit, then the next try
+    int32_t  m_targetSide;                   // +0x30 - TargetSide of the current target
+    bool     m_urgentShown;                  // +0x34 - HUD "time_low" already raised
+    uint8_t  m_padding35[3];                 // +0x35
+    pongDrillMovementConfig* m_pMovementData;  // +0x38 - m_pConfig, when it is a gdDrillMovementData
 };
 
 /**
@@ -459,8 +492,6 @@ private:
 class pongDrillServeMeter : public pongTrainingDrill {
 public:
     virtual void Init() override {}
-    virtual void Update() override {}
-    virtual void Process() override {}
     virtual const char* GetConfigName() override;      // vfn_18 @ 0x8210CBF8 — "Serve Meter"
     virtual bool HasActiveTarget() override;           // vfn_21 @ 0x8210CC20 — m_meterTargetIdx (+48) >= 1
 
@@ -479,8 +510,6 @@ private:
 class pongDrillServing : public pongTrainingDrill {
 public:
     virtual void Init() override {}
-    virtual void Update() override {}
-    virtual void Process() override {}
     virtual const char* GetConfigName() override;      // vfn_18 @ 0x8210CC10 — "Serve Aim"
 };
 
@@ -493,8 +522,6 @@ public:
 class pongDrillReturn : public pongTrainingDrill {
 public:
     virtual void Init() override {}
-    virtual void Update() override {}
-    virtual void Process() override {}
     virtual const char* GetConfigName() override;      // vfn_18 @ 0x8210CC48 — "Return"
     virtual bool HasActiveTarget() override;           // vfn_21 alias @ 0x8210CD80 — m_returnTargetIdx (+36) >= 0
 
@@ -512,8 +539,6 @@ private:
 class pongDrillPlacement : public pongTrainingDrill {
 public:
     virtual void Init() override {}
-    virtual void Update() override {}
-    virtual void Process() override {}
     virtual const char* GetConfigName() override;      // vfn_18 @ 0x8210CC60 — "Placement"
 };
 
@@ -527,8 +552,6 @@ class pongDrillSoftShot : public pongTrainingDrill {
 public:
     virtual void SetConfig(pongTrainingDrillConfig* pConfig) override;  // vfn_1 @ 0x8210EDA0
     virtual void Init() override {}
-    virtual void Update() override {}
-    virtual void Process() override {}
     virtual const char* GetConfigName() override;       // vfn_18 @ 0x8210CC78 — "Soft Shot"
     virtual bool HasActiveTarget() override;            // vfn_21 @ 0x8210CC88 — m_softShotTargetIdx (+52) >= 0
 
@@ -549,8 +572,6 @@ private:
 class pongDrillCharging : public pongTrainingDrill {
 public:
     virtual void Init() override {}
-    virtual void Update() override {}
-    virtual void Process() override {}
     virtual const char* GetConfigName() override;       // vfn_18 @ 0x8210CCB0 — "Charging"
     virtual bool HasActiveTarget() override;            // vfn_21 @ 0x8210CCC0 — m_chargingTargetIdx (+56) >= 0
 
@@ -573,7 +594,7 @@ public:
     virtual bool HasActiveTarget() override;         // vfn_21 @ 0x8210CD10 — m_spinTargetIdx (+40) >= 0
 
     virtual void Init() override {}      // vfn_3 @ 0x821101E0
-    virtual void Process() override {}   // vfn_8 @ 0x82110218
+    // vfn_8 (0x82110218) and vfn_9 (0x82110530): not lifted
 
 private:
     // Base class ends at +36 (0x24); target field sits at +40 (0x28).
@@ -593,8 +614,6 @@ public:
     virtual const char* GetConfigName() override;    // vfn_18 @ 0x8210CD00 — "Focus Shot"
 
     virtual void Init() override {}
-    virtual void Update() override {}
-    virtual void Process() override {}
 };
 
 /**
@@ -610,8 +629,6 @@ public:
     virtual bool HasActiveTarget() override;         // vfn_21 @ 0x8210CD48 — m_counterSpinTargetIdx (+72) >= 0
 
     virtual void Init() override {}
-    virtual void Update() override {}
-    virtual void Process() override {}
 
 private:
     // Base class ends at +36 (0x24); target field sits at +72 (0x48).
@@ -633,8 +650,6 @@ public:
     virtual const char* GetConfigName() override;                       // vfn_18 @ 0x8210CD70
 
     virtual void Init() override {}
-    virtual void Update() override {}
-    virtual void Process() override {}
 
     void ChooseRobotTarget(); // 0x82111A98
 

@@ -9,26 +9,28 @@
 #include "globals.h"
 #include "game/pong_strings.hpp"
 #include <stdio.h>
+#include <string.h>
 #include <math.h>
 
 // External function declarations
 extern "C" {
-    void ProcessPageGroupInput(int param1, int param2, const char* param3, int param4);
     void NotifyUIEvent(int eventId, int flags, int param3, int param4);  // pg_E6E0 @ 0x8225E6E0
     void SetTrainingState(void* pStateMachine, int nState);             // atSingleton_E9F8_w @ 0x821EE9F8
-    void rage_debugLog(const char* message);
+    void rage_debugLog(const char* message);  // @ 0x8240E6D0 (empty in this build)
     void xmlNodeStruct_vfn_2(void* self);  // @ base class PostLoadProperties
 }
 
-// External globals
-extern struct SinglesNetworkClient* g_singles_network_client;  // @ 0x82036614
-extern void  ComputeNetworkHash(void* networkClient, int numSuccesses);
-
 // Game state globals
-extern struct pongGameState* g_pGameState;   // @ SDA+25648 (0x82606430) — player/game state manager
+extern struct pongGameState* g_pGameState;   // @ 0x82606430 (SDA+25648) — player/game state manager
 extern void*      g_pTrainingStateMachine;   // @ 0x8271A34C — training HSM singleton
-extern struct pongTrainingDrill* g_pTrainingData;  // @ 0x8271A31C — training drill data manager
-extern uint32_t*  g_pDrillSaveData;          // @ 0x8271A35C — drill high-score save array
+// The object behind 0x8271A31C, as far as the drills read it: the save data
+// keeps 12 words per drill set, and +0x04 picks the set.
+struct pongTrainingProgress {
+    uint32_t _unk00;
+    int32_t  m_drillSetIndex;  // +0x04
+};
+extern pongTrainingProgress* g_pTrainingData;  // @ 0x8271A31C
+extern int32_t*   g_pDrillSaveData;          // @ 0x8271A35C — best rank per drill, 12 words per set
 
 // PRNG state (Multiply-With-Carry LCG)
 extern uint32_t   g_prngState[2];            // @ 0x825CA2C8 — [0]=seed, [1]=carry
@@ -37,32 +39,143 @@ extern float      g_fPrngNormalize;          // @ 0x82079E68 — 1.0f / 2^23, sc
 // Drill score scaling constant
 extern float      g_fDrillScoreScale;        // @ 0x8202C504 — multiplier for bonus score computation
 
-/**
- * pongTrainingDrill::Init
- * @ 0x8210CDB8 | size: 0x30
- * 
- * Initializes/resets the training drill to default state.
- * Sets all counters to zero, loads default time limit, and resets target index.
- * 
- * Assembly details:
- *   - Loads float constant from 0x825C5938
- *   - Initializes 7 fields to known values
- *   - Sets target index to -1 (no target)
- */
-void pongTrainingDrill::Init() {
-    // Initialize counters and state
+// ── Objects the drills drive, as far as they touch them (their own headers
+// belong to other files) ──────────────────────────────────────────────────
+
+struct alignas(16) DrillVector4 {  // a VMX vector in the game
+    float x, y, z, w;
+};
+
+// gmPracticeTarget (pong_match.hpp), the fields the drill touches.
+struct DrillPracticeTarget {
+    uint8_t _pad00[0x14];
+    bool    m_visible;        // +0x14
+    uint8_t _pad15[2];
+    bool    m_clampToTable;   // +0x17 SetPosition keeps the target on the table while set
+    uint8_t _pad18[0x4C];
+    bool    m_spinStopped;    // +0x64 set by IsPointOnTarget on a hit
+};
+extern DrillPracticeTarget* g_pPracticeTarget;  // @ 0x826063A8
+
+// hudTrainingHUD (hud.hpp), the fields the drill touches.
+struct DrillTrainingHud {
+    uint8_t _pad00[0x98];
+    char    m_timeText[32];   // +0x98 clock text; +0xB8 is pushed as "arrow_direction"
+};
+extern DrillTrainingHud* g_pTrainingHud;  // @ 0x82606614
+
+struct DrillTransform {
+    DrillVector4 m_axes[3];
+    DrillVector4 m_position;  // +0x30
+};
+
+// The object at 0x825EAB28 (g_input_obj_ptr elsewhere). 0x821C9CD0 gives the
+// play area of one side of it; the matrix at +0x44 is the one whose position
+// the drill tests against the target and places targets around.
+struct DrillMatchView {
+    uint8_t               _pad00[0x44];
+    const DrillTransform* m_pPlayerTransform;  // +0x44
+};
+extern void* g_input_obj_ptr;  // @ 0x825EAB28
+
+// The game state at 0x82606430: each player's aiming reticle.
+struct DrillReticle {
+    uint8_t _pad00[0x18];
+    bool    m_enabled;        // +0x18 pongTrainingDrill::Start sets it from EnableReticle
+};
+struct DrillPlayerView {
+    uint8_t       _pad00[0x1840];
+    DrillReticle* m_pReticle; // +0x1840
+};
+struct DrillGameStateView {
+    uint8_t          _pad00[0x74];
+    DrillPlayerView* m_players[4];   // +0x74
+    int32_t          m_activePlayer; // +0x84
+};
+
+// Class id of gdDrillMovementData for the config's IsOfType (slot 20).
+extern uint32_t g_gdDrillMovementData_classId;  // @ 0x825C6BC4
+
+// Multiply-with-carry generator shared by the drills (state at 0x825CA2C8).
+// Returns the next 23 random bits as a float; times g_fPrngNormalize that is [0, 1).
+static inline float NextRandomBits() {
+    uint64_t next = (uint64_t)g_prngState[0] * 0x5CDCFAA7u + g_prngState[1];
+    g_prngState[0] = (uint32_t)next;
+    g_prngState[1] = (uint32_t)(next >> 32);
+    return (float)(g_prngState[0] & 0x7FFFFF);
+}
+
+extern "C" int _snprintf(char* buffer, size_t count, const char* format, ...);
+extern void PostPageGroupMessageFmt(uint32_t messageId, uint32_t mask, const char* format, ...);  // @ 0x8225E480
+extern int  RoundHalfAwayFromZero(float value);                                       // @ 0x8210CB88
+extern void hudTrainingHUD_SetCompleted(DrillTrainingHud* hud, int count);            // @ 0x822FA818
+extern void hudTrainingHUD_SetTimeLow(DrillTrainingHud* hud, bool low);               // @ 0x822FA878
+// Pushes the HUD's +0xB8 as "arrow_direction". Every caller passes 0 in r4;
+// the callee never reads it.
+extern void hudTrainingHUD_PushArrowDirection(DrillTrainingHud* hud, int unused);     // @ 0x822FA8F0
+// Corners of side `side`'s play area: (min.x, 0, min.z) and (max.x, 0, max.z).
+extern void DrillMatch_GetSideBounds(  // @ 0x821C9CD0
+    DrillMatchView* match, int side, DrillVector4* pMin, DrillVector4* pMax);
+// Moves the target to `position` (w = radius); clamps it to the table while
+// m_clampToTable is set.
+extern void gmPracticeTarget_SetPosition(  // @ 0x82113BA8
+    DrillPracticeTarget* target, const DrillVector4* position);
+// Shows one of the table target sets (gmPracticeTarget, 0x821137B0).
+extern void gmPracticeTarget_SelectSet(  // @ 0x821137B0
+    DrillPracticeTarget* target, int32_t setId, int arg2, int arg3);
+// Whether `point` (x/z) is inside the active target zone; sets m_spinStopped on a
+// hit. Every caller leaves r4 unset and the callee reads neither it nor `radius`.
+extern bool gmPracticeTarget_IsPointOnTarget(  // @ 0x82113C38
+    DrillPracticeTarget* target, int unused, const DrillVector4* point, float radius);
+
+static inline DrillReticle* ActivePlayerReticle() {
+    DrillGameStateView* state = reinterpret_cast<DrillGameStateView*>(g_pGameState);
+    return state->m_players[state->m_activePlayer]->m_pReticle;
+}
+
+static inline bool ConfigIsOfType(pongTrainingDrillConfig* config, uint32_t classId) {
+    typedef bool (*IsOfTypeFn)(pongTrainingDrillConfig*, uint32_t);
+    return reinterpret_cast<IsOfTypeFn>(config->vtable[20])(config, classId);
+}
+
+// True when the clock went from above `mark` to at or below it this frame.
+static inline bool PassedMark(float before, float now, float mark) {
+    return before > mark && now <= mark;
+}
+
+
+// Default for m_timeRemaining: -1, "no time limit". A .data word, so loaded.
+extern float g_fDrillDefaultTime;   // @ 0x825C5938
+
+inline void pongTrainingDrill::ResetCounters() {
+    m_timeRemaining = g_fDrillDefaultTime;
     m_numAttempts = 0;
     m_numSuccesses = 0;
     m_prevSuccesses = 0;
-    m_numFailures = 0;
-    
-    // Load default time limit from data section @ 0x825C5938
-    // Original: lis r10,-32164; lfs f0,22840(r10)
-    // Value is -1.0f (sentinel "no time limit") per float_constants.txt.
-    m_timeRemaining = -1.0f;
-    
+    m_rank = 0;
     m_completionFlag = 0;
-    m_targetIndex = 0xFFFFFFFF;  // -1 = no target selected
+    m_targetIndex = 0xFFFFFFFF;  // no target
+}
+
+inline void pongTrainingDrill::TickTimeLimit(float dt) {
+    if (m_timeRemaining > 0.0f) {
+        m_timeRemaining -= dt;
+        if (m_timeRemaining <= 0.0f) {
+            m_timeRemaining = g_fDrillDefaultTime;
+            NotifyUIEvent(0x10, 0x40, 0, 0);
+        }
+    }
+}
+
+/**
+ * pongTrainingDrill::Init
+ * @ 0x8210CDB8 | size: 0x30
+ *
+ * Clears the counters and the rank, puts the time limit back to its default
+ * and forgets the target. pongDrillMovement::Init repeats this inline.
+ */
+void pongTrainingDrill::Init() {
+    ResetCounters();
 }
 
 /**
@@ -88,67 +201,29 @@ void pongTrainingDrill::CallInit() {
 }
 
 /**
- * pongTrainingDrill::OnEnd
+ * pongTrainingDrill::Update
  * @ 0x8210D098 | size: 0x4C (vfn_6)
  *
- * Decrements m_timeRemaining by the elapsed time (f1). When the timer
- * hits zero or below, reloads the default time from data (@ 0x825C5938)
- * and broadcasts UI event 16 with channel 64. Early-returns if already
- * expired or still above zero after decrement.
- *
- * @param fDelta  Elapsed time (PowerPC FP arg in f1)
+ * Per-frame tick: runs down the optional time limit. pongDrillMovement::Update
+ * starts with the same code inline.
  */
-void pongTrainingDrill::OnEnd(float fDelta) {
-    // Load pre-expiry threshold from .rdata @ 0x8202CFE8 (float 0.0f)
-    const float kExpiredThreshold = 0.0f;  // lbl_8202CFE8
-
-    // If already expired, nothing to do
-    if (m_timeRemaining <= kExpiredThreshold) {
-        return;
-    }
-
-    // Decrement remaining time by elapsed delta
-    m_timeRemaining -= fDelta;
-
-    // If we've just crossed to zero, reset and fire UI event 16
-    if (m_timeRemaining > kExpiredThreshold) {
-        return;
-    }
-
-    // Reload default time limit from data (@ 0x825C5938) and notify UI
-    extern float g_fDrillDefaultTime;   // @ 0x825C5938
-    m_timeRemaining = g_fDrillDefaultTime;
-    NotifyUIEvent(16, 64, 0, 0);
+void pongTrainingDrill::Update(float dt) {
+    TickTimeLimit(dt);
 }
 
 /**
- * pongTrainingDrill::OnReset
+ * pongTrainingDrill::IsFinished
  * @ 0x8210D0E8 | size: 0x40 (vfn_7)
  *
- * Writes a single boolean byte at *pOut indicating whether the drill's
- * objective is satisfied, then returns 1 (true). Returns 0 if the
- * attempt floor (m_numAttempts vs config+16) isn't met.
- *
- * Objective satisfied ⇔  m_numAttempts   >= m_pConfig->m_nMaxSuccesses
- *                    AND m_numSuccesses  >= m_pConfig->m_nRequiredSuccesses
- *
- * @param pOut  Output byte; 1 if objective met, 0 otherwise
- * @return      1 if the floor condition passed (and pOut was written); else 0
+ * The drill is over once every try has been used; *pPassed then says
+ * whether the player reached MinNumSuccesses.
  */
-int pongTrainingDrill::OnReset(uint8_t* pOut) {
-    int32_t nAttempts = (int32_t)m_numAttempts;
-    int32_t nMaxTotal = (int32_t)m_pConfig->m_nMaxSuccesses;
-
-    if (nAttempts < nMaxTotal) {
-        return 0;
+bool pongTrainingDrill::IsFinished(bool* pPassed) {
+    if (m_numAttempts < m_pConfig->m_totalNumTries) {
+        return false;
     }
-
-    int32_t nRequired  = (int32_t)m_pConfig->m_nRequiredSuccesses;
-    int32_t nSuccesses = (int32_t)m_numSuccesses;
-
-    // Success byte: 1 if we met the required-successes bar, else 0
-    *pOut = (nSuccesses >= nRequired) ? 1 : 0;
-    return 1;
+    *pPassed = m_numSuccesses >= m_pConfig->m_minNumSuccesses;
+    return true;
 }
 
 /**
@@ -202,7 +277,7 @@ void pongTrainingDrill::OnSuccess() {
  * pongTrainingDrill::IsScoreValid
  * @ 0x8210D320 | size: 0x20 (vfn_12)
  *
- * Reads m_pConfig->m_nScoreThreshold (+44). Returns true when the
+ * Reads m_pConfig->m_tableTargetSetID (+44). Returns true when the
  * threshold is >= 0 (i.e. a finite threshold is set); returns false
  * when negative (interpreted as "unlimited / no threshold").
  *
@@ -217,20 +292,20 @@ bool pongTrainingDrill::IsScoreValid() {
  * pongTrainingDrill::GetTimeLimit
  * @ 0x8210D340 | size: 0xC (vfn_13)
  *
- * @return  m_pConfig->m_fTimeLimit  (+52)
+ * @return  m_pConfig->m_aimDelay  (+52)
  */
 float pongTrainingDrill::GetTimeLimit() {
-    return m_pConfig->m_fTimeLimit;
+    return m_pConfig->m_aimDelay;
 }
 
 /**
  * pongTrainingDrill::GetMaxTime
  * @ 0x8210D350 | size: 0xC (vfn_14)
  *
- * @return  m_pConfig->m_fMaxTime  (+56)
+ * @return  m_pConfig->m_postPointDelay  (+56)
  */
 float pongTrainingDrill::GetMaxTime() {
-    return m_pConfig->m_fMaxTime;
+    return m_pConfig->m_postPointDelay;
 }
 
 /**
@@ -250,10 +325,10 @@ int pongTrainingDrill::GetDrillCategory() {
  * pongTrainingDrill::GetProgressTarget
  * @ 0x8210D360 | size: 0xC (vfn_16)
  *
- * @return  m_pConfig->m_nProgressTarget  (+68)
+ * @return  m_pConfig->m_unlockDrillName  (+68)
  */
 uint32_t pongTrainingDrill::GetProgressTarget() {
-    return m_pConfig->m_nProgressTarget;
+    return m_pConfig->m_unlockDrillName;
 }
 
 /**
@@ -266,214 +341,129 @@ uint32_t pongTrainingDrill::GetProgressTarget() {
  * @return m_numSuccesses  (+8)
  */
 uint32_t pongTrainingDrill::GetScore() {
-    // Original loads from +16, which is m_numFailures in this layout.
+    // Original loads from +16, which is m_rank in this layout.
     // Matches the IDA-named 'score' slot stored in that field.
-    return m_numFailures;
+    return m_rank;
 }
 
 /**
  * pongTrainingDrill::GetDifficulty
  * @ 0x8210D370 | size: 0xC (vfn_24)
  *
- * @return  m_pConfig->m_nDifficulty  (+48, byte)
+ * @return  m_pConfig->m_enableReticle  (+48, byte)
  */
 uint8_t pongTrainingDrill::GetDifficulty() {
     return *(uint8_t*)((uint8_t*)m_pConfig + 48);
 }
 
 /**
- * pongTrainingDrill::SetDifficulty
+ * pongTrainingDrill::ApplyTargetSet
  * @ 0x8210D380 | size: 0x7C (vfn_25)
  *
- * Dispatches through vtable slot 12 (IsScoreValid) to see whether the
- * drill supports scoring. If it does AND vtable slot 17
- * (GetDrillTypeIndex) returns non-zero, issues a UI refresh for the
- * active client via pg_37B0_g with args (g_singles_network_client,
- * m_pConfig->m_nScoreThreshold, -1, 1).
- *
- * Otherwise this is a no-op. Called when the difficulty slider moves
- * on the setup screen so the HUD re-evaluates per-difficulty scoring.
+ * For drills that use table targets (slot 12) and have a drill type of their
+ * own, shows the config's TableTargetSetID on the practice target.
  */
-void pongTrainingDrill::SetDifficulty() {
-    // vtable slot 12 — IsScoreValid
+void pongTrainingDrill::ApplyTargetSet() {
     if (!IsScoreValid()) {
         return;
     }
-
-    // vtable slot 17 — GetDrillTypeIndex (non-virtual-safe via VCALL)
-    typedef int (*GetDrillTypeIndexFn)(pongTrainingDrill*);
-    GetDrillTypeIndexFn fnType = (GetDrillTypeIndexFn)(((void***)this)[0][17]);
-    if (fnType(this) == 0) {
+    if (GetDrillTypeIndex() == 0) {
         return;
     }
-
-    // Broadcast to the singles network client for HUD refresh
-    extern void pg_37B0_g(void* client, int nThreshold, int nFlag, int bActive);
-    int32_t nThreshold = (int32_t)*(int32_t*)((uint8_t*)m_pConfig + 44);
-    pg_37B0_g(g_singles_network_client, nThreshold, -1, 1);
+    gmPracticeTarget_SelectSet(g_pPracticeTarget, m_pConfig->m_tableTargetSetID, -1, 1);
 }
 
 /**
  * pongTrainingDrill::IncreaseNumSuccesses
- * @ 0x8210D400 | size: 0x84
- * 
- * Increases the success counter by the specified amount.
- * Clamps to maximum allowed successes from config.
- * Updates network state and UI.
- * 
- * Error message @ 0x82031970:
- *   "pongTrainingDrill::IncreaseNumSuccesses() - winning more than total possible, something is"
- * 
- * @param increment Number of successes to add
+ * @ 0x8210D400 | size: 0x84 (vfn_26)
+ *
+ * Adds to the successes, capped at TotalNumTries, shows the count on the
+ * HUD ("completed") and posts 0x5008.
  */
 void pongTrainingDrill::IncreaseNumSuccesses(int increment) {
-    // Add increment to current successes
     m_numSuccesses += increment;
-    
-    // Get maximum allowed successes from config
-    uint32_t maxSuccesses = m_pConfig ? *(uint32_t*)((uint8_t*)m_pConfig + 16) : 0xFFFFFFFF;
-    
-    // Clamp to maximum
-    if (m_numSuccesses > maxSuccesses) {
-        // Error: winning more than total possible
-        rage_debugLog(g_str_pongDrill_tooManySuccesses);
-        m_numSuccesses = maxSuccesses;
+    int32_t totalNumTries = m_pConfig->m_totalNumTries;
+    if (m_numSuccesses > totalNumTries) {
+        rage_debugLog("pongTrainingDrill::IncreaseNumSuccesses() - winning more than total possible, "
+                      "something is wrong");
+        m_numSuccesses = totalNumTries;
     }
-    
-    // Update network state
-    // Original: lwz r3,26132(r11) where r11 = -32160 (lis)
-    // Address: 0x82036614 (g_singles_network_client)
-    if (g_singles_network_client) {
-        ComputeNetworkHash(g_singles_network_client, m_numSuccesses);
-    }
-    
-    // Update UI
-    // Original: li r3,20488; li r4,64; addi r5,r11,30872; li r6,1
-    ProcessPageGroupInput(20488, 64, nullptr, 1);
+    hudTrainingHUD_SetCompleted(g_pTrainingHud, m_numSuccesses);
+    PostPageGroupMessageFmt(0x5008, 0x40, "i", 1);
 }
 
 /**
- * pongDrillMovement::Init
- * @ 0x8210DB48 | size: 0x54
- * 
- * Initializes the movement drill with extended state.
- * Calls base class Init() and sets up movement-specific fields.
- * 
- * Assembly details:
- *   - Loads config pointer from +56 (0x38)
- *   - Reads distance value from config +108
- *   - Initializes movement-specific fields at +36, +40, +44, +48, +52
- */
-void pongDrillMovement::Init() {
-    // Call base class initialization
-    pongTrainingDrill::Init();
-    
-    // Movement-specific initialization
-    m_movementFlag = 0;
-    
-    // Load target distance from config
-    // Original: lwz r9,56(r3); lfs f13,108(r9)
-    if (m_pConfig) {
-        void* configExt = (void*)((uint8_t*)m_pConfig + 56);
-        if (configExt) {
-            m_targetDistance = *(float*)((uint8_t*)configExt + 108);
-        }
-    }
-    
-    m_movementState = MOVEMENT_STATE_0;
-    m_moveTimer = 0.0f;  // Load from data section @ 0x82031970
-    m_isComplete = 0;
-}
-
-
-/**
- * pongTrainingDrill::OnStart
- * @ 0x8210CFF0 | size: 0xA4 (164 bytes)
+ * pongTrainingDrill::Finish
+ * @ 0x8210CFF0 | size: 0xA4 (vfn_5)
  *
- * Called when the training drill begins. Notifies the UI, clears the active
- * player's training-controller flag, resets hit/miss counters via virtual
- * dispatch, and transitions the training state machine to state 5 (active).
- *
- * Global accesses:
- *   - g_pGameState    (SDA+25648) — player manager, indexed by active slot
- *   - g_pTrainingStateMachine (0x8271A34C) — training HSM singleton
+ * Ends the drill: posts 0x5004, turns the active player's reticle off,
+ * computes the final rank (saving it if it beats the best), runs slot 28 and
+ * moves the training state machine to state 5.
  */
-void pongTrainingDrill::OnStart() {
-    // Notify UI that the drill is starting
-    NotifyUIEvent(20484, 64, 0, 0);
+void pongTrainingDrill::Finish() {
+    NotifyUIEvent(0x5004, 0x40, 0, 0);
 
-    // Access active player's training controller and clear its active flag
-    uint32_t* pGameState = (uint32_t*)g_pGameState;
-    int32_t nPlayerSlot = (int32_t)pGameState[33];                     // +132 = active player slot
-    void* pPlayer = ((void**)pGameState)[nPlayerSlot + 29];            // pointer array at +116
-    void* pTrainingCtrl = *(void**)((uint8_t*)pPlayer + 6208);        // +0x1840
-    if (pTrainingCtrl != NULL) {
-        *(uint8_t*)((uint8_t*)pTrainingCtrl + 24) = 0;                // clear active flag
+    DrillReticle* reticle = ActivePlayerReticle();
+    if (reticle != nullptr) {
+        reticle->m_enabled = false;
     }
-
-    // Reset hit/miss state through virtual dispatch
-    OnBallHit(1);    // vfn_27 — reset with save-data update enabled
-    OnBallMiss();    // vfn_28 — reset miss state
-
-    // Transition training state machine to state 5 (drill active)
+    UpdateRank(true);
+    OnBallMiss();  // slot 28
     SetTrainingState(g_pTrainingStateMachine, 5);
 }
 
 /**
- * pongTrainingDrill::OnBallHit
+ * pongTrainingDrill::UpdateRank
  * @ 0x8210D488 | size: 0x144 (324 bytes)
  *
- * Called when the ball is successfully hit during a drill. If the player
- * has met or exceeded the required successes, computes a performance score
- * based on the ratio of excess hits to the available range, scaled by a
- * constant, floored, and clamped >= 1.
+ * Rates the drill 1..5 once the player has MinNumSuccesses: 5 when every
+ * try beyond the minimum succeeded, otherwise the floored share of them,
+ * at least 1. With saveBest, a rank above the saved best for this drill
+ * replaces it and posts 0x500B.
  *
- * If bUpdateSaveData is true, compares the computed score against the
- * player's saved best for this drill type, and updates if improved.
- *
- * @param bUpdateSaveData  If nonzero, check and update drill save data
+ * @param saveBest  check and update the drill's saved best rank
  *
  * Key addresses:
  *   - g_fDrillScoreScale  (0x8202C504) — scaling multiplier for bonus score
  *   - g_pTrainingData     (0x8271A31C) — +4 gives drill-set index
  *   - g_pDrillSaveData    (0x8271A35C) — per-drill save array
  */
-void pongTrainingDrill::OnBallHit(int bUpdateSaveData) {
+void pongTrainingDrill::UpdateRank(bool saveBest) {
     int32_t nSuccesses = (int32_t)m_numSuccesses;
-    int32_t nRequired  = (int32_t)m_pConfig->m_nRequiredSuccesses;
+    int32_t nRequired  = (int32_t)m_pConfig->m_minNumSuccesses;
 
     // Only compute score if player has met or exceeded the requirement
     if (nSuccesses < nRequired) {
         return;
     }
 
-    int32_t nMaxTotal = (int32_t)m_pConfig->m_nMaxSuccesses;
+    int32_t nMaxTotal = (int32_t)m_pConfig->m_totalNumTries;
     int32_t nRange = nMaxTotal - nRequired;
 
     if (nRange == 0) {
         // No extra shots available — assign default score of 5
-        m_numFailures = 5;
+        m_rank = 5;
     } else {
         // Compute performance score: how far into the extra range the player reached
         int32_t nExcess = nSuccesses - nRequired;
         float fRatio  = (float)nExcess / (float)nRange;
         float fScaled = fRatio * g_fDrillScoreScale;
-        int nScore = (int)floorf(fScaled);
+        int nScore = RoundHalfAwayFromZero(floorf(fScaled));
 
         // Clamp to minimum of 1
         if (nScore < 1) {
             nScore = 1;
         }
-        m_numFailures = (uint32_t)nScore;
+        m_rank = (uint32_t)nScore;
     }
 
     // If save-data update is enabled, check and update the player's best score
-    if ((uint8_t)bUpdateSaveData == 0) {
+    if (!saveBest) {
         return;
     }
 
     // Load drill-set index from training data manager (+4)
-    int32_t nDrillSetIdx = *(int32_t*)((uint8_t*)g_pTrainingData + 4);
+    int32_t nDrillSetIdx = g_pTrainingData->m_drillSetIndex;
 
     // Get this drill's type index via virtual dispatch (vfn_17)
     int nDrillTypeIdx = GetDrillTypeIndex();
@@ -483,7 +473,7 @@ void pongTrainingDrill::OnBallHit(int bUpdateSaveData) {
     int32_t nSavedBest = (int32_t)g_pDrillSaveData[nSaveIdx];
 
     // Only update if current score exceeds saved best
-    if (nSavedBest >= (int32_t)m_numFailures) {
+    if (nSavedBest >= (int32_t)m_rank) {
         return;
     }
 
@@ -492,7 +482,7 @@ void pongTrainingDrill::OnBallHit(int bUpdateSaveData) {
     nSaveIdx = nDrillSetIdx * 12 + nDrillTypeIdx + 3;
 
     // Write new best score and notify UI
-    g_pDrillSaveData[nSaveIdx] = m_numFailures;
+    g_pDrillSaveData[nSaveIdx] = m_rank;
     NotifyUIEvent(20491, 64, 0, 0);
 }
 
@@ -513,8 +503,8 @@ void pongTrainingDrill::OnBallHit(int bUpdateSaveData) {
  * @param pRallyEvent  Rally event data; result written to +128
  */
 void pongTrainingDrill::OnRallyEnd(void* pRallyEvent) {
-    float fMin = m_pConfig->m_fRangeMin;
-    float fMax = m_pConfig->m_fRangeMax;
+    float fMin = m_pConfig->m_minBallSpeed;
+    float fMax = m_pConfig->m_maxBallSpeed;
 
     // Validate: both must be positive and min <= max
     if (!(fMin > 0.0f && fMax > 0.0f && fMin <= fMax)) {
@@ -523,7 +513,7 @@ void pongTrainingDrill::OnRallyEnd(void* pRallyEvent) {
 
     // If min == max, store exact value (no randomness needed)
     if (fMin == fMax) {
-        *(float*)((uint8_t*)pRallyEvent + 128) = m_pConfig->m_fRangeMin;
+        *(float*)((uint8_t*)pRallyEvent + 128) = m_pConfig->m_minBallSpeed;
         return;
     }
 
@@ -545,6 +535,289 @@ void pongTrainingDrill::OnRallyEnd(void* pRallyEvent) {
     float fRange  = fMax - fMin;
     float fResult = fRange * fNormalized + fMin;
     *(float*)((uint8_t*)pRallyEvent + 128) = fResult;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// pongDrillMovement — "Movement" drill (vtable 0x82031CCC)
+//
+// A target appears on the floor on the player's side of the table; the player
+// runs onto it. Each try places a new target (NextAttempt), a hit counts once
+// the player's position is inside the target (Update), and the rank depends on
+// how much of DrillTime was left after the last target (UpdateRank). The drill
+// ends when the clock runs out or every try was used.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * pongDrillMovement::SetConfig
+ * @ 0x8210DAE0 | size: 0x64 (vfn_1)
+ *
+ * Keeps the config, and also as m_pMovementData when it is a gdDrillMovementData.
+ */
+void pongDrillMovement::SetConfig(pongTrainingDrillConfig* pConfig) {
+    m_pConfig = pConfig;
+    if (ConfigIsOfType(pConfig, g_gdDrillMovementData_classId)) {
+        m_pMovementData = static_cast<pongDrillMovementConfig*>(pConfig);
+    }
+}
+
+/**
+ * pongDrillMovement::Init
+ * @ 0x8210DB48 | size: 0x54 (vfn_3)
+ *
+ * pongTrainingDrill::Init (inline), then a full clock and no target.
+ */
+void pongDrillMovement::Init() {
+    ResetCounters();
+    m_finished = false;
+    m_timeLeft = m_pMovementData->m_drillTime;
+    m_targetSide = TARGET_NONE;
+    m_hitHoldTimer = 0.0f;
+    m_urgentShown = false;
+}
+
+/**
+ * pongDrillMovement::Start
+ * @ 0x8210DBA0 | size: 0xA4 (vfn_4)
+ *
+ * After the common start: shows the clock, clears "time_low", turns the
+ * player's reticle off and lets the target leave the table.
+ */
+void pongDrillMovement::Start() {
+    pongTrainingDrill::Start();
+    hudTrainingHUD_PushArrowDirection(g_pTrainingHud, 0);
+    UpdateTimeDisplay();
+    hudTrainingHUD_SetTimeLow(g_pTrainingHud, false);
+
+    DrillReticle* reticle = ActivePlayerReticle();
+    if (reticle != nullptr) {
+        reticle->m_enabled = false;
+    }
+    g_pPracticeTarget->m_clampToTable = false;
+}
+
+/**
+ * pongDrillMovement::Finish
+ * @ 0x8210DC48 | size: 0x30 (vfn_5)
+ */
+void pongDrillMovement::Finish() {
+    pongTrainingDrill::Finish();
+    hudTrainingHUD_PushArrowDirection(g_pTrainingHud, 0);
+}
+
+/**
+ * pongDrillMovement::Update
+ * @ 0x8210DC78 | size: 0x210 (vfn_6)
+ *
+ * Runs the clock (beeping, message 0x1806, as it passes 5, 4, 3, 2 and 1
+ * seconds) and ends the drill at 0. While no hit is being held, a player
+ * standing on the target scores a success (message 0x5008); TargetHitTime
+ * later the next try starts.
+ */
+void pongDrillMovement::Update(float dt) {
+    TickTimeLimit(dt);  // pongTrainingDrill::Update, inline
+    if (m_finished) {
+        return;
+    }
+
+    float before = m_timeLeft;
+    m_timeLeft = before - dt;
+    // 4 and 3 are .data words in the original, 5, 2 and 1 .rdata.
+    if (PassedMark(before, m_timeLeft, 5.0f) || PassedMark(before, m_timeLeft, 4.0f) ||
+        PassedMark(before, m_timeLeft, 3.0f) || PassedMark(before, m_timeLeft, 2.0f) ||
+        PassedMark(before, m_timeLeft, 1.0f)) {
+        NotifyUIEvent(0x1806, 0x40, 0, 0);
+    }
+    UpdateTimeDisplay();
+
+    if (m_timeLeft <= 0.0f) {
+        m_timeLeft = 0.0f;
+        m_finished = true;
+        return;
+    }
+
+    if (m_hitHoldTimer > 0.0f) {
+        m_hitHoldTimer -= dt;
+        if (m_hitHoldTimer <= 0.0f) {
+            m_hitHoldTimer = 0.0f;
+            NextAttempt(1);
+        }
+        return;
+    }
+
+    DrillMatchView* match = static_cast<DrillMatchView*>(g_input_obj_ptr);
+    if (gmPracticeTarget_IsPointOnTarget(g_pPracticeTarget, 0, &match->m_pPlayerTransform->m_position,
+                                         m_pMovementData->m_detectRadius)) {
+        m_numSuccesses++;
+        PostPageGroupMessageFmt(0x5008, 0x40, "i", 1);
+        m_hitHoldTimer = m_pMovementData->m_targetHitTime;
+        if (m_hitHoldTimer <= 0.0f) {
+            NextAttempt(1);
+        }
+    }
+}
+
+/**
+ * pongDrillMovement::IsFinished
+ * @ 0x8210DE88 | size: 0x38 (vfn_7)
+ *
+ * Like the base, *pPassed is set once every try is used; but the answer is
+ * m_finished, which the clock can set first.
+ */
+bool pongDrillMovement::IsFinished(bool* pPassed) {
+    if (m_numAttempts >= m_pConfig->m_totalNumTries) {
+        *pPassed = m_numSuccesses >= m_pConfig->m_minNumSuccesses;
+    }
+    return m_finished;
+}
+
+/**
+ * pongDrillMovement::NextAttempt
+ * @ 0x8210DEC0 | size: 0x348 (vfn_9)
+ *
+ * After the base's bookkeeping: ends the drill (and hides the target) once
+ * every try was used, otherwise puts the target somewhere new in the
+ * player's half, TargetRadius plus 0.05 inside its edges. Sides alternate:
+ * after a target beside the player (x) the next one is along an end (z) with
+ * 90 % chance and vice versa; it goes to the side with more room. A target
+ * beside the player lies between the player and that edge, at the near-z
+ * edge; one along an end spans the whole width.
+ */
+void pongDrillMovement::NextAttempt(int count) {
+    pongTrainingDrill::NextAttempt(count);
+
+    if (m_numAttempts > m_pMovementData->m_totalNumTries) {
+        g_pPracticeTarget->m_visible = false;
+        m_finished = true;
+        return;
+    }
+
+    DrillMatchView* match = static_cast<DrillMatchView*>(g_input_obj_ptr);
+    DrillVector4 areaMin, areaMax;
+    DrillMatch_GetSideBounds(match, 0, &areaMin, &areaMax);
+
+    // Chance of a target beside the player (x) rather than along an end (z).
+    float besideChance = 0.5f;
+    switch (m_targetSide) {
+    case TARGET_LOW_X:
+    case TARGET_HIGH_X:
+        besideChance = 0.1f;
+        break;
+    case TARGET_NEAR_Z:
+    case TARGET_FAR_Z:
+        besideChance = 0.9f;  // a .data word in the original
+        break;
+    }
+
+    const float kEdgeMargin = 0.05f;
+    DrillVector4 player = match->m_pPlayerTransform->m_position;
+    DrillVector4 target = {0.0f, 0.0f, 0.0f, 0.0f};
+    float xLo, xHi, zLo, zHi;
+    bool randomZ = false;
+
+    if (NextRandomBits() * g_fPrngNormalize < besideChance) {
+        float radius = m_pMovementData->m_targetRadius;
+        if (areaMax.x - player.x > player.x - areaMin.x) {
+            m_targetSide = TARGET_HIGH_X;
+            xLo = player.x + radius + kEdgeMargin;
+            xHi = areaMax.x - radius - kEdgeMargin;
+        } else {
+            m_targetSide = TARGET_LOW_X;
+            xLo = areaMin.x + radius + kEdgeMargin;
+            xHi = player.x - radius - kEdgeMargin;
+        }
+        zLo = areaMin.z + radius + kEdgeMargin;
+        zHi = areaMax.z - radius - kEdgeMargin;  // computed, but z stays at zLo
+    } else {
+        float radius = m_pMovementData->m_targetRadius;
+        xLo = areaMin.x + radius + kEdgeMargin;
+        xHi = areaMax.x - radius - kEdgeMargin;
+        if (player.z - areaMin.z > areaMax.z - player.z) {
+            m_targetSide = TARGET_NEAR_Z;
+            zLo = areaMin.z + radius + kEdgeMargin;
+        } else {
+            m_targetSide = TARGET_FAR_Z;
+            zLo = areaMax.z - radius - kEdgeMargin;
+        }
+        zHi = zLo;
+        randomZ = true;  // over an empty range: still draws a number
+    }
+
+    target.x = (xHi - xLo) * NextRandomBits() * g_fPrngNormalize + xLo;
+    target.y = m_pMovementData->m_verticalOffset;
+    if (randomZ) {
+        target.z = (zHi - zLo) * NextRandomBits() * g_fPrngNormalize + zLo;
+    } else {
+        target.z = zLo;
+    }
+    target.w = m_pMovementData->m_targetRadius;
+
+    DrillPracticeTarget* practiceTarget = g_pPracticeTarget;
+    practiceTarget->m_spinStopped = false;
+    practiceTarget->m_clampToTable = false;
+    gmPracticeTarget_SetPosition(practiceTarget, &target);
+    practiceTarget->m_visible = true;
+}
+
+/**
+ * pongDrillMovement::UpdateRank
+ * @ 0x8210E208 | size: 0x16C (vfn_27)
+ *
+ * Rank 0 when the clock ran out before every target was reached. Reaching
+ * them all with at least DrillTime - HighestRankTime left is rank 5; less
+ * time left scales down to 1. With saveBest, a rank above the saved best
+ * for this drill replaces it and posts 0x500B.
+ */
+void pongDrillMovement::UpdateRank(bool saveBest) {
+    const pongDrillMovementConfig* data = m_pMovementData;
+    if (m_timeLeft <= 0.0f && m_numSuccesses < data->m_totalNumTries) {
+        m_rank = 0;
+    } else if (m_numSuccesses >= data->m_totalNumTries) {
+        float topRankTime = data->m_drillTime - data->m_highestRankTime;
+        if (m_timeLeft >= topRankTime) {
+            m_rank = 5;
+        } else {
+            int rank = RoundHalfAwayFromZero(floorf(m_timeLeft / topRankTime * 5.0f));
+            if (rank < 1) {
+                rank = 1;
+            }
+            m_rank = rank;
+        }
+    }
+
+    if (!saveBest) {
+        return;
+    }
+    int slot = g_pTrainingData->m_drillSetIndex * 12 + GetDrillTypeIndex() + 3;
+    if (g_pDrillSaveData[slot] >= m_rank) {
+        return;
+    }
+    slot = g_pTrainingData->m_drillSetIndex * 12 + GetDrillTypeIndex() + 3;
+    g_pDrillSaveData[slot] = m_rank;
+    NotifyUIEvent(0x500B, 0x40, 0, 0);
+}
+
+/**
+ * pongDrillMovement::UpdateTimeDisplay
+ * @ 0x8210E378 | size: 0x118
+ *
+ * Writes the clock, rounded up to whole seconds, as "m:ss" into the HUD,
+ * and raises "time_low" once when it drops to UrgentTime.
+ */
+void pongDrillMovement::UpdateTimeDisplay() {
+    float seconds = ceilf(m_timeLeft);
+    // RoundHalfAwayFromZero, inline here
+    int totalSeconds = seconds >= 0.0f ? (int)(seconds + 0.5f) : (int)(seconds - 0.5f);
+    int minutes = totalSeconds / 60;
+    int secondsPart = totalSeconds % 60;
+
+    char text[32];
+    _snprintf(text, sizeof(text), secondsPart < 10 ? "%d:0%d" : "%d:%d", minutes, secondsPart);
+    strncpy(g_pTrainingHud->m_timeText, text, sizeof(text));
+
+    if (!m_urgentShown && m_timeLeft <= m_pMovementData->m_urgentTime) {
+        hudTrainingHUD_SetTimeLow(g_pTrainingHud, true);
+        m_urgentShown = true;
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -607,7 +880,7 @@ hitTipData::~hitTipData() {
 void hitTipData::PostLoadProperties() {
     // Validate ShotType: must be in range [0, 5]
     if (m_shotType < 0 || m_shotType >= 6) {
-        rage_debugLog("Invalid hit tip found: %d");  // @ 0x82043090
+        rage_debugLog("Invalid hit tip found: %d");  // string at 0x82043090
     }
 
     // Check score/consecutive field consistency
@@ -618,7 +891,7 @@ void hitTipData::PostLoadProperties() {
             return;
         }
         // Score fields invalid: log error and set default
-        rage_debugLog("Invalid hit tip, setting InARow to default");  // @ 0x820430AC
+        rage_debugLog("Invalid hit tip, setting InARow to default");  // string at 0x820430AC
         m_consecutiveThreshold = 2;  // Default to 2
     }
 
@@ -779,7 +1052,7 @@ bool noSoftShotsTipData::PostLoadProperties(uint32_t typeHash) {
 // Each concrete drill subclass overrides three short slots off the base
 // pongTrainingDrill vtable:
 //   vfn_17 GetDrillTypeIndex  — integer drill-type tag used to index
-//                               g_pDrillSaveData (see pongTrainingDrill::OnBallHit).
+//                               g_pDrillSaveData (see pongTrainingDrill::UpdateRank).
 //                               Base returns 0; only Spin/FocusShot/
 //                               CounterSpin/Smash override it.
 //   vfn_18 GetConfigName      — pointer to the XML config-node name string.
@@ -804,18 +1077,13 @@ const char* pongDrillMovement::GetConfigName() {
 }
 
 /**
- * pongDrillMovement::vfn_22
- * @ 0x8210CBF0 | size: 0x8 (vfn_22 — secondary active-state probe)
+ * pongDrillMovement::IsOver
+ * @ 0x8210CBF0 | size: 0x8 (vfn_22)
  *
- * Thunk — reads m_movementFlag (+36) as a byte and returns it as a bool.
- * Distinct from HasActiveTarget (vfn_21); other subclasses override vfn_21
- * with a word-indexed target-idx test, but Movement uses this byte-flag
- * slot instead.
- *
- * Original: lbz r3,36(r3); blr
+ * Whether the drill has ended: the clock ran out or every try was used.
  */
-bool pongDrillMovement::vfn_22() {
-    return m_movementFlag != 0;
+bool pongDrillMovement::IsOver() {
+    return m_finished;
 }
 
 // ── pongDrillServeMeter ──────────────────────────────────────────────────────
@@ -930,7 +1198,7 @@ bool pongDrillCharging::HasActiveTarget() {
  * @ 0x8210CCE0 | size: 0x8
  *
  * Returns the drill-type slot (7) for the Spin drill. The base class
- * returns 0; this override lets pongTrainingDrill::OnBallHit index the
+ * returns 0; this override lets pongTrainingDrill::UpdateRank index the
  * proper slot in g_pDrillSaveData for save-data tracking.
  */
 int pongDrillSpin::GetDrillTypeIndex() {
