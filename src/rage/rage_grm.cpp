@@ -7,8 +7,10 @@
 
 // Forward declarations for external functions
 extern "C" void fragDrawable_0AA0_2h(void* state, void* geom, void* drawable, int index, void* param); // @ 0x820F0AA0
-extern "C" void* g_iccProfilePtr;     // @ 0x825EB1D0
-extern "C" void* g_currentGeometry;   // @ 0x82606350
+namespace rage {
+extern uint32_t* g_iccProfilePtr;     // @ 0x825EB1D0  (defined in rage_core_utils.cpp)
+extern void*     g_currentGeometry;   // @ 0x82606350
+}
 
 // Helpers used by lifted dispatch methods (all raw recomp stubs).
 extern "C" void   rage_free_00C0(uint32_t ptr);              // @ 0x820C00C0

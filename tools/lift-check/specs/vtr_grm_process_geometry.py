@@ -5,6 +5,8 @@ FUNCTION = "rage::fragDrawable::ProcessGeometry"
 ADDRESS = 0x820F1C00
 SOURCE = "src/rage/rage_grm.cpp"
 
+EXTERNS = {"rage::g_iccProfilePtr": 0x825EB1D0, "rage::g_currentGeometry": 0x82606350}
+
 OVERRIDE = 0x825EB1D0
 FORCED = 0x82606350
 

@@ -9,7 +9,7 @@ EXTERNS = {
     "rage::cmNode_GetFloat": 0x82179350,
     "rage::cmNode_GetVector": 0x821792D8,
     "cmApproach_VectorStep": 0x82277D38,
-    "rage::g_sysTimeManager": 0x825CAEB8,
+    "g_sysTimeManager": 0x825CAEB8,
     "rage::g_cm_frameTime": 0x825C4958,
     "rage::g_cm_zeroFloat": 0x8202D110,
 }

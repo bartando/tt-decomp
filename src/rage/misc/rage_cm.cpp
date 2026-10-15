@@ -866,11 +866,16 @@ static bool cmApproachOperator_VectorApproach(
     }
 }
 
-// Only the time scale at +8 of rage::sysTimeManager is read here.
-struct cmTimeManagerView { uint8_t _pad[8]; float timeScale; };
-extern cmTimeManagerView g_sysTimeManager;  // @ 0x825CAEB8
-// Vector step toward target: (current, target, rate, dt). @ 0x82277D38
-extern "C" void cmApproach_VectorStep(float* current, const float* target, float rate, float dt);
+// rage::sysTimeManager (defined in match_data.cpp); Tick reads +8.
+struct cmTimeManagerView { void** vtable; uint32_t field_04; float frameSeconds; float framesPerSecond; };
+extern "C" cmTimeManagerView g_sysTimeManager;  // @ 0x825CAEB8
+
+// Vector step toward target: (current, target, rate, dt); the asm multiplies
+// rate * dt first, then runs the step cmApproachOperator_VectorApproach models.
+// @ 0x82277D38
+extern "C" void cmApproach_VectorStep(float* current, const float* target, float rate, float dt) {
+    cmApproachOperator_VectorApproach(current, target, rate * dt);
+}
 
 // cmApproachOperator::Tick @ 0x82278B90 (vfn_10)
 // Moves the result (+0x28) toward portA (+0x14) at the rate from portB (+0x1C)
@@ -879,7 +884,7 @@ extern "C" void cmApproach_VectorStep(float* current, const float* target, float
 // The asm doesn't null-check the result.
 void cmApproachOperator::Tick() {
     cmDataObj* result = m_pResult;
-    float dt = g_sysTimeManager.timeScale * g_cm_frameTime;
+    float dt = g_sysTimeManager.frameSeconds * g_cm_frameTime;
     uint8_t dim = result->m_dim;
 
     if (dim == 2) {
