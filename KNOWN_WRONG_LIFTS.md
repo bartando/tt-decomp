@@ -20,7 +20,21 @@ before relying on any of these; fix and delete the entry when done.
 - `msgMsgSink::vfn_126` (0x8244FF38, `msg_msg_sink.cpp`): same name lookup as
   `xactGlobalSettings::FindCategory`, but loses the name argument and treats chain indices
   as pointers.
+- `pongNetMessageHolder::RemoveElementByPointer` (0x82134350, `pong_network.cpp`) compares the
+  stored pointer (`*slot == target`); the asm compares the slot address. It is really the
+  stripifier's strip-list erase.
+- 0x82134408 (`xe_buffers.c`, `AllocateU32AlignedWithCounter`, stores a pointer as `uint32_t`)
+  and 0x821350B8 (`memory.cpp`, `datPtrArray_DestroyAll`) are the strip list's constructor and
+  destructor under unrelated names.
+- `pong_match.hpp`: gmPracticeTarget vtable slot 1 (0x82112DF8) is labelled `ScalarDtor` but is
+  the data-file loader; slot 0 (0x82112C70) is the deleting destructor.
 - `globals.c`: `g_msgSinkTemplate` is at 0x8261A0C0, not 0x8241A0C0.
+
+## The recomp is not ground truth
+
+`recomp/structured_pass5_final` has codegen bugs (dropped `li`, reordered checks, wrong
+register tested, no stack frames). Trust `disasm/sections/.text.s` when they disagree; see
+`tools/lift-check/tristrip-poc/README.md`.
 
 ## Misnamed globals (shared across files, rename together)
 
@@ -41,3 +55,4 @@ libraries:
 | 0x82460…–0x82462C38 (`ph_vt57D8_*`, `phInst_*_p39`) | XAudio (reverb effect) | allocator id 0x82 |
 | 0x82484…–0x82493… (`phObject_*`) | XMV movie decoder | allocator id 0x8C, HRESULTs |
 | 0x82448…–0x8244F… (`msgMsgSink_*`) | XACT 2 runtime | allocator id 0x84 |
+| 0x821342A0–0x821359DC (`cmOperatorCtor_*`) | triangle stripifier (engine tool code, not cm graph) | no vtables; used by 0x82133A28 |
