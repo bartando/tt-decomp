@@ -64,8 +64,14 @@ into the repo.
    - `BUILD name: ...` [2]: the TU didn't cross-compile, or a symbol the lift calls has no
      original address (add it to `EXTERNS = {"name": 0x82...}` or give it a `// @ 0x` marker).
 
+`tools/lift-check/lift-check all [--jobs N] [--filter PREFIX] [--trials N] [-v]` runs every
+spec (skipping `_`-prefixed helpers and files without a `FUNCTION`) in parallel, prints each
+one's status line as it finishes and a summary listing the non-PASS ones, and exits 1 unless
+all pass (about 45 s for 180 specs at 8 jobs). `-v` adds the context lines of failures.
+
 `tools/lift-check/lift-check selftest` runs Xenia's instruction tests through the
-emulator, the example specs, and nine mutated lifts that must all fail (about 40 s).
+emulator, the marker scan on a made-up TU, the example specs, and mutated lifts that must
+all fail (about 40 s).
 
 ### Spec reference
 
@@ -74,22 +80,47 @@ emulator, the example specs, and nine mutated lifts that must all fail (about 40
   with tolerance and names fields in reports); `t.w8/w16/w32/w64/wf32/wf64(addr, v)`;
   `t.floats(addr, n, lo, hi)`; `t.args(r3=..., f1=...)`; `t.vtable("name")` returns a table
   of fake functions whose calls show up as `name.vfn_<k>`; `t.fake_fn("name")`;
-  `t.sym("g_x")`; `t.w32(t.sym("g_x"), v)` patches a global in the image for this trial.
+  `t.sym("g_x")`; `t.w32(t.sym("g_x"), v)` patches a global in the image for this trial;
+  `t.ignore(addr, size)` leaves bytes out of this trial's memory comparison;
+  `t.w32(t.sp + 0x54, v)` writes the caller's frame (stack arguments) over the random fill.
   Unset registers are random; `r1` is a fresh stack, `r13` a zeroed block.
 - `CALLS`, keyed by symbol name, address or fake-function name:
   - `stub(ret=None|int|float|"void"|fn(ctx), out={"r4": size}, args=("r3", "f1"),
     deref={"r4": 16})`: record and return. The default returns random r3 and f1, and fills
     non-const pointer arguments that point into the stack (out-params) with random data
-    typed from the lift's declaration. `args` overrides which registers are compared,
-    `deref` compares what a register points at.
-  - `returns(v)`, `alloc(size_reg="r3")` (fresh zeroed heap block), `run()` (execute the
-    original callee, on both sides), `model(fn)` (Python; `ctx.r(3)`, `ctx.read/write`,
-    `ctx.ret(r3=, f1=)`), `fail()`.
-  - memcpy, memmove, memset and strlen are Python models and stay out of the call trace
-    (MSVC and clang inline different copies); their effects are in the memory diff.
+    typed from the lift's declaration. `args` overrides which registers are compared (typed
+    from the declaration where it has them, so a variadic `r6` can be added) and limits the
+    pointee comparison to them; `deref` compares what a register points at;
+    `preserves=("r8", "f1")` keeps registers the callee leaves alone.
+  - `returns(v)`, `alloc(size_reg="r3")` (fresh zeroed heap block), `run(transparent=False)`
+    (execute the original callee, on both sides; `transparent` leaves it out of the trace,
+    for a helper the lift calls and the original inlines), `model(fn, args=, deref=,
+    preserves=)` (Python; `ctx.r(3)`, `ctx.read/write`, `ctx.ret(r3=, f1=)`, `ctx.side`;
+    a failed `assert` in it is a FAIL on the lift side, a SPEC problem on the original's),
+    `fail()`.
+  - memcpy, memmove, memset, strlen and strcmp are Python models and stay out of the call
+    trace (MSVC and clang inline different copies); their effects are in the memory diff.
+  - After a stub or model returns, the volatile registers are clobbered with random values,
+    except those the original callee never writes, through all its direct calls (when
+    nothing in the chain calls through a register; about 40% of the game's functions):
+    MSVC's link-time codegen keeps values in them across such calls. A stub with
+    the default return also keeps r3/f1 then. A call to a one-branch thunk (`b X`) is
+    recorded, matched and handled as a call to X.
 - `EXTERNS`, `FTOL` (relative float tolerance, default 0), `TRIALS`, `RET` (`"r3"`, `"f1"`,
   `None`; default from the lift's return type), `EXTRA_RANGES` (more code ranges that belong
-  to the original function).
+  to the original function), `IGNORE = [(addr, size), ...]` (left out of the memory diff).
+- `HOST = {"rage::rage_alloc_aligned": model(...)}`: helpers the lift calls that have no
+  game address (host code standing in for something the original inlines). Each gets a
+  fake address and its policy, usually a transparent model of the inlined code.
+- `STATIC_INIT = False`: start from the raw boot image. By default the game's C++ static
+  initializers (`__xc_a..__xc_z`, 0x825B0010) run first, in order, each call they make
+  returning 0, so globals MSVC fills at startup (constant vectors, copies) hold their
+  values. Cached in `build/`.
+- `FP_CONTRACT = "off"` (or `--fp-contract off`): compile the lift without fusing `a*b + c`
+  into fmadd. The default, `"on"`, fuses within one expression, which is what MSVC did for
+  most of the game (5 specs fail with `off`); use `off` where the asm rounds the product
+  first (`fmuls` then `fadds`) instead of raising `FTOL`. Lifts always build with
+  `-fno-math-errno`, so `sqrtf` is an `fsqrt`, not a libm call.
 
 ## How it works
 
@@ -97,7 +128,8 @@ emulator, the example specs, and nine mutated lifts that must all fail (about 40
   every 64-bit, FP or vector instruction raises exception 96 there, and on the 970 models
   stores go nowhere. Xenon titles run with MSR[SF]=0 anyway (record forms compare the low
   word), so 32-bit mode is the right model. What the G4 can't do runs in Python
-  (`assist.py`, `vmx.py`): 64-bit integer ops (upper GPR halves live in a shadow), fsqrt,
+  (`assist.py`, `vmx.py`): 64-bit integer ops (upper GPR halves live in a shadow, which
+  the 32-bit ops in the same function keep up to date), fsqrt,
   fcfid/fctid/fctiw, dcbz128, and every vector instruction, AltiVec and VMX128 alike
   (Unicorn doesn't expose vector registers). The image is pre-scanned and only those
   addresses are hooked. A CA bit computed in Python goes in through a 4-instruction
@@ -108,17 +140,26 @@ emulator, the example specs, and nine mutated lifts that must all fail (about 40
   address and the optimiser can't inline or look into it; then `-O2` codegen for
   `powerpc-unknown-elf` (4-byte pointers, so struct layouts match the game's), and
   `ld.lld --gc-sections` at 0x82800000, right after the image. Symbols are resolved from
-  `config/434C4803/master_symbol_map.json` (`by_name`) and `// @ 0x...` markers in `src/`
-  and `include/`, and passed as `--defsym`. A separate `-O1 -g` object supplies the
-  signatures (which registers a call passes and how wide) and struct layouts.
+  `// @ 0x...` markers in `src/` and `include/` (and the TU itself), then
+  `config/434C4803/master_symbol_map.json` (`by_name`), and passed as `--defsym`. A marker
+  counts on the declaration or definition it trails (any line of a multi-line one), from a
+  comment block directly above one (no blank line between), or as `Name @ 0x...` in a
+  comment. Where a name has several addresses, one on the declaration itself beats
+  comment ones; a call statement's trailing marker counts least. A free function declared
+  inside `namespace rage {}` matches `rage::X`; lambdas never resolve. A BUILD error lists
+  each unresolved symbol with its conflicting markers. A separate `-O1 -g` object
+  supplies the signatures (which registers a call passes and how wide) and struct layouts.
 - **Calls.** A block hook catches every jump out of the function (the original's range from
   the symbol map; the lift's own code). The save/restore helpers just run. Both sides get
   the same scripted or random return for the n-th call to a target, and the same clobbered
   volatile registers.
 - **Comparison.** Bytes written outside the stack, with floats in `ctype`/`wf32` words and
   float arguments compared to `FTOL` relative to max(1, |a|, |b|); ints exactly. Pointer
-  arguments into the stack compare as `<stack>`, plus the pointee if it's `const`; string
-  pointers (arguments and pointer return values) compare by content.
+  arguments into the stack compare as `<stack>` (also untyped ones: calls without a
+  declaration, `args=` registers the declaration lacks), plus the pointee if it's `const`
+  and not an empty struct. `const char*` arguments compare by their text at the call (any
+  length, any memory); other pointers into the image that look like short strings, too.
+  Pointer return values that point at strings compare by content.
 
 ## Limits
 
@@ -128,9 +169,11 @@ emulator, the example specs, and nine mutated lifts that must all fail (about 40
   fres and frsqrte the G4's estimate. Lifts that divide where the original estimates differ
   by a few ulps, hence `FTOL`. The VMX multiply-adds round the product (non-fused), per
   Xenia's tests; scalar fmadd is fused.
-- **Upper GPR halves** after native 32-bit instructions read as the sign extension of the
-  low word (`mfcr`, `lwz` really zero-extend). Only matters for 64-bit code that mixes the
-  two (ld/std pairs and extsw/clrldi are exact).
+- **Upper GPR halves**: in a function (or `run()` callee, `EXTRA_RANGES`) that has any
+  64-bit integer instruction, every native 32-bit instruction that writes a GPR gets its
+  64-bit result tracked too (`mulld` + `add` carries, `lwz` zero-extends). Elsewhere a
+  native result reads as the sign extension of its low word. Record forms and CA use the
+  low word, as with MSR[SF]=0.
 - **Headers that don't cross-compile**: 125 of the 157 TUs in `src/` build. The rest have
   errors of their own (missing headers, declarations that don't match) or are the host
   layer (`src/xam`, `src/crt`: SDL, pthread, sockets). `shim/` covers the libc/libstdc++

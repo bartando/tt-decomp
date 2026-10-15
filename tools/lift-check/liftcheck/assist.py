@@ -8,6 +8,10 @@ exception 96, and on the 970 models stores vanish), so lift-check runs a 7400 in
   GPRs are 32 bits wide in the emulator, so the upper halves live in a shadow:
   a value written here keeps its upper half while the low half is unchanged;
   anything else reads as the sign extension of its low half.
+- In code that uses those, every 32-bit integer instruction that writes a GPR
+  (add, addi, ori, rlwinm, lwz, ...) still runs natively, but `predict` first
+  works out its full 64-bit result and records the upper half, so `mulld` then
+  `add` carries into the upper word and `lwz` zero-extends, as on Xenon.
 - fsqrt(s), fcfid, fctid(z), dcbz/dcbz128, lwsync/eieio variants.
 - every vector instruction (vmx.py), because Unicorn doesn't expose VRs.
 
@@ -31,6 +35,52 @@ _OP31_ASSIST = {
     489: "divd", 1001: "divdo", 457: "divdu", 969: "divduo",
     68: "td", 84: "ldarx", 214: "stdcx.", 1014: "dcbz",
 }
+
+
+_OP31_WIDE = frozenset(k for k, v in _OP31_ASSIST.items() if v != "dcbz")
+
+
+def is_wide(w: int) -> bool:
+    """A 64-bit integer instruction: code containing one gets `predict` hooks."""
+    op = w >> 26
+    if op in (30, 58, 62, 2):
+        return True
+    if op == 31:
+        xo10 = (w >> 1) & 0x3FF
+        return (xo10 in _OP31_WIDE or ((w >> 2) & 0x1FF) == 413
+                or (xo10 in (0, 32) and (w >> 21) & 1))
+    return op in (10, 11) and bool((w >> 21) & 1)
+
+
+# 32-bit instructions that write a GPR, run natively.
+_D_PREDICT = frozenset({7, 8, 12, 13, 14, 15, 20, 21, 23, 24, 25, 26, 27, 28, 29, 32, 33, 34, 35,
+                        37, 39, 40, 41, 42, 43, 45, 46, 49, 51, 53, 55})
+_XO_ARITH = {266: "add", 10: "addc", 138: "adde", 202: "addze", 234: "addme", 40: "subf",
+             8: "subfc", 136: "subfe", 200: "subfze", 232: "subfme", 104: "neg", 235: "mullw",
+             75: "mulhw", 11: "mulhwu", 491: "divw", 459: "divwu"}
+_X_LOGIC = {28: "and", 60: "andc", 444: "or", 412: "orc", 316: "xor", 124: "nor", 476: "nand",
+            284: "eqv", 24: "slw", 536: "srw", 792: "sraw", 824: "srawi", 26: "cntlzw",
+            954: "extsb", 922: "extsh"}
+# X-form loads: xo10 -> (size, signed, update)
+_X_LOAD = {23: (4, False, False), 55: (4, False, True), 87: (1, False, False),
+           119: (1, False, True), 279: (2, False, False), 311: (2, False, True),
+           343: (2, True, False), 375: (2, True, True), 534: (4, False, False),
+           790: (2, False, False), 20: (4, False, False)}
+_X_UPDATE = frozenset({183, 247, 439, 567, 631, 695, 759})   # st*ux, lf*ux, stf*ux: RA = EA
+_X_CLEAR = frozenset({19, 83, 339, 371, 533, 597})            # mfcr mfmsr mfspr mftb lswx lswi
+_D_LOAD = {32: (4, False), 33: (4, False), 34: (1, False), 35: (1, False), 40: (2, False),
+           41: (2, False), 42: (2, True), 43: (2, True)}
+
+
+def needs_predict(w: int) -> bool:
+    op = w >> 26
+    if op in _D_PREDICT:
+        return True
+    if op != 31 or needs_assist(w):
+        return False
+    xo10 = (w >> 1) & 0x3FF
+    return ((xo10 & 0x1FF) in _XO_ARITH or xo10 in _X_LOGIC or xo10 in _X_LOAD
+            or xo10 in _X_UPDATE or xo10 in _X_CLEAR)
 
 
 def sext32(x: int) -> int:
@@ -116,6 +166,127 @@ class Assist:
         if op in (59, 63):
             return self._fp(w, op)
         raise Unsupported(f"opcode 0x{w:08X}")
+
+    # 64-bit results of native 32-bit instructions --------------------------
+    def predict(self, w: int) -> list:
+        """[(reg, values)] for the instruction about to run natively: the full 64-bit
+        results it can produce (two when it reads the CA bit, which Python can't see),
+        or None where the sign extension of the native result is right."""
+        cpu = self.cpu
+        op = w >> 26
+        rt, ra, rb = (w >> 21) & 31, (w >> 16) & 31, (w >> 11) & 31
+        simm = (w & 0xFFFF) - 0x10000 if w & 0x8000 else w & 0xFFFF
+
+        def g(n):
+            return cpu.gpr64(n) & M64
+
+        def ea_d():
+            return ((cpu.gpr(ra) if ra else 0) + simm) & M32
+
+        def load(ea, size, signed):
+            try:
+                v = int.from_bytes(cpu.uc.mem_read(ea, size), "big")
+            except Exception:
+                return None
+            if signed and v >> (8 * size - 1):
+                v -= 1 << (8 * size)
+            return [v]
+
+        if op == 31:
+            xo10 = (w >> 1) & 0x3FF
+            name = _XO_ARITH.get(xo10 & 0x1FF)
+            if name is not None:
+                a, b = g(ra), g(rb)
+                if name in ("add", "addc"):
+                    return [(rt, [a + b])]
+                if name in ("subf", "subfc"):
+                    return [(rt, [b - a])]
+                if name == "neg":
+                    return [(rt, [-a])]
+                if name == "adde":
+                    return [(rt, [a + b, a + b + 1])]
+                if name == "addze":
+                    return [(rt, [a, a + 1])]
+                if name == "addme":
+                    return [(rt, [a - 1, a])]
+                if name == "subfe":
+                    return [(rt, [~a + b, ~a + b + 1])]
+                if name == "subfze":
+                    return [(rt, [~a, ~a + 1])]
+                if name == "subfme":
+                    return [(rt, [~a - 1, ~a])]
+                if name == "mullw":
+                    return [(rt, [sext32(a) * sext32(b)])]
+                # upper half undefined in the ISA; Xenon (per Xenia's tests) zero-extends
+                # all but mulhw
+                la, lb = a & M32, b & M32
+                if name == "mulhwu":
+                    return [(rt, [(la * lb) >> 32])]
+                if name == "divwu":
+                    return [(rt, [la // lb] if lb else None)]
+                if name == "divw":
+                    sa, sb = sext32(la), sext32(lb)
+                    if sb == 0 or (sa == -(1 << 31) and sb == -1):
+                        return [(rt, None)]
+                    q = abs(sa) // abs(sb)
+                    return [(rt, [(q if (sa < 0) == (sb < 0) else -q) & M32])]
+                return [(rt, None)]
+            name = _X_LOGIC.get(xo10)
+            if name is not None:
+                s, b = g(rt), g(rb)
+                if name in ("slw", "srw"):
+                    n, lo = cpu.gpr(rb) & 63, s & M32
+                    r = 0 if n > 31 else (lo << n) & M32 if name == "slw" else lo >> n
+                    return [(ra, [r])]
+                r = {"and": lambda: s & b, "andc": lambda: s & ~b, "or": lambda: s | b,
+                     "orc": lambda: s | ~b, "xor": lambda: s ^ b, "nor": lambda: ~(s | b),
+                     "nand": lambda: ~(s & b), "eqv": lambda: ~(s ^ b)}.get(name)
+                return [(ra, [r()] if r else None)]
+            if xo10 in _X_LOAD:
+                size, signed, update = _X_LOAD[xo10]
+                ea = ((cpu.gpr(ra) if ra else 0) + cpu.gpr(rb)) & M32
+                v = load(ea, size, signed)
+                if xo10 == 534 and v:
+                    v = [int.from_bytes(v[0].to_bytes(4, "big"), "little")]
+                elif xo10 == 790 and v:
+                    v = [int.from_bytes(v[0].to_bytes(2, "big"), "little")]
+                return [(rt, v)] + ([(ra, [ea])] if update else [])
+            if xo10 in _X_UPDATE:
+                return [(ra, [(cpu.gpr(ra) + cpu.gpr(rb)) & M32])]
+            if xo10 == 19:
+                return [(rt, [cpu.cr()])]
+            if xo10 == 339 and (((w >> 16) & 0x1F) | ((w >> 6) & 0x3E0)) in (8, 9):
+                return [(rt, [cpu.spr_lr_ctr((w >> 16) & 0x1F)])]
+            return [(rt, None)]
+        if op in _D_LOAD:
+            size, signed = _D_LOAD[op]
+            ea = ea_d()
+            return [(rt, load(ea, size, signed))] + ([(ra, [ea])] if op & 1 else [])
+        if op in (37, 39, 45, 49, 51, 53, 55):      # stores and FP loads with update
+            return [(ra, [ea_d()])]
+        if op == 46:                                # lmw
+            return [(n, None) for n in range(rt, 32)]
+        if op in (14, 15):
+            base = g(ra) if ra else 0
+            return [(rt, [base + (simm << 16 if op == 15 else simm)])]
+        if op in (12, 13):
+            return [(rt, [g(ra) + simm])]
+        if op == 8:
+            return [(rt, [simm - g(ra)])]
+        if op == 7:
+            return [(rt, [s64(g(ra)) * simm])]
+        if op in (24, 25, 26, 27, 28, 29):
+            imm = (w & 0xFFFF) << (16 if op & 1 else 0)
+            s = g(rt)
+            return [(ra, [s | imm if op < 26 else s ^ imm if op < 28 else s & imm])]
+        if op in (20, 21, 23):
+            sh = cpu.gpr(rb) & 31 if op == 23 else rb
+            mb, me = (w >> 6) & 31, (w >> 1) & 31
+            lo = g(rt) & M32
+            r = _rotl64(lo | (lo << 32), sh)
+            m = _mask64(mb + 32, me + 32)
+            return [(ra, [(r & m) | (g(ra) & ~m if op == 20 else 0)])]
+        return []
 
     # helpers -----------------------------------------------------------------
     def _cr0(self, v64: int, rc: bool):
@@ -228,7 +399,7 @@ class Assist:
         if xo10 == 598:
             return "sync"
         if xo10 == 19:      # mfocrf
-            cpu.set_gpr(rt, cpu.cr())
+            cpu.set_gpr64(rt, cpu.cr())
             return "mfocrf"
         if xo10 == 144:     # mtocrf
             fxm = (w >> 12) & 0xFF

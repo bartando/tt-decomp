@@ -28,6 +28,11 @@ EXPECT = [
     ("pong_player_toss_serve_ball", "PASS|FAIL:_pad", ()),
     ("pong_player_toss_serve_ball", "PASS", (TOSS_W_FIX,)),
     ("ccal_dispatch_color_constants", "UNSUPPORTED", ()),
+    ("lc_drill_on_rally_end", "PASS", ()),
+    ("lc_camviewcs_update_leaf", "PASS", ()),     # a stub keeps what its leaf callee keeps
+    ("lc_xact_image_dtor_thunk", "PASS", ()),     # a call through `b X` is a call to X
+    ("lc_drill_strings", "PASS", ()),             # const char* by content, any length
+    ("lc_world_bound_static_init", "PASS", ()),   # the static initializers have run
 ]
 
 MUTATIONS = [
@@ -51,7 +56,74 @@ MUTATIONS = [
      [TOSS_W_FIX, ("    ball->vfn_1();\n    phSimulator_CBB8_g", "    phSimulator_CBB8_g")]),
     ("pong_player_toss_serve_ball", "pongBallBody padding 4 bytes short (mass at +0x60)",
      [TOSS_W_FIX, ("    uint8_t     _pad14[0x50];", "    uint8_t     _pad14[0x4C];")]),
+    # what lift-check itself computed before it tracked native ops' upper halves
+    ("lc_drill_on_rally_end", "carry = the sum's sign (a 32-bit add's upper half)",
+     [("uint32_t nNewCarry = (uint32_t)(nNext >> 32);",
+       "uint32_t nNewCarry = (uint32_t)((int32_t)nNewSeed >> 31);")]),
+    ("lc_drill_strings", "change the tail of the 90-byte debug message",
+     [('"something is wrong"', '"something is off"')]),
+    ("lc_drill_strings", "post 2 instead of 1 (a variadic argument)",
+     [('m_numSuccesses);\n    PostPageGroupMessageFmt(0x5008, 0x40, "i", 1);',
+       'm_numSuccesses);\n    PostPageGroupMessageFmt(0x5008, 0x40, "i", 2);')]),
 ]
+
+
+# The marker scan, on a made-up TU: (demangled name, expected address or None).
+MARKER_TU = """
+// @ 0x82000010 (some_map_name) -- a comment block above a declaration ending in ';'
+extern "C" float lcst_AboveDecl(float value, float lo, float hi);
+extern "C" void* lcst_TwoLines(void* object, int delta,
+                               int isReference);  // @ 0x82000020
+// =====================================================================
+// lcst section banner, Vtable @ 0x82000030
+// =====================================================================
+
+extern "C" {
+    void lcst_InBlock(void* self, int param);  // @ 0x82000040
+}
+void lcst_Shared(int);                          // @ 0x82000050
+void lcst_Caller() {
+    lcst_Shared(1);  // @ 0x82000058  (a string the call prints)
+}
+namespace rage {
+void lcst_InNamespace(int x);  // @ 0x82000060
+}
+struct lcstHolder {
+    // @ 0x82000070 -- an in-class declaration under a comment
+    int Method();
+};
+extern void (*lcst_FnPtr)();  // @ 0x82000080
+"""
+MARKER_EXPECT = [
+    ("lcst_AboveDecl", 0x82000010),
+    ("lcst_TwoLines", 0x82000020),
+    ("lcst_InBlock", 0x82000040),
+    ("lcst_Shared(int)", 0x82000050),
+    ("rage::lcst_InNamespace(int)", 0x82000060),
+    ("lcstHolder::Method()", 0x82000070),
+    ("lcst_FnPtr", 0x82000080),
+    ("lcst_Caller()::$_0::operator()() const", None),
+    ("void", None),
+]
+
+
+def _markers() -> list[str]:
+    import tempfile
+
+    from .runner import repo_root
+    from .symbols import Symbols
+    syms = Symbols(repo_root())
+    with tempfile.TemporaryDirectory() as d:
+        tu = Path(d) / "markers.cpp"
+        tu.write_text(MARKER_TU)
+        syms.include(tu)
+        bad = []
+        for name, want in MARKER_EXPECT:
+            got = syms.resolve(name, name)
+            if got != want:
+                bad.append(f"{name}: {f'0x{got:08X}' if got is not None else None}, "
+                           f"want {f'0x{want:08X}' if want is not None else None}")
+    return bad
 
 
 def _run(spec: str, patches, trials=None):
@@ -103,6 +175,13 @@ def main(argv=None) -> int:
             print(f"skip isa: no instruction tests at {tests} (pass --rexglue)")
         if args.isa:
             return 1 if bad else 0
+
+    bad_markers = _markers()
+    print(f"{'ok  ' if not bad_markers else 'FAIL'} markers: {len(MARKER_EXPECT) - len(bad_markers)}"
+          f"/{len(MARKER_EXPECT)} resolve as expected")
+    for line in bad_markers:
+        print(f"     {line}")
+    bad += 1 if bad_markers else 0
 
     for spec, expect, patches in EXPECT:
         status, line = _run(spec, patches)

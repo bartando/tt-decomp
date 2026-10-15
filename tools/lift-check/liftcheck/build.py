@@ -172,12 +172,13 @@ def _declare_functions(ir: str, names: set[str], keep: str) -> str:
     return "\n".join(out)
 
 
-def compile_flags(repo: Path, source: Path, opt: str) -> list[str]:
+def compile_flags(repo: Path, source: Path, opt: str, fp_contract: str = "on") -> list[str]:
     is_c = source.suffix == ".c"
     flags = [
         "--target=powerpc-unknown-elf", "-mcpu=970", "-mno-altivec",
         "-std=c11" if is_c else "-std=c++17", opt, "-g",
         "-ffreestanding", "-fno-strict-aliasing", "-fwrapv", "-fno-pic",
+        f"-ffp-contract={fp_contract}", "-fno-math-errno",
         "-ffunction-sections", "-fdata-sections", "-fno-common", "-nostdlibinc",
         "-isystem", str(TOOL_DIR / "shim"),
         "-I", str(repo / "include"), "-I", str(repo / "src"),
@@ -191,10 +192,16 @@ def compile_flags(repo: Path, source: Path, opt: str) -> list[str]:
 
 def build_lift(repo: Path, syms: Symbols, source: Path, function: str, *, orig_addr: int,
                workdir: Path, opt: str = "-O2", patches=(), extra_flags=(),
-               externs_override: dict | None = None) -> Lift:
+               externs_override: dict | None = None, fp_contract: str = "on", tag: str = "") -> Lift:
+    """fp_contract: "on" fuses a*b+c within an expression into fmadd, as MSVC does for
+    Xenon; "off" for a function whose asm rounds the product first. tag: keeps the
+    build directories of specs that check the same function apart (parallel runs)."""
     clang = llvm_bin("clang")
     source = source.resolve()
-    key = hashlib.sha1(repr((str(source), function, opt, patches, extra_flags)).encode()).hexdigest()[:10]
+    if not source.is_relative_to(repo.resolve()):
+        syms.include(source)
+    key = hashlib.sha1(repr((str(source), function, opt, patches, extra_flags, fp_contract, tag)
+                            ).encode()).hexdigest()[:10]
     out = workdir / f"{source.stem}-{key}"
     out.mkdir(parents=True, exist_ok=True)
 
@@ -211,13 +218,13 @@ def build_lift(repo: Path, syms: Symbols, source: Path, function: str, *, orig_a
     # 0. in the background: an ordinary -O1 -g object, only for its debug info
     #    (signatures of every callee and the struct layouts the specs name)
     dwarf_obj = out / "dwarf.o"
-    dwarf_job = subprocess.Popen([clang, *compile_flags(repo, source, "-O1"), *extra_flags, "-c", str(tu),
+    dwarf_job = subprocess.Popen([clang, *compile_flags(repo, source, "-O1", fp_contract), *extra_flags, "-c", str(tu),
                                   "-o", str(dwarf_obj)], stdout=subprocess.DEVNULL,
                                  stderr=subprocess.DEVNULL)
 
     # 1. IR straight from the front end, before any pass has looked across functions
     ll = out / "lift.ll"
-    cmd = [clang, *compile_flags(repo, source, "-O1"), "-Xclang", "-disable-llvm-passes",
+    cmd = [clang, *compile_flags(repo, source, "-O1", fp_contract), "-Xclang", "-disable-llvm-passes",
            *extra_flags, "-S", "-emit-llvm", str(tu), "-o", str(ll)]
     p = _run(cmd)
     if p.returncode != 0:
@@ -257,7 +264,7 @@ def build_lift(repo: Path, syms: Symbols, source: Path, function: str, *, orig_a
     # 3. optimise and generate code
     obj = out / "lift.o"
     p = _run([clang, "--target=powerpc-unknown-elf", "-mcpu=970", "-mno-altivec", opt, "-fno-pic",
-              "-ffunction-sections", "-fdata-sections", "-w", "-c", str(ll2), "-o", str(obj)])
+              f"-ffp-contract={fp_contract}", "-fno-math-errno", "-ffunction-sections", "-fdata-sections", "-w", "-c", str(ll2), "-o", str(obj)])
     if p.returncode != 0:
         raise BuildError("codegen failed:\n" + "\n".join(p.stderr.splitlines()[:25]))
 
@@ -279,12 +286,13 @@ def build_lift(repo: Path, syms: Symbols, source: Path, function: str, *, orig_a
         if a is None:
             a = syms.resolve(u, d)
         if a is None:
-            missing.append(d)
+            missing.append(f"{d}: {syms.explain(u, d)}")
         else:
             externs[u] = a
     if missing:
-        raise BuildError("can't map these to original addresses (add them to EXTERNS in the spec,\n"
-                         "or give them a `// @ 0x...` marker):\n  " + "\n  ".join(missing))
+        raise BuildError(f"{len(missing)} symbol(s) the lift uses have no original address (add them "
+                         "to EXTERNS in the spec, or give them a `// @ 0x...` marker):\n  "
+                         + "\n  ".join(missing))
 
     p = _run(base + [f"--defsym={u}=0x{a:X}" for u, a in externs.items()])
     if p.returncode != 0:

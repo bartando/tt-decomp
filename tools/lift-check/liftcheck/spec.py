@@ -19,7 +19,7 @@ from __future__ import annotations
 import random
 import struct
 
-from .machine import ARENA_BASE, ARENA_SIZE, FAKE_BASE, STACK_HI, STACK_LO
+from .machine import ARENA_BASE, ARENA_SIZE, FAKE_BASE, STACK_HI, STACK_LO, STACK_TOP
 
 __all__ = ["stub", "returns", "alloc", "run", "model", "fail", "MODELS"]
 
@@ -41,6 +41,8 @@ class Trial:
         self.image_patches: dict[int, bytes] = {}
         self.fakes: dict[int, str] = {}
         self._fake_next = FAKE_BASE + 0x100
+        self.ignored: list[tuple[int, int]] = []
+        self.stack_patches: dict[int, bytes] = {}
 
     # memory -----------------------------------------------------------------
     def alloc(self, size: int, name: str = "", fill: str | bytes = "random", align: int = 16,
@@ -89,6 +91,9 @@ class Trial:
             if 0x82000000 <= addr < 0x82800000:
                 self.image_patches[addr] = bytes(data)
                 return
+            if STACK_LO <= addr < STACK_HI:
+                self.stack_patches[addr] = bytes(data)     # over the random fill
+                return
             raise ValueError(f"0x{addr:08X} isn't in an alloc() or the image")
         self.arena[off: off + len(data)] = data
 
@@ -108,6 +113,15 @@ class Trial:
     def floats(self, addr: int, count: int, lo: float = -100.0, hi: float = 100.0):
         for k in range(count):
             self.wf32(addr + 4 * k, self.rng.uniform(lo, hi))
+
+    @property
+    def sp(self) -> int:
+        """r1 at entry: t.w32(t.sp + 0x54, v) writes the caller's frame (stack arguments)."""
+        return STACK_TOP
+
+    def ignore(self, addr: int, size: int = 4):
+        """Leave [addr, addr+size) out of this trial's memory comparison."""
+        self.ignored.append((addr, size))
 
     # registers and symbols --------------------------------------------------
     def args(self, **regs):
@@ -154,6 +168,9 @@ class Trial:
 
 class Policy:
     transparent = False   # left out of the call-trace comparison
+    preserves = ()        # volatile registers the callee leaves alone (beyond a leaf's own)
+    args = None           # registers to compare (default: the lift's declaration)
+    deref = None          # {reg: size} to compare what they point at
 
     def handle(self, ctx):  # returns 'return' or 'run'
         raise NotImplementedError
@@ -213,12 +230,13 @@ class stub(Policy):
     callable(ctx) -> value. out: {'r4': size} fills what r4 points at with random data.
     By default non-const pointer arguments into the stack (out-params) get filled."""
 
-    def __init__(self, ret=None, out=None, deref=None, args=None, auto_out=True):
+    def __init__(self, ret=None, out=None, deref=None, args=None, auto_out=True, preserves=()):
         self.ret_ = ret
         self.out = out or {}
         self.deref = deref or {}
         self.args = args
         self.auto_out = auto_out
+        self.preserves = tuple(preserves)
 
     def handle(self, ctx):
         from .dwarf import arg_registers
@@ -266,18 +284,27 @@ class alloc(stub):
 
 
 class run(Policy):
-    """Runs the callee's original code (both sides run the same thing)."""
+    """Runs the callee's original code (both sides run the same thing). transparent:
+    leave it out of the call trace (a helper the lift calls and the original inlines)."""
+
+    def __init__(self, transparent=False):
+        if transparent:
+            self.transparent = True
 
     def handle(self, ctx):
         return "run"
 
 
 class model(Policy):
-    """A Python stand-in: fn(ctx) does the work and calls ctx.ret(...)."""
+    """A Python stand-in: fn(ctx) does the work and calls ctx.ret(...). An assertion
+    in fn fails the trial (lift side) or reports a SPEC problem (original side)."""
 
-    def __init__(self, fn, transparent=False):
+    def __init__(self, fn, transparent=False, args=None, deref=None, preserves=()):
         self.fn = fn
         self.transparent = transparent
+        self.args = args
+        self.deref = deref or {}
+        self.preserves = tuple(preserves)
 
     def handle(self, ctx):
         self.fn(ctx)
@@ -303,6 +330,18 @@ def _memset(ctx):
     ctx.ret(r3=d)
 
 
+def _cstr(ctx, a):
+    out = bytearray()
+    while (c := ctx.read(a + len(out), 1)) != b"\0":
+        out += c
+    return bytes(out)
+
+
+def _strcmp(ctx):
+    x, y = _cstr(ctx, ctx.r(3)), _cstr(ctx, ctx.r(4))
+    ctx.ret(r3=(x > y) - (x < y))
+
+
 def _strlen(ctx):
     a, n = ctx.r(3), 0
     while ctx.read(a + n, 1) != b"\0":
@@ -315,4 +354,5 @@ MODELS = {
     "memmove": model(_memcpy, transparent=True),
     "memset": model(_memset, transparent=True),
     "strlen": model(_strlen, transparent=True),
+    "strcmp": model(_strcmp, transparent=True),
 }
