@@ -167,6 +167,15 @@ slot 1..25 one off; header fixed, drill subclasses other than Movement not re-ve
 - `rage_grm.cpp` declares `rage_free_00C0(uint32_t)` (truncates host pointers).
 - `msg_msg_sink.cpp` 8B78/8B90 drop the slot argument in r4.
 - `globals.c`: `g_msgSinkTemplate` is at 0x8261A0C0, not 0x8241A0C0.
+- `globals.c` defines 0x82619BE0 as all-ones; `pong_creature.cpp` says it keeps xyz only. A
+  static initializer sets it, so unverified.
+- 0x8271A2F8 +0x10/+0x14 are two `gdBallPredictData*`, swapped per shot by 0x82282A50.
+- 0x821CD0F8 (`util_D0F8`) records a replay ball sample into a 900-entry ring; 0x8225FFF8
+  invokes a 16-byte functor.
+- 0x82288368 `phBoundCapsule_8368_g` is the ball predictor's step and 0x822832D0
+  `phBoundCapsule_32D0_g` its flight model (`ComputeAccel` in `ball_predict.cpp`).
+- `pong_match.cpp` calls an undefined `BallPredictData_Reset`; it's `gdBallPredictData::Reset`
+  (0x821D7750, lifted in `ball_predict.cpp`).
 
 
 ## The recomp is not ground truth
