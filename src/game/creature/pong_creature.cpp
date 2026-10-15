@@ -538,88 +538,50 @@ void LocomotionState::ValidateAnimationTiming(uint32_t& animSetIndex, uint32_t& 
     }
 }
 
+// 0x820DEDC0 — no pseudocode available; defined as a no-op further down.
+void pongCreatureInst_EDC0_g(void* a, void* b, void* c);
+
+// What 0x8214C8F8 reads from `this`. Its callers (pongCreature::UpdateReplay
+// and UpdateAnimation, through LocomotionStateAnim_C8F8_g) pass a skeleton,
+// pongCreature+0xAC; LocomotionStateAnim's header layout (which also gets a
+// C++ vptr) doesn't describe it.
+struct skeletonPoseData {
+    uint8_t         _pad00[0x04];
+    const uint32_t* parents;    // +0x04  parent bone index per bone
+    uint8_t         _pad08[0x04];
+    uint16_t        boneCount;  // +0x0C
+};
+
+struct skeletonPoseView {
+    uint8_t                 _pad00[0x04];
+    const skeletonPoseData* data;        // +0x04
+    void*                   rootHelper;  // +0x08
+    uint8_t*                bones;       // +0x0C  0x50-byte bone records
+    uint8_t                 _pad10[0x04];
+    uint8_t*                matrices;    // +0x14  0x40-byte bone matrices
+};
+
 /**
  * LocomotionStateAnim::CopyAnimationData @ 0x8214C8F8 | size: 0xD0
- * 
- * Copies animation transformation data between two internal buffers.
- * This is used during locomotion state transitions to transfer animation
- * pose data from one state to another.
- * 
- * The function handles two cases:
- * 1. If a helper object exists, delegates to pongCreatureInst helper
- * 2. Otherwise, manually copies 64 bytes of transformation data using SIMD
- * 
- * After the initial copy, processes additional animations from an array.
+ * (locomotion.cpp has the same address as LocomotionStateAnim_C8F8_g, a no-op)
+ *
+ * Root bone: with a helper at +0x08, 0x820DEDC0(matrix 0, record 0, helper);
+ * otherwise the record's leading 64 bytes become matrix 0. Every further bone
+ * i goes through 0x820DEDC0(matrix i, record i, matrix of parents[i]).
  */
 void LocomotionStateAnim::CopyAnimationData() {
-    // Get source and destination buffer pointers
-    void* srcBuffer = (void*)this->field_0x000c;   // +0x0C
-    void* dstBuffer = (void*)this->field_0x0014;   // +0x14
+    const skeletonPoseView* skel = reinterpret_cast<const skeletonPoseView*>(this);
 
-    // Check if we have a helper object for the copy operation
-    void* helperObj = (void*)this->field_0x0008;    // +0x08
-    
-    if (helperObj != nullptr) {
-        // Use pongCreatureInst helper to perform the copy
-        // This likely handles more complex transformation logic
-        extern void pongCreatureInst_CopyTransform(void* dst, void* src, void* helper);
-        pongCreatureInst_CopyTransform(dstBuffer, srcBuffer, helperObj);
-    } else {
-        // Manual copy: 64 bytes (4 x 16-byte vectors) of transformation data
-        // This is likely a 4x4 transformation matrix (16 floats = 64 bytes)
-        
-        // Copy using 16-byte aligned SIMD operations
-        // Vector 0: bytes 0-15
-        memcpy(dstBuffer, srcBuffer, 16);
-        
-        // Vector 1: bytes 16-31
-        memcpy((char*)dstBuffer + 16, (char*)srcBuffer + 16, 16);
-        
-        // Vector 2: bytes 32-47
-        memcpy((char*)dstBuffer + 32, (char*)srcBuffer + 32, 16);
-        
-        // Vector 3: bytes 48-63
-        memcpy((char*)dstBuffer + 48, (char*)srcBuffer + 48, 16);
-    }
-    
-    // Process additional animations from the animation array
-    // Get animation info structure from offset +4
-    void* animInfo = (void*)this->field_0x0004;
-    
-    if (animInfo == nullptr) {
-        return;
-    }
-    
-    // Get animation count from offset +12 in animInfo
-    uint16_t animCount = *(uint16_t*)((char*)animInfo + 12);
-    
-    // Get animation array pointer from offset +4 in animInfo
-    uint32_t* animArray = *(uint32_t**)((char*)animInfo + 4);
-    
-    if (animCount <= 1) {
-        return;  // No additional animations to process
-    }
-    
-    // Process each additional animation (skip first one, already handled)
-    for (int i = 0; i < animCount - 1; i++) {
-        // Get animation index from array
-        uint32_t animIndex = animArray[i];
-        
-        // Calculate buffer offsets for this animation
-        // Each animation uses 64-byte destination blocks and 80-byte source blocks
-        uint32_t dstOffset = 64 + (i * 64);   // Start at +64, increment by 64
-        uint32_t srcOffset = 80 + (i * 80);   // Start at +80, increment by 80
-        
-        // Calculate indexed destination offset: animIndex * 64
-        uint32_t indexedDstOffset = animIndex * 64;
-        
-        // Copy animation data using helper
-        void* dstPtr = (char*)dstBuffer + dstOffset;
-        void* srcPtr = (char*)srcBuffer + srcOffset;
-        void* indexedDstPtr = (char*)dstBuffer + indexedDstOffset;
-        
-        extern void pongCreatureInst_CopyTransform(void* dst, void* src, void* indexed);
-        pongCreatureInst_CopyTransform(dstPtr, srcPtr, indexedDstPtr);
+    if (skel->rootHelper != nullptr)
+        pongCreatureInst_EDC0_g(skel->matrices, skel->bones, skel->rootHelper);
+    else
+        memcpy(skel->matrices, skel->bones, 64);
+
+    const skeletonPoseData* data = skel->data;
+    const int boneCount = data->boneCount;
+    for (int i = 1; i < boneCount; ++i) {
+        pongCreatureInst_EDC0_g(skel->matrices + 0x40 * i, skel->bones + 0x50 * i,
+                                skel->matrices + 0x40 * data->parents[i]);
     }
 }
 
