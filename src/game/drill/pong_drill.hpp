@@ -430,7 +430,7 @@ public:
     virtual void OnStart() override {}                 // vfn_5
     virtual void Process() override {}                 // vfn_9
     virtual const char* GetConfigName() override;      // vfn_18 @ 0x8210CBE0 — "Movement"
-    virtual bool HasActiveTarget() override;           // vfn_22 thunk @ 0x8210CBF0 — m_movementFlag
+    virtual bool vfn_22() override;                    // vfn_22 thunk @ 0x8210CBF0 — m_movementFlag
 
 private:
     enum MovementState {
