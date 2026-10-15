@@ -12,6 +12,11 @@
  * return type / parameter list — update this header opportunistically.
  */
 #pragma once
+
+// Most classes below carry the game's vtable pointer as an explicit `vtable`
+// member. Their slot methods are listed by game slot but declared non-virtual:
+// a C++ virtual would add a second vtable pointer in front of `vtable` and
+// shift every member by 4. Dispatch through `vtable` by hand.
 #include <stdint.h>
 
 // ── AcceptMessage  [vtable @ 0x8206F880] ──────────────────────────
@@ -19,11 +24,11 @@ struct AcceptMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bb350
-    virtual void vfn_2();  // [2] @ 0x823bb3b0
-    virtual void vfn_5();  // [5] @ 0x823bb2c0
-    virtual void vfn_6();  // [6] @ 0x823bb330
-    virtual void vfn_7();  // [7] @ 0x823bb340
+    void ScalarDtor(int flags); // [1] @ 0x823bb350
+    void vfn_2();  // [2] @ 0x823bb3b0
+    void vfn_5();  // [5] @ 0x823bb2c0
+    void vfn_6();  // [6] @ 0x823bb330
+    void vfn_7();  // [7] @ 0x823bb340
 };
 
 // ── AcceptSpectatorMessage  [vtable @ 0x8206F8A8] ──────────────────────────
@@ -31,13 +36,13 @@ struct AcceptSpectatorMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bb718
-    virtual void vfn_2();  // [2] @ 0x823bb7b8
-    virtual void vfn_3();  // [3] @ 0x823bb9d8
-    virtual void vfn_4();  // [4] @ 0x823bb848
-    virtual void vfn_5();  // [5] @ 0x823bb400
-    virtual void vfn_6();  // [6] @ 0x823bb508
-    virtual void vfn_7();  // [7] @ 0x823bb518
+    void ScalarDtor(int flags); // [1] @ 0x823bb718
+    void vfn_2();  // [2] @ 0x823bb7b8
+    void vfn_3();  // [3] @ 0x823bb9d8
+    void vfn_4();  // [4] @ 0x823bb848
+    void vfn_5();  // [5] @ 0x823bb400
+    void vfn_6();  // [6] @ 0x823bb508
+    void vfn_7();  // [7] @ 0x823bb518
 };
 
 // ── AckHandling  [vtable @ 0x82071654] ──────────────────────────
@@ -45,7 +50,7 @@ struct AckHandling {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~AckHandling();                  // [0] @ 0x823d3480
+    ~AckHandling();                  // [0] @ 0x823d3480
 };
 
 // ── BallHitMessage  [vtable @ 0x8206FA9C] ──────────────────────────
@@ -53,12 +58,12 @@ struct BallHitMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823b65f8
-    virtual void vfn_2();  // [2] @ 0x823b6660
-    virtual void vfn_5();  // [5] @ 0x823b63e0
-    virtual void vfn_6();  // [6] @ 0x823b64e8
-    virtual void vfn_7();  // [7] @ 0x823b64f8
-    virtual void vfn_8();  // [8] @ 0x823b6508
+    void ScalarDtor(int flags); // [1] @ 0x823b65f8
+    void vfn_2();  // [2] @ 0x823b6660
+    void vfn_5();  // [5] @ 0x823b63e0
+    void vfn_6();  // [6] @ 0x823b64e8
+    void vfn_7();  // [7] @ 0x823b64f8
+    void vfn_8();  // [8] @ 0x823b6508
 };
 
 // ── CancelLobbyCountdownMessage  [vtable @ 0x8207002C] ──────────────────────────
@@ -66,10 +71,10 @@ struct CancelLobbyCountdownMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x823bf7c0
-    virtual void vfn_5();  // [5] @ 0x823bf698
-    virtual void vfn_6();  // [6] @ 0x823bf7a0
-    virtual void vfn_7();  // [7] @ 0x823bf7b0
+    void vfn_4();  // [4] @ 0x823bf7c0
+    void vfn_5();  // [5] @ 0x823bf698
+    void vfn_6();  // [6] @ 0x823bf7a0
+    void vfn_7();  // [7] @ 0x823bf7b0
 };
 
 // ── DataRequestFailedMessage  [vtable @ 0x8206FC1C] ──────────────────────────
@@ -77,9 +82,9 @@ struct DataRequestFailedMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_5();  // [5] @ 0x823bad40
-    virtual void vfn_6();  // [6] @ 0x823bae08
-    virtual void vfn_7();  // [7] @ 0x823bae18
+    void vfn_5();  // [5] @ 0x823bad40
+    void vfn_6();  // [6] @ 0x823bae08
+    void vfn_7();  // [7] @ 0x823bae18
 };
 
 // ── DataRequestMessage  [vtable @ 0x8206F7E0] ──────────────────────────
@@ -89,11 +94,11 @@ struct DataRequestMessage {
     int16_t     m_dataId;         // +0x08
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823babe0
-    virtual void vfn_2();  // [2] @ 0x823bae28
-    virtual void vfn_5();  // [5] @ 0x823baaf8
-    virtual void vfn_6();  // [6] @ 0x823babc0
-    virtual void vfn_7();  // [7] @ 0x823babd0
+    void ScalarDtor(int flags); // [1] @ 0x823babe0
+    void vfn_2();  // [2] @ 0x823bae28
+    void vfn_5();  // [5] @ 0x823baaf8
+    void vfn_6();  // [6] @ 0x823babc0
+    void vfn_7();  // [7] @ 0x823babd0
 
     // ── non-virtual methods (lifted) ──
     void Deserialise(void* client);
@@ -112,11 +117,11 @@ struct DataSendMessage {
     uint8_t     m_dataPayload[1]; // +0x0C  variable-length payload
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bed20
-    virtual void vfn_2();  // [2] @ 0x823bed90
-    virtual void vfn_5();  // [5] @ 0x823bac40
-    virtual void vfn_6();  // [6] @ 0x823bad20
-    virtual void vfn_7();  // [7] @ 0x823bad30
+    void ScalarDtor(int flags); // [1] @ 0x823bed20
+    void vfn_2();  // [2] @ 0x823bed90
+    void vfn_5();  // [5] @ 0x823bac40
+    void vfn_6();  // [6] @ 0x823bad20
+    void vfn_7();  // [7] @ 0x823bad30
 
     // ── non-virtual methods (lifted) ──
     void Deserialise(void* client);
@@ -131,9 +136,9 @@ struct DenySpectatorMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_5();  // [5] @ 0x823bbaa8
-    virtual void vfn_6();  // [6] @ 0x823bbb20
-    virtual void vfn_7();  // [7] @ 0x823bbb30
+    void vfn_5();  // [5] @ 0x823bbaa8
+    void vfn_6();  // [6] @ 0x823bbb20
+    void vfn_7();  // [7] @ 0x823bbb30
 };
 
 // ── DisconnectingSinglesClientMessage  [vtable @ 0x8206F920] ──────────────────────────
@@ -141,9 +146,9 @@ struct DisconnectingSinglesClientMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_5();  // [5] @ 0x823bc488
-    virtual void vfn_6();  // [6] @ 0x823bc500
-    virtual void vfn_7();  // [7] @ 0x823bc510
+    void vfn_5();  // [5] @ 0x823bc488
+    void vfn_6();  // [6] @ 0x823bc500
+    void vfn_7();  // [7] @ 0x823bc510
 };
 
 // ── DropSpectatorConnection  [vtable @ 0x8206FC44] ──────────────────────────
@@ -151,11 +156,11 @@ struct DropSpectatorConnection {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bd010
-    virtual void vfn_2();  // [2] @ 0x823bd088
-    virtual void vfn_5();  // [5] @ 0x823bb040
-    virtual void vfn_6();  // [6] @ 0x823bb108
-    virtual void vfn_7();  // [7] @ 0x823bb118
+    void ScalarDtor(int flags); // [1] @ 0x823bd010
+    void vfn_2();  // [2] @ 0x823bd088
+    void vfn_5();  // [5] @ 0x823bb040
+    void vfn_6();  // [6] @ 0x823bb108
+    void vfn_7();  // [7] @ 0x823bb118
 };
 
 // ── EnteringReplayMessage  [vtable @ 0x8206FDFC] ──────────────────────────
@@ -163,10 +168,10 @@ struct EnteringReplayMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x823bd6b0
-    virtual void vfn_5();  // [5] @ 0x823bd588
-    virtual void vfn_6();  // [6] @ 0x823bd690
-    virtual void vfn_7();  // [7] @ 0x823bd6a0
+    void vfn_4();  // [4] @ 0x823bd6b0
+    void vfn_5();  // [5] @ 0x823bd588
+    void vfn_6();  // [6] @ 0x823bd690
+    void vfn_7();  // [7] @ 0x823bd6a0
 };
 
 // ── EventBase  [vtable @ 0x82070DC4] ──────────────────────────
@@ -184,10 +189,10 @@ struct ExitPostGameMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x823b98d0
-    virtual void vfn_5();  // [5] @ 0x823b97a8
-    virtual void vfn_6();  // [6] @ 0x823b98b0
-    virtual void vfn_7();  // [7] @ 0x823b98c0
+    void vfn_4();  // [4] @ 0x823b98d0
+    void vfn_5();  // [5] @ 0x823b97a8
+    void vfn_6();  // [6] @ 0x823b98b0
+    void vfn_7();  // [7] @ 0x823b98c0
 };
 
 // ── FloatAverager  [4 vtables — template/MI] ──────────────────────────
@@ -215,7 +220,7 @@ struct FloatAverager {
     // float m_currentAvg;    // Cached average value
 
     // ── virtual methods ──
-    virtual ~FloatAverager();                  // [0] @ 0x821a7aa0
+    ~FloatAverager();                  // [0] @ 0x821a7aa0
 };
 
 // ── ForceMatchTimeSyncMessage  [vtable @ 0x8206F5A4] ──────────────────────────
@@ -227,13 +232,13 @@ struct ForceMatchTimeSyncMessage {
     float       m_timing;         // +0x14  — timing float (for Serialise)
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823b7aa0
-    virtual void Deserialise(void* client);  // [2] @ 0x823b7af0
-    virtual void Serialise(void* client);    // [3] @ 0x823b7608 — actually Process
-    virtual void Process();
-    virtual void vfn_5();  // [5] @ 0x823b74e0
-    virtual void vfn_6();  // [6] @ 0x823b75e8
-    virtual void vfn_7();  // [7] @ 0x823b75f8
+    void ScalarDtor(int flags); // [1] @ 0x823b7aa0
+    void Deserialise(void* client);  // [2] @ 0x823b7af0
+    void Serialise(void* client);    // [3] @ 0x823b7608 — actually Process
+    void Process();
+    void vfn_5();  // [5] @ 0x823b74e0
+    void vfn_6();  // [6] @ 0x823b75e8
+    void vfn_7();  // [7] @ 0x823b75f8
 };
 
 // ── ForceSessionTimeSyncMessage  [vtable @ 0x8206F61C] ──────────────────────────
@@ -241,10 +246,10 @@ struct ForceSessionTimeSyncMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x823b7b50
-    virtual void vfn_5();  // [5] @ 0x823b7978
-    virtual void vfn_6();  // [6] @ 0x823b7a80
-    virtual void vfn_7();  // [7] @ 0x823b7a90
+    void vfn_3();  // [3] @ 0x823b7b50
+    void vfn_5();  // [5] @ 0x823b7978
+    void vfn_6();  // [6] @ 0x823b7a80
+    void vfn_7();  // [7] @ 0x823b7a90
 };
 
 // ── ForfeitMatchMessage  [vtable @ 0x8206FA60] ──────────────────────────
@@ -252,11 +257,11 @@ struct ForfeitMatchMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bdc30
-    virtual void vfn_2();  // [2] @ 0x823bdca0
-    virtual void vfn_5();  // [5] @ 0x823bdb08
-    virtual void vfn_6();  // [6] @ 0x823bdc10
-    virtual void vfn_7();  // [7] @ 0x823bdc20
+    void ScalarDtor(int flags); // [1] @ 0x823bdc30
+    void vfn_2();  // [2] @ 0x823bdca0
+    void vfn_5();  // [5] @ 0x823bdb08
+    void vfn_6();  // [6] @ 0x823bdc10
+    void vfn_7();  // [7] @ 0x823bdc20
 };
 
 // ── FrameTimeEstimate  [vtable @ 0x82071660] ──────────────────────────
@@ -264,7 +269,7 @@ struct FrameTimeEstimate {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~FrameTimeEstimate();                  // [0] @ 0x823d39f8
+    ~FrameTimeEstimate();                  // [0] @ 0x823d39f8
 };
 
 // ── Gamer  [vtable @ 0x8206E7E0] ──────────────────────────
@@ -272,9 +277,9 @@ struct Gamer {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~Gamer();                  // [0] @ 0x823b40d8
-    virtual void vfn_4();  // [4] @ 0x823b4150
-    virtual void vfn_5();  // [5] @ 0x823b48c0
+    ~Gamer();                  // [0] @ 0x823b40d8
+    void vfn_4();  // [4] @ 0x823b4150
+    void vfn_5();  // [5] @ 0x823b48c0
 };
 
 // ── GamerReadyMessage  [vtable @ 0x8206FEEC] ──────────────────────────
@@ -282,13 +287,13 @@ struct GamerReadyMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823be630
-    virtual void vfn_2();  // [2] @ 0x823be690
-    virtual void vfn_3();  // [3] @ 0x823be768
-    virtual void vfn_4();  // [4] @ 0x823be6e0
-    virtual void vfn_5();  // [5] @ 0x823be508
-    virtual void vfn_6();  // [6] @ 0x823be610
-    virtual void vfn_7();  // [7] @ 0x823be620
+    void ScalarDtor(int flags); // [1] @ 0x823be630
+    void vfn_2();  // [2] @ 0x823be690
+    void vfn_3();  // [3] @ 0x823be768
+    void vfn_4();  // [4] @ 0x823be6e0
+    void vfn_5();  // [5] @ 0x823be508
+    void vfn_6();  // [6] @ 0x823be610
+    void vfn_7();  // [7] @ 0x823be620
 };
 
 // ── GamerUpdateMessage  [vtable @ 0x8206FF14] ──────────────────────────
@@ -296,13 +301,13 @@ struct GamerUpdateMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823be928
-    virtual void vfn_2();  // [2] @ 0x823be9a8
-    virtual void vfn_3();  // [3] @ 0x823bea68
-    virtual void vfn_4();  // [4] @ 0x823bea08
-    virtual void vfn_5();  // [5] @ 0x823be828
-    virtual void vfn_6();  // [6] @ 0x823be908
-    virtual void vfn_7();  // [7] @ 0x823be918
+    void ScalarDtor(int flags); // [1] @ 0x823be928
+    void vfn_2();  // [2] @ 0x823be9a8
+    void vfn_3();  // [3] @ 0x823bea68
+    void vfn_4();  // [4] @ 0x823bea08
+    void vfn_5();  // [5] @ 0x823be828
+    void vfn_6();  // [6] @ 0x823be908
+    void vfn_7();  // [7] @ 0x823be918
 };
 
 // ── HitDataMessage  [vtable @ 0x8206F500] ──────────────────────────
@@ -315,13 +320,13 @@ struct HitDataMessage {
     uint8_t     m_playerIndex;    // +0xD4  — player index byte
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823b5b58
-    virtual void Deserialise(void* client);  // [2] @ 0x823b5bd8
-    virtual void vfn_3();  // [3] @ 0x823b5c40
-    virtual void vfn_4();  // [4] @ 0x823b5ca0
-    virtual void vfn_5();  // [5] @ 0x823b5970
-    virtual void vfn_6();  // [6] @ 0x823b59d8
-    virtual void vfn_7();  // [7] @ 0x823b59e8
+    void ScalarDtor(int flags); // [1] @ 0x823b5b58
+    void Deserialise(void* client);  // [2] @ 0x823b5bd8
+    void vfn_3();  // [3] @ 0x823b5c40
+    void vfn_4();  // [4] @ 0x823b5ca0
+    void vfn_5();  // [5] @ 0x823b5970
+    void vfn_6();  // [6] @ 0x823b59d8
+    void vfn_7();  // [7] @ 0x823b59e8
 };
 
 // ── HitMessage  [vtable @ 0x8206F528] ──────────────────────────
@@ -331,12 +336,12 @@ struct HitMessage {
     uint8_t     m_hitFlags;       // +0x08  — hit flags byte
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823b5fe0
-    virtual void Deserialise(void* client);  // [2] @ 0x823ba5f0
-    virtual void vfn_5();  // [5] @ 0x823b6040
-    virtual void vfn_6();  // [6] @ 0x823b6108
-    virtual void vfn_7();  // [7] @ 0x823b6118
-    virtual void vfn_8();  // [8] @ 0x823b5fd0
+    void ScalarDtor(int flags); // [1] @ 0x823b5fe0
+    void Deserialise(void* client);  // [2] @ 0x823ba5f0
+    void vfn_5();  // [5] @ 0x823b6040
+    void vfn_6();  // [6] @ 0x823b6108
+    void vfn_7();  // [7] @ 0x823b6118
+    void vfn_8();  // [8] @ 0x823b5fd0
 };
 
 // ── InternalMessageRelay  [vtable @ 0x8206FE74] ──────────────────────────
@@ -344,12 +349,12 @@ struct InternalMessageRelay {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823be080
-    virtual void vfn_2();  // [2] @ 0x823be0d8
-    virtual void vfn_4();  // [4] @ 0x823be0e0
-    virtual void vfn_5();  // [5] @ 0x823bde50
-    virtual void vfn_6();  // [6] @ 0x823bdf30
-    virtual void vfn_7();  // [7] @ 0x823bdf40
+    void ScalarDtor(int flags); // [1] @ 0x823be080
+    void vfn_2();  // [2] @ 0x823be0d8
+    void vfn_4();  // [4] @ 0x823be0e0
+    void vfn_5();  // [5] @ 0x823bde50
+    void vfn_6();  // [6] @ 0x823bdf30
+    void vfn_7();  // [7] @ 0x823bdf40
 };
 
 // ── JoinSpectatorSessionMessage  [vtable @ 0x8206FCE4] ──────────────────────────
@@ -357,12 +362,12 @@ struct JoinSpectatorSessionMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bbd80
-    virtual void vfn_2();  // [2] @ 0x823bbd98
-    virtual void vfn_4();  // [4] @ 0x823bbdb0
-    virtual void vfn_5();  // [5] @ 0x823bbc78
-    virtual void vfn_6();  // [6] @ 0x823bbd60
-    virtual void vfn_7();  // [7] @ 0x823bbd70
+    void ScalarDtor(int flags); // [1] @ 0x823bbd80
+    void vfn_2();  // [2] @ 0x823bbd98
+    void vfn_4();  // [4] @ 0x823bbdb0
+    void vfn_5();  // [5] @ 0x823bbc78
+    void vfn_6();  // [6] @ 0x823bbd60
+    void vfn_7();  // [7] @ 0x823bbd70
 };
 
 // ── JunkSwingStartedMessage  [vtable @ 0x8206F768] ──────────────────────────
@@ -370,10 +375,10 @@ struct JunkSwingStartedMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x823ba640
-    virtual void vfn_5();  // [5] @ 0x823ba508
-    virtual void vfn_6();  // [6] @ 0x823ba5d0
-    virtual void vfn_7();  // [7] @ 0x823ba5e0
+    void vfn_4();  // [4] @ 0x823ba640
+    void vfn_5();  // [5] @ 0x823ba508
+    void vfn_6();  // [6] @ 0x823ba5d0
+    void vfn_7();  // [7] @ 0x823ba5e0
 };
 
 // ── LeaveSpectatorSessionMessage  [vtable @ 0x8206FD0C] ──────────────────────────
@@ -381,10 +386,10 @@ struct LeaveSpectatorSessionMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x823bbef8
-    virtual void vfn_5();  // [5] @ 0x823bbdd0
-    virtual void vfn_6();  // [6] @ 0x823bbed8
-    virtual void vfn_7();  // [7] @ 0x823bbee8
+    void vfn_4();  // [4] @ 0x823bbef8
+    void vfn_5();  // [5] @ 0x823bbdd0
+    void vfn_6();  // [6] @ 0x823bbed8
+    void vfn_7();  // [7] @ 0x823bbee8
 };
 
 // ── LevelConfigMessage  [vtable @ 0x8206F8D0] ──────────────────────────
@@ -392,11 +397,11 @@ struct LevelConfigMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bc0f0
-    virtual void vfn_2();  // [2] @ 0x823bc150
-    virtual void vfn_5();  // [5] @ 0x823bbfc0
-    virtual void vfn_6();  // [6] @ 0x823bc088
-    virtual void vfn_7();  // [7] @ 0x823bc098
+    void ScalarDtor(int flags); // [1] @ 0x823bc0f0
+    void vfn_2();  // [2] @ 0x823bc150
+    void vfn_5();  // [5] @ 0x823bbfc0
+    void vfn_6();  // [6] @ 0x823bc088
+    void vfn_7();  // [7] @ 0x823bc098
 };
 
 // ── LoadDataQuery  [vtable @ 0x8206FE9C] ──────────────────────────
@@ -404,9 +409,9 @@ struct LoadDataQuery {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_5();  // [5] @ 0x823be2d8
-    virtual void vfn_6();  // [6] @ 0x823be350
-    virtual void vfn_7();  // [7] @ 0x823be360
+    void vfn_5();  // [5] @ 0x823be2d8
+    void vfn_6();  // [6] @ 0x823be350
+    void vfn_7();  // [7] @ 0x823be360
 };
 
 // ── LoadDataQueryResponse  [vtable @ 0x8206FEC4] ──────────────────────────
@@ -414,12 +419,12 @@ struct LoadDataQueryResponse {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823be498
-    virtual void vfn_2();  // [2] @ 0x823be4a0
-    virtual void vfn_4();  // [4] @ 0x823be4a8
-    virtual void vfn_5();  // [5] @ 0x823be370
-    virtual void vfn_6();  // [6] @ 0x823be478
-    virtual void vfn_7();  // [7] @ 0x823be488
+    void ScalarDtor(int flags); // [1] @ 0x823be498
+    void vfn_2();  // [2] @ 0x823be4a0
+    void vfn_4();  // [4] @ 0x823be4a8
+    void vfn_5();  // [5] @ 0x823be370
+    void vfn_6();  // [6] @ 0x823be478
+    void vfn_7();  // [7] @ 0x823be488
 };
 
 // ── LoadingStateRequestMessage  [vtable @ 0x8206FA10] ──────────────────────────
@@ -427,9 +432,9 @@ struct LoadingStateRequestMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_5();  // [5] @ 0x823bd958
-    virtual void vfn_6();  // [6] @ 0x823bd9d0
-    virtual void vfn_7();  // [7] @ 0x823bd9e0
+    void vfn_5();  // [5] @ 0x823bd958
+    void vfn_6();  // [6] @ 0x823bd9d0
+    void vfn_7();  // [7] @ 0x823bd9e0
 };
 
 // ── LoadingStateResponseMessage  [vtable @ 0x8206FA38] ──────────────────────────
@@ -437,11 +442,11 @@ struct LoadingStateResponseMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bdad8
-    virtual void vfn_2();  // [2] @ 0x823bdaf0
-    virtual void vfn_5();  // [5] @ 0x823bd9f0
-    virtual void vfn_6();  // [6] @ 0x823bdab8
-    virtual void vfn_7();  // [7] @ 0x823bdac8
+    void ScalarDtor(int flags); // [1] @ 0x823bdad8
+    void vfn_2();  // [2] @ 0x823bdaf0
+    void vfn_5();  // [5] @ 0x823bd9f0
+    void vfn_6();  // [6] @ 0x823bdab8
+    void vfn_7();  // [7] @ 0x823bdac8
 };
 
 // ── LogicNetworkClient  [vtable @ 0x8206C394] ──────────────────────────
@@ -449,7 +454,7 @@ struct LogicNetworkClient {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~LogicNetworkClient();                  // [0] @ 0x8239a9e8
+    ~LogicNetworkClient();                  // [0] @ 0x8239a9e8
 };
 
 // ── MatchScoreMessage  [vtable @ 0x8206F970] ──────────────────────────
@@ -457,11 +462,11 @@ struct MatchScoreMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bce78
-    virtual void vfn_2();  // [2] @ 0x823bced8
-    virtual void vfn_5();  // [5] @ 0x823bcd78
-    virtual void vfn_6();  // [6] @ 0x823bce58
-    virtual void vfn_7();  // [7] @ 0x823bce68
+    void ScalarDtor(int flags); // [1] @ 0x823bce78
+    void vfn_2();  // [2] @ 0x823bced8
+    void vfn_5();  // [5] @ 0x823bcd78
+    void vfn_6();  // [6] @ 0x823bce58
+    void vfn_7();  // [7] @ 0x823bce68
 };
 
 // ── MatchStatsMessage  [vtable @ 0x8206FF3C] ──────────────────────────
@@ -469,10 +474,10 @@ struct MatchStatsMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x823bede0
-    virtual void vfn_5();  // [5] @ 0x823beae0
-    virtual void vfn_6();  // [6] @ 0x823bebc0
-    virtual void vfn_7();  // [7] @ 0x823bebd0
+    void vfn_4();  // [4] @ 0x823bede0
+    void vfn_5();  // [5] @ 0x823beae0
+    void vfn_6();  // [6] @ 0x823bebc0
+    void vfn_7();  // [7] @ 0x823bebd0
 };
 
 // ── MatchTimeSyncMessage  [vtable @ 0x8206F554] ──────────────────────────
@@ -487,12 +492,12 @@ struct MatchTimeSyncMessage {
     uint16_t    m_frameCounter;   // +0x24  — 16-bit frame counter
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823b70a8
-    virtual void Deserialise(void* client);  // [2] @ 0x823b7130
-    virtual void Serialise(void* client);
-    virtual void vfn_5();  // [5] @ 0x823b6f80
-    virtual void vfn_6();  // [6] @ 0x823b7088
-    virtual void vfn_7();  // [7] @ 0x823b7098
+    void ScalarDtor(int flags); // [1] @ 0x823b70a8
+    void Deserialise(void* client);  // [2] @ 0x823b7130
+    void Serialise(void* client);
+    void vfn_5();  // [5] @ 0x823b6f80
+    void vfn_6();  // [6] @ 0x823b7088
+    void vfn_7();  // [7] @ 0x823b7098
 };
 
 // ── MatchTimeSyncRequestMessage  [vtable @ 0x8206F57C] ──────────────────────────
@@ -500,11 +505,11 @@ struct MatchTimeSyncRequestMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823b72e0
-    virtual void vfn_2();  // [2] @ 0x823b7928
-    virtual void vfn_5();  // [5] @ 0x823b71b8
-    virtual void vfn_6();  // [6] @ 0x823b72c0
-    virtual void vfn_7();  // [7] @ 0x823b72d0
+    void ScalarDtor(int flags); // [1] @ 0x823b72e0
+    void vfn_2();  // [2] @ 0x823b7928
+    void vfn_5();  // [5] @ 0x823b71b8
+    void vfn_6();  // [6] @ 0x823b72c0
+    void vfn_7();  // [7] @ 0x823b72d0
 };
 
 // ── MatchTimeSyncRequestMessageEx  [vtable @ 0x8206FB4C] ──────────────────────────
@@ -512,11 +517,11 @@ struct MatchTimeSyncRequestMessageEx {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823b73f0
-    virtual void vfn_2();  // [2] @ 0x823b7470
-    virtual void vfn_5();  // [5] @ 0x823b72e8
-    virtual void vfn_6();  // [6] @ 0x823b73d0
-    virtual void vfn_7();  // [7] @ 0x823b73e0
+    void ScalarDtor(int flags); // [1] @ 0x823b73f0
+    void vfn_2();  // [2] @ 0x823b7470
+    void vfn_5();  // [5] @ 0x823b72e8
+    void vfn_6();  // [6] @ 0x823b73d0
+    void vfn_7();  // [7] @ 0x823b73e0
 };
 
 // ── NetBallHitManager  [vtable @ 0x82070DDC] ──────────────────────────
@@ -524,7 +529,7 @@ struct NetBallHitManager {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~NetBallHitManager();                  // [0] @ 0x823cf788
+    ~NetBallHitManager();                  // [0] @ 0x823cf788
 };
 
 // ── NetDataQuery  [vtable @ 0x8207116C] ──────────────────────────
@@ -532,11 +537,11 @@ struct NetDataQuery {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~NetDataQuery();                  // [0] @ 0x823d15c8
-    virtual void vfn_4();  // [4] @ 0x823d1ad0
-    virtual void vfn_8();  // [8] @ 0x823d1628
-    virtual void vfn_10();  // [10] @ 0x823d17c8
-    virtual void GetName();  // [13] @ 0x823d1850
+    ~NetDataQuery();                  // [0] @ 0x823d15c8
+    void vfn_4();  // [4] @ 0x823d1ad0
+    void vfn_8();  // [8] @ 0x823d1628
+    void vfn_10();  // [10] @ 0x823d17c8
+    void GetName();  // [13] @ 0x823d1850
 };
 
 namespace NetDataQueryInner {
@@ -546,8 +551,8 @@ struct stateFinish {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x823d1a20
-    virtual void GetName();  // [13] @ 0x823d1a60
+    void OnEnter();  // [11] @ 0x823d1a20
+    void GetName();  // [13] @ 0x823d1a60
 };
 
 // ── NetDataQuery::stateInit  [vtable @ 0x820711B4] ──────────────────────────
@@ -555,15 +560,15 @@ struct stateInit {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x8238dbe8
-    virtual void OnEnter();  // [11] @ 0x821036a0
-    virtual void vfn_12();  // [12] @ 0x82106b18
-    virtual void GetName();  // [13] @ 0x823d1958
-    virtual void vfn_14();  // [14] @ 0x823d1f70
-    virtual void vfn_15();  // [15] @ 0x821071f0
-    virtual void vfn_16();  // [16] @ 0x821037a8
-    virtual void vfn_17();  // [17] @ 0x82106bb8
-    virtual void vfn_18();  // [18] @ 0x82107040
+    void vfn_10();  // [10] @ 0x8238dbe8
+    void OnEnter();  // [11] @ 0x821036a0
+    void vfn_12();  // [12] @ 0x82106b18
+    void GetName();  // [13] @ 0x823d1958
+    void vfn_14();  // [14] @ 0x823d1f70
+    void vfn_15();  // [15] @ 0x821071f0
+    void vfn_16();  // [16] @ 0x821037a8
+    void vfn_17();  // [17] @ 0x82106bb8
+    void vfn_18();  // [18] @ 0x82107040
 };
 
 // ── NetDataQuery::stateReceiveData  [vtable @ 0x82071244] ──────────────────────────
@@ -571,9 +576,9 @@ struct stateReceiveData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x823d19e8
-    virtual void OnEnter();  // [11] @ 0x823d19d8
-    virtual void GetName();  // [13] @ 0x823d1a10
+    void vfn_10();  // [10] @ 0x823d19e8
+    void OnEnter();  // [11] @ 0x823d19d8
+    void GetName();  // [13] @ 0x823d1a10
 };
 
 // ── NetDataQuery::stateRequestData  [vtable @ 0x820711FC] ──────────────────────────
@@ -588,7 +593,7 @@ struct NetLoadingThread {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~NetLoadingThread();                  // [0] @ 0x823d1338
+    ~NetLoadingThread();                  // [0] @ 0x823d1338
 };
 
 // ── NetStateSync  [vtable @ 0x820713BC] ──────────────────────────
@@ -596,10 +601,10 @@ struct NetStateSync {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~NetStateSync();                  // [0] @ 0x823d1a70
-    virtual void vfn_8();  // [8] @ 0x823d1ad8
-    virtual void vfn_10();  // [10] @ 0x823d1d70
-    virtual void GetName();  // [13] @ 0x823d1dd0
+    ~NetStateSync();                  // [0] @ 0x823d1a70
+    void vfn_8();  // [8] @ 0x823d1ad8
+    void vfn_10();  // [10] @ 0x823d1d70
+    void GetName();  // [13] @ 0x823d1dd0
 };
 
 namespace NetStateSyncInner {
@@ -609,8 +614,8 @@ struct stateEnterState {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x823d2070
-    virtual void GetName();  // [13] @ 0x823d2080
+    void OnEnter();  // [11] @ 0x823d2070
+    void GetName();  // [13] @ 0x823d2080
 };
 
 // ── NetStateSync::stateInit  [vtable @ 0x82071404] ──────────────────────────
@@ -618,15 +623,15 @@ struct stateInit {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x8238dbe8
-    virtual void OnEnter();  // [11] @ 0x821036a0
-    virtual void vfn_12();  // [12] @ 0x82106b18
-    virtual void GetName();  // [13] @ 0x823d1958
-    virtual void vfn_14();  // [14] @ 0x823d1f70
-    virtual void vfn_15();  // [15] @ 0x821071f0
-    virtual void vfn_16();  // [16] @ 0x821037a8
-    virtual void vfn_17();  // [17] @ 0x82106bb8
-    virtual void vfn_18();  // [18] @ 0x82107040
+    void vfn_10();  // [10] @ 0x8238dbe8
+    void OnEnter();  // [11] @ 0x821036a0
+    void vfn_12();  // [12] @ 0x82106b18
+    void GetName();  // [13] @ 0x823d1958
+    void vfn_14();  // [14] @ 0x823d1f70
+    void vfn_15();  // [15] @ 0x821071f0
+    void vfn_16();  // [16] @ 0x821037a8
+    void vfn_17();  // [17] @ 0x82106bb8
+    void vfn_18();  // [18] @ 0x82107040
 };
 
 // ── NetStateSync::stateReceiveSyncronization  [vtable @ 0x8207156C] ──────────────────────────
@@ -634,9 +639,9 @@ struct stateReceiveSyncronization {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x823d2210
-    virtual void GetName();  // [13] @ 0x823d2288
-    virtual void vfn_14();  // [14] @ 0x823d2268
+    void vfn_10();  // [10] @ 0x823d2210
+    void GetName();  // [13] @ 0x823d2288
+    void vfn_14();  // [14] @ 0x823d2268
 };
 
 // ── NetStateSync::stateRequestSyncronization  [vtable @ 0x820714DC] ──────────────────────────
@@ -644,8 +649,8 @@ struct stateRequestSyncronization {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x823d2090
-    virtual void GetName();  // [13] @ 0x823d2138
+    void OnEnter();  // [11] @ 0x823d2090
+    void GetName();  // [13] @ 0x823d2138
 };
 
 // ── NetStateSync::stateSendSyncronization  [vtable @ 0x82071524] ──────────────────────────
@@ -653,9 +658,9 @@ struct stateSendSyncronization {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x823d2148
-    virtual void GetName();  // [13] @ 0x823d2200
-    virtual void vfn_14();  // [14] @ 0x823d21e0
+    void OnEnter();  // [11] @ 0x823d2148
+    void GetName();  // [13] @ 0x823d2200
+    void vfn_14();  // [14] @ 0x823d21e0
 };
 
 // ── NetStateSync::stateWaitForSyncState  [vtable @ 0x8207144C] ──────────────────────────
@@ -663,9 +668,9 @@ struct stateWaitForSyncState {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x823d2008
-    virtual void OnEnter();  // [11] @ 0x823d1f90
-    virtual void GetName();  // [13] @ 0x823d2060
+    void vfn_10();  // [10] @ 0x823d2008
+    void OnEnter();  // [11] @ 0x823d1f90
+    void GetName();  // [13] @ 0x823d2060
 };
 
 // ── NetStateSync::stateWaitTime  [vtable @ 0x820715B4] ──────────────────────────
@@ -673,9 +678,9 @@ struct stateWaitTime {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x823d22e0
-    virtual void OnEnter();  // [11] @ 0x823d2298
-    virtual void GetName();  // [13] @ 0x823d2390
+    void vfn_10();  // [10] @ 0x823d22e0
+    void OnEnter();  // [11] @ 0x823d2298
+    void GetName();  // [13] @ 0x823d2390
 };
 
 } // namespace NetStateSyncInner
@@ -685,7 +690,7 @@ struct NetTimedMessageSortedQueue {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~NetTimedMessageSortedQueue();                  // [0] @ 0x823cf1f8
+    ~NetTimedMessageSortedQueue();                  // [0] @ 0x823cf1f8
 };
 
 // ── NetTimer  [vtable @ 0x8206C49C] ──────────────────────────
@@ -694,10 +699,10 @@ struct NetTimer {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~NetTimer();                  // [0] @ 0x8239c128
-    virtual void ScalarDtor(int flags); // [1] @ 0x8239c1d8
-    virtual void vfn_2();  // [2] @ 0x8239c270
-    virtual void vfn_3();  // [3] @ 0x8239c2c0
+    ~NetTimer();                  // [0] @ 0x8239c128
+    void ScalarDtor(int flags); // [1] @ 0x8239c1d8
+    void vfn_2();  // [2] @ 0x8239c270
+    void vfn_3();  // [3] @ 0x8239c2c0
 
     // ── non-virtual methods (from debug strings) ──
     void Release();
@@ -708,8 +713,8 @@ struct NetTimerBase {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~NetTimerBase();                  // [0] @ 0x8239bd50
-    virtual void ScalarDtor(int flags); // [1] @ 0x8239be00
+    ~NetTimerBase();                  // [0] @ 0x8239bd50
+    void ScalarDtor(int flags); // [1] @ 0x8239be00
 };
 
 // ── NetTuningData  [vtable @ 0x82071108] ──────────────────────────
@@ -717,10 +722,10 @@ struct NetTuningData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~NetTuningData();                  // [0] @ 0x823d0e30
-    virtual void vfn_3();  // [3] @ 0x823d0ff0
-    virtual void vfn_6();  // [6] @ 0x823d0fd0
-    virtual void vfn_7();  // [7] @ 0x823d0fe0
+    ~NetTuningData();                  // [0] @ 0x823d0e30
+    void vfn_3();  // [3] @ 0x823d0ff0
+    void vfn_6();  // [6] @ 0x823d0fd0
+    void vfn_7();  // [7] @ 0x823d0fe0
 };
 
 // ── NetworkClient  [vtable @ 0x8206C3F4] ──────────────────────────
@@ -728,7 +733,7 @@ struct NetworkClient {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~NetworkClient();                  // [0] @ 0x8239a650
+    ~NetworkClient();                  // [0] @ 0x8239a650
 };
 
 // ── NextMatchMessage  [vtable @ 0x8206F948] ──────────────────────────
@@ -736,11 +741,11 @@ struct NextMatchMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bc648
-    virtual void vfn_2();  // [2] @ 0x823bc6c8
-    virtual void vfn_5();  // [5] @ 0x823bc520
-    virtual void vfn_6();  // [6] @ 0x823bc628
-    virtual void vfn_7();  // [7] @ 0x823bc638
+    void ScalarDtor(int flags); // [1] @ 0x823bc648
+    void vfn_2();  // [2] @ 0x823bc6c8
+    void vfn_5();  // [5] @ 0x823bc520
+    void vfn_6();  // [6] @ 0x823bc628
+    void vfn_7();  // [7] @ 0x823bc638
 };
 
 // ── NextMatchSpectatorMessage  [vtable @ 0x8206FD5C] ──────────────────────────
@@ -748,11 +753,11 @@ struct NextMatchSpectatorMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bc898
-    virtual void vfn_2();  // [2] @ 0x823bc8b0
-    virtual void vfn_5();  // [5] @ 0x823bc738
-    virtual void vfn_6();  // [6] @ 0x823bc790
-    virtual void vfn_7();  // [7] @ 0x823bc7a0
+    void ScalarDtor(int flags); // [1] @ 0x823bc898
+    void vfn_2();  // [2] @ 0x823bc8b0
+    void vfn_5();  // [5] @ 0x823bc738
+    void vfn_6();  // [6] @ 0x823bc790
+    void vfn_7();  // [7] @ 0x823bc7a0
 };
 
 // ── PlayerCacheMessage  [vtable @ 0x82070054] ──────────────────────────
@@ -760,11 +765,11 @@ struct PlayerCacheMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bf8d8
-    virtual void vfn_2();  // [2] @ 0x823bf9e8
-    virtual void vfn_5();  // [5] @ 0x823bf7d8
-    virtual void vfn_6();  // [6] @ 0x823bf8b8
-    virtual void vfn_7();  // [7] @ 0x823bf8c8
+    void ScalarDtor(int flags); // [1] @ 0x823bf8d8
+    void vfn_2();  // [2] @ 0x823bf9e8
+    void vfn_5();  // [5] @ 0x823bf7d8
+    void vfn_6();  // [6] @ 0x823bf8b8
+    void vfn_7();  // [7] @ 0x823bf8c8
 };
 
 // ── PlayerMovementMessage  [vtable @ 0x8206F66C] ──────────────────────────
@@ -781,12 +786,12 @@ struct PlayerMovementMessage {
     bool        isMoving;         // +0x20
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823b8110
-    virtual void vfn_2();  // [2] @ 0x823b8240
-    virtual void vfn_4();  // [4] @ 0x823b8358
-    virtual void vfn_5();  // [5] @ 0x823b7ef8
-    virtual void vfn_6();  // [6] @ 0x823b8000
-    virtual void vfn_7();  // [7] @ 0x823b8010
+    void ScalarDtor(int flags); // [1] @ 0x823b8110
+    void vfn_2();  // [2] @ 0x823b8240
+    void vfn_4();  // [4] @ 0x823b8358
+    void vfn_5();  // [5] @ 0x823b7ef8
+    void vfn_6();  // [6] @ 0x823b8000
+    void vfn_7();  // [7] @ 0x823b8010
 
     // ── non-virtual methods (lifted) ──
     void Deserialise(void* networkClient);
@@ -802,12 +807,12 @@ struct PlayerStopMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823b84d0
-    virtual void vfn_2();  // [2] @ 0x823b85a8
-    virtual void vfn_4();  // [4] @ 0x823b8658
-    virtual void vfn_5();  // [5] @ 0x823b83e8
-    virtual void vfn_6();  // [6] @ 0x823b84b0
-    virtual void vfn_7();  // [7] @ 0x823b84c0
+    void ScalarDtor(int flags); // [1] @ 0x823b84d0
+    void vfn_2();  // [2] @ 0x823b85a8
+    void vfn_4();  // [4] @ 0x823b8658
+    void vfn_5();  // [5] @ 0x823b83e8
+    void vfn_6();  // [6] @ 0x823b84b0
+    void vfn_7();  // [7] @ 0x823b84c0
 };
 
 // ── PlayerUpdateMessage  [vtable @ 0x8206F644] ──────────────────────────
@@ -815,12 +820,12 @@ struct PlayerUpdateMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823b7dd8
-    virtual void vfn_2();  // [2] @ 0x823b7e58
-    virtual void vfn_4();  // [4] @ 0x823b7eb8
-    virtual void vfn_5();  // [5] @ 0x823b7cb8
-    virtual void vfn_6();  // [6] @ 0x823b7db8
-    virtual void vfn_7();  // [7] @ 0x823b7dc8
+    void ScalarDtor(int flags); // [1] @ 0x823b7dd8
+    void vfn_2();  // [2] @ 0x823b7e58
+    void vfn_4();  // [4] @ 0x823b7eb8
+    void vfn_5();  // [5] @ 0x823b7cb8
+    void vfn_6();  // [6] @ 0x823b7db8
+    void vfn_7();  // [7] @ 0x823b7dc8
 };
 
 // ── PointDeclaredMessage  [vtable @ 0x8206F9E8] ──────────────────────────
@@ -828,12 +833,12 @@ struct PointDeclaredMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bd210
-    virtual void vfn_2();  // [2] @ 0x823bd270
-    virtual void vfn_4();  // [4] @ 0x823bd2c0
-    virtual void vfn_5();  // [5] @ 0x823bd128
-    virtual void vfn_6();  // [6] @ 0x823bd1f0
-    virtual void vfn_7();  // [7] @ 0x823bd200
+    void ScalarDtor(int flags); // [1] @ 0x823bd210
+    void vfn_2();  // [2] @ 0x823bd270
+    void vfn_4();  // [4] @ 0x823bd2c0
+    void vfn_5();  // [5] @ 0x823bd128
+    void vfn_6();  // [6] @ 0x823bd1f0
+    void vfn_7();  // [7] @ 0x823bd200
 };
 
 // ── PongNet  [vtable @ 0x8206BFC4] ──────────────────────────
@@ -841,7 +846,7 @@ struct PongNet {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~PongNet();                  // [0] @ 0x82390b00
+    ~PongNet();                  // [0] @ 0x82390b00
 };
 
 // ── PongNetExhibitionCoordinator  [vtable @ 0x8206D4FC] ──────────────────────────
@@ -849,19 +854,19 @@ struct PongNetExhibitionCoordinator {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~PongNetExhibitionCoordinator();                  // [0] @ 0x823a41c8
-    virtual void vfn_2();  // [2] @ 0x823a53b0
-    virtual void vfn_3();  // [3] @ 0x823a4490
-    virtual void vfn_5();  // [5] @ 0x823a4258
-    virtual void vfn_6();  // [6] @ 0x823a5598
-    virtual void vfn_9();  // [9] @ 0x823a58c0
-    virtual void vfn_10();  // [10] @ 0x823a5970
-    virtual void OnEnter();  // [11] @ 0x823a5978
-    virtual void vfn_12();  // [12] @ 0x823a4508
-    virtual void vfn_16();  // [16] @ 0x823a4600
-    virtual void vfn_17();  // [17] @ 0x823a46c8
-    virtual void PostLoadChildren();  // [22] @ 0x823a5f18
-    virtual void vfn_23();  // [23] @ 0x823a6030
+    ~PongNetExhibitionCoordinator();                  // [0] @ 0x823a41c8
+    void vfn_2();  // [2] @ 0x823a53b0
+    void vfn_3();  // [3] @ 0x823a4490
+    void vfn_5();  // [5] @ 0x823a4258
+    void vfn_6();  // [6] @ 0x823a5598
+    void vfn_9();  // [9] @ 0x823a58c0
+    void vfn_10();  // [10] @ 0x823a5970
+    void OnEnter();  // [11] @ 0x823a5978
+    void vfn_12();  // [12] @ 0x823a4508
+    void vfn_16();  // [16] @ 0x823a4600
+    void vfn_17();  // [17] @ 0x823a46c8
+    void PostLoadChildren();  // [22] @ 0x823a5f18
+    void vfn_23();  // [23] @ 0x823a6030
 };
 
 // ── PongNetGameModeCoordinator  [vtable @ 0x8206D48C] ──────────────────────────
@@ -870,18 +875,18 @@ struct PongNetGameModeCoordinator {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~PongNetGameModeCoordinator();                  // [0] @ 0x8239e428
-    virtual void ScalarDtor(int flags); // [1] @ 0x8239e4f0
-    virtual void vfn_2();  // [2] @ 0x8239e8e0
-    virtual void vfn_5();  // [5] @ 0x8239e9e8
-    virtual void vfn_6();  // [6] @ 0x8239eca8
-    virtual void GetName();  // [13] @ 0x8239e6b0
-    virtual void vfn_14();  // [14] @ 0x8239e7d0
-    virtual void vfn_19();  // [19] @ 0x8239e6a8
-    virtual void PostLoadProperties();  // [20] @ 0x8239faa8
-    virtual void PostLoadChildren();  // [22] @ 0x8239fb40
-    virtual void vfn_23();  // [23] @ 0x8239fc30
-    virtual void vfn_24();  // [24] @ 0x8239fca0
+    ~PongNetGameModeCoordinator();                  // [0] @ 0x8239e428
+    void ScalarDtor(int flags); // [1] @ 0x8239e4f0
+    void vfn_2();  // [2] @ 0x8239e8e0
+    void vfn_5();  // [5] @ 0x8239e9e8
+    void vfn_6();  // [6] @ 0x8239eca8
+    void GetName();  // [13] @ 0x8239e6b0
+    void vfn_14();  // [14] @ 0x8239e7d0
+    void vfn_19();  // [19] @ 0x8239e6a8
+    void PostLoadProperties();  // [20] @ 0x8239faa8
+    void PostLoadChildren();  // [22] @ 0x8239fb40
+    void vfn_23();  // [23] @ 0x8239fc30
+    void vfn_24();  // [24] @ 0x8239fca0
 
     // ── non-virtual methods (from debug strings) ──
     void Reset();
@@ -893,13 +898,13 @@ struct PongNetGameModeManager {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~PongNetGameModeManager();                  // [0] @ 0x8239dd80
-    virtual void ScalarDtor(int flags); // [1] @ 0x8239def0
-    virtual void vfn_2();  // [2] @ 0x8239df30
-    virtual void vfn_3();  // [3] @ 0x8239df80
-    virtual void vfn_4();  // [4] @ 0x8239e008
-    virtual void vfn_5();  // [5] @ 0x8239e2a0
-    virtual void vfn_6();  // [6] @ 0x8239e260
+    ~PongNetGameModeManager();                  // [0] @ 0x8239dd80
+    void ScalarDtor(int flags); // [1] @ 0x8239def0
+    void vfn_2();  // [2] @ 0x8239df30
+    void vfn_3();  // [3] @ 0x8239df80
+    void vfn_4();  // [4] @ 0x8239e008
+    void vfn_5();  // [5] @ 0x8239e2a0
+    void vfn_6();  // [6] @ 0x8239e260
 };
 
 // ── PongNetMessage  [vtable @ 0x8206C304] ──────────────────────────
@@ -907,7 +912,7 @@ struct PongNetMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~PongNetMessage();                  // [0] @ 0x823bc0a8
+    ~PongNetMessage();                  // [0] @ 0x823bc0a8
 };
 
 // ── PongNetProxyCoordinator  [vtable @ 0x8206D5DC] ──────────────────────────
@@ -915,7 +920,7 @@ struct PongNetProxyCoordinator {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~PongNetProxyCoordinator();                  // [0] @ 0x823a6528
+    ~PongNetProxyCoordinator();                  // [0] @ 0x823a6528
 };
 
 // ── PongNetRoundRobinCoordinator  [vtable @ 0x8206D56C] ──────────────────────────
@@ -923,22 +928,22 @@ struct PongNetRoundRobinCoordinator {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~PongNetRoundRobinCoordinator();                  // [0] @ 0x823a03e8
-    virtual void vfn_2();  // [2] @ 0x823a1e98
-    virtual void vfn_3();  // [3] @ 0x823a09b0
-    virtual void vfn_5();  // [5] @ 0x823a04d8
-    virtual void vfn_6();  // [6] @ 0x823a2370
-    virtual void vfn_9();  // [9] @ 0x823a2778
-    virtual void vfn_10();  // [10] @ 0x823a2830
-    virtual void OnEnter();  // [11] @ 0x823a2868
-    virtual void vfn_12();  // [12] @ 0x823a09e8
-    virtual void vfn_15();  // [15] @ 0x823a0b48
-    virtual void vfn_16();  // [16] @ 0x823a0b58
-    virtual void vfn_17();  // [17] @ 0x823a15a8
-    virtual void vfn_18();  // [18] @ 0x823a1868
-    virtual void PostLoadProperties();  // [20] @ 0x823a30d0
-    virtual void PostLoadChildren();  // [22] @ 0x823a31a0
-    virtual void vfn_23();  // [23] @ 0x823a3808
+    ~PongNetRoundRobinCoordinator();                  // [0] @ 0x823a03e8
+    void vfn_2();  // [2] @ 0x823a1e98
+    void vfn_3();  // [3] @ 0x823a09b0
+    void vfn_5();  // [5] @ 0x823a04d8
+    void vfn_6();  // [6] @ 0x823a2370
+    void vfn_9();  // [9] @ 0x823a2778
+    void vfn_10();  // [10] @ 0x823a2830
+    void OnEnter();  // [11] @ 0x823a2868
+    void vfn_12();  // [12] @ 0x823a09e8
+    void vfn_15();  // [15] @ 0x823a0b48
+    void vfn_16();  // [16] @ 0x823a0b58
+    void vfn_17();  // [17] @ 0x823a15a8
+    void vfn_18();  // [18] @ 0x823a1868
+    void PostLoadProperties();  // [20] @ 0x823a30d0
+    void PostLoadChildren();  // [22] @ 0x823a31a0
+    void vfn_23();  // [23] @ 0x823a3808
 };
 
 // ── PostPointExitMessage  [vtable @ 0x8206FDAC] ──────────────────────────
@@ -946,10 +951,10 @@ struct PostPointExitMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x823bd0d8
-    virtual void vfn_5();  // [5] @ 0x823bcf28
-    virtual void vfn_6();  // [6] @ 0x823bcff0
-    virtual void vfn_7();  // [7] @ 0x823bd000
+    void vfn_4();  // [4] @ 0x823bd0d8
+    void vfn_5();  // [5] @ 0x823bcf28
+    void vfn_6();  // [6] @ 0x823bcff0
+    void vfn_7();  // [7] @ 0x823bd000
 };
 
 // ── RemoteServeReadyMessage  [vtable @ 0x8206FB20] ──────────────────────────
@@ -957,13 +962,13 @@ struct RemoteServeReadyMessage : public HitMessage {
     uint16_t    m_serveParam;     // +0x0C  — 16-bit serve parameter
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823b6ed8
-    virtual void Deserialise(void* client);  // [2] @ 0x823b6f20
-    virtual void Serialise(void* client);    // [3] @ 0x823b6e98
-    virtual void vfn_5();  // [5] @ 0x823b6d28
-    virtual void vfn_6();  // [6] @ 0x823b6e30
-    virtual void vfn_7();  // [7] @ 0x823b6e40
-    virtual void vfn_8();  // [8] @ 0x823b6e50
+    void ScalarDtor(int flags); // [1] @ 0x823b6ed8
+    void Deserialise(void* client);  // [2] @ 0x823b6f20
+    void Serialise(void* client);    // [3] @ 0x823b6e98
+    void vfn_5();  // [5] @ 0x823b6d28
+    void vfn_6();  // [6] @ 0x823b6e30
+    void vfn_7();  // [7] @ 0x823b6e40
+    void vfn_8();  // [8] @ 0x823b6e50
 };
 
 // ── RemoveSpectatorMessage  [vtable @ 0x8206FCBC] ──────────────────────────
@@ -971,9 +976,9 @@ struct RemoveSpectatorMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_5();  // [5] @ 0x823bbb50
-    virtual void vfn_6();  // [6] @ 0x823bbc58
-    virtual void vfn_7();  // [7] @ 0x823bbc68
+    void vfn_5();  // [5] @ 0x823bbb50
+    void vfn_6();  // [6] @ 0x823bbc58
+    void vfn_7();  // [7] @ 0x823bbc68
 };
 
 // ── ReplayEmoteMessage  [vtable @ 0x8206FDD4] ──────────────────────────
@@ -981,12 +986,12 @@ struct ReplayEmoteMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bd3e0
-    virtual void vfn_2();  // [2] @ 0x823bd490
-    virtual void vfn_4();  // [4] @ 0x823bd500
-    virtual void vfn_5();  // [5] @ 0x823bd2f8
-    virtual void vfn_6();  // [6] @ 0x823bd3c0
-    virtual void vfn_7();  // [7] @ 0x823bd3d0
+    void ScalarDtor(int flags); // [1] @ 0x823bd3e0
+    void vfn_2();  // [2] @ 0x823bd490
+    void vfn_4();  // [4] @ 0x823bd500
+    void vfn_5();  // [5] @ 0x823bd2f8
+    void vfn_6();  // [6] @ 0x823bd3c0
+    void vfn_7();  // [7] @ 0x823bd3d0
 };
 
 // ── RequestDataMessage  [vtable @ 0x8206FF8C] ──────────────────────────
@@ -1001,9 +1006,9 @@ struct RequestDataMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_5();           // [5] @ 0x823bf058 - Return to pool
-    virtual void* vfn_6();          // [6] @ 0x823bf120 - Get pool singleton
-    virtual const char* vfn_7();    // [7] @ 0x823bf130 - Get type name
+    void vfn_5();           // [5] @ 0x823bf058 - Return to pool
+    void* vfn_6();          // [6] @ 0x823bf120 - Get pool singleton
+    const char* vfn_7();    // [7] @ 0x823bf130 - Get type name
 
     // ── non-virtual methods (lifted in pong_network.cpp) ──
     void ReturnToPool();
@@ -1016,12 +1021,12 @@ struct RoundRobinDataMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~RoundRobinDataMessage();                  // [0] @ 0x823bf420
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bf480
-    virtual void vfn_2();  // [2] @ 0x823bf4e0
-    virtual void vfn_5();  // [5] @ 0x823bf320
-    virtual void vfn_6();  // [6] @ 0x823bf400
-    virtual void vfn_7();  // [7] @ 0x823bf410
+    ~RoundRobinDataMessage();                  // [0] @ 0x823bf420
+    void ScalarDtor(int flags); // [1] @ 0x823bf480
+    void vfn_2();  // [2] @ 0x823bf4e0
+    void vfn_5();  // [5] @ 0x823bf320
+    void vfn_6();  // [6] @ 0x823bf400
+    void vfn_7();  // [7] @ 0x823bf410
 };
 
 // ── ScoreMessage  [vtable @ 0x8206FE24] ──────────────────────────
@@ -1029,12 +1034,12 @@ struct ScoreMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bd7c8
-    virtual void vfn_2();  // [2] @ 0x823bd820
-    virtual void vfn_4();  // [4] @ 0x823bd8f0
-    virtual void vfn_5();  // [5] @ 0x823bd6c8
-    virtual void vfn_6();  // [6] @ 0x823bd7a8
-    virtual void vfn_7();  // [7] @ 0x823bd7b8
+    void ScalarDtor(int flags); // [1] @ 0x823bd7c8
+    void vfn_2();  // [2] @ 0x823bd820
+    void vfn_4();  // [4] @ 0x823bd8f0
+    void vfn_5();  // [5] @ 0x823bd6c8
+    void vfn_6();  // [6] @ 0x823bd7a8
+    void vfn_7();  // [7] @ 0x823bd7b8
 };
 
 // ── ServeAbortMessage  [vtable @ 0x8206F714] ──────────────────────────
@@ -1042,11 +1047,11 @@ struct ServeAbortMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823b8d20
-    virtual void vfn_4();  // [4] @ 0x823b8cc8
-    virtual void vfn_5();  // [5] @ 0x823b8be0
-    virtual void vfn_6();  // [6] @ 0x823b8ca8
-    virtual void vfn_7();  // [7] @ 0x823b8cb8
+    void ScalarDtor(int flags); // [1] @ 0x823b8d20
+    void vfn_4();  // [4] @ 0x823b8cc8
+    void vfn_5();  // [5] @ 0x823b8be0
+    void vfn_6();  // [6] @ 0x823b8ca8
+    void vfn_7();  // [7] @ 0x823b8cb8
 };
 
 // ── ServeFaultMessage  [vtable @ 0x8206FB9C] ──────────────────────────
@@ -1054,13 +1059,13 @@ struct ServeFaultMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823b93c0
-    virtual void vfn_2();  // [2] @ 0x823b9430
-    virtual void vfn_4();  // [4] @ 0x823b9498
-    virtual void vfn_5();  // [5] @ 0x823b9290
-    virtual void vfn_6();  // [6] @ 0x823b9358
-    virtual void vfn_7();  // [7] @ 0x823b9368
-    virtual void vfn_8();  // [8] @ 0x823b9378
+    void ScalarDtor(int flags); // [1] @ 0x823b93c0
+    void vfn_2();  // [2] @ 0x823b9430
+    void vfn_4();  // [4] @ 0x823b9498
+    void vfn_5();  // [5] @ 0x823b9290
+    void vfn_6();  // [6] @ 0x823b9358
+    void vfn_7();  // [7] @ 0x823b9368
+    void vfn_8();  // [8] @ 0x823b9378
 };
 
 // ── ServeLetMessage  [vtable @ 0x8206FBC8] ──────────────────────────
@@ -1068,13 +1073,13 @@ struct ServeLetMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823b9658
-    virtual void vfn_2();  // [2] @ 0x823b96c8
-    virtual void vfn_4();  // [4] @ 0x823b9730
-    virtual void vfn_5();  // [5] @ 0x823b9528
-    virtual void vfn_6();  // [6] @ 0x823b95f0
-    virtual void vfn_7();  // [7] @ 0x823b9600
-    virtual void vfn_8();  // [8] @ 0x823b9610
+    void ScalarDtor(int flags); // [1] @ 0x823b9658
+    void vfn_2();  // [2] @ 0x823b96c8
+    void vfn_4();  // [4] @ 0x823b9730
+    void vfn_5();  // [5] @ 0x823b9528
+    void vfn_6();  // [6] @ 0x823b95f0
+    void vfn_7();  // [7] @ 0x823b9600
+    void vfn_8();  // [8] @ 0x823b9610
 };
 
 // ── ServeReadyMessage  [vtable @ 0x8206F6E8] ──────────────────────────
@@ -1082,13 +1087,13 @@ struct ServeReadyMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823b8b10
-    virtual void vfn_2();  // [2] @ 0x823b8b78
-    virtual void vfn_4();  // [4] @ 0x823b8aa0
-    virtual void vfn_5();  // [5] @ 0x823b88d8
-    virtual void vfn_6();  // [6] @ 0x823b89e0
-    virtual void vfn_7();  // [7] @ 0x823b89f0
-    virtual void vfn_8();  // [8] @ 0x823b8a00
+    void ScalarDtor(int flags); // [1] @ 0x823b8b10
+    void vfn_2();  // [2] @ 0x823b8b78
+    void vfn_4();  // [4] @ 0x823b8aa0
+    void vfn_5();  // [5] @ 0x823b88d8
+    void vfn_6();  // [6] @ 0x823b89e0
+    void vfn_7();  // [7] @ 0x823b89f0
+    void vfn_8();  // [8] @ 0x823b8a00
 };
 
 // ── ServeStartedMessage  [vtable @ 0x8206F740] ──────────────────────────
@@ -1107,14 +1112,14 @@ struct ServeStartedMessage {
     uint8_t  m_bSecondaryPlayer;  // +0xE2  secondary player flag
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags);         // [1] @ 0x823b8f68
-    virtual void Deserialise(void* client);     // [2] @ 0x823b8f68  (net packet read)
-    virtual void Serialise(void* client);       // [3] @ 0x823b9050  (net packet write)
-    virtual void Process(void* matchObj);       // [4] @ 0x823b9100  (apply to game state)
-    virtual void vfn_5();                       // [5] @ 0x823b8d28
-    virtual uint16_t GetIndexInPool() const;    // [6] @ 0x823b8df0
-    virtual void* GetSingleton();               // [7] @ 0x823b8e00
-    virtual const char* GetTypeName();          // [7] @ 0x823b8e00 (slot 7)
+    void ScalarDtor(int flags);         // [1] @ 0x823b8f68
+    void Deserialise(void* client);     // [2] @ 0x823b8f68  (net packet read)
+    void Serialise(void* client);       // [3] @ 0x823b9050  (net packet write)
+    void Process(void* matchObj);       // [4] @ 0x823b9100  (apply to game state)
+    void vfn_5();                       // [5] @ 0x823b8d28
+    uint16_t GetIndexInPool() const;    // [6] @ 0x823b8df0
+    void* GetSingleton();               // [7] @ 0x823b8e00
+    const char* GetTypeName();          // [7] @ 0x823b8e00 (slot 7)
 };
 
 // ── ServeUnlockMessage  [vtable @ 0x8206FAF4] ──────────────────────────
@@ -1122,11 +1127,11 @@ struct ServeUnlockMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x823b6c90
-    virtual void vfn_4();  // [4] @ 0x823b6cd0
-    virtual void vfn_5();  // [5] @ 0x823b6ba8
-    virtual void vfn_6();  // [6] @ 0x823b6c70
-    virtual void vfn_7();  // [7] @ 0x823b6c80
+    void vfn_3();  // [3] @ 0x823b6c90
+    void vfn_4();  // [4] @ 0x823b6cd0
+    void vfn_5();  // [5] @ 0x823b6ba8
+    void vfn_6();  // [6] @ 0x823b6c70
+    void vfn_7();  // [7] @ 0x823b6c80
 };
 
 // ── SessionMessageRequester  [vtable @ 0x82070AB4] ──────────────────────────
@@ -1134,10 +1139,10 @@ struct SessionMessageRequester {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~SessionMessageRequester();                  // [0] @ 0x823c9980
-    virtual void vfn_4();  // [4] @ 0x823c9ba0
-    virtual void vfn_8();  // [8] @ 0x823c9c40
-    virtual void GetName();  // [13] @ 0x823c9d80
+    ~SessionMessageRequester();                  // [0] @ 0x823c9980
+    void vfn_4();  // [4] @ 0x823c9ba0
+    void vfn_8();  // [8] @ 0x823c9c40
+    void GetName();  // [13] @ 0x823c9d80
 };
 
 namespace SessionMessageRequesterInner {
@@ -1147,9 +1152,9 @@ struct stateAwaitingMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x823ca158
-    virtual void OnEnter();  // [11] @ 0x823ca0f8
-    virtual void GetName();  // [13] @ 0x823ca1a0
+    void vfn_10();  // [10] @ 0x823ca158
+    void OnEnter();  // [11] @ 0x823ca0f8
+    void GetName();  // [13] @ 0x823ca1a0
 };
 
 // ── SessionMessageRequester::stateIdle  [vtable @ 0x82070AFC] ──────────────────────────
@@ -1157,8 +1162,8 @@ struct stateIdle {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x823c9e98
-    virtual void vfn_12();  // [12] @ 0x823c9ed8
+    void OnEnter();  // [11] @ 0x823c9e98
+    void vfn_12();  // [12] @ 0x823c9ed8
 };
 
 // ── SessionMessageRequester::stateRequestingMessage  [vtable @ 0x82070B44] ──────────────────────────
@@ -1166,9 +1171,9 @@ struct stateRequestingMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_9();  // [9] @ 0x823c9f28
-    virtual void GetName();  // [13] @ 0x823ca0e8
-    virtual void vfn_14();  // [14] @ 0x823ca0d0
+    void vfn_9();  // [9] @ 0x823c9f28
+    void GetName();  // [13] @ 0x823ca0e8
+    void vfn_14();  // [14] @ 0x823ca0d0
 };
 
 } // namespace SessionMessageRequesterInner
@@ -1178,11 +1183,11 @@ struct SessionTimeSyncMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823b7728
-    virtual void vfn_2();  // [2] @ 0x823b7780
-    virtual void vfn_5();  // [5] @ 0x823b7640
-    virtual void vfn_6();  // [6] @ 0x823b7708
-    virtual void vfn_7();  // [7] @ 0x823b7718
+    void ScalarDtor(int flags); // [1] @ 0x823b7728
+    void vfn_2();  // [2] @ 0x823b7780
+    void vfn_5();  // [5] @ 0x823b7640
+    void vfn_6();  // [6] @ 0x823b7708
+    void vfn_7();  // [7] @ 0x823b7718
 };
 
 // ── SessionTimeSyncRequestMessage  [vtable @ 0x8206F5F4] ──────────────────────────
@@ -1190,9 +1195,9 @@ struct SessionTimeSyncRequestMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_5();  // [5] @ 0x823b7800
-    virtual void vfn_6();  // [6] @ 0x823b7908
-    virtual void vfn_7();  // [7] @ 0x823b7918
+    void vfn_5();  // [5] @ 0x823b7800
+    void vfn_6();  // [6] @ 0x823b7908
+    void vfn_7();  // [7] @ 0x823b7918
 };
 
 // ── SignalReadyToServeMessage  [vtable @ 0x8206F6BC] ──────────────────────────
@@ -1200,11 +1205,11 @@ struct SignalReadyToServeMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x823b8808
-    virtual void vfn_5();  // [5] @ 0x823b8720
-    virtual void vfn_6();  // [6] @ 0x823b87e8
-    virtual void vfn_7();  // [7] @ 0x823b87f8
-    virtual void vfn_8();  // [8] @ 0x823b86e8
+    void vfn_4();  // [4] @ 0x823b8808
+    void vfn_5();  // [5] @ 0x823b8720
+    void vfn_6();  // [6] @ 0x823b87e8
+    void vfn_7();  // [7] @ 0x823b87f8
+    void vfn_8();  // [8] @ 0x823b86e8
 };
 
 // ── SinglesConnectRequest  [vtable @ 0x8206F830] ──────────────────────────
@@ -1212,11 +1217,11 @@ struct SinglesConnectRequest {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bdd98
-    virtual void vfn_2();  // [2] @ 0x823bbb40
-    virtual void vfn_5();  // [5] @ 0x823bae80
-    virtual void vfn_6();  // [6] @ 0x823baef8
-    virtual void vfn_7();  // [7] @ 0x823baf08
+    void ScalarDtor(int flags); // [1] @ 0x823bdd98
+    void vfn_2();  // [2] @ 0x823bbb40
+    void vfn_5();  // [5] @ 0x823bae80
+    void vfn_6();  // [6] @ 0x823baef8
+    void vfn_7();  // [7] @ 0x823baf08
 };
 
 // ── SinglesNetworkClient  [vtable @ 0x8206C32C] ──────────────────────────
@@ -1224,434 +1229,39 @@ struct SinglesConnectRequest {
 struct SinglesNetworkClient {
     void**      vtable;           // +0x00
 
-    // ── field access clusters ──
-    uint8_t      m_bInitialized;     // +0x0001  R:1 W:0  init flag
-    uint16_t     m_sessionFlags;     // +0x0002  R:13 W:5  session state flags
-    uint8_t      m_bSessionValid;    // +0x0003  R:1 W:0  session valid flag
-    uint32_t     m_state;            // +0x0004  R:101 W:181  state machine value (0-5+)
-    uint8_t      m_bStateReady;      // +0x0005  R:2 W:0  state ready check
-    uint16_t     m_stateFlags;       // +0x0006  R:6 W:4  state transition flags
-    uint8_t      m_stateSubIdx;      // +0x0007  R:5 W:3  state sub-index
-    uint64_t     m_pBitStream;       // +0x0008  R:33 W:78  bitstream context pointer
-    uint8_t      m_bitstreamMode;    // +0x0009  R:21 W:3  bitstream read/write mode
-    uint16_t     m_bitstreamPos;     // +0x000a  R:2 W:10  bitstream bit position
-    uint8_t      m_bBitstreamReady;  // +0x000b  R:1 W:1  bitstream ready flag
-    uint32_t     m_packetSize;       // +0x000c  R:27 W:65  packet buffer size
-    uint8_t      m_packetFlags;      // +0x000d  R:2 W:5  packet flags byte
-    uint16_t     m_packetSeqNum;     // +0x000e  R:1 W:16  packet sequence number
-    uint8_t      m_bPacketPending;   // +0x000f  R:0 W:2  packet pending flag
-    uint64_t     m_pMessageQueue;    // +0x0010  R:116 W:70  message queue pointer
-    uint16_t     m_queueWritePos;    // +0x0012  R:0 W:4  queue write position
-    uint32_t     m_pNetworkSession;  // +0x0014  R:42 W:74  network session pointer
-    uint16_t     m_sessionWritePos;  // +0x0016  R:0 W:3  session write position
-    uint64_t     m_bAllPlayersReady; // +0x0018  R:35 W:49  all-players-ready flag
-    uint16_t     m_readyWritePos;    // +0x001a  R:0 W:2  ready state write pos
-    uint8_t      m_bReadyPending;    // +0x001b  R:0 W:1  ready pending flag
-    uint32_t     m_pConnectionState; // +0x001c  R:45 W:69  connection state pointer
-    uint8_t      m_bConnEstablished; // +0x001d  R:1 W:0  connection established
-    uint8_t      m_connRetryCount;   // +0x001e  R:1 W:1  connection retry count
-    uint8_t      m_connFlags;        // +0x001f  R:1 W:1  connection flags
-    uint64_t     m_pSendBuffer;      // +0x0020  R:44 W:78  send buffer pointer
-    uint8_t      m_sendFlags;        // +0x0021  R:3 W:4  send buffer flags
-    uint16_t     m_sendSeqNum;       // +0x0022  R:1 W:1  send sequence number
-    uint32_t     m_pRecvBuffer;      // +0x0024  R:17 W:41  receive buffer pointer
-    uint16_t     m_recvFlags;        // +0x0026  R:3 W:1  receive buffer flags
-    uint64_t     m_pReliableQueue;   // +0x0028  R:26 W:36  reliable message queue
-    uint16_t     m_reliableFlags;    // +0x002a  R:2 W:1  reliable queue flags
-    uint32_t     m_pPeerState;       // +0x002c  R:37 W:26  peer connection state
-    uint16_t     m_peerFlags;        // +0x002e  R:4 W:1  peer flags
-    uint32_t     m_pMatchState;      // +0x0030  R:23 W:25  match state pointer
-    uint8_t      m_matchWriteFlags;  // +0x0031  R:0 W:4  match write flags
-    uint16_t     m_matchSeqNum;      // +0x0032  R:0 W:2  match sequence number
-    uint32_t     m_pTimingState;     // +0x0034  R:22 W:10  timing state data
-    uint64_t     m_pNetMsgSingleton; // +0x0038  R:50 W:13  network message singleton
-    uint32_t     m_msgPoolCount;     // +0x003c  R:42 W:6  message pool ref count
-    uint64_t     m_pPlayerData;      // +0x0040  R:13 W:10  player data pointer
-    uint8_t      m_bPlayerDataValid; // +0x0041  R:1 W:1  player data valid
-    uint16_t     m_playerDataFlags;  // +0x0042  R:2 W:2  player data flags
-    uint32_t     m_pSessionMgr;      // +0x0044  R:9 W:14  session manager pointer
-    uint8_t      m_sessionMgrFlags;  // +0x0047  R:1 W:1  session manager flags
-    uint64_t     m_pGameState;       // +0x0048  R:13 W:6  game state pointer
-    uint8_t      m_bGameStateValid;  // +0x004a  R:1 W:0  game state valid
-    uint32_t     m_pRoundState;      // +0x004c  R:6 W:5  round state pointer
-    uint32_t     m_pSingletonRef;    // +0x0050  R:16 W:7  singleton reference
-    uint64_t     m_pServeState;      // +0x0054  R:20 W:6  serve state pointer
-    uint8_t      m_bServeActive;     // +0x0055  R:1 W:0  serve active flag
-    uint32_t     m_serveTimer;       // +0x0058  R:1 W:4  serve timer value
-    uint32_t     m_pRallyState;      // +0x005c  R:18 W:11  rally state pointer
-    uint8_t      m_rallyFlags;       // +0x005d  R:2 W:4  rally flags byte 0
-    uint8_t      m_rallyFlags2;      // +0x005e  R:2 W:4  rally flags byte 1
-    uint8_t      m_rallyFlags3;      // +0x005f  R:3 W:5  rally flags byte 2
-    uint32_t     m_pInputBuffer;     // +0x0060  R:22 W:76  input buffer pointer
-    uint8_t      m_inputFlags;       // +0x0061  R:5 W:4  input state flags
-    uint8_t      m_inputIndex;       // +0x0062  R:3 W:5  input buffer index
-    uint8_t      m_bInputPending;    // +0x0063  R:0 W:4  input pending flag
-    uint32_t     m_pSwingBuffer;     // +0x0064  R:11 W:10  swing data buffer
-    uint8_t      m_bSwingReady;      // +0x0065  R:0 W:1  swing ready flag
-    uint8_t      m_bSwingActive;     // +0x0066  R:0 W:1  swing active flag
-    uint8_t      m_swingWriteFlags;  // +0x0067  R:0 W:4  swing write flags
-    uint32_t     m_pBallHitState;    // +0x0068  R:5 W:11  ball hit state
-    uint32_t     m_pBounceState;     // +0x006c  R:4 W:5  bounce state
-    uint64_t     m_pScoreState;      // +0x0070  R:17 W:11  score state pointer
-    uint32_t     m_scoreCount;       // +0x0074  R:11 W:7  score count
-    uint64_t     m_pReplayBuffer;    // +0x0078  R:6 W:7  replay buffer pointer
-    uint8_t      m_bReplayReady;     // +0x0079  R:0 W:1  replay ready flag
-    uint8_t      m_bReplayActive;    // +0x007a  R:0 W:1  replay active flag
-    uint32_t     m_replayTimer;      // +0x007c  R:1 W:4  replay timer
-    uint64_t     m_pLobbyState;      // +0x0080  R:8 W:9  lobby state pointer
-    uint32_t     m_lobbyTimer;       // +0x0084  R:0 W:5  lobby timer
-    uint8_t      m_bLobbyReady;      // +0x0085  R:0 W:1  lobby ready flag
-    uint32_t     m_pVoiceState;      // +0x0088  R:2 W:13  voice chat state
-    uint32_t     m_pPresenceState;   // +0x008c  R:1 W:9  presence state
-    uint8_t      m_bPresenceValid;   // +0x008d  R:1 W:0  presence valid flag
-    uint8_t      m_bPresencePending; // +0x008f  R:0 W:1  presence pending
-    uint32_t     m_pStatsBuffer;     // +0x0090  R:2 W:8  stats buffer pointer
-    uint8_t      m_bStatsReady;      // +0x0091  R:0 W:1  stats ready flag
-    uint32_t     m_pLeaderboard;     // +0x0094  R:2 W:4  leaderboard pointer
-    uint16_t     m_leaderboardIdx;   // +0x0096  R:3 W:1  leaderboard index
-    uint32_t     m_pMatchConfig;     // +0x0098  R:5 W:7  match configuration
-    uint32_t     m_pGameModeData;    // +0x009c  R:2 W:5  game mode data
-    uint8_t      m_gameModeFlags;    // +0x009d  R:2 W:4  game mode flags
-    uint32_t     m_pCharSelectState; // +0x00a0  R:3 W:6  character select state
-    uint32_t     m_pTimeSyncState;   // +0x00a4  R:9 W:4  time sync state
-    uint64_t     m_syncTimestamp;    // +0x00a8  R:18 W:5  sync timestamp
-    uint32_t     m_syncWriteCount;   // +0x00ac  R:0 W:3  sync write count
-    uint64_t     m_pAckBuffer;       // +0x00b0  R:7 W:8  ack buffer pointer
-    uint16_t     m_ackWritePos;      // +0x00b2  R:0 W:1  ack write position
-    uint32_t     m_pAckState;        // +0x00b4  R:1 W:6  ack state pointer
-    uint16_t     m_ackStateFlags;    // +0x00b6  R:0 W:1  ack state flags
-    uint64_t     m_pRetransmitBuf;   // +0x00b8  R:1 W:6  retransmit buffer
-    uint32_t     m_retransmitTimer;  // +0x00bc  R:0 W:4  retransmit timer
-    uint8_t      m_bRetransmitReady; // +0x00bd  R:0 W:1  retransmit ready
-    uint8_t      m_retransmitFlags;  // +0x00bf  R:0 W:3  retransmit flags
-    uint32_t     m_pSequenceState;   // +0x00c0  R:26 W:13  sequence state
-    uint16_t     m_seqReadFlags;     // +0x00c2  R:1 W:0  sequence read flags
-    uint32_t     m_pOrderedQueue;    // +0x00c4  R:8 W:6  ordered queue
-    uint16_t     m_orderedFlags;     // +0x00c6  R:3 W:0  ordered queue flags
-    uint32_t     m_pFragmentBuf;     // +0x00c8  R:3 W:8  fragment buffer
-    uint32_t     m_pFragmentState;   // +0x00cc  R:5 W:8  fragment state
-    uint8_t      m_fragmentFlags;    // +0x00ce  R:6 W:4  fragment flags
-    uint32_t     m_pReassemblyBuf;   // +0x00d0  R:2 W:7  reassembly buffer
-    uint16_t     m_reassemblyFlags;  // +0x00d2  R:0 W:1  reassembly flags
-    uint32_t     m_pChannelState;    // +0x00d4  R:3 W:7  channel state
-    uint32_t     m_pChannelConfig;   // +0x00d8  R:1 W:6  channel config
-    uint32_t     m_pFlowControl;     // +0x00dc  R:1 W:3  flow control
-    uint64_t     m_pCongestionState; // +0x00e0  R:1 W:5  congestion state
-    uint32_t     m_congestionTimer;  // +0x00e4  R:1 W:3  congestion timer
-    uint64_t     m_pKeepAliveState;  // +0x00e8  R:2 W:4  keep-alive state
-    uint32_t     m_keepAliveTimer;   // +0x00ec  R:1 W:4  keep-alive timer
-    uint8_t      m_bKeepAliveReady;  // +0x00ed  R:0 W:2  keep-alive ready
-    uint8_t      m_keepAliveFlags;   // +0x00ee  R:1 W:2  keep-alive flags
-    uint8_t      m_bKeepAliveActive; // +0x00ef  R:1 W:1  keep-alive active
-    uint64_t     m_pHeartbeatState;  // +0x00f0  R:2 W:4  heartbeat state
-    uint8_t      m_bHeartbeatValid;  // +0x00f1  R:1 W:1  heartbeat valid
-    uint16_t     m_heartbeatFlags;   // +0x00f2  R:0 W:1  heartbeat flags
-    uint32_t     m_heartbeatTimer;   // +0x00f4  R:2 W:5  heartbeat timer
-    uint32_t     m_pQoSState;        // +0x00f8  R:10 W:6  quality of service state
-    uint32_t     m_qosWriteCount;    // +0x00fc  R:0 W:4  QoS write count
-    uint32_t     m_pLatencyState;    // +0x0100  R:2 W:3  latency tracking state
-    uint32_t     m_latencyTimer;     // +0x0104  R:1 W:2  latency timer
-    uint32_t     m_pJitterBuffer;    // +0x0108  R:1 W:3  jitter buffer
-    uint32_t     m_jitterWriteCount; // +0x010c  R:0 W:3  jitter write count
-    uint32_t     m_pBandwidthState;  // +0x0110  R:2 W:3  bandwidth state
-    uint32_t     m_bandwidthTimer;   // +0x0114  R:1 W:1  bandwidth timer
-    uint64_t     m_pNATState;        // +0x0118  R:1 W:3  NAT traversal state
-    uint32_t     m_natPunchCount;    // +0x011c  R:7 W:1  NAT punch attempt count
-    uint64_t     m_pEncryptionState; // +0x0120  R:1 W:4  encryption state
-    uint32_t     m_encryptionKey;    // +0x0124  R:11 W:5  encryption key index
-    uint64_t     m_pCompressionBuf;  // +0x0128  R:8 W:4  compression buffer
-    uint32_t     m_compressionFlags; // +0x012c  R:3 W:1  compression flags
-    uint16_t     m_peerCount;        // +0x0130  R:7 W:1  peer count
-    uint16_t     m_maxPeers;         // +0x0132  R:1 W:0  max peers
-    uint16_t     m_activePeers;      // +0x0134  R:1 W:0  active peers
-    uint16_t     m_spectatorCount;   // +0x0136  R:1 W:0  spectator count
-    uint64_t     m_pHostMigration;   // +0x0138  R:1 W:1  host migration state
-    uint8_t      m_bIsHost;          // +0x0139  R:1 W:0  is-host flag
-    uint8_t      m_bIsDedicated;     // +0x013a  R:1 W:0  is-dedicated flag
-    uint32_t     m_pMigrationBuf;    // +0x0140  R:1 W:3  migration buffer
-    uint32_t     m_migrationTimer;   // +0x0144  R:0 W:2  migration timer
-    uint32_t     m_pMigrationState;  // +0x0148  R:1 W:2  migration state
-    uint64_t     m_pDisconnectBuf;   // +0x0150  R:0 W:2  disconnect buffer
-    uint64_t     m_pDisconnectState; // +0x0158  R:0 W:1  disconnect state
-    uint64_t     m_pTimeoutState;    // +0x0160  R:1 W:2  timeout state
-    uint8_t      m_bTimeoutPending;  // +0x0164  R:0 W:1  timeout pending
-    uint8_t      m_bTimeoutActive;   // +0x0168  R:0 W:1  timeout active
-    uint8_t     _pad0x0178[12];
-    uint32_t     m_pErrorState;      // +0x0178  R:0 W:1  error state
-    uint32_t     m_errorCode;        // +0x017c  R:0 W:1  error code
-    uint32_t     m_errorFlags;       // +0x0180  R:0 W:1  error flags
-    uint64_t     m_pDebugState;      // +0x0188  R:0 W:2  debug state
-    uint64_t     m_pDebugLog;        // +0x0190  R:0 W:1  debug log pointer
-    uint16_t     m_debugLogPos;      // +0x0192  R:0 W:1  debug log position
-    uint64_t     m_pProfileState;    // +0x0198  R:0 W:2  profile state
-    uint8_t      m_bProfileActive;   // +0x01a0  R:0 W:1  profile active
-    uint8_t     _pad0x01b0[12];
-    uint32_t     m_pMatchHistory;    // +0x01b0  R:0 W:1  match history
-    uint32_t     m_matchHistoryIdx;  // +0x01b4  R:2 W:1  match history index
-    uint32_t     m_pMatchResult;     // +0x01b8  R:0 W:2  match result
-    uint32_t     m_matchResultFlags; // +0x01bc  R:0 W:1  match result flags
-    uint32_t     m_pTournamentState; // +0x01c0  R:1 W:2  tournament state
-    uint8_t      m_bTournActive;     // +0x01c1  R:0 W:1  tournament active
-    uint8_t      m_bTournReady;      // +0x01c3  R:0 W:1  tournament ready
-    uint32_t     m_pTournConfig;     // +0x01c4  R:1 W:1  tournament config
-    uint8_t      m_tournRound;       // +0x01c7  R:4 W:0  tournament round
-    uint32_t     m_pTournBracket;    // +0x01c8  R:4 W:4  tournament bracket
-    uint32_t     m_tournBracketSize; // +0x01cc  R:0 W:1  tournament bracket size
-    uint32_t     m_pRankingState;    // +0x01d0  R:3 W:0  ranking state
-    uint32_t     m_pSkillState;      // +0x01d8  R:4 W:0  skill rating state
-    uint8_t     _pad0x01e8[12];
-    uint32_t     m_pSkillRating;     // +0x01e8  R:1 W:0  skill rating value
-    uint32_t     m_pNetProperties;   // +0x01ec  R:11 W:0  network properties
-    uint16_t     m_netPropertyCount; // +0x01f0  R:12 W:0  network property count
-    uint32_t     m_pPropertyCache;   // +0x01f8  R:1 W:0  property cache
-    uint8_t     _pad0x020a[14];
-    uint16_t     m_xuidWritePos;     // +0x020a  R:0 W:3  XUID write position
-    uint8_t     _pad0x021c[14];
-    uint32_t     m_pQoSProbeResult;  // +0x021c  R:2 W:0  QoS probe result
-    uint8_t     _pad0x0260[64];
-    uint16_t     m_sessionMemberCnt; // +0x0260  R:2 W:0  session member count
-    uint32_t     m_pSlotAssignment;  // +0x0268  R:0 W:1  slot assignment
-    uint32_t     m_slotFlags;        // +0x026c  R:0 W:1  slot flags
-    uint8_t      m_bSlotReady;       // +0x0270  R:0 W:1  slot ready flag
-    uint8_t     _pad0x027c[8];
-    uint32_t     m_pArbitration;     // +0x027c  R:2 W:0  arbitration state
-    uint8_t     _pad0x0288[8];
-    uint32_t     m_pArbitResult;     // +0x0288  R:0 W:2  arbitration result
-    uint8_t     _pad0x0294[8];
-    uint32_t     m_pReadyCheckState; // +0x0294  R:3 W:1  ready check state
-    uint32_t     m_readyCheckTimer;  // +0x0298  R:2 W:3  ready check timer
-    uint32_t     m_readyCheckFlags;  // +0x029c  R:0 W:1  ready check flags
-    uint8_t     _pad0x02bc[28];
-    uint8_t      m_bLoadComplete;    // +0x02bc  R:1 W:1  load complete flag
-    uint8_t     _pad0x02cc[12];
-    uint32_t     m_pLoadState;       // +0x02cc  R:0 W:1  load state
-    uint8_t     _pad0x02dc[12];
-    uint32_t     m_pStartState;      // +0x02dc  R:0 W:1  start state
-    uint8_t      m_bMatchStarted;    // +0x02e0  R:1 W:1  match started flag
-    uint32_t     m_pWarmupState;     // +0x02e4  R:0 W:1  warmup state
-    uint32_t     m_warmupTimer;      // +0x02e8  R:0 W:1  warmup timer
-    uint32_t     m_warmupFlags;      // +0x02ec  R:0 W:1  warmup flags
-    uint8_t      m_bWarmupActive;    // +0x02f0  R:0 W:2  warmup active flag
-    uint8_t     _pad0x03d4[224];
-    uint8_t      m_playerReadyMask;  // +0x03d4  R:11 W:7  player ready bitmask
-    uint8_t     _pad0x03e0[8];
-    uint32_t     m_pServeMachine;    // +0x03e0  R:12 W:5  serve state machine
-    uint8_t      m_bServePending;    // +0x03e4  R:0 W:2  serve pending flag
-    uint8_t     _pad0x03f8[16];
-    uint32_t     m_pMsgDispatcher;   // +0x03f8  R:35 W:2  message dispatcher
-    uint32_t     m_dispatcherFlags;  // +0x0400  R:2 W:0  dispatcher flags
-    uint32_t     m_pMsgProcessor;    // +0x0404  R:71 W:1  message processor
-    uint8_t     _pad0x0440[56];
-    uint32_t     m_pEventQueue;      // +0x0440  R:0 W:1  event queue
-    uint32_t     m_eventQueueFlags;  // +0x0444  R:2 W:0  event queue flags
-    uint32_t     m_pEventState;      // +0x0448  R:0 W:1  event state
-    uint8_t      m_bEventPending;    // +0x044d  R:0 W:1  event pending
-    uint8_t     _pad0x0460[15];
-    uint8_t      m_bEventActive;     // +0x0460  R:0 W:1  event active
-    uint8_t     _pad0x0498[52];
-    uint32_t     m_pCallbackTable;   // +0x0498  R:7 W:3  callback table
-    uint32_t     m_callbackCount;    // +0x049c  R:0 W:1  callback count
-    uint8_t     _pad0x04b0[16];
-    uint16_t     m_notifyFlags;      // +0x04b0  R:1 W:1  notification flags
-    uint16_t     m_notifyMask;       // +0x04b4  R:2 W:1  notification mask
-    uint8_t     _pad0x04c0[8];
-    uint32_t     m_pTimerManager;    // +0x04c0  R:7 W:3  timer manager
-    uint32_t     m_pTimerState;      // +0x04c4  R:5 W:4  timer state
-    uint32_t     m_timerCount;       // +0x04c8  R:1 W:2  timer count
-    uint16_t     m_timerWritePos;    // +0x04cc  R:0 W:2  timer write position
-    uint16_t     m_timerReadPos;     // +0x04ce  R:0 W:2  timer read position
-    uint8_t     _pad0x0530[94];
-    uint32_t     m_pSnSession;       // +0x0530  R:3 W:0  snSession pointer
-    uint32_t     m_pSnPeer;          // +0x0534  R:3 W:1  snPeer pointer
-    uint32_t     m_pSnChannel;       // +0x0538  R:2 W:1  snChannel pointer
-    uint8_t     _pad0x0564[40];
-    uint32_t     m_pMsgSinkTable;    // +0x0564  R:11 W:2  message sink table
-    uint32_t     m_msgSinkCount;     // +0x0568  R:8 W:2  message sink count
-    uint8_t      m_bMsgSinkActive;   // +0x056c  R:0 W:2  message sink active
-    uint8_t     _pad0x059c[44];
-    uint32_t     m_pPeerSlot0;       // +0x059c  R:0 W:1  peer slot 0
-    uint32_t     m_pPeerSlot1;       // +0x05a0  R:0 W:1  peer slot 1
-    uint32_t     m_pPeerSlot2;       // +0x05a4  R:0 W:1  peer slot 2
-    uint32_t     m_pPeerSlot3;       // +0x05a8  R:0 W:1  peer slot 3
-    uint32_t     m_pPeerSlot4;       // +0x05ac  R:0 W:1  peer slot 4
-    uint32_t     m_pPeerSlot5;       // +0x05b0  R:0 W:1  peer slot 5
-    uint8_t     _pad0x0664[176];
-    uint32_t     m_pVoiceConfig;     // +0x0664  R:3 W:0  voice config
-    uint32_t     m_pVoiceBuffer;     // +0x0668  R:0 W:1  voice buffer
-    uint8_t     _pad0x06c8[92];
-    uint16_t     m_voiceSeqNum;      // +0x06c8  R:0 W:2  voice sequence number
-    uint8_t     _pad0x07c8[252];
-    uint32_t     m_pXNetQoSResult;   // +0x07c8  R:1 W:0  XNet QoS result
-    uint8_t     _pad0x0914[328];
-    uint32_t     m_pCreateParams0;   // +0x0914  R:0 W:1  create params 0
-    uint32_t     m_pCreateParams1;   // +0x0918  R:0 W:1  create params 1
-    uint32_t     m_pCreateParams2;   // +0x091c  R:0 W:1  create params 2
-    uint64_t     m_pCreateParams3;   // +0x0920  R:0 W:1  create params 3
-    uint8_t     _pad0x0990[108];
-    uint32_t     m_pJoinState;       // +0x0990  R:1 W:1  join state
-    uint32_t     m_pJoinParams0;     // +0x0998  R:0 W:1  join params 0
-    uint32_t     m_pJoinParams1;     // +0x099c  R:0 W:1  join params 1
-    uint8_t     _pad0x0a54[180];
-    uint32_t     m_pSearchParams0;   // +0x0a54  R:0 W:1  search params 0
-    uint32_t     m_pSearchParams1;   // +0x0a58  R:0 W:1  search params 1
-    uint8_t     _pad0x0aa0[68];
-    uint8_t      m_bSearchComplete;  // +0x0aa0  R:1 W:0  search complete flag
-    uint8_t     _pad0x0b54[176];
-    uint32_t     m_pResultsList;     // +0x0b54  R:1 W:0  results list
-    uint32_t     m_resultsCount;     // +0x0b58  R:1 W:0  results count
-    uint8_t     _pad0x0d3c[480];
-    uint32_t     m_pWriteStatsState; // +0x0d3c  R:0 W:7  write stats state
-    uint32_t     m_writeStatsFlags;  // +0x0d40  R:1 W:0  write stats flags
-    uint8_t      m_bStatsWriteDone;  // +0x0d48  R:2 W:1  stats write done
-    uint8_t     _pad0x0d58[12];
-    uint32_t     m_pLbWriteState;    // +0x0d58  R:0 W:1  leaderboard write state
-    uint32_t     m_pLbReadState;     // +0x0d5c  R:1 W:2  leaderboard read state
-    uint32_t     m_lbReadFlags;      // +0x0d60  R:0 W:1  leaderboard read flags
-    uint32_t     m_pLbQueryResult;   // +0x0d64  R:1 W:1  leaderboard query result
-    uint32_t     m_lbQueryFlags0;    // +0x0d68  R:0 W:1  leaderboard query flags 0
-    uint32_t     m_lbQueryFlags1;    // +0x0d6c  R:0 W:1  leaderboard query flags 1
-    uint32_t     m_lbQueryFlags2;    // +0x0d70  R:0 W:1  leaderboard query flags 2
-    uint32_t     m_lbQueryFlags3;    // +0x0d74  R:0 W:1  leaderboard query flags 3
-    uint32_t     m_lbQueryFlags4;    // +0x0d78  R:0 W:1  leaderboard query flags 4
-    uint32_t     m_lbQueryFlags5;    // +0x0d7c  R:0 W:1  leaderboard query flags 5
-    uint32_t     m_lbQueryFlags6;    // +0x0d84  R:0 W:1  leaderboard query flags 6
-    uint8_t     _pad0x0d98[16];
-    uint32_t     m_pStatsReader;     // +0x0d98  R:0 W:2  stats reader
-    uint32_t     m_pStatsReaderCfg;  // +0x0d9c  R:5 W:4  stats reader config
-    uint32_t     m_statsReaderState; // +0x0da0  R:2 W:2  stats reader state
-    uint8_t      m_bStatsReaderDone; // +0x0da8  R:0 W:1  stats reader done
-    uint8_t      m_bStatsReaderErr;  // +0x0da9  R:0 W:1  stats reader error
-    uint32_t     m_pAchievements;    // +0x0dac  R:0 W:1  achievements state
-    uint32_t     m_pAchieveCfg;      // +0x0db0  R:0 W:1  achievement config
-    uint32_t     m_achieveFlags;     // +0x0db4  R:0 W:1  achievement flags
-    uint8_t      m_bAchieveReady;    // +0x0db8  R:0 W:1  achievement ready
-    uint32_t     m_pAchieveResult;   // +0x0dbc  R:0 W:1  achievement result
-    uint8_t     _pad0x0e10[80];
-    uint16_t     m_inviteWritePos;   // +0x0e10  R:0 W:2  invite write position
-    uint16_t     m_inviteReadPos;    // +0x0e12  R:0 W:2  invite read position
-    uint8_t     _pad0x0ea0[138];
-    uint8_t      m_bInviteActive;    // +0x0ea0  R:2 W:0  invite active flag
-    uint32_t     m_pInviteState;     // +0x0ea8  R:1 W:1  invite state
-    uint8_t     _pad0x0eb8[12];
-    uint32_t     m_pFriendState;     // +0x0eb8  R:0 W:1  friend state
-    uint8_t     _pad0x0ec8[12];
-    uint32_t     m_pFriendList;      // +0x0ec8  R:2 W:1  friend list
-    uint32_t     m_friendCount;      // +0x0ecc  R:1 W:1  friend count
-    uint8_t     _pad0x1008[312];
-    uint8_t      m_localPlayerIdx;   // +0x1008  R:4 W:2  local player index
-    uint32_t     m_pPlayerSlotMap;   // +0x100c  R:1 W:3  player slot map
-    uint8_t      m_playerSlotFlags;  // +0x100e  R:1 W:3  player slot flags
-    uint8_t      m_playerSlotCount;  // +0x100f  R:1 W:4  player slot count
-    uint32_t     m_pPlayerMapping;   // +0x1010  R:1 W:6  player mapping
-    uint32_t     m_pPlayerConfig;    // +0x1014  R:3 W:4  player config
-    uint32_t     m_playerConfigFlags;// +0x1018  R:3 W:2  player config flags
-    uint32_t     m_pPlayerProfile;   // +0x101c  R:1 W:1  player profile
-    uint8_t     _pad0x1069[73];
-    uint8_t      m_bProfileReady;    // +0x1069  R:0 W:1  profile ready
-    uint8_t      m_bProfileValid;    // +0x106a  R:0 W:1  profile valid
-    uint8_t     _pad0x10b0[66];
-    uint32_t     m_pSignInState;     // +0x10b0  R:5 W:0  sign-in state
-    uint8_t      m_bSignedIn;        // +0x10b5  R:1 W:0  signed in flag
-    uint8_t     _pad0x1170[183];
-    uint8_t      m_bSysLinkActive;   // +0x1170  R:0 W:1  system link active
-    uint8_t     _pad0x1180[12];
-    uint64_t     m_pSysLinkSession;  // +0x1180  R:0 W:1  system link session
-    uint8_t      m_bSysLinkReady;    // +0x1188  R:0 W:1  system link ready
-    uint8_t     _pad0x1198[12];
-    uint64_t     m_pSysLinkPeer;     // +0x1198  R:0 W:1  system link peer
-    uint8_t     _pad0x11b1[21];
-    uint8_t      m_charSelectIdx;    // +0x11b1  R:2 W:4  character select index
-    uint32_t     m_pCharSelectCfg;   // +0x11b4  R:0 W:4  character select config
-    uint32_t     m_charSelectTimer;  // +0x11b8  R:0 W:2  character select timer
-    uint32_t     m_charSelectFlags;  // +0x11bc  R:0 W:2  character select flags
-    uint16_t     m_charId;           // +0x11c0  R:1 W:0  character ID
-    uint8_t      m_charSlot;         // +0x11c4  R:1 W:0  character slot
-    uint16_t     m_charCostume;      // +0x11c6  R:1 W:0  character costume
-    uint8_t     _pad0x11d4[10];
-    uint8_t      m_bCharConfirmed;   // +0x11d4  R:2 W:0  character confirmed
-    uint8_t     _pad0x1214[60];
-    uint32_t     m_pGameRulesState;  // +0x1214  R:0 W:1  game rules state
-    uint32_t     m_pGameRulesCfg;    // +0x1218  R:2 W:2  game rules config
-    uint32_t     m_pGameRulesTimer;  // +0x121c  R:3 W:2  game rules timer
-    uint32_t     m_pGameRulesFlags;  // +0x1220  R:1 W:3  game rules flags
-    uint32_t     m_pGameRulesResult; // +0x1224  R:1 W:2  game rules result
-    uint8_t      m_gameRulesMode;    // +0x1228  R:9 W:6  game rules mode
-    uint32_t     m_pGameRulesExtra;  // +0x122c  R:1 W:2  game rules extra data
-    uint8_t     _pad0x15b4[900];
-    uint32_t     m_pMsgHandlerTable; // +0x15b4  R:132 W:6  message handler table
-    uint32_t     m_msgHandlerCount;  // +0x15b8  R:3 W:2  message handler count
-    uint32_t     m_msgHandlerFlags;  // +0x15bc  R:4 W:0  message handler flags
-    uint8_t     _pad0x15e0[32];
-    uint32_t     m_pMsgHandlerInit;  // +0x15e0  R:0 W:1  message handler init
-    uint8_t     _pad0x1754[368];
-    uint8_t      m_rallyPhase;       // +0x1754  R:2 W:2  rally phase
-    uint8_t      m_rallyInputState;  // +0x1755  R:2 W:8  rally input state
-    uint32_t     m_pRallyMachine;    // +0x1758  R:2 W:1  rally state machine
-    uint8_t      m_bRallyServing;    // +0x175c  R:1 W:2  rally serving flag
-    uint8_t      m_bRallyActive2;    // +0x175d  R:1 W:2  rally active flag 2
-    uint32_t     m_pRallyConfig;     // +0x1760  R:1 W:1  rally config
-    uint8_t      m_bRallyFlag0;      // +0x1764  R:0 W:1  rally flag 0
-    uint8_t      m_bRallyFlag1;      // +0x1765  R:0 W:1  rally flag 1
-    uint8_t      m_bRallyFlag2;      // +0x1766  R:0 W:1  rally flag 2
-    uint8_t      m_bRallyFlag3;      // +0x1767  R:0 W:1  rally flag 3
-    uint8_t     _pad0x17b4[73];
-    uint32_t     m_pServeBuf0;       // +0x17b4  R:0 W:1  serve buffer 0
-    uint32_t     m_pServeBuf1;       // +0x17bc  R:0 W:1  serve buffer 1
-    uint32_t     m_pServeBuf2;       // +0x17c4  R:0 W:1  serve buffer 2
-    uint32_t     m_pServeBuf3;       // +0x17cc  R:0 W:1  serve buffer 3
-    uint8_t     _pad0x1864[148];
-    uint32_t     m_pReplayState0;    // +0x1864  R:1 W:0  replay state 0
-    uint8_t     _pad0x1870[8];
-    uint32_t     m_pReplayState1;    // +0x1870  R:1 W:0  replay state 1
-    uint8_t     _pad0x1888[20];
-    uint32_t     m_pReplayState2;    // +0x1888  R:1 W:0  replay state 2
-    uint8_t     _pad0x1918[140];
-    uint32_t     m_pReplayState3;    // +0x1918  R:1 W:0  replay state 3
-    uint8_t     _pad0x1978[92];
-    uint8_t      m_bReplayPlaying;   // +0x1978  R:1 W:0  replay playing flag
-    uint8_t     _pad0x19a8[44];
-    uint32_t     m_pScoreDisplay;    // +0x19a8  R:5 W:1  score display state
-    uint8_t     _pad0x19ec[64];
-    uint32_t     m_pPointState;      // +0x19ec  R:2 W:1  point state
-    uint32_t     m_pGameScore;       // +0x19f0  R:2 W:2  game score
-    uint32_t     m_pSetScore;        // +0x19f4  R:8 W:0  set score
-    uint8_t     _pad0x25c8[3024];
-    uint32_t     m_pTrainingState;   // +0x25c8  R:0 W:1  training state
-    uint8_t      m_bTrainingActive;  // +0x25cc  R:1 W:1  training active flag
-    uint8_t     _pad0x3130[2912];
-    uint32_t     m_pDrillState;      // +0x3130  R:1 W:0  drill state
-    uint8_t     _pad0x391c[2024];
-    uint32_t     m_pExhibitionFlags; // +0x391c  R:2 W:0  exhibition flags
-    uint8_t     _pad0x3944[36];
-    uint32_t     m_pExhibWriteState; // +0x3944  R:0 W:7  exhibition write state
-    uint32_t     m_exhibWriteCount;  // +0x3948  R:0 W:4  exhibition write count
-    uint8_t     _pad0x65eb[11423];
-    uint8_t      m_bNetworkDebugFlag;// +0x65eb  R:1 W:1  network debug flag
+    // The generated "field access clusters" list for this class overlapped
+    // itself (fields at every byte, u64s at odd offsets), so no member sat
+    // where the asm reads it. Only fields the lifts use are kept, at their
+    // asm offsets; add more the same way.
+    uint32_t     m_state;            // +0x04  IsStateActive 0x823FA420, CompareFlags 0x82329E68
+    uint8_t      _pad08[0x0C];       // +0x08
+    uint32_t     m_pNetworkSession;  // +0x14  CheckAllPlayersReady 0x82311098
+    uint8_t      m_bAllPlayersReady; // +0x18  CheckAllPlayersReady: lbz/stb +0x18
 
     // ── virtual methods ──
-    virtual ~SinglesNetworkClient();                  // [0] @ 0x82391f98
-    virtual void ScalarDtor(int flags); // [1] @ 0x823ca528
-    virtual void vfn_2();  // [2] @ 0x823920e8
-    virtual void vfn_3();  // [3] @ 0x82392270
-    virtual void vfn_4();  // [4] @ 0x82392310
-    virtual void vfn_5();  // [5] @ 0x82392318
-    virtual void vfn_6();  // [6] @ 0x82394268
-    virtual void vfn_7();  // [7] @ 0x8239b4f8
-    virtual void vfn_8();  // [8] @ 0x8239b420
-    virtual void vfn_9();  // [9] @ 0x823941d0
-    virtual void vfn_10();  // [10] @ 0x8239ad40
-    virtual void OnEnter();  // [11] @ 0x8239adc0
-    virtual void vfn_12();  // [12] @ 0x8239af80
-    virtual void GetName();  // [13] @ 0x8239af98
-    virtual void vfn_14();  // [14] @ 0x8239afb0
-    virtual void vfn_15();  // [15] @ 0x8239afe0
-    virtual void vfn_16();  // [16] @ 0x8239b030
-    virtual void vfn_17();  // [17] @ 0x8239b000
-    virtual void vfn_18();  // [18] @ 0x8239b080
-    virtual void vfn_19();  // [19] @ 0x8239b0d0
-    virtual void PostLoadProperties();  // [20] @ 0x8239b1f0
-    virtual void PostLoadChildren();  // [22] @ 0x82392070
-    virtual void vfn_23();  // [23] @ 0x82393b58
+    ~SinglesNetworkClient();                  // [0] @ 0x82391f98
+    void ScalarDtor(int flags); // [1] @ 0x823ca528
+    void vfn_2();  // [2] @ 0x823920e8
+    void vfn_3();  // [3] @ 0x82392270
+    void vfn_4();  // [4] @ 0x82392310
+    void vfn_5();  // [5] @ 0x82392318
+    void vfn_6();  // [6] @ 0x82394268
+    void vfn_7();  // [7] @ 0x8239b4f8
+    void vfn_8();  // [8] @ 0x8239b420
+    void vfn_9();  // [9] @ 0x823941d0
+    void vfn_10();  // [10] @ 0x8239ad40
+    void OnEnter();  // [11] @ 0x8239adc0
+    void vfn_12();  // [12] @ 0x8239af80
+    void GetName();  // [13] @ 0x8239af98
+    void vfn_14();  // [14] @ 0x8239afb0
+    void vfn_15();  // [15] @ 0x8239afe0
+    void vfn_16();  // [16] @ 0x8239b030
+    void vfn_17();  // [17] @ 0x8239b000
+    void vfn_18();  // [18] @ 0x8239b080
+    void vfn_19();  // [19] @ 0x8239b0d0
+    void PostLoadProperties();  // [20] @ 0x8239b1f0
+    void PostLoadChildren();  // [22] @ 0x82392070
+    void vfn_23();  // [23] @ 0x82393b58
 
     // ── non-virtual methods (from debug strings) ──
     bool HandleBallHitMessage();
@@ -1707,24 +1317,25 @@ struct SkipReplayMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bc400
-    virtual void vfn_4();  // [4] @ 0x823bc470
-    virtual void vfn_5();  // [5] @ 0x823bc2d8
-    virtual void vfn_6();  // [6] @ 0x823bc3e0
-    virtual void vfn_7();  // [7] @ 0x823bc3f0
+    void ScalarDtor(int flags); // [1] @ 0x823bc400
+    void vfn_4();  // [4] @ 0x823bc470
+    void vfn_5();  // [5] @ 0x823bc2d8
+    void vfn_6();  // [6] @ 0x823bc3e0
+    void vfn_7();  // [7] @ 0x823bc3f0
 };
 
 // ── SpectatorBallHitMessage  [vtable @ 0x8206FAC8] ──────────────────────────
 struct SpectatorBallHitMessage : public HitMessage {
-    uint8_t     m_ballHitData[192]; // +0x10 — ball hit data block
+    uint8_t     _pad0C[4];          // +0x0C
+    uint8_t     m_ballHitData[192]; // +0x10 — ball hit data block (0x823B6B48 deserialises r31+0x10)
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823b6b00
-    virtual void Deserialise(void* client);  // [2] @ 0x823b6b48
-    virtual void vfn_5();  // [5] @ 0x823b67e8
-    virtual void vfn_6();  // [6] @ 0x823b68d0
-    virtual void vfn_7();  // [7] @ 0x823b68e0
-    virtual void vfn_8();  // [8] @ 0x823b68f0
+    void ScalarDtor(int flags); // [1] @ 0x823b6b00
+    void Deserialise(void* client);  // [2] @ 0x823b6b48
+    void vfn_5();  // [5] @ 0x823b67e8
+    void vfn_6();  // [6] @ 0x823b68d0
+    void vfn_7();  // [7] @ 0x823b68e0
+    void vfn_8();  // [8] @ 0x823b68f0
 };
 
 // ── SpectatorConnectRequest  [vtable @ 0x8206F858] ──────────────────────────
@@ -1732,9 +1343,9 @@ struct SpectatorConnectRequest {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_5();  // [5] @ 0x823baf18
-    virtual void vfn_6();  // [6] @ 0x823bb020
-    virtual void vfn_7();  // [7] @ 0x823bb030
+    void vfn_5();  // [5] @ 0x823baf18
+    void vfn_6();  // [6] @ 0x823bb020
+    void vfn_7();  // [7] @ 0x823bb030
 };
 
 // ── SpectatorNetworkClient  [vtable @ 0x82070D14] ──────────────────────────
@@ -1742,14 +1353,14 @@ struct SpectatorNetworkClient {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~SpectatorNetworkClient();                  // [0] @ 0x823ca408
-    virtual void vfn_2();  // [2] @ 0x823ca530
-    virtual void vfn_3();  // [3] @ 0x823ca5e8
-    virtual void vfn_4();  // [4] @ 0x823ca628
-    virtual void vfn_5();  // [5] @ 0x823ca630
-    virtual void vfn_6();  // [6] @ 0x823caa48
-    virtual void vfn_7();  // [7] @ 0x823cc3c8
-    virtual void PostLoadChildren();  // [22] @ 0x823ca4c8
+    ~SpectatorNetworkClient();                  // [0] @ 0x823ca408
+    void vfn_2();  // [2] @ 0x823ca530
+    void vfn_3();  // [3] @ 0x823ca5e8
+    void vfn_4();  // [4] @ 0x823ca628
+    void vfn_5();  // [5] @ 0x823ca630
+    void vfn_6();  // [6] @ 0x823caa48
+    void vfn_7();  // [7] @ 0x823cc3c8
+    void PostLoadChildren();  // [22] @ 0x823ca4c8
 };
 
 // ── SpectatorQuitMessage  [vtable @ 0x8206FC6C] ──────────────────────────
@@ -1757,11 +1368,11 @@ struct SpectatorQuitMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bb210
-    virtual void vfn_2();  // [2] @ 0x823bb270
-    virtual void vfn_5();  // [5] @ 0x823bb128
-    virtual void vfn_6();  // [6] @ 0x823bb1f0
-    virtual void vfn_7();  // [7] @ 0x823bb200
+    void ScalarDtor(int flags); // [1] @ 0x823bb210
+    void vfn_2();  // [2] @ 0x823bb270
+    void vfn_5();  // [5] @ 0x823bb128
+    void vfn_6();  // [6] @ 0x823bb1f0
+    void vfn_7();  // [7] @ 0x823bb200
 };
 
 // ── StartLobbyCountdownMessage  [vtable @ 0x82070004] ──────────────────────────
@@ -1769,10 +1380,10 @@ struct StartLobbyCountdownMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x823bf658
-    virtual void vfn_5();  // [5] @ 0x823bf530
-    virtual void vfn_6();  // [6] @ 0x823bf638
-    virtual void vfn_7();  // [7] @ 0x823bf648
+    void vfn_4();  // [4] @ 0x823bf658
+    void vfn_5();  // [5] @ 0x823bf530
+    void vfn_6();  // [6] @ 0x823bf638
+    void vfn_7();  // [7] @ 0x823bf648
 };
 
 // ── StateSyncMessage  [vtable @ 0x8206F7B8] ──────────────────────────
@@ -1780,11 +1391,11 @@ struct StateSyncMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823baa20
-    virtual void vfn_2();  // [2] @ 0x823baa98
-    virtual void vfn_5();  // [5] @ 0x823ba8f8
-    virtual void vfn_6();  // [6] @ 0x823baa00
-    virtual void vfn_7();  // [7] @ 0x823baa10
+    void ScalarDtor(int flags); // [1] @ 0x823baa20
+    void vfn_2();  // [2] @ 0x823baa98
+    void vfn_5();  // [5] @ 0x823ba8f8
+    void vfn_6();  // [6] @ 0x823baa00
+    void vfn_7();  // [7] @ 0x823baa10
 };
 
 // ── StateSyncRequestMessage  [vtable @ 0x8206F790] ──────────────────────────
@@ -1792,11 +1403,11 @@ struct StateSyncRequestMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823ba800
-    virtual void vfn_2();  // [2] @ 0x823ba888
-    virtual void vfn_5();  // [5] @ 0x823ba6d8
-    virtual void vfn_6();  // [6] @ 0x823ba7e0
-    virtual void vfn_7();  // [7] @ 0x823ba7f0
+    void ScalarDtor(int flags); // [1] @ 0x823ba800
+    void vfn_2();  // [2] @ 0x823ba888
+    void vfn_5();  // [5] @ 0x823ba6d8
+    void vfn_6();  // [6] @ 0x823ba7e0
+    void vfn_7();  // [7] @ 0x823ba7f0
 };
 
 // ── SwingStartedMessage  [vtable @ 0x8206F4D8] ──────────────────────────
@@ -1804,13 +1415,13 @@ struct SwingStartedMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~SwingStartedMessage();                  // [0] @ 0x823b9ab8
-    virtual void ScalarDtor(int flags); // [1] @ 0x823b9ea8
-    virtual void vfn_2();  // [2] @ 0x823ba018
-    virtual void vfn_4();  // [4] @ 0x823ba118
-    virtual void vfn_5();  // [5] @ 0x823b98e8
-    virtual void vfn_6();  // [6] @ 0x823b99c8
-    virtual void vfn_7();  // [7] @ 0x823b99d8
+    ~SwingStartedMessage();                  // [0] @ 0x823b9ab8
+    void ScalarDtor(int flags); // [1] @ 0x823b9ea8
+    void vfn_2();  // [2] @ 0x823ba018
+    void vfn_4();  // [4] @ 0x823ba118
+    void vfn_5();  // [5] @ 0x823b98e8
+    void vfn_6();  // [6] @ 0x823b99c8
+    void vfn_7();  // [7] @ 0x823b99d8
 };
 
 // ── TerminateRallyMessage  [vtable @ 0x8206FE4C] ──────────────────────────
@@ -1818,10 +1429,10 @@ struct TerminateRallyMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x823bddd8
-    virtual void vfn_5();  // [5] @ 0x823bdd00
-    virtual void vfn_6();  // [6] @ 0x823bdd78
-    virtual void vfn_7();  // [7] @ 0x823bdd88
+    void vfn_4();  // [4] @ 0x823bddd8
+    void vfn_5();  // [5] @ 0x823bdd00
+    void vfn_6();  // [6] @ 0x823bdd78
+    void vfn_7();  // [7] @ 0x823bdd88
 };
 
 // ── TimedGameUpdateTimerMessage  [vtable @ 0x8206FB74] ──────────────────────────
@@ -1829,11 +1440,11 @@ struct TimedGameUpdateTimerMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823b7c00
-    virtual void vfn_2();  // [2] @ 0x823b7c68
-    virtual void vfn_5();  // [5] @ 0x823b7b88
-    virtual void vfn_6();  // [6] @ 0x823b7be0
-    virtual void vfn_7();  // [7] @ 0x823b7bf0
+    void ScalarDtor(int flags); // [1] @ 0x823b7c00
+    void vfn_2();  // [2] @ 0x823b7c68
+    void vfn_5();  // [5] @ 0x823b7b88
+    void vfn_6();  // [6] @ 0x823b7be0
+    void vfn_7();  // [7] @ 0x823b7bf0
 };
 
 // ── TournamentCompleteMessage  [vtable @ 0x8206FD84] ──────────────────────────
@@ -1841,10 +1452,10 @@ struct TournamentCompleteMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x823bc8c8
-    virtual void vfn_5();  // [5] @ 0x823bc7b0
-    virtual void vfn_6();  // [6] @ 0x823bc878
-    virtual void vfn_7();  // [7] @ 0x823bc888
+    void vfn_4();  // [4] @ 0x823bc8c8
+    void vfn_5();  // [5] @ 0x823bc7b0
+    void vfn_6();  // [6] @ 0x823bc878
+    void vfn_7();  // [7] @ 0x823bc888
 
     // ── non-virtual methods (lifted in pong_network.cpp) ──
     void Process();
@@ -1858,10 +1469,10 @@ struct TwoMinuteWarningMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x823befe0
-    virtual void vfn_5();  // [5] @ 0x823beeb8
-    virtual void vfn_6();  // [6] @ 0x823befc0
-    virtual void vfn_7();  // [7] @ 0x823befd0
+    void vfn_4();  // [4] @ 0x823befe0
+    void vfn_5();  // [5] @ 0x823beeb8
+    void vfn_6();  // [6] @ 0x823befc0
+    void vfn_7();  // [7] @ 0x823befd0
 };
 
 // ── UserRequestReplayMessage  [vtable @ 0x8206FD34] ──────────────────────────
@@ -1869,10 +1480,10 @@ struct UserRequestReplayMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x823bc2c8
-    virtual void vfn_5();  // [5] @ 0x823bc1a0
-    virtual void vfn_6();  // [6] @ 0x823bc2a8
-    virtual void vfn_7();  // [7] @ 0x823bc2b8
+    void vfn_4();  // [4] @ 0x823bc2c8
+    void vfn_5();  // [5] @ 0x823bc1a0
+    void vfn_6();  // [6] @ 0x823bc2a8
+    void vfn_7();  // [7] @ 0x823bc2b8
 };
 
 // ── netPoliciesDerived  [vtable @ 0x820710FC] ──────────────────────────
@@ -1887,13 +1498,16 @@ struct pongLiveManager {
     void**      vtable;           // +0x00
 
     // ── field access clusters ──
+    uint8_t      _pad04[0x34];       // +0x0004
     uint32_t     m_pPeerArray;       // +0x0038  R:7 W:0  pointer to peer array
     uint32_t     m_numPeers;         // +0x003c  R:7 W:0  number of peers in array
+    uint8_t      _pad40[4];          // +0x0040
     uint32_t     m_pSpectatorSlot0;  // +0x0044  R:0 W:1  spectator slot 0
+    uint8_t      _pad48[4];          // +0x0048
     uint32_t     m_pSpectatorSlot1;  // +0x004c  R:0 W:1  spectator slot 1
 
     // ── virtual methods ──
-    virtual ~pongLiveManager();                  // [0] @ 0x823aae40
+    ~pongLiveManager();                  // [0] @ 0x823aae40
 
     // ── non-virtual methods (from debug strings) ──
     void GetAvailablePeerIndex();
@@ -1910,9 +1524,9 @@ struct SessionManager {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~SessionManager();                  // [0] @ 0x823aa048
-    virtual void ScalarDtor(int flags); // [1] @ 0x823a9e88
-    virtual void vfn_2();  // [2] @ 0x823a9f80
+    ~SessionManager();                  // [0] @ 0x823aa048
+    void ScalarDtor(int flags); // [1] @ 0x823a9e88
+    void vfn_2();  // [2] @ 0x823a9f80
 };
 
 } // namespace pongLiveManagerInner
@@ -1921,193 +1535,20 @@ struct SessionManager {
 struct pongNetMessageHolder {
     void**      vtable;           // +0x00
 
-    // ── field access clusters ──
-    uint32_t     m_typeId;           // +0x0004  R:69 W:40  message type identifier
-    uint8_t      m_bTypeValid;       // +0x0005  R:0 W:3  type valid flag
-    uint16_t     m_poolIndex;        // +0x0006  R:9 W:19  pool index
-    uint8_t      m_bPoolValid;       // +0x0007  R:0 W:1  pool valid flag
-    void*        m_pInternalArray;   // +0x0008  R:204 W:224  pointer to message array
-    uint8_t      m_bArrayReady;      // +0x0009  R:0 W:1  array ready flag
-    uint8_t      m_bArrayValid;      // +0x000a  R:0 W:1  array valid flag
-    uint32_t     m_refCount;         // +0x000c  R:85 W:92  reference count
-    uint32_t     m_elemSize;         // +0x0010  R:4 W:13  element size
-    uint32_t     m_elemCapacity;     // +0x0014  R:4 W:16  element capacity
-    uint8_t      m_bCapacitySet;     // +0x0015  R:0 W:1  capacity set flag
-    uint8_t      m_bCapacityValid;   // +0x0016  R:0 W:1  capacity valid flag
-    uint8_t      m_bCapacityLocked;  // +0x0017  R:0 W:1  capacity locked flag
-    // ── message slot 0 (offset +0x18) ──
-    uint32_t     m_slot0_pData;      // +0x0018  R:0 W:11  slot 0 data pointer
-    uint8_t      m_slot0_bReady;     // +0x0019  R:0 W:1  slot 0 ready flag
-    uint8_t      m_slot0_bValid;     // +0x001a  R:0 W:1  slot 0 valid flag
-    uint32_t     m_slot0_flags;      // +0x001c  R:0 W:4  slot 0 flags
-    uint32_t     m_slot0_pVtable;    // +0x0020  R:0 W:8  slot 0 vtable
-    uint32_t     m_slot0_typeId;     // +0x0024  R:0 W:6  slot 0 type ID
-    uint32_t     m_slot0_pArray;     // +0x0028  R:0 W:9  slot 0 array pointer
-    uint8_t      m_slot0_arrReady;   // +0x0029  R:0 W:1  slot 0 array ready
-    uint8_t      m_slot0_arrValid;   // +0x002a  R:0 W:1  slot 0 array valid
-    uint32_t     m_slot0_refCount;   // +0x002c  R:0 W:3  slot 0 ref count
-    uint32_t     m_slot0_elemSize;   // +0x0030  R:0 W:9  slot 0 element size
-    uint32_t     m_slot0_elemCap;    // +0x0034  R:0 W:8  slot 0 element capacity
-    uint32_t     m_slot0_extra0;     // +0x0038  R:0 W:5  slot 0 extra data 0
-    uint8_t      m_slot0_extraF0;    // +0x0039  R:0 W:1  slot 0 extra flag 0
-    uint8_t      m_slot0_extraF1;    // +0x003a  R:0 W:1  slot 0 extra flag 1
-    // ── message slot 1 (offset +0x3c) ──
-    uint32_t     m_slot1_flags;      // +0x003c  R:0 W:4  slot 1 flags
-    uint32_t     m_slot1_pVtable;    // +0x0040  R:0 W:9  slot 1 vtable
-    uint32_t     m_slot1_typeId;     // +0x0044  R:0 W:6  slot 1 type ID
-    uint32_t     m_slot1_pArray;     // +0x0048  R:0 W:9  slot 1 array pointer
-    uint8_t      m_slot1_arrReady;   // +0x0049  R:0 W:1  slot 1 array ready
-    uint8_t      m_slot1_arrValid;   // +0x004a  R:0 W:1  slot 1 array valid
-    uint32_t     m_slot1_refCount;   // +0x004c  R:0 W:2  slot 1 ref count
-    uint16_t     m_slot1_poolIdx;    // +0x004e  R:0 W:2  slot 1 pool index
-    uint32_t     m_slot1_elemSize;   // +0x0050  R:0 W:7  slot 1 element size
-    uint16_t     m_slot1_elemIdx;    // +0x0052  R:4 W:2  slot 1 element index
-    uint32_t     m_slot1_elemCap;    // +0x0054  R:0 W:8  slot 1 element capacity
-    uint32_t     m_slot1_extra0;     // +0x0058  R:0 W:6  slot 1 extra data 0
-    uint32_t     m_slot1_extra1;     // +0x005c  R:0 W:1  slot 1 extra data 1
-    uint16_t     m_slot1_extraF0;    // +0x005e  R:0 W:1  slot 1 extra flag 0
-    // ── message slot 2 (offset +0x60) ──
-    uint32_t     m_slot2_pVtable;    // +0x0060  R:0 W:5  slot 2 vtable
-    uint16_t     m_slot2_elemIdx;    // +0x0062  R:2 W:2  slot 2 element index
-    uint32_t     m_slot2_elemCap;    // +0x0064  R:0 W:6  slot 2 element capacity
-    uint16_t     m_slot2_poolIdx;    // +0x0066  R:2 W:1  slot 2 pool index
-    uint32_t     m_slot2_extra0;     // +0x0068  R:0 W:5  slot 2 extra data 0
-    uint32_t     m_slot2_extra1;     // +0x006c  R:0 W:1  slot 2 extra data 1
-    uint32_t     m_slot2_flags;      // +0x0070  R:0 W:4  slot 2 flags
-    uint32_t     m_slot2_refCount;   // +0x0074  R:0 W:3  slot 2 ref count
-    uint16_t     m_slot2_flagsB;     // +0x0076  R:0 W:1  slot 2 flags B
-    uint32_t     m_slot2_pArray;     // +0x0078  R:0 W:5  slot 2 array pointer
-    uint16_t     m_slot2_arrIdx;     // +0x007a  R:2 W:1  slot 2 array index
-    uint16_t     m_slot2_arrFlags;   // +0x007c  R:0 W:1  slot 2 array flags
-    // ── message slot 3 (offset +0x80) ──
-    uint32_t     m_slot3_pData;      // +0x0080  R:0 W:3  slot 3 data pointer
-    uint32_t     m_slot3_flags;      // +0x0084  R:0 W:4  slot 3 flags
-    uint32_t     m_slot3_refCount;   // +0x0088  R:0 W:3  slot 3 ref count
-    // ── pool management (offset +0x90) ──
-    uint32_t     m_pool0_pData;      // +0x0090  R:1 W:4  pool 0 data
-    uint32_t     m_pool0_flags;      // +0x0094  R:1 W:4  pool 0 flags
-    uint32_t     m_pool0_refCount;   // +0x0098  R:0 W:3  pool 0 ref count
-    uint8_t      m_pool0_bReady;     // +0x0099  R:0 W:1  pool 0 ready
-    uint16_t     m_pool0_poolIdx;    // +0x009a  R:0 W:1  pool 0 pool index
-    uint16_t     m_pool0_writePos;   // +0x009e  R:0 W:3  pool 0 write position
-    uint16_t     m_pool0_readPos;    // +0x00a0  R:0 W:4  pool 0 read position
-    uint16_t     m_msgActiveCount;   // +0x00a2  R:8 W:4  active message count
-    uint32_t     m_pMsgPoolState;    // +0x00a4  R:2 W:5  message pool state
-    uint32_t     m_msgPoolSize;      // +0x00a8  R:2 W:1  message pool size
-    uint32_t     m_msgPoolCapacity;  // +0x00ac  R:2 W:1  message pool capacity
-    uint8_t     _pad0x00c8[24];
-    // ── repeating message type entries (240 bytes each, 50 entries) ──
-    // entry 0 @ +0xC8
-    uint32_t     m_entry0_pHandler;  // +0x00c8  R:1 W:1  entry 0 handler
-    uint32_t     m_entry0_flags;     // +0x00cc  R:0 W:1  entry 0 flags
-    uint32_t     m_entry0_pVtable;   // +0x00d0  R:1 W:2  entry 0 vtable
-    uint16_t     m_entry0_typeFlags; // +0x00d2  R:0 W:1  entry 0 type flags
-    uint32_t     m_entry0_typeId;    // +0x00d4  R:1 W:1  entry 0 type ID
-    uint16_t     m_entry0_poolIdx;   // +0x00d6  R:0 W:1  entry 0 pool index
-    uint16_t     m_entry0_seqNum;    // +0x00d8  R:0 W:1  entry 0 seq number
-    uint16_t     m_entry0_elemIdx;   // +0x00da  R:2 W:1  entry 0 element index
-    uint16_t     m_entry0_refCount;  // +0x00dc  R:0 W:1  entry 0 ref count
-    uint16_t     m_entry0_extra;     // +0x00e0  R:0 W:1  entry 0 extra
-    uint8_t     _pad0x00f0[12];
-    // entry 1 @ +0xF0
-    uint16_t     m_entry1_pHandler;  // +0x00f0  R:0 W:1  entry 1 handler
-    uint16_t     m_entry1_seqNum;    // +0x00f6  R:0 W:1  entry 1 seq number
-    uint16_t     m_entry1_typeId;    // +0x00f8  R:0 W:1  entry 1 type ID
-    uint16_t     m_entry1_elemIdx;   // +0x00fa  R:2 W:1  entry 1 element index
-    uint16_t     m_entry1_refCount;  // +0x00fc  R:0 W:1  entry 1 ref count
-    uint8_t     _pad0x0120[32];
-    // entry 2 @ +0x120
-    uint16_t     m_entry2_pHandler;  // +0x0120  R:0 W:1  entry 2 handler
-    uint8_t     _pad0x0160[60];
-    // entry 3 @ +0x160
-    uint32_t     m_entry3_pVtable;   // +0x0160  R:0 W:1  entry 3 vtable
-    uint32_t     m_entry3_flags;     // +0x0164  R:0 W:1  entry 3 flags
-    uint16_t     m_entry3_typeFlags; // +0x0166  R:0 W:1  entry 3 type flags
-    uint32_t     m_entry3_pData;     // +0x0168  R:0 W:2  entry 3 data
-    uint16_t     m_entry3_elemIdx;   // +0x016a  R:2 W:1  entry 3 element index
-    uint32_t     m_entry3_refCount;  // +0x016c  R:0 W:2  entry 3 ref count
-    uint32_t     m_entry3_typeId;    // +0x0170  R:0 W:1  entry 3 type ID
-    uint16_t     m_entry3_poolIdx;   // +0x0174  R:0 W:1  entry 3 pool index
-    uint8_t      m_entry3_bReady;    // +0x0176  R:0 W:1  entry 3 ready flag
-    uint8_t     _pad0x0184[10];
-    uint8_t      m_entry3_extraF0;   // +0x0184  R:0 W:1  entry 3 extra flag 0
-    uint8_t      m_entry3_extraF1;   // +0x0185  R:0 W:1  entry 3 extra flag 1
-    uint8_t      m_entry3_extraF2;   // +0x0186  R:0 W:1  entry 3 extra flag 2
-    uint8_t     _pad0x01a8[30];
-    // entry 4 @ +0x1A8
-    uint8_t      m_entry4_bActive;   // +0x01a8  R:2 W:1  entry 4 active
-    uint8_t      m_entry4_bReady;    // +0x01a9  R:1 W:1  entry 4 ready
-    uint8_t     _pad0x0208[91];
-    // entry 5 @ +0x208
-    uint16_t     m_entry5_pHandler;  // +0x0208  R:0 W:1  entry 5 handler
-    uint8_t     _pad0x024a[62];
-    // entry 6 @ +0x24A
-    uint16_t     m_entry6_pHandler;  // +0x024a  R:0 W:1  entry 6 handler
-    uint16_t     m_entry6_pVtable;   // +0x0250  R:0 W:1  entry 6 vtable
-    uint16_t     m_entry6_elemIdx;   // +0x0252  R:2 W:1  entry 6 element index
-    uint16_t     m_entry6_refCount;  // +0x0254  R:0 W:1  entry 6 ref count
-    uint8_t     _pad0x027c[36];
-    uint16_t     m_entry7_pHandler;  // +0x027c  R:0 W:1  entry 7 handler
-    uint8_t     _pad0x0324[164];
-    uint32_t     m_entry8_pData;     // +0x0324  R:0 W:1  entry 8 data
-    uint8_t     _pad0x03f2[202];
-    uint16_t     m_entry9_pHandler;  // +0x03f2  R:0 W:1  entry 9 handler
-    uint8_t     _pad0x0400[10];
-    uint16_t     m_entry10_pVtable;  // +0x0400  R:0 W:1  entry 10 vtable
-    uint16_t     m_entry10_elemIdx;  // +0x0402  R:2 W:1  entry 10 element index
-    uint16_t     m_entry10_refCnt;   // +0x0404  R:0 W:1  entry 10 ref count
-    uint8_t     _pad0x0488[128];
-    uint32_t     m_entry11_pData;    // +0x0488  R:0 W:1  entry 11 data
-    uint32_t     m_entry11_flags;    // +0x048c  R:0 W:1  entry 11 flags
-    uint8_t     _pad0x04fe[110];
-    uint16_t     m_entry12_pHandler; // +0x04fe  R:0 W:1  entry 12 handler
-    uint16_t     m_entry12_pVtable;  // +0x0500  R:0 W:1  entry 12 vtable
-    uint16_t     m_entry12_elemIdx;  // +0x0502  R:2 W:1  entry 12 element index
-    uint16_t     m_entry12_refCnt;   // +0x0504  R:0 W:1  entry 12 ref count
-    uint8_t     _pad0x0890[904];
-    uint32_t     m_entry13_pData;    // +0x0890  R:0 W:1  entry 13 data
-    uint32_t     m_entry13_flags;    // +0x0894  R:0 W:1  entry 13 flags
-    uint8_t      m_entry13_bReady;   // +0x0898  R:0 W:1  entry 13 ready
-    uint8_t     _pad0x1c9c[5120];
-    uint32_t     m_entry14_pData;    // +0x1c9c  R:0 W:1  entry 14 data
-    uint32_t     m_entry14_flags;    // +0x1ca0  R:0 W:1  entry 14 flags
-    uint32_t     m_entry14_refCount; // +0x1ca4  R:0 W:1  entry 14 ref count
-    uint8_t     _pad0x22f2[1610];
-    uint16_t     m_entry15_pHandler; // +0x22f2  R:0 W:1  entry 15 handler
-    uint8_t     _pad0x2300[10];
-    uint16_t     m_entry15_pVtable;  // +0x2300  R:0 W:1  entry 15 vtable
-    uint16_t     m_entry15_elemIdx;  // +0x2302  R:2 W:1  entry 15 element index
-    uint16_t     m_entry15_refCnt;   // +0x2304  R:0 W:1  entry 15 ref count
-    uint8_t     _pad0x2580[632];
-    uint32_t     m_entry16_pData;    // +0x2580  R:0 W:1  entry 16 data
-    uint32_t     m_entry16_flags;    // +0x2584  R:0 W:1  entry 16 flags
-    uint32_t     m_entry16_refCount; // +0x2588  R:0 W:1  entry 16 ref count
-    uint8_t     _pad0x2600[116];
-    uint8_t      m_entry16_bReady;   // +0x2600  R:0 W:1  entry 16 ready
-    uint32_t     m_entry16_extra;    // +0x2604  R:0 W:1  entry 16 extra
-    uint8_t     _pad0x27e0[472];
-    uint32_t     m_entry17_pData;    // +0x27e0  R:0 W:1  entry 17 data
-    uint8_t      m_entry17_bReady;   // +0x27e4  R:0 W:1  entry 17 ready
-    uint8_t     _pad0x2ed2[1770];
-    uint16_t     m_entry18_pHandler; // +0x2ed2  R:0 W:1  entry 18 handler
-    uint8_t     _pad0x2ee0[10];
-    uint16_t     m_entry18_pVtable;  // +0x2ee0  R:0 W:1  entry 18 vtable
-    uint16_t     m_entry18_elemIdx;  // +0x2ee2  R:2 W:1  entry 18 element index
-    uint16_t     m_entry18_refCnt;   // +0x2ee4  R:0 W:1  entry 18 ref count
-    uint8_t     _pad0x3e72[3978];
-    uint16_t     m_entry19_pHandler; // +0x3e72  R:0 W:1  entry 19 handler
-    uint8_t     _pad0x3e80[10];
-    uint16_t     m_entry19_pVtable;  // +0x3e80  R:0 W:1  entry 19 vtable
-    uint16_t     m_entry19_elemIdx;  // +0x3e82  R:2 W:1  entry 19 element index
-    uint16_t     m_entry19_refCnt;   // +0x3e84  R:0 W:1  entry 19 ref count
+    // The generated "field access clusters" list for this class overlapped
+    // itself (fields at every byte, u64s at odd offsets), so no member sat
+    // where the asm reads it. Only fields the lifts use are kept, at their
+    // asm offsets; add more the same way.
+    uint8_t      _pad04[4];          // +0x04
+    void*        m_pInternalArray;   // +0x08  list head (0x82582228, CleanupInternalArray)
+    uint32_t     m_refCount;         // +0x0C  0x82582228 increments it
 
     // ── virtual methods ──
-    virtual ~pongNetMessageHolder();                  // [0] @ 0x823C5788
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bfba8
-    virtual void CleanupInternalArray();  // [2] @ 0x823C3878
+    ~pongNetMessageHolder();                  // [0] @ 0x823C5788
+    void ScalarDtor(int flags); // [1] @ 0x823bfba8
+    void CleanupInternalArray();  // [2] @ 0x823C3878
     
     // ── non-virtual methods ──
-    void InsertIntoList();  // @ 0x825821A8
     void InitializeTimedGameUpdateArray();  // @ 0x823C6E30
     void CleanupNestedArrays();  // @ 0x82135C70
     void RemoveElementByPointer(void* targetPtr);  // @ 0x82134350
@@ -2122,7 +1563,7 @@ struct pongNetMessageHolderBase {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongNetMessageHolderBase();                  // [0] @ 0x823b5890
+    ~pongNetMessageHolderBase();                  // [0] @ 0x823b5890
 };
 
 // ── pongPresence  [vtable @ 0x82070914] ──────────────────────────
@@ -2135,9 +1576,9 @@ struct pongRemotePlayer {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongRemotePlayer();                  // [0] @ 0x8239c960
-    virtual void vfn_2();  // [2] @ 0x8239ca30
-    virtual void vfn_3();  // [3] @ 0x8239cbc8
+    ~pongRemotePlayer();                  // [0] @ 0x8239c960
+    void vfn_2();  // [2] @ 0x8239ca30
+    void vfn_3();  // [3] @ 0x8239cbc8
 };
 
 

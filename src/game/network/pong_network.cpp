@@ -87,7 +87,7 @@ extern void pongNetMessageHolder_vfn_2_1628_1(pongNetMessageHolder* holder);
 extern pongNetMessageHolder* pongNetMessageHolder_FAE0_isl();
 extern void pongNetMessageHolder_5038_w();
 extern void rage_27C0(void* instance);
-extern "C" void sysMemAllocator_Free(void* ptr);
+extern "C" void sysMemAllocator_Free(void* ptr);  // 0x820C00C0 (the name is also marked 0x82186228 in gd_data.cpp)
 extern void game_5E70(void* gameState);
 extern void pongNetMessageHolder_7668_2hr(void* stateArray);
 
@@ -160,6 +160,7 @@ extern pongNetMessageHolder g_holderInstance_129C;          // @ 0x825D129C
 extern pongNetMessageHolder g_holderInstance_AudioRefCount; // @ 0x825D12B4
 extern uint8_t              g_holderInstance_InputDataMgr;  // @ 0x825D1960
 extern uint8_t              g_holderInstance_13A4;          // @ 0x825D13A4
+extern uint8_t              g_holderInstance_1948;          // @ 0x825D1948
 extern void*                g_holderInstance_MotionRangeMgr_ptr; // @ 0x825D164C
 extern void*                g_holderInstance_MotionRangeMgr;     // @ 0x825D1638
 extern void*                g_holderInstance_DataMgr;       // @ 0x825D1900
@@ -619,20 +620,29 @@ void pongNetMessageHolder_4BF8_w() {
     --NetMessageHolderLiveCount();
 }
 
+// Pushes a static holder node onto the holder singleton's list.
+static void PushStaticHolderNode(void* nodeAddr) {
+    pongNetMessageHolder* holder = pongNetMessageHolder_FAE0_isl();
+    auto* node = reinterpret_cast<PongNetMessageHolderStaticNode*>(nodeAddr);
+    node->m_field8 = (uint32_t)(uintptr_t)holder->m_pInternalArray;
+    holder->m_pInternalArray = nodeAddr;
+    holder->m_refCount++;
+}
+
 // ===========================================================================
 // pongNetMessageHolder_2228_2h @ 0x82582228 | size: 0x40
 //
 // Adds the static node at 0x825D1960 to the holder singleton list.
 // ===========================================================================
+// @ 0x82582228
 void pongNetMessageHolder_2228_2h() {
-    pongNetMessageHolder* holder = pongNetMessageHolder_FAE0_isl();
-    const uint32_t previousHead = (uint32_t)(uintptr_t)holder->m_pInternalArray;
+    PushStaticHolderNode(&g_holderInstance_InputDataMgr);
+}
 
-    auto* node = reinterpret_cast<PongNetMessageHolderStaticNode*>(&g_holderInstance_InputDataMgr);
-    node->m_field8 = previousHead;
-
-    holder->m_pInternalArray = (void*)(uintptr_t)&g_holderInstance_InputDataMgr;
-    holder->m_refCount = previousHead + 1;
+// pongNetMessageHolder_21A8_2h: the same for the static node at 0x825D1948.
+// @ 0x825821A8
+void pongNetMessageHolder_21A8_2h() {
+    PushStaticHolderNode(&g_holderInstance_1948);
 }
 
 // ===========================================================================
@@ -705,25 +715,18 @@ pongNetMessageHolder* pongNetMessageHolder_vfn_0_5B48_1(pongNetMessageHolder* se
 //
 // This is called during destruction to release dynamically allocated internal state.
 // ===========================================================================
+// @ 0x823C3878
 void pongNetMessageHolder::CleanupInternalArray()
 {
-    void** arrayPtr = (void**)m_pInternalArray;
-    
-    if (arrayPtr != nullptr) {
-        // Set cleanup vtable for each element in the array
-        // Python-verified: loop from i=1 down to i=0 (2 iterations)
-        // Offsets: +24 (element 1), +12 (element 0)
-        extern void* g_pCleanupVtable;  // @ 0x8206C394 (lis -32249 + -15612)
-        
+    void* array = m_pInternalArray;
+    if (array != nullptr) {
+        // Two 12-byte elements get the base element vtable (0x8206C304, an
+        // address, not a load) before the block is freed; the asm walks down
+        // from the second one.
         for (int i = 1; i >= 0; i--) {
-            void** element = (void**)((uint8_t*)arrayPtr + 12 + (i * 12));
-            *element = g_pCleanupVtable;
+            *(uint32_t*)((uint8_t*)array + i * 12) = 0x8206C304u;
         }
-        
-        // Free the array
-        sysMemAllocator_Free(arrayPtr);
-        
-        // Null out the pointer
+        sysMemAllocator_Free(array);
         m_pInternalArray = nullptr;
     }
 }
@@ -1269,43 +1272,6 @@ void SinglesNetworkClient::ProcessPendingMessages()
         // Advance to next message
         NetworkClient_EndMessageProcessing(&procFlags);
     }
-}
-
-
-// ===========================================================================
-// pongNetMessageHolder::InsertIntoList @ 0x825821A8 | size: 0x40
-//
-// Inserts this message holder into the global linked list at the head position.
-// This is part of the network message lifecycle management system.
-//
-// The function:
-// 1. Gets the singleton holder (list head)
-// 2. Reads the current next pointer from the singleton
-// 3. Updates the singleton's next pointer to point to this node
-// 4. Updates this node's next pointer to point to the old head
-// 5. Increments the reference count
-//
-// This implements a classic "insert at head" linked list operation for
-// tracking active network message holders.
-//
-// Original symbol: pongNetMessageHolder_21A8_2h
-// ===========================================================================
-void pongNetMessageHolder::InsertIntoList()
-{
-    // Get the singleton holder (list head)
-    pongNetMessageHolder* singleton = pongNetMessageHolder_FAE0_isl();
-    
-    // Read the current next pointer from the singleton
-    void* oldNext = singleton->m_pInternalArray;
-    
-    // Update singleton to point to the old head
-    *(void**)((char*)singleton + 8) = oldNext;
-    
-    // Make this node point to the singleton
-    this->m_pInternalArray = singleton;
-    
-    // Increment reference count
-    this->m_refCount++;
 }
 
 
