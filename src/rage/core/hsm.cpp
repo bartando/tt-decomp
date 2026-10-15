@@ -245,19 +245,14 @@ void jumptable_3A48(void* slot, unsigned int kind,
 
 void hsmContext_Init(void* obj)        { (void)obj; }
 void hsmContext_InitTimers(void)       {}
-void hsmEvent_Init(void* e)            { (void)e; }
+// 0x823DDA08 is snEvent's constructor, lifted in sn_event.cpp.
+void* snEvent_Construct(void* event);
+void hsmEvent_Init(void* e)            { snEvent_Construct(e); }
 void HSM_QueueNotification(void* n)    { (void)n; }
 void PostStateTransitionRequest(void* m, int e) { (void)m; (void)e; }
 void SetTrainingState(int s)           { (void)s; }
 void gmLogic_StepFrame(void)           {}
 
-// hsmEvent_Init also appears inside namespace rage — callers
-// (snMigrateMachine, snSessionStates) invoke it from within a
-// `namespace rage {}` block, so the mangled name carries the rage:: prefix.
-// rage::hsmState_AttachChild is defined with its body further down.
-namespace rage {
-void hsmEvent_Init(void* event) { (void)event; }
-}  // namespace rage
 
 extern "C" void gmLogic_StepFrame_impl(void* ctx) { (void)ctx; }
 

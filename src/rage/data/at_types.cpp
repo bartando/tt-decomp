@@ -69,6 +69,119 @@ bool StringsMatch(const char* left, const char* right)
 
 } // namespace
 
+// ─────────────────────────────────────────────────────────────────────────────
+// rage::xmlTree teardown. Callers know 0x821A8070 as atArray_Clear; it is the
+// xmlTree destructor body (vtable 0x8203A928, back to datBase 0x820276C4 at the end).
+// rage_core_utils.cpp aliases it to the C symbol _atArray_Clear.
+// ─────────────────────────────────────────────────────────────────────────────
+
+void rage_free(void* p);
+
+struct xmlTreeListNode {
+    void** vtable;              // slot 0: scalar deleting destructor
+    uint32_t _4;
+    xmlTreeListNode* next;      // +0x08
+};
+
+struct xmlTreeEntry {           // 12 bytes on the game
+    char* name;                 // +0x00
+    uint32_t _4;
+    xmlTreeListNode* head;      // +0x08
+};
+
+struct xmlTreeView {
+    void** vtable;
+    xmlTreeListNode* root;      // +0x04
+    xmlTreeEntry* entries;      // +0x08, new[]'d with a count word in front
+    uint16_t count;             // +0x0C
+    uint16_t capacity;          // +0x0E
+};
+
+namespace {
+
+using ScalarDtorFn = void (*)(void*, int);
+
+constexpr uintptr_t kVtable_xmlTree = 0x8203A928;
+constexpr uintptr_t kVtable_datBase = 0x820276C4;
+
+} // namespace
+
+// @ 0x821A8118
+void xmlTreeEntry_Destruct(xmlTreeEntry* entry)
+{
+    for (xmlTreeListNode* node = entry->head; node != nullptr;) {
+        xmlTreeListNode* next = node->next;
+        reinterpret_cast<ScalarDtorFn>(node->vtable[0])(node, 1);
+        node = next;
+    }
+    rage_free(entry->name);
+}
+
+// delete[] for xmlTreeEntry; the flags argument in r4 is ignored.
+// @ 0x820C2980
+void* xmlTreeEntry_DeleteArray(xmlTreeEntry* entries)
+{
+    uint32_t* block = reinterpret_cast<uint32_t*>(entries) - 1;
+    for (int32_t i = static_cast<int32_t>(*block) - 1; i >= 0; --i) {
+        xmlTreeEntry_Destruct(&entries[i]);
+    }
+    rage_free(block);
+    return block;
+}
+
+// @ 0x821A8070
+void atArray_Clear(void* obj)
+{
+    auto* tree = static_cast<xmlTreeView*>(obj);
+    tree->vtable = reinterpret_cast<void**>(kVtable_xmlTree);
+    if (tree->root != nullptr) {
+        reinterpret_cast<ScalarDtorFn>(tree->root->vtable[0])(tree->root, 1);
+    }
+    if (tree->entries != nullptr) {
+        xmlTreeEntry_DeleteArray(tree->entries);
+    }
+    tree->entries = nullptr;
+    tree->count = 0;
+    tree->capacity = 0;
+    tree->vtable = reinterpret_cast<void**>(kVtable_datBase);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// atArray<u32>::Realloc. The original inlines rage_free.
+// ─────────────────────────────────────────────────────────────────────────────
+
+extern "C" void* xe_EC88(uint32_t size);  // operator new
+
+struct atArrayU32View {
+    uint32_t* data;     // +0x00
+    int32_t count;      // +0x04
+    int32_t capacity;   // +0x08
+};
+
+// @ 0x821322B0
+void* datArray_Grow(void* obj, uint32_t newCapacity)
+{
+    auto* array = static_cast<atArrayU32View*>(obj);
+    const int32_t capacity = static_cast<int32_t>(newCapacity);
+    uint32_t* data = nullptr;
+    if (capacity > 0) {
+        data = static_cast<uint32_t*>(
+            xe_EC88(newCapacity > 0x3FFFFFFFu ? 0xFFFFFFFFu : newCapacity * 4));
+    }
+    const int32_t keep = capacity < array->count ? capacity : array->count;
+    for (int32_t i = 0; i < keep; ++i) {
+        data[i] = array->data[i];
+    }
+    uint32_t* old = array->data;
+    array->capacity = capacity;
+    array->count = keep;
+    if (old != nullptr) {
+        rage_free(old);
+    }
+    array->data = data;
+    return data;
+}
+
 // All symbols below use C linkage — C source files (src/rage/core/app_init.c,
 // src/rage/render_loop.c, src/xam/*) reach them through underscore-prefixed
 // symbol names. C++ callers just take the unmangled name.
@@ -113,14 +226,6 @@ void* atHashMap_Find(void* table, const void* key) {
     return nullptr;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// atArray — flat dynamic-array base surface.
-//   atArray_Clear      @ ~0x821A8070 (gameObject base dtor).
-//   atArray_Destructor @ 0x820C2980  (weak body here; an address-backed
-//                                     version lives in src/rage/memory/
-//                                     atArray.cpp when that file is linked).
-// ─────────────────────────────────────────────────────────────────────────────
-void atArray_Clear(void* obj) { (void)obj; }
 void* atArray_Destructor(void* pArray) { (void)pArray; return nullptr; }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -168,7 +273,6 @@ void atFactory_GetFactory(void* a) { (void)a; }
 // datRef_Release — reference-count release (real @ rage_6A90 0x82126A90).
 // datResource_Load — blocking load dispatch; ph_physics.cpp calls this.
 // ─────────────────────────────────────────────────────────────────────────────
-void datArray_Grow(void* a, uint32_t b)             { (void)a; (void)b; }
 void datRef_Release(void* ref)                      { (void)ref; }
 void datResource_Load(void* a, const char* b)       { (void)a; (void)b; }
 
