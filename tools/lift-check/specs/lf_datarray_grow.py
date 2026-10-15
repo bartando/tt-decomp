@@ -11,7 +11,7 @@ SOURCE = "src/rage/data/at_types.cpp"
 CALLS = {
     0x820DEC88: alloc(size_reg="r3"),
     0x820C00C0: inlined(),                       # rage_free, inlined in the original
-    0x820F90D0: stub(ret=lambda c: c.ret(r3=c.rng.choice([0, 1]))),
+    0x820F90D0: stub(ret=lambda c: c.rng.choice([0, 1])),
     "heap.vfn_2": stub(ret="void", args=("r3", "r4")),
 }
 
