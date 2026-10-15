@@ -1574,7 +1574,7 @@ bool pongCameraMgr::CheckAllCameraQueries(void* gameState, float f1, float f2) {
 extern void sysMemAllocator_Free(void* ptr);                        // @ 0x820C00C0
 extern void atSingleton_9420(void* obj);                      // @ 0x821A9420
 extern void pongCameraMgr_3E98_g(void* obj);                  // @ 0x82143E98 (GetAspectRatio)
-extern void phBoundCapsule_3598_g(void* obj);                  // @ 0x82153598
+extern void phBoundCapsule_3598_g(void* obj);                  // @ 0x82153598 — grcViewport: projection from +0x338..+0x344
 extern uint8_t pongCameraMgr_C450_g(void* node);              // @ 0x8220C450
 extern bool pongCameraMgr_7EA8_g(void* mgr, void* state, int flag); // @ 0x82167EA8
 extern void pg_7CE0(void* mgr, void* node);                   // @ 0x82167CE0
@@ -2613,54 +2613,45 @@ void* pongCameraMgr_9DE8_g(void* owner, uint32_t param1, uint32_t /*unused*/,
 // camViewCS — 6 virtual methods (slots 3, 6, 7, 8, 9, 10)
 // ═════════════════════════════════════════════════════════════════════════════
 
-// Param-hook registration helper shared by many camera/view classes.
-// Signature inferred from calls at 0x82177B60: (host, kind, field, addr, enabled, tag, pad).
+// Param-hook registration (0x82177B60, pongHairData_7B60_g in the symbol map):
+// copies name, drops its spaces, and records field with the kind (1 = byte
+// flag, 6 = float). Callers also pass 1 and 0 in r7/r8, which it never reads.
 extern void pongCameraView_RegisterParamHook(void* paramHost, int32_t kind,
-                                             void* fieldAddr, const char* name,
-                                             int32_t enabled, void* userData,
-                                             int32_t flags);
+                                             const char* name, void* field,
+                                             int32_t unusedR7, int32_t unusedR8);
 
-// String literals pulled from .rdata (annotated in pass5_final):
-extern const char kCamViewCS_ParamFlag[];     // lbl_82036304 → "UseOverrideExtents"-style flag tag
-extern const char kCamViewCS_ParamRadius[];   // lbl_82036314 → override-extent-X tag
-extern const char kCamViewCS_ParamHeight[];   // lbl_82036320 → override-extent-Y tag
-extern const char kCamViewCS_TypeName[];      // lbl_820362E8 → returned by GetTypeName
-extern const char kCamViewCS_DebugLabel[];    // lbl_820362F8 → returned by GetDebugLabel
+// String literals in .rdata
+extern const char kCamViewCS_UseGlobalClip[]; // @ 0x82036304 "UseGlobalClip"
+extern const char kCamViewCS_ClipNear[];      // @ 0x82036314 "Clip Near"
+extern const char kCamViewCS_ClipFar[];       // @ 0x82036320 "Clip Far"
+extern const char kCamViewCS_TypeName[];      // @ 0x82032868 (not in the string dumps)
+extern const char kCamViewCS_DebugLabel[];    // @ 0x820362F8 "camViewCS"
 
-// Zero-float constant used by OnReset (lfs f0 from .rdata).
-extern const float g_camViewCS_ResetFloat;    // lbl_8202D090 → 0.0f
+// 0x82228EA0 (phBoundCapsule_8EA0_g in the symbol map): the aspect ratio
+// camViewCS gives its viewport. Returns gameLoop+0x204 times the float listed
+// for display mode gameLoop+0x200 in the 4-entry table at 0x825CB75C (1.0 when
+// the mode isn't listed). A leaf that leaves f6/f7 alone, which is why the
+// original keeps the clip planes in f6/f7 across the call.
+extern float gameLoop_GetDisplayAspect(void* gameLoop);
 
-// Capsule-style FOV solver from the phBoundCapsule helper bank.
-// At 0x82228EA0 it takes (loopObj, extentY_in_f7, extentX_in_f6) and returns
-// the horizontal FOV in f1 plus propagates f6/f7 through to the caller.
-extern float phBoundCapsule_SolveFOV(void* loopObj, float extentY, float extentX);
-
-// Final bound-capsule publish step (0x82153598) — commits the 824/828/832/836
-// float block plus the 864 active flag to the pongCameraMgr render state.
-extern void pongCameraMgr_PublishViewExtents(void* mgr);
-
-// Loop-object global pulled from 0x825EAB30 (annotated as g_loop_obj_ptr).
-extern void* g_loopObject;
+// @ 0x825EAB30 — the gameLoop object (globals.c)
+extern "C" void* g_loop_obj_ptr;
 
 /**
  * camViewCS::RegisterParamHooks  [vtable slot 3]  @ 0x8216CEB0
  *
- * Registers three parameter hooks with the supplied host: the override-extents
- * toggle at +0x38 and the two override floats at +0x40/+0x3C. Forwarded straight
- * to pongHairData_7B60_g with kinds 1/6/6 respectively.
+ * Registers the UseGlobalClip flag (+0x38) and the two clip planes it
+ * enables: "Clip Near" (+0x40) and "Clip Far" (+0x3C).
  */
 void camViewCS::RegisterParamHooks(void* paramHost) {
-    pongCameraView_RegisterParamHook(paramHost, 1,
-        &this->m_useOverrideExtents, kCamViewCS_ParamFlag,   1, nullptr, 0);
-    pongCameraView_RegisterParamHook(paramHost, 6,
-        &this->m_overrideExtentY,    kCamViewCS_ParamRadius, 1, nullptr, 0);
-    pongCameraView_RegisterParamHook(paramHost, 6,
-        &this->m_overrideExtentX,    kCamViewCS_ParamHeight, 1, nullptr, 0);
+    pongCameraView_RegisterParamHook(paramHost, 1, kCamViewCS_UseGlobalClip, &m_useGlobalClip, 1, 0);
+    pongCameraView_RegisterParamHook(paramHost, 6, kCamViewCS_ClipNear, &m_clipNear, 1, 0);
+    pongCameraView_RegisterParamHook(paramHost, 6, kCamViewCS_ClipFar, &m_clipFar, 1, 0);
 }
 
 /**
  * camViewCS::GetTypeName  [vtable slot 6]  @ 0x82177830
- * Returns the "camViewCS" class-name string baked into .rdata.
+ * Returns the .rdata string at 0x82032868; other classes share this slot body.
  */
 const char* camViewCS::GetTypeName() {
     return kCamViewCS_TypeName;
@@ -2668,7 +2659,7 @@ const char* camViewCS::GetTypeName() {
 
 /**
  * camViewCS::GetDebugLabel  [vtable slot 7]  @ 0x8216CAE8
- * Returns a human-readable debug label also baked into .rdata.
+ * Returns "camViewCS".
  */
 const char* camViewCS::GetDebugLabel() {
     return kCamViewCS_DebugLabel;
@@ -2677,85 +2668,61 @@ const char* camViewCS::GetDebugLabel() {
 /**
  * camViewCS::OnReset  [vtable slot 8]  @ 0x8216CE40
  *
- * Dispatches reset to the active source (and, if present, a secondary source
- * at +0x34), then zeroes the time accumulator and the view-flags word.
- * The active-source vtable byte-offset 32 corresponds to slot 8 (OnReset).
+ * Resets the second source (if any) and the viewed source through their
+ * slot 8, then clears the time accumulator (0.0f from 0x8202D110), +0x30 and
+ * m_viewFlags.
  */
 void camViewCS::OnReset() {
-    // Secondary source (copy held in +0x34) is reset first if non-null.
-    if (this->m_boundCamera != nullptr) {
-        typedef void (*ResetFn)(void*);
-        ResetFn reset = ((ResetFn**)this->m_boundCamera)[0][8];
-        reset(this->m_boundCamera);
-    }
-    // Primary active source — always dispatched.
-    typedef void (*ResetFn)(void*);
-    ResetFn reset = ((ResetFn**)this->m_activeSource)[0][8];
-    reset(this->m_activeSource);
+    if (m_otherSource != nullptr)
+        GameVirtual<void (*)(void*)>(m_otherSource, 8)(m_otherSource);
+    GameVirtual<void (*)(camBaseCS*)>(m_source, 8)(m_source);
 
-    this->m_timeAccumulator = g_camViewCS_ResetFloat;
-    // Original also clears a 4-byte scratch slot at +0x30 (inside the padding
-    // region) plus the u16 view-flags. Kept inline so the offset doesn't leak
-    // into the header as a named field until we learn what +0x30 actually is.
-    uint32_t* scratchAtOffset0x30 = (uint32_t*)((char*)this + 0x30);
-    *scratchAtOffset0x30 = 0u;
-    this->m_viewFlags = 0u;
+    m_timeAccumulator = 0.0f;
+    field_0x30 = 0;
+    m_viewFlags = 0;
 }
 
 /**
  * camViewCS::OnSourceChanged  [vtable slot 9]  @ 0x8216CD30
  *
- * Forwards a source-changed notification to the active source (vtable slot 9),
- * then invalidates m_viewFlags when the primary and secondary source pointers
- * no longer match — signalling that the cached view state is stale.
+ * Runs the viewed source's slot 9, then clears m_viewFlags when the viewed
+ * source isn't m_otherSource. pongCameraMgr::Update calls this every frame.
  */
 void camViewCS::OnSourceChanged() {
-    typedef void (*ChangedFn)(void*);
-    ChangedFn changed = ((ChangedFn**)this->m_activeSource)[0][9];
-    changed(this->m_activeSource);
+    GameVirtual<void (*)(camBaseCS*)>(m_source, 9)(m_source);
 
-    if (this->m_activeSource != this->m_boundCamera) {
-        this->m_viewFlags = 0u;
-    }
+    if (m_source != m_otherSource)
+        m_viewFlags = 0;
 }
 
 /**
  * camViewCS::Update  [vtable slot 10]  @ 0x8216CD88
  *
- * Per-frame update. Commits the bound camera's transform to the camera manager,
- * then — depending on the override-extents flag — feeds either the override
- * floats or the bound camera's native extents (+168/+172) into the capsule FOV
- * solver. The resulting FOV/aspect/extents block is written to the manager at
- * +824..+836 with the active flag set at +864, before the publish helper runs.
+ * Gives the current viewport the viewed source's matrix, then sets
+ * m_viewport's perspective: the source's FOV, the display aspect, and the
+ * clip planes from either this view (UseGlobalClip) or the source.
  */
 void camViewCS::Update() {
-    // 0x8216CD98: the current viewport gets the viewed source's matrix.
-    static_cast<grcViewport*>(g_currentViewport)->SetCameraMtx(this->m_source->m_matrix);
+    static_cast<grcViewport*>(g_currentViewport)->SetCameraMtx(m_source->m_matrix);
 
-    float extentX;
-    float extentY;
-    if (this->m_useOverrideExtents != 0) {
-        extentY = this->m_overrideExtentY;
-        extentX = this->m_overrideExtentX;
+    float clipNear;
+    float clipFar;
+    if (m_useGlobalClip != 0) {
+        clipFar  = m_clipFar;
+        clipNear = m_clipNear;
     } else {
-        // +168 / +172 on the active source supply native extents.
-        extentY = *(float*)((char*)this->m_activeSource + 172);
-        extentX = *(float*)((char*)this->m_activeSource + 168);
+        clipFar  = m_source->m_cameraFar;
+        clipNear = m_source->m_cameraNear;
     }
+    float aspect = gameLoop_GetDisplayAspect(g_loop_obj_ptr);  // called in each branch
 
-    float horizontalFOV = phBoundCapsule_SolveFOV(g_loopObject, extentY, extentX);
-
-    // The active-source-derived base-fov lives at +164.
-    float baseFOV = *(float*)((char*)this->m_activeSource + 164);
-
-    void* mgr = this->m_cameraMgr;
-    *(float*)  ((char*)mgr + 824) = baseFOV;
-    *(uint8_t*)((char*)mgr + 864) = 1u;
-    *(float*)  ((char*)mgr + 828) = horizontalFOV;
-    *(float*)  ((char*)mgr + 832) = extentX;
-    *(float*)  ((char*)mgr + 836) = extentY;
-
-    pongCameraMgr_PublishViewExtents(mgr);
+    grcViewport* viewport = m_viewport;
+    viewport->m_fov           = m_source->m_cameraFOV;
+    viewport->m_isPerspective = 1;
+    viewport->m_aspect        = aspect;
+    viewport->m_zClipNear     = clipNear;
+    viewport->m_zClipFar      = clipFar;
+    phBoundCapsule_3598_g(viewport);  // builds the projection from those
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

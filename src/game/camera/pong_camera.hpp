@@ -40,7 +40,17 @@ struct grcViewport {
     CamMatrix44 m_cameraMtx44;      // +0x180 - camera matrix with w forced to (0, 0, 0, 1)
     CamMatrix44 m_viewMtx;          // +0x1C0 - inverse of the camera matrix, w forced to (0, 0, 0, 1)
     CamMatrix44 m_viewMtxFlipZ;     // +0x200 - m_viewMtx with its z column negated
-    uint8_t     _pad_0x240[0x150];  // +0x240..+0x38F (+0x338..+0x344 FOV/aspect/clip, +0x360 dirty flag)
+    uint8_t     _pad_0x240[0xF8];   // +0x240..+0x337
+    // Perspective inputs. Writers set all four and m_isPerspective, then call
+    // 0x82153598, which builds the projection from them; 0x82153318 calls
+    // 0x82153598 again while m_isPerspective is set.
+    float       m_fov;              // +0x338
+    float       m_aspect;           // +0x33C - 0 = from the window size (0x82143E98)
+    float       m_zClipNear;        // +0x340
+    float       m_zClipFar;         // +0x344 - z scale = far / (near - far)
+    uint8_t     _pad_0x348[0x18];   // +0x348..+0x35F (outputs of 0x82153598)
+    uint8_t     m_isPerspective;    // +0x360
+    uint8_t     _pad_0x361[0x2F];   // +0x361..+0x38F
 
     void SetCameraMtx(const CamMatrix44& cameraMtx);  // @ 0x821539F0
 };
@@ -54,6 +64,12 @@ struct camBaseCS {
     CamMatrix44  m_matrix;         // +0x10 - camera matrix of this source (identity in the ctor)
     uint8_t      _pad_0x50[0x48];  // +0x50..+0x97
     grcViewport* m_viewport;       // +0x98 - viewport this source renders through
+    // Tunables, set by the ctor and registered by 0x8216DBB8 (slot 3 in charViewCS's vtable):
+    // +0x9C "BlendTime", +0xA0 "BlendGoal", +0xB4 "IgnoreTimeWarp" (byte)
+    uint8_t      _pad_0x9C[0x08];  // +0x9C..+0xA3
+    float        m_cameraFOV;      // +0xA4 - "CameraFOV"
+    float        m_cameraNear;     // +0xA8 - "CameraNear"
+    float        m_cameraFar;      // +0xAC - "CameraFar"
 
     // ── virtual methods ──
     virtual ~camBaseCS();                  // [0] @ 0x8216daa0
@@ -62,7 +78,7 @@ struct camBaseCS {
 // ── CMtoCSAdapter  [vtable @ 0x82036844] ──────────────────────────
 // Camera source driven by the camera machine; ctor @ 0x8216EE68 (base ctor 0x8216D9B8 first).
 struct CMtoCSAdapter : camBaseCS {
-    uint8_t       _pad_0x9C[0x94];  // +0x9C..+0x12F
+    uint8_t       _pad_0xB0[0x80];  // +0xB0..+0x12F
     pongCMCamera* m_cmCamera;       // +0x130 - second ctor argument (pongCameraMgr::m_cmCamera)
 
     // ── virtual methods ──
@@ -104,34 +120,35 @@ struct camShotMgr {
 };
 
 // ── camViewCS  [vtable @ 0x82036330] ──────────────────────────
-// Camera "view of current shot" — pulls position from active camera source and
-// writes final FOV/aspect/view-extents into the bound pongCameraMgr each frame.
+// Turns the viewed camera source into the render view: Update gives the
+// current viewport the source's matrix and sets the FOV/aspect/clip planes of
+// m_viewport. 0x48 bytes; pongCameraMgr's init (0x82165AE0) builds it inline.
 struct camViewCS {
-    void**      vtable;               // +0x00
-    uint8_t     _pad_0x04[12];        // +0x04..+0x0F
-    uint16_t    m_viewFlags;          // +0x10 - cleared by OnReset / invalidated on source change
-    uint8_t     _pad_0x12[2];         // +0x12..+0x13
-    float       m_timeAccumulator;    // +0x14 - reset to 0.0 by OnReset
-    uint8_t     _pad_0x18[20];        // +0x18..+0x2B
-    void*       m_cameraMgr;          // +0x28 - bound pongCameraMgr (receives FOV writes)
-    camBaseCS*  m_source;             // +0x2C - camera source being viewed (pongCameraMgr::Update publishes its matrix)
-    void*       m_boundCamera;        // +0x30 - bound camera/source object (supplies position at +164)
-    uint8_t     _pad_0x34[4];         // +0x34..+0x37
-    void*       m_activeSource;       // +0x38 - active camShot / source dispatched through vtable
-    uint8_t     _pad_0x3C[8];         // +0x3C..+0x43
-    uint8_t     m_useOverrideExtents; // +0x44 - non-zero → use m_overrideX/Y instead of bound-camera extents
-    uint8_t     _pad_0x45[3];         // +0x45..+0x47
-    float       m_overrideExtentX;    // +0x48
-    float       m_overrideExtentY;    // +0x4C
+    void**       vtable;            // +0x00
+    uint8_t      _pad_0x04[12];     // +0x04..+0x0F (+0x04 gets a copied name string)
+    uint16_t     m_viewFlags;       // +0x10 - cleared by OnReset, and by OnSourceChanged while m_source != m_otherSource
+    uint8_t      _pad_0x12[2];      // +0x12..+0x13
+    float        m_timeAccumulator; // +0x14 - reset to 0.0 by OnReset
+    uint8_t      _pad_0x18[16];     // +0x18..+0x27 (zeroed by the ctor)
+    grcViewport* m_viewport;        // +0x28 - gets FOV/aspect/clip planes (pongCameraMgr::m_viewport)
+    camBaseCS*   m_source;          // +0x2C - camera source being viewed (pongCameraMgr::Update publishes its matrix)
+    uint32_t     field_0x30;        // +0x30 - zeroed by OnReset
+    void*        m_otherSource;     // +0x34 - second source: OnReset resets it too (slot 8)
+    uint8_t      m_useGlobalClip;   // +0x38 - "UseGlobalClip": clip planes from +0x3C/+0x40, not the source
+    uint8_t      _pad_0x39[3];      // +0x39..+0x3B
+    float        m_clipFar;         // +0x3C - "Clip Far"
+    float        m_clipNear;        // +0x40 - "Clip Near"
+    uint8_t      field_0x44;        // +0x44 - zeroed by the ctor
+    uint8_t      _pad_0x45[3];      // +0x45..+0x47
 
     // ── virtual methods ──
     virtual ~camViewCS();                                  // [0] @ 0x8216caf8
-    virtual void RegisterParamHooks(void* paramHost);      // [3] @ 0x8216ceb0 — registers 3 parameter hooks (flag/radius/height) with the param host
-    virtual const char* GetTypeName();                     // [6] @ 0x82177830 — returns class name string
-    virtual const char* GetDebugLabel();                   // [7] @ 0x8216cae8 — returns debug label string
-    virtual void OnReset();                                // [8] @ 0x8216ce40 — reset accumulators / forward reset to active source
-    virtual void OnSourceChanged();                        // [9] @ 0x8216cd30 — forward change-notification to active source and clear m_viewFlags if source ptr changed
-    virtual void Update();                                 // [10] @ 0x8216cd88 — per-frame: update bound camera, write FOV/aspect/extents to pongCameraMgr
+    virtual void RegisterParamHooks(void* paramHost);      // [3] @ 0x8216ceb0 — UseGlobalClip, Clip Near, Clip Far
+    virtual const char* GetTypeName();                     // [6] @ 0x82177830 — returns the .rdata string at 0x82032868
+    virtual const char* GetDebugLabel();                   // [7] @ 0x8216cae8 — returns "camViewCS"
+    virtual void OnReset();                                // [8] @ 0x8216ce40 — resets both sources (slot 8), clears +0x10/+0x14/+0x30
+    virtual void OnSourceChanged();                        // [9] @ 0x8216cd30 — m_source's slot 9, clears m_viewFlags if m_source != m_otherSource
+    virtual void Update();                                 // [10] @ 0x8216cd88 — current viewport gets the source's matrix, m_viewport its FOV/aspect/clip
 };
 
 // ── cameraShake  [vtable @ 0x820363F0] ──────────────────────────
