@@ -6690,30 +6690,33 @@ void pongNetMessageHolder_74F8_w(void* self_v, void* src_v) {
 // ───────────────────────────────────────────────────────────────────────────
 // pongNetMessageHolder_8B80_w @ 0x82238B80 | size: 0x140
 //
-// Singleton-backed linked-list → array flattener. Steps:
-//   1. Call xam_singleton_init_8D60 to obtain the list-owner object (r31).
-//   2. If owner's "count" field (u16 @+4) is 0, walk the list @+8 (single-
-//      ly-linked via +8 pointer), counting entries.
-//   3. If owner->u16@+6 == 0, allocate count pointers into owner->arr (+0)
-//      and update owner->u16@+6 = count.
-//   4. Store count at owner->u16@+4. If count > 0, populate owner->arr
-//      with the list entries in order and sort them with
-//      fiAsciiTokenizer_1950_g (the CRT qsort: base, count, width, cmp).
-//   5. Finally, compute owner->u32@+20 = owner->u32@+12 + owner->u32@+16
-//      - 1 (inclusive end-index of the flattened slice). Fields +12/+16/+20
-//      form a classic (offset, length, lastIndex) tuple used by the
-//      fiAsciiTokenizer_1950_g sorter to remember the active slice after
-//      the list-to-array flattening is done.
+// Numbers the registered message types. The owner comes from
+// xam_singleton_init_8D60; 100 static initialisers (0x8257F628 and on)
+// each push a node onto owner->head and bump owner->registeredCount.
+//   1. Return if owner->countA (u16 @+4) is already set.
+//   2. Count the list (linked through node +8).
+//   3. If owner->cap (u16 @+6) is 0, set it to the count and allocate that
+//      many node pointers into owner->arr (+0), or store null for none.
+//   4. Store the count in owner->countA; stop unless it is positive.
+//   5. Copy the list into owner->arr in list order and qsort it with
+//      fiAsciiTokenizer_8F28_2h, which puts nodes whose id is -1 first
+//      (strcmp on their names) and the rest by ascending id.
+//   6. Give the first registeredCount sorted nodes the ids firstId,
+//      firstId + 1, ... and store the last one in owner->lastId.
 // ───────────────────────────────────────────────────────────────────────────
-struct PNMHBatch2Node { uint8_t pad[8]; PNMHBatch2Node* next; };
+struct PNMHBatch2Node {
+    int32_t id;                  // +0  -1 until numbered
+    const char* name;            // +4  comparator strcmp's these for id -1
+    PNMHBatch2Node* next;        // +8
+};
 struct PNMHBatch2Owner {
     PNMHBatch2Node** arr;        // +0  list entries, flattened
     uint16_t countA;             // +4
     uint16_t cap;                // +6
     PNMHBatch2Node* head;        // +8
-    int32_t  field12;            // +12
-    int32_t  field16;            // +16
-    int32_t  endCursor;          // +20
+    int32_t  registeredCount;    // +12 one per static registration
+    int32_t  firstId;            // +16
+    int32_t  lastId;             // +20 firstId + registeredCount - 1
 };
 
 // fiAsciiTokenizer_1950_g @ 0x82431950 is the CRT qsort (EINVAL on a null
@@ -6742,8 +6745,11 @@ void pongNetMessageHolder_8B80_w(void) {
     if (owner->cap == 0) {
         owner->cap = static_cast<uint16_t>(count);
         if (count != 0) {
-            uint32_t g = count;
-            uint32_t bytes = (g <= 0x3FFFFFFFu) ? (g * sizeof(Node*)) + 4u : 0xFFFFFFFFu;
+            // new Node*[count]: the guest asks for count * 4 bytes, or for
+            // 0xFFFFFFFF when that overflows.
+            uint32_t bytes = (count <= 0xFFFFFFFFu / sizeof(Node*))
+                                 ? count * static_cast<uint32_t>(sizeof(Node*))
+                                 : 0xFFFFFFFFu;
             owner->arr = static_cast<Node**>(xe_EC88(bytes));
         } else {
             owner->arr = nullptr;
@@ -6769,7 +6775,12 @@ void pongNetMessageHolder_8B80_w(void) {
                             owner->countA,
                             sizeof(Node*),
                             &fiAsciiTokenizer_8F28_2h);
-    owner->endCursor = owner->field12 + owner->field16 - 1;
+    // Number the first registeredCount sorted entries from firstId up.
+    int32_t id = owner->firstId;
+    for (int32_t i = 0; i < owner->registeredCount; ++i) {
+        owner->arr[i]->id = id++;
+    }
+    owner->lastId = owner->firstId + owner->registeredCount - 1;
 }
 
 
