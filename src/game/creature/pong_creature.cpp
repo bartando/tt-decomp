@@ -2023,8 +2023,10 @@ bool pongCreatureInst::AttachToScene(bool rejectIfKeyCached) {
     self->flags |= FRAG_INST_FLAG_ATTACHED;
     manager->onAttach.thunk(&manager->onAttach, self->managerHandle);
 
+    // The game's slot 48 (InitializeTransform); the header's virtuals don't
+    // follow the game's slot order, so a C++ virtual call would miss it.
     if (self->ResolvedType() != nullptr)
-        InitializeTransform();  // vtable slot 48
+        VCALL(this, 48, void (*)(pongCreatureInst*))(this);
 
     fragTypeHolder* holder = self->typeHolder;
     if (holder == nullptr)
