@@ -1136,364 +1136,393 @@ void gmLogicSinglesMatch_MidGame(void* self) { // @ 0x8238CA38
 // ═════════════════════════════════════════════════════════════════════════════
 // gmLogicSwingPractice — single-player swing practice mode
 //
-// Vtable @ 0x820303F4. Hierarchical state machine with 8 RTTI-tagged states:
-//   statePreInit, stateInit, stateMainMenu, stateAim, stateShoot,
-//   stateAwaitReturnHit, stateReturnHit, statePostPoint
+// Vtable @ 0x820303F4. Slot 8 (0x821020D8) builds the eight HSM states into
+// m_states: statePreInit, stateInit, stateMainMenu, stateAim, stateShoot,
+// stateAwaitReturnHit, stateReturnHit, statePostPoint. Each one is
+// {vtable, 0, owning gmLogicSwingPractice*, ...}.
 //
-// Key object layout (confirmed via callee offsets):
-//   +8    sub-object holding gmPracticeTarget pointer @ +152, flags @ +88..+89
-//   +12   float parameter (aim arc / shot power), sampled via cmSampleCamActions
-//   +16   int sub-state (-1 = none)
-//   +84   current HSM state index (valid range 0..10)
-//   +88   flag: whether target is armed
-//   +148  locomotion state anim controller
-//   +152  gmPracticeTarget sub-struct (fields: +22, +23, +96 pos, +100 latch)
-//   +156  "awaiting confirmation" byte flag
-//
-// Method dispatch pattern: states live at this+40..this+80 (slots 10..20) and
-// are invoked via `lwzx r3, r11, this` with a computed slot offset. Each state
-// slot holds a vtable pointer; slots 3/6/8/9/16 in the state vtable are:
-//   3  → Init / arm      6  → OnTick       8  → OnMessage
-//   9  → OnEnterState    16 → OnChildStateMessage
+// Besides the HSM states the logic owns eleven objects at +0x28 (one active,
+// index at +0x54), the ball robot at +0x94 and the practice target at +0x98.
+// Their vtable slots used here: 0 scalar deleting destructor, 6 Update(dt),
+// 8 OnMessage(msg), 9 (stateAim passes 1).
 // ═════════════════════════════════════════════════════════════════════════════
 
-// Anchor: "gmLogicSwingPractice::stateAim::onEnterState" @ 0x820303B8
-extern const char* g_str_hsm_gmLogicSwingPractice_stateAim_onEnterState;
-
-// Per-mode globals identified via string xrefs
-static uint8_t* const g_SwingPracticeTargetDirty = /* 0x8205A37A */ (uint8_t*)0x8205A37A;
-static const float* const g_SwingPractice_AimDefaults = /* 0x8202D108 */ (const float*)0x8202D108;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// gmLogicSwingPractice::~gmLogicSwingPractice  [vtable slot 0 @ 0x82101F80]
-// Destructor — delegates to atSingleton teardown, then frees if owned (bit 0).
-// ─────────────────────────────────────────────────────────────────────────────
-void gmLogicSwingPractice_Destructor(void* self, uint32_t flags) { // @ 0x82101f80
-    atSingleton_Destructor(self);
-    if (flags & 1) {
-        rage_free(self);
-    }
+// Loads a virtual function out of an object's vtable (the guest's
+// `lwz r11,0(r3); lwz r11,slot*4(r11); mtctr; bctrl`).
+template <typename Fn>
+static Fn VirtualSlot(const void* object, int slot) {
+    return reinterpret_cast<Fn>((*static_cast<void* const* const*>(object))[slot]);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// gmLogicSwingPractice::ResetAim  [vtable slot 10 @ 0x82102A58]
-// Called on return to aim state. Clears the target latch, re-arms the target,
-// clears the "was hit" flag, and resets the HSM state index to -1.
-// ─────────────────────────────────────────────────────────────────────────────
-void gmLogicSwingPractice_ResetAim(void* self) { // @ 0x82102a58
-    void* target = *(void**)((char*)self + 152);
-    *((uint8_t*)target + 100) = 0;   // clear "hit" latch
-    *((uint8_t*)target + 23)  = 1;   // arm
-    void* target2 = *(void**)((char*)self + 152);
-    *((uint8_t*)target2 + 22) = 0;   // clear "served" flag
+// rage::sysTimeManager instance (vtable 0x82038CA8). The image holds 1/60 at
+// +0x08 and 60.0 at +0x0C; +0x08 is what the game scales per-frame motion by.
+struct sysTimeManagerView {
+    void**   vtable;            // +0x00
+    uint32_t field_04;          // +0x04
+    float    m_frameSeconds;    // +0x08
+    float    m_framesPerSecond; // +0x0C
+};
+extern sysTimeManagerView g_sysTimeManager;  // @ 0x825CAEB8
 
-    // If the "awaiting confirmation" flag is set, leave state index alone.
-    if (*((uint8_t*)self + 156) != 0) {
-        return;
-    }
-    *(int32_t*)((char*)self + 84) = -1;
+extern void* g_game_state_ptr;               // @ 0x8271A2F8
+// Set elsewhere; stateAim moves the target to a new random spot and clears it.
+extern uint8_t g_swingPracticeMoveTarget;    // @ 0x8260637A (lbl_8260637A)
+
+extern void rage_free(void* ptr);            // @ 0x820C00C0
+// @ 0x82101FD0 — gmLogicSwingPractice's destructor body: deletes the eleven
+// children, the ball robot and the target, tears down +0x18, then runs gmLogic's.
+extern void gmLogicSwingPractice_Destruct(gmLogicSwingPractice* logic);
+// @ 0x821129D0 — wraps a value into [min, max] (lifted, unbuilt, in cm_cam_actions.cpp).
+extern "C" float WrapValueInRange(float value, float min, float max);
+// @ 0x82112508 (LocomotionStateAnim_2508_h) — per-frame update of the object at
+// +0x94. Its neighbours 0x821120A8..0x821129C8 are gmBallRobot's methods.
+extern void gmBallRobot_Update(gmBallRobot* robot);
+// @ 0x82113A98 (gmPracticeTarget_3A98_p46) — puts the target at a random spot
+// on the table (RNG at 0x825CA2C8, table size via 0x8271A304) and hands the
+// position to 0x82113BA8. stateAim passes 1 in r4; the callee never reads it.
+extern void gmPracticeTarget_PlaceRandomly(gmPracticeTarget* target, int unused);
+// @ 0x821D3860 — game_3860, lifted at the end of this file.
+void game_3860(void* gameState, int kind, const char* name);
+// @ 0x8225E480 (pg_E480) — posts a message whose arguments follow a format
+// string ('i' and 'f', 32 bits each); floats travel as their bit patterns.
+extern void PostPageGroupMessageFmt(uint32_t messageId, uint32_t mask, const char* format, ...);
+
+static uint32_t FloatBits(float value) {
+    uint32_t bits;
+    __builtin_memcpy(&bits, &value, sizeof(bits));
+    return bits;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// gmLogicSwingPractice::Tick  [vtable slot 11 @ 0x82102A90]
-// Per-frame update: advances aim-target position, ticks locomotion, then
-// forwards OnTick (state vtable slot 6) to the active child state.
-// ─────────────────────────────────────────────────────────────────────────────
-void gmLogicSwingPractice_Tick(void* self) { // @ 0x82102a90
-    // If aim input is active and target exists and is not latched…
-    if (*((uint8_t*)self + 88) != 0) {
-        void* target = *(void**)((char*)self + 152);
-        if (target != nullptr && *((uint8_t*)target + 100) == 0) {
-            // Integrate aim position by (default step * frame time)
-            float step     = g_SwingPractice_AimDefaults[2];   // [8]
-            float curPos   = *(float*)((char*)target + 96);
-            float frameDt  = rage_FrameTimeSeconds;           // -16340(-32253)
-            float newPos   = step * frameDt + curPos;
-            *(float*)((char*)target + 96) = newPos;
-
-            // Clamp via cmSampleCamActions to valid aim arc
-            newPos = cmSampleCamActions_Clamp(newPos, /*min*/ -0.0f, /*max*/ +0.0f);
-            *(float*)((char*)target + 96) = newPos;
-        }
-    }
-
-    // Tick locomotion/anim controller if present
-    void* locomotion = *(void**)((char*)self + 148);
-    if (locomotion != nullptr) {
-        LocomotionStateAnim_Tick(locomotion);
-    }
-
-    // Dispatch OnTick (slot 6) to current child state if index is valid.
-    int32_t stateIdx = *(int32_t*)((char*)self + 84);
-    if (stateIdx > -1 && stateIdx < 11) {
-        void** stateSlot = (void**)((char*)self + (stateIdx + 10) * 4);
-        void* state = *stateSlot;
-        VCALL_SLOT(state, 6);  // OnTick
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// gmLogicSwingPractice::GetSubState  [vtable slot 13 @ 0x82102B60]
-// Returns the vtable-dispatched sub-state object by index, or a default
-// 1-vs-(not-1) flag if the sub-state isn't instantiated.
-// Layout of (this): +4 = count, +8 = state-array base, +12 = active-idx.
-// ─────────────────────────────────────────────────────────────────────────────
-void* gmLogicSwingPractice_GetSubState(void* self, int32_t idx) { // @ 0x82102b60
-    int32_t count = *(int32_t*)((char*)self + 4);
-    if (idx >= count) {
-        return nullptr;
-    }
-    int32_t activeIdx = *(int32_t*)((char*)self + 12);
-    if (activeIdx != -1) {
-        void** arr = *(void***)((char*)self + 8);
-        void* state = arr[activeIdx];
-        if (state != nullptr) {
-            // Tail-call slot 15 (offset +60 in state vtable)
-            return VCALL_SLOT_RET(state, 15);
-        }
-    }
-    // Fallback: return (idx == 1) as a boolean-style flag
-    return (void*)(uintptr_t)(idx == 1 ? 1u : 0u);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// gmLogicSwingPractice::OnChildExit  [vtable slot 15 @ 0x82102BC0]
-// Forwards child-state exit notification to the nested state (vtable slot 2
-// at offset +8). No-op if the owning sub-struct or its target is null.
-// ─────────────────────────────────────────────────────────────────────────────
-void gmLogicSwingPractice_OnChildExit(void* self) { // @ 0x82102bc0
-    if (*((uint8_t*)self + 88) == 0) return;
-    void* target = *(void**)((char*)self + 152);
-    if (target == nullptr) return;
-    VCALL_SLOT(target, 2);  // OnChildExit on practice target
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// gmLogicSwingPractice::OnMessage  [vtable slot 18 @ 0x82102BF0]
-// Central message router. Translates HSM messages:
-//   msg 0x500C (20492) → "begin awaiting confirmation": set +156=1, call vfn_3
-//   msg 0x500D (20493) → "cancel awaiting":             clear +156
-//   otherwise          → forward to current sub-state (vfn_16) and current
-//                        HSM state (slot 8 = OnMessage)
-// ─────────────────────────────────────────────────────────────────────────────
-void gmLogicSwingPractice_OnMessage(void* self, const void* msg) { // @ 0x82102bf0
-    int32_t activeIdx = *(int32_t*)((char*)self + 12);
-    void* subState = nullptr;
-    if (activeIdx != -1) {
-        void** arr = *(void***)((char*)self + 8);
-        subState = arr[activeIdx];
-    }
-
-    uint16_t msgId = *(const uint16_t*)msg;
-
-    if (msgId == 20492) {
-        // "Await confirmation" start — gate the aim state & invoke self-vfn_3
-        int32_t stateIdx = *(int32_t*)((char*)self + 84);
-        if (stateIdx > -1 && stateIdx < 11) {
-            *((uint8_t*)self + 156) = 1;
-            VCALL_SLOT(self, 3);  // self.OnAwaitConfirmStart
-        }
-        return;
-    }
-
-    if (msgId == 20493) {
-        // "Await confirmation" cancel
-        *((uint8_t*)self + 156) = 0;
-        return;
-    }
-
-    // General case: first forward to sub-state's vfn_16 unless it already has
-    // a pending response (+16 != -1), then forward OnMessage to current HSM.
-    if (subState != nullptr) {
-        int32_t pending = *(int32_t*)((char*)self + 16);
-        if (pending == -1) {
-            VCALL_SLOT_ARG(subState, 16, msg);
-        }
-    }
-    int32_t stateIdx = *(int32_t*)((char*)self + 84);
-    if (stateIdx > -1 && stateIdx < 11) {
-        void** stateSlot = (void**)((char*)self + (stateIdx + 10) * 4);
-        VCALL_SLOT_ARG(*stateSlot, 8, msg);   // state.OnMessage
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// gmLogicSwingPractice::stateAim::onEnterState  [@ 0x82103878, size 0x15C]
-// String anchor: "gmLogicSwingPractice::stateAim::onEnterState" @ 0x820303B8
-//
-// Enters the aim state. Resets aim parameter (+12) from defaults, clears
-// "shot fired" (+16), registers the aim camera, and if a target-update is
-// pending, refreshes the practice-target meter and clears the dirty flag.
-// ─────────────────────────────────────────────────────────────────────────────
-void gmLogicSwingPractice_stateAim_OnEnterState(void* self) { // @ 0x82103878
-    float aimDefault = g_SwingPractice_AimDefaults[2];         // [8]
-    *(float*)((char*)self + 12) = aimDefault;
-    *((uint8_t*)self + 16) = 0;
-
-    // Log entry (hooked HSM log)
-    game_3860(g_HsmLogObject);
-
-    // Post "enter-aim" page-group message (id 2108, param 64)
-    PostPageGroupMessage(2108, 64, 0, nullptr);
-
-    // If a global target-dirty flag is set, rewrite meter & clear flag.
-    if (*g_SwingPracticeTargetDirty != 0) {
-        void* owner = *(void**)((char*)self + 8);
-        void* target = *(void**)((char*)owner + 152);
-        *((uint8_t*)target + 100) = 0;   // clear latch
-        *((uint8_t*)target + 23)  = 1;   // arm
-        void* owner2 = *(void**)((char*)self + 8);
-        void* target2 = *(void**)((char*)owner2 + 152);
-        gmPracticeTarget_RefreshMeter(target2);
-        *g_SwingPracticeTargetDirty = 0;
-    }
-
-    // If target + camera pose are valid, register a camera pose event.
-    void* owner3 = *(void**)((char*)self + 8);
-    if (*((uint8_t*)owner3 + 89) != 0) {
-        float px = *(float*)((char*)owner3 + 112);
-        float py = *(float*)((char*)owner3 + 116);
-        float pz = *(float*)((char*)owner3 + 120);
-        PostPageGroupMessage(4119, 1, /*strRef*/ 0x8202D594, px, py, pz);
-    }
-
-    // Always post the aim-hint message using default aim params.
-    float paramA = g_SwingPractice_AimDefaults[0];
-    PostPageGroupMessage(41, 128, /*strRef*/ 0x8202D500, paramA, aimDefault);
-
-    // Delegate to the parent HSM state if current index is valid (slot 9).
-    void* owner4 = *(void**)((char*)self + 8);
-    int32_t stateIdx = *(int32_t*)((char*)owner4 + 84);
-    if (stateIdx > -1 && stateIdx < 11) {
-        void** stateSlot = (void**)((char*)owner4 + (stateIdx + 10) * 4);
-        VCALL_SLOT(*stateSlot, 9);  // parent.OnEnterState
-    }
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// gdaiMeterLogic — AI node: reads the meter (power bar) globals
-//
-// Vtable @ 0x82041E84. Probes three named globals against `other`:
-//   +24756 @ 0x825D3DB4 : live meter ptr
-//   +(-32708) @ 0x825CFBFC, +(-32712) @ 0x825CFBF8 : alternates
-// Used by AI to decide "is this the target the meter is tracking?"
-// ═════════════════════════════════════════════════════════════════════════════
-
-// ─────────────────────────────────────────────────────────────────────────────
-// gdaiMeterLogic::IsSameTarget  [vtable slot 20 @ 0x821E91C0]
-// Returns 1 if `other` matches any of 3 well-known meter-target globals.
-// ─────────────────────────────────────────────────────────────────────────────
-uint8_t gdaiMeterLogic_IsSameTarget(void* /*self*/, void* other) { // @ 0x821e91c0
-    void* meterA = *(void**)0x825D3DB4;
-    if (other == meterA) return 1;
-    void* meterB = *(void**)0x825CFBFC;
-    if (other == meterB) return 1;
-    void* meterC = *(void**)0x825CFBF8;
-    return (other == meterC) ? 1 : 0;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// gdaiMeterLogic::RegisterSerializationFields  [vtable slot 21 @ 0x821E92B0]
-// Registers 5 serialization fields (offsets +16/+20/+24/+28/+32) against the
-// AI-logic schema object @ 0x825CAF94. Field names live in .rdata @ various
-// offsets of lbl_82050E... (decode to "MinHits", "MaxHits", "MinPower", etc.).
-// ─────────────────────────────────────────────────────────────────────────────
-void gdaiMeterLogic_RegisterSerializationFields(void* self) { // @ 0x821e92b0
-    void* schema = (void*)0x825CAF94;
-    RegisterSerializationField(self, (const char*)0x82050E8C, (char*)self + 16, schema, 0);
-    RegisterSerializationField(self, (const char*)0x82050F0C, (char*)self + 20, schema, 0);
-    RegisterSerializationField(self, (const char*)0x82050F18, (char*)self + 24, schema, 0);
-    RegisterSerializationField(self, (const char*)0x82050F28, (char*)self + 28, schema, 0);
-    RegisterSerializationField(self, (const char*)0x82050E98, (char*)self + 32, schema, 0);
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// gdaiComeBackLogic::BuildShotLists  [vtable slot 3 @ 0x821EA1B8]
-//
-// Scans the linked-list of candidate shots hanging off (this+12) and partitions
-// them into two buckets by calling `slot 20` (IsClassified) on each with two
-// different class tags stored at globals:
-//   g_AIClass_A @ 0x825D3E18  (weak/defensive shot)
-//   g_AIClass_B @ 0x825D3E14  (aggressive/return shot)
-//
-// Result layout inside `this`:
-//   +16 : array handle for class-B hits (size = var_r28)
-//   +24 : array handle for class-A hits (size = var_r25)
-// Each element also writes back its own index into entry+28.
-// Entries that match NEITHER get logged via nop_8240E6D0 with their slot-19
-// name string (debug trace).
-// ═════════════════════════════════════════════════════════════════════════════
-void gdaiComeBackLogic_BuildShotLists(void* self) { // @ 0x821ea1b8
-    uint16_t countA = 0, countB = 0;
-    void* classA = *(void**)0x825D3E18;
-    void* classB = *(void**)0x825D3E14;
-
-    // Pass 1: count classifications and log unknowns.
-    void* node = *(void**)((char*)self + 12);
-    while (node != nullptr) {
-        if (VCALL_SLOT_ARG_RET_U8(node, 20, classA)) {
-            countA++;
-        } else if (VCALL_SLOT_ARG_RET_U8(node, 20, classB)) {
-            countB++;
-        } else {
-            const char* name = (const char*)VCALL_SLOT_RET(node, 19);
-            nop_8240E6D0((const char*)0x8203F3C8, name);  // "leAnim%s" fmt
-        }
-        node = *(void**)((char*)node + 8);
-    }
-
-    // Allocate/clear result arrays.
-    void* arrB = (char*)self + 16;
-    if (countB != 0) {
-        game_DB80(arrB, countB);
-    } else {
-        *(uint32_t*)arrB = 0;
-        *((uint16_t*)arrB + 3) = 0;
-    }
-
-    void* arrA = (char*)self + 24;
-    if (countA != 0) {
-        game_DB80(arrA, countA);
-    } else {
-        *(uint32_t*)arrA = 0;
-        *((uint16_t*)arrA + 3) = 0;
-    }
-
-    // Pass 2: populate the arrays in the original list order.
-    uint32_t idxA = 0, idxB = 0;
-    node = *(void**)((char*)self + 12);
-    while (node != nullptr) {
-        if (VCALL_SLOT_ARG_RET_U8(node, 20, classA)) {
-            // Append to class-A bucket (+24)
-            uint16_t slot = *((uint16_t*)arrA + 2);   // write cursor
-            void** base   = *(void***)arrA;
-            *((uint16_t*)arrA + 2) = slot + 1;
-            base[slot] = node;
-            *(uint32_t*)((char*)node + 28) = idxA++;
-        } else if (VCALL_SLOT_ARG_RET_U8(node, 20, classB)) {
-            // Append to class-B bucket (+16)
-            uint16_t slot = *((uint16_t*)arrB + 2);
-            void** base   = *(void***)arrB;
-            *((uint16_t*)arrB + 2) = slot + 1;
-            base[slot] = node;
-            *(uint32_t*)((char*)node + 28) = idxB++;
-        }
-        node = *(void**)((char*)node + 8);
-    }
-}
-
-
-// ============================================================================
-// Match state stubs — moved from stubs.cpp
-// ============================================================================
+static const float kTwoPi = 6.28318548f;     // @ 0x8202C02C
+static const float kMinusPi = -3.14159274f;  // @ 0x82079B2C
+static const float kPi = 3.14159274f;        // @ 0x82079B30
 
 /**
- * game_3860 @ 0x82483860 | size: 0x144
- * Match state setup with string lookup — initializes a match state
- * context with the given parameters and name string.
- * TODO: Full lift (324 bytes).
+ * gmLogicSwingPractice::ScalarDeletingDtor  [slot 0] @ 0x82101F80 | size: 0x50
+ *
+ * Runs the destructor body, then frees the object when bit 0 of flags is set.
  */
-void game_3860(void* matchState, int stateId, const char* stateName) {
-    (void)matchState; (void)stateId; (void)stateName;
+gmLogicSwingPractice* gmLogicSwingPractice::ScalarDeletingDtor(uint32_t flags) {
+    gmLogicSwingPractice_Destruct(this);
+    if (flags & 1) {
+        rage_free(this);
+    }
+    return this;
 }
 
+/**
+ * gmLogicSwingPractice::ResetTarget  [slot 10] @ 0x82102A58 | size: 0x34
+ *
+ * Lets the target spin again and re-arms it; unless a confirmation is pending,
+ * no child stays active.
+ */
+void gmLogicSwingPractice::ResetTarget() {
+    m_pTarget->m_spinStopped = 0;
+    m_pTarget->field_17 = 1;
+    m_pTarget->field_16 = 0;
+    if (m_awaitingConfirm != 0) {
+        return;
+    }
+    m_activeChild = -1;
+}
+
+/**
+ * gmLogicSwingPractice::Update  [slot 11] @ 0x82102A90 | size: 0xCC
+ *
+ * Spins the target one turn per second (angle kept in [-pi, pi]), updates the
+ * ball robot and passes the frame time to the active child's slot 6.
+ */
+void gmLogicSwingPractice::Update() {
+    if (m_targetEnabled != 0) {
+        gmPracticeTarget* target = m_pTarget;
+        if (target != nullptr && target->m_spinStopped == 0) {
+            target->m_spinAngle = g_sysTimeManager.m_frameSeconds * kTwoPi + target->m_spinAngle;
+            target->m_spinAngle = WrapValueInRange(target->m_spinAngle, kMinusPi, kPi);
+        }
+    }
+
+    if (m_pBallRobot != nullptr) {
+        gmBallRobot_Update(m_pBallRobot);
+    }
+
+    if (HasActiveChild()) {
+        gmLogicChild* child = m_children[m_activeChild];
+        VirtualSlot<void (*)(gmLogicChild*, float)>(child, 6)(child, g_sysTimeManager.m_frameSeconds);
+    }
+}
+
+/**
+ * gmLogicSwingPractice::CanTransitionTo  [slot 13] @ 0x82102B60 | size: 0x5C
+ *
+ * Out-of-range ids are refused. Otherwise the current HSM state decides
+ * (tail call to its slot 15 with the same id); with no current state only
+ * state 1 is allowed.
+ */
+bool gmLogicSwingPractice::CanTransitionTo(int32_t stateId) {
+    if (stateId >= m_stateCount) {
+        return false;
+    }
+    if (m_currentState != -1) {
+        hsmState* state = m_states[m_currentState];
+        if (state != nullptr) {
+            return VirtualSlot<uint8_t (*)(hsmState*, int32_t)>(state, 15)(state, stateId) != 0;
+        }
+    }
+    return stateId == 1;
+}
+
+/**
+ * gmLogicSwingPractice::AddToDrawBuckets  [slot 15] @ 0x82102BC0 | size: 0x2C
+ *
+ * While the target is enabled, tail-calls its slot 2 (gmPracticeTarget::
+ * AddToDrawBucket).
+ */
+void gmLogicSwingPractice::AddToDrawBuckets() {
+    if (m_targetEnabled == 0) {
+        return;
+    }
+    gmPracticeTarget* target = m_pTarget;
+    if (target == nullptr) {
+        return;
+    }
+    VirtualSlot<void (*)(gmPracticeTarget*)>(target, 2)(target);
+}
+
+/**
+ * gmLogicSwingPractice::OnMessage  [slot 18] @ 0x82102BF0 | size: 0x168
+ *
+ * 0x500C: with a child active, mark a confirmation pending and call own slot 3.
+ * 0x500D: clear the pending confirmation.
+ * Anything else goes to the current HSM state's OnMessage (slot 16) unless a
+ * transition is pending, then to the active child's slot 8.
+ */
+void gmLogicSwingPractice::OnMessage(const gmMessage* msg) {
+    hsmState* state = (m_currentState == -1) ? nullptr : m_states[m_currentState];
+
+    if (msg->m_id == 0x500C) {
+        if (HasActiveChild()) {
+            m_awaitingConfirm = 1;
+            VirtualSlot<void (*)(gmLogicSwingPractice*)>(this, 3)(this);
+        }
+        return;
+    }
+
+    if (msg->m_id == 0x500D) {
+        m_awaitingConfirm = 0;
+        return;
+    }
+
+    if (state != nullptr && m_nextState == -1) {
+        VirtualSlot<void (*)(hsmState*, const gmMessage*)>(state, 16)(state, msg);
+    }
+    if (HasActiveChild()) {
+        gmLogicChild* child = m_children[m_activeChild];
+        VirtualSlot<void (*)(gmLogicChild*, const gmMessage*)>(child, 8)(child, msg);
+    }
+}
+
+/**
+ * gmLogicSwingPractice::stateAim::OnEnter  [slot 11] @ 0x82103878 | size: 0x15C
+ *
+ * Logs "gmLogicSwingPractice::stateAim::onEnterState", posts message 0x83C,
+ * moves the target if g_swingPracticeMoveTarget asks for it, posts the aim
+ * point (0x1017, "fff") when the logic has one and 0x29 ("ff", 1.0 and 0.0),
+ * then calls the active child's slot 9 with 1.
+ */
+void gmLogicSwingPractice::stateAim::OnEnter() {
+    const float zero = 0.0f;  // @ 0x8202D110
+    const float one = 1.0f;   // @ 0x8202D108
+
+    m_timeInState = zero;
+    field_10 = 0;
+    game_3860(g_game_state_ptr, 1, "gmLogicSwingPractice::stateAim::onEnterState");
+    PostPageGroupMessage(0x83C, 0x40, 0, nullptr);
+
+    if (g_swingPracticeMoveTarget != 0) {
+        gmPracticeTarget* target = m_pLogic->m_pTarget;
+        target->m_spinStopped = 0;
+        target->field_17 = 1;
+        gmPracticeTarget_PlaceRandomly(m_pLogic->m_pTarget, 1);
+        g_swingPracticeMoveTarget = 0;
+    }
+
+    gmLogicSwingPractice* logic = m_pLogic;
+    if (logic->m_hasAimPoint != 0) {
+        PostPageGroupMessageFmt(0x1017, 1, "fff", FloatBits(logic->m_aimPoint[0]),
+                                FloatBits(logic->m_aimPoint[1]), FloatBits(logic->m_aimPoint[2]));
+    }
+
+    PostPageGroupMessageFmt(0x29, 0x80, "ff", FloatBits(one), FloatBits(zero));
+
+    logic = m_pLogic;
+    if (logic->HasActiveChild()) {
+        gmLogicChild* child = logic->m_children[logic->m_activeChild];
+        VirtualSlot<void (*)(gmLogicChild*, int)>(child, 9)(child, 1);
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// gdaiMeterLogic / gdaiComeBackLogic — AI nodes from shots.xml
+//
+// gdaiMeterLogic slot 20 (0x821E91C0) is lifted in gd_data.cpp as
+// gdaiMeterLogic::ValidateTypeId; that one matches the asm.
+// ═════════════════════════════════════════════════════════════════════════════
+
+namespace rage { struct xmlNodeStructFloat; }
+extern rage::xmlNodeStructFloat g_xmlNodeStructFloat;  // @ 0x825CAF94 (vtable 0x8203AA74)
+extern "C" void RegisterSerializationField(void* obj, const char* name, void* fieldPtr,
+                                           void* typeDesc, int flags);  // @ 0x821A8F58
+
+// gdaiMeterLogic fields registered by slot 21.
+struct gdaiMeterLogicView {
+    uint8_t _pad00[0x10];
+    float   m_awareness;         // +0x10  "Awareness"
+    float   m_chargeMeter;       // +0x14  "ChargeMeter"
+    float   m_conserveMeter;     // +0x18  "ConserveMeter"
+    float   m_doFocusShot;       // +0x1C  "DoFocusShot"
+    float   m_learningModifier;  // +0x20  "LearningModifier"
+};
+
+/**
+ * gdaiMeterLogic::RegisterSerializationFields  [slot 21] @ 0x821E92B0 | size: 0xC0
+ *
+ * Registers its five float members with rage::xmlNodeStructFloat.
+ */
+void gdaiMeterLogic_RegisterSerializationFields(void* self) {
+    gdaiMeterLogicView* logic = static_cast<gdaiMeterLogicView*>(self);
+    void* floatType = &g_xmlNodeStructFloat;
+    RegisterSerializationField(self, "Awareness", &logic->m_awareness, floatType, 0);
+    RegisterSerializationField(self, "ChargeMeter", &logic->m_chargeMeter, floatType, 0);
+    RegisterSerializationField(self, "ConserveMeter", &logic->m_conserveMeter, floatType, 0);
+    RegisterSerializationField(self, "DoFocusShot", &logic->m_doFocusShot, floatType, 0);
+    RegisterSerializationField(self, "LearningModifier", &logic->m_learningModifier, floatType, 0);
+}
+
+// A child node of gdaiComeBackLogic (siblings linked through +0x08).
+struct gdaiNode {
+    void**    vtable;     // +0x00  slot 19 = name, slot 20 = IsA(typeId)
+    uint8_t   _pad04[4];
+    gdaiNode* m_next;     // +0x08
+    uint8_t   _pad0C[0x10];
+    int32_t   m_index;    // +0x1C  position in the list it was sorted into
+};
+
+// atArray<gdaiNode*>: data, count, capacity.
+struct gdaiNodeArray {
+    gdaiNode** m_data;      // +0x00
+    uint16_t   m_count;     // +0x04
+    uint16_t   m_capacity;  // +0x06
+};
+
+struct gdaiComeBackLogicView {
+    uint8_t       _pad00[0x0C];
+    gdaiNode*     m_firstChild;  // +0x0C
+    gdaiNodeArray m_leads;       // +0x10  children that are gdaiLead
+    gdaiNodeArray m_deficits;    // +0x18  children that are gdaiDeficit
+};
+
+// Each class's type id is a word holding its own address; slot 20 compares it.
+extern void* g_gdaiDeficitTypeId;  // @ 0x825C60CC
+extern void* g_gdaiLeadTypeId;     // @ 0x825C60D0
+extern void nop_8240E6D0(const char* format, ...);       // @ 0x8240E6D0, debug log (empty)
+extern void game_DB80(gdaiNodeArray* array, uint32_t capacity);  // @ 0x821EDB80, atArray::Reserve
+
+static bool gdaiNode_IsA(gdaiNode* node, void* typeId) {
+    return VirtualSlot<uint8_t (*)(gdaiNode*, void*)>(node, 20)(node, typeId) != 0;
+}
+
+static void ReserveOrClear(gdaiNodeArray* array, uint32_t count) {
+    if (count != 0) {
+        game_DB80(array, count);
+    } else {
+        array->m_data = nullptr;
+        array->m_capacity = 0;
+    }
+}
+
+/**
+ * gdaiComeBackLogic::SplitLeadAndDeficit  [slot 3] @ 0x821EA1B8 | size: 0x1B0
+ *
+ * Counts the children that are gdaiDeficit or gdaiLead (logging any other as
+ * "unknown node type found in shots.xml: %s"), sizes the two arrays, then
+ * appends each child to its array and stores its index there in the child.
+ */
+void gdaiComeBackLogic_SplitLeadAndDeficit(void* self) {
+    gdaiComeBackLogicView* logic = static_cast<gdaiComeBackLogicView*>(self);
+    uint32_t numDeficits = 0;
+    uint32_t numLeads = 0;
+
+    for (gdaiNode* node = logic->m_firstChild; node != nullptr; node = node->m_next) {
+        if (gdaiNode_IsA(node, g_gdaiDeficitTypeId)) {
+            numDeficits++;
+        } else if (gdaiNode_IsA(node, g_gdaiLeadTypeId)) {
+            numLeads++;
+        } else {
+            const char* name = VirtualSlot<const char* (*)(gdaiNode*)>(node, 19)(node);
+            nop_8240E6D0("unknown node type found in shots.xml: %s", name);
+        }
+    }
+
+    ReserveOrClear(&logic->m_leads, numLeads);
+    ReserveOrClear(&logic->m_deficits, numDeficits);
+
+    int32_t leadIndex = 0;
+    int32_t deficitIndex = 0;
+    for (gdaiNode* node = logic->m_firstChild; node != nullptr; node = node->m_next) {
+        if (gdaiNode_IsA(node, g_gdaiDeficitTypeId)) {
+            gdaiNodeArray* list = &logic->m_deficits;
+            list->m_data[list->m_count++] = node;
+            node->m_index = deficitIndex++;
+        } else if (gdaiNode_IsA(node, g_gdaiLeadTypeId)) {
+            gdaiNodeArray* list = &logic->m_leads;
+            list->m_data[list->m_count++] = node;
+            node->m_index = leadIndex++;
+        }
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// game_3860 @ 0x821D3860 | size: 0x84
+// ═════════════════════════════════════════════════════════════════════════════
+
+// The 16-byte callback shape pong_player.cpp documents (rage::datCallback-like).
+typedef void (*pongCallbackFn)();
+struct pongCallback {
+    void*          target;    // +0x00
+    pongCallbackFn function;  // +0x04
+    void*          data;      // +0x08
+    int32_t        kind;      // +0x0C  1: function(target); 4: function(target, int* answer)
+};
+
+// The object at gameState+0x14: 0x821D7750 logs
+// "%s called BallPredictData::Reset() %s" and clears it.
+struct BallPredictData {
+    uint8_t      _pad00[0x27E8];
+    pongCallback m_callback;  // +0x27E8
+};
+
+struct pongGameStatePredictView {
+    uint8_t          _pad00[0x14];
+    BallPredictData* m_pBallPredict;  // +0x14
+};
+
+// @ 0x821D7750 (game_7750) — BallPredictData::Reset(caller name).
+extern void BallPredictData_Reset(BallPredictData* data, const char* caller);
+
+/**
+ * game_3860 @ 0x821D3860 | size: 0x84
+ *
+ * Resets the ball prediction on behalf of `name`, then points its callback at
+ * the empty logger with gameState as target (kind 4). `kind` is never read.
+ */
+void game_3860(void* gameState, int /*kind*/, const char* name) {
+    pongGameStatePredictView* state = static_cast<pongGameStatePredictView*>(gameState);
+    BallPredictData_Reset(state->m_pBallPredict, name);
+
+    pongCallback callback;
+    callback.target = gameState;
+    callback.function = reinterpret_cast<pongCallbackFn>(&nop_8240E6D0);  // the empty logger
+    callback.data = nullptr;
+    callback.kind = 4;
+    state->m_pBallPredict->m_callback = callback;
+}

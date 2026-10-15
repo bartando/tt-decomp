@@ -130,6 +130,7 @@ set(SOURCES
     src/game/player/pong_player.cpp
     src/game/pong_render.cpp
     src/game/match/hsm_log_strings.cpp
+    src/game/match/pong_match.cpp
     src/game/match/pong_states.cpp
     src/game/match/match_rtti_strings.cpp
     src/rage/rtti_class_strings.cpp
