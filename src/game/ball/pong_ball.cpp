@@ -6,6 +6,7 @@
  */
 
 #include "pong_ball.hpp"
+#include <cstddef>   // offsetof
 #include <cstring>   // memcpy, memset
 #include <cmath>     // fabs
 
@@ -959,8 +960,12 @@ const char* gmBallNode::GetTypeName() {
 // made by CreateInst), its effects (two trails, a shadow, the spin texture and
 // a 2D splash) and the game-pace tuning it loads from XML. Initialize builds the
 // effects, gives the ball the mass properties of a thin shell and publishes the
-// node and its pace settings; Reset puts everything back for a new rally; Draw
-// queues the effects; Terminate frees them.
+// node and its pace settings; Reset puts everything back for a new rally; Update
+// tracks the ball every frame (velocity, trails, audio emitters, the fxScale
+// fade); Draw queues the effects; Terminate frees them. Messages reach it
+// through the msgMsgSink base at +0x80 (gmBallNode_HandleMessage), and reach the
+// ball's physics instance through its own sink at +0x50
+// (pongBallInstance_HandleMessage), which mostly sets what the ball collides with.
 //
 // Objects it doesn't own are read through the views in namespace gmball, which
 // hold only offsets these functions' asm proves (the game's 32-bit offsets are
@@ -981,6 +986,23 @@ inline R CallSlot(void* object, int slot, A... args) {
 }
 
 inline void** GameVtable(uintptr_t address) { return reinterpret_cast<void**>(address); }
+
+// ── Vector math as the VMX unit does it ─────────────────────────────────────
+inline Vec4 Sub(const Vec4& a, const Vec4& b) { return Vec4{a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w}; }
+inline Vec4 Mul(const Vec4& a, const Vec4& b) { return Vec4{a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w}; }
+inline float Dot3(const Vec4& a, const Vec4& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }  // vmsum3fp
+
+// a × b, from two vpermwi shuffles of each; w comes out as a.w·b.w − a.w·b.w.
+inline Vec4 Cross(const Vec4& a, const Vec4& b) {
+    return Vec4{a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x, a.w * b.w - a.w * b.w};
+}
+
+// 1/x splatted: vrefp, then one Newton-Raphson step against `one`.
+inline Vec4 Reciprocal(float x, const Vec4& one) {
+    float e = 1.0f / x;  // vrefp
+    auto lane = [&](float o) { return e * (o - e * x) + e; };
+    return Vec4{lane(one.x), lane(one.y), lane(one.z), lane(one.w)};
+}
 
 constexpr uintptr_t kVtable_gmBallNode            = 0x820571DCu;
 constexpr uintptr_t kVtable_gmBallNode_renderEnt  = 0x82057288u;  // +0x60
@@ -1028,19 +1050,46 @@ struct ArchetypeView {             // rage::phArchetype
     void SetAngInertia(const float* inertia) { CallSlot<void>(this, 14, inertia); }
 };
 
-struct BallAudioView {             // pongBallAudio (0x340 bytes, made by 0x8228A7D8)
-    uint8_t  _pad000[0x32C];
-    uint32_t word32C;              // +0x32C  Reset clears it
+// An audio emitter inside pongBallAudio; 0x82160C98 moves it (see SetEmitterPosition).
+struct AudioEmitterView {
+    uint8_t _pad00[0x50];
+    Vec4    position;              // +0x50
 };
 
-struct BallInstView {              // pongBallInstance (ctor 0x8227F870), a rage::phInst
+struct BallAudioView {             // pongBallAudio (0x340 bytes, made by 0x8228A7D8)
+    uint8_t          _pad000[0x1A0];
+    AudioEmitterView emitterA;     // +0x1A0  Update moves it only while emitterAActive is set
+    uint8_t          _pad200[0x40];
+    AudioEmitterView emitterB;     // +0x240
+    uint8_t          _pad2A0[0x74];
+    float            offsetXB;     // +0x314  added to emitterB's x when lbl_8260656D is set
+    uint8_t          _pad318[0x14];
+    uint32_t         word32C;      // +0x32C  Reset clears it
+    uint8_t          _pad330[8];
+    uint8_t          emitterAActive;  // +0x338
+};
+static_assert(offsetof(BallAudioView, emitterB) == 0x240 && offsetof(BallAudioView, offsetXB) == 0x314 &&
+                  offsetof(BallAudioView, emitterAActive) == 0x338,
+              "pongBallAudio layout");
+
+struct BallInstView {              // pongBallInstance (ctor 0x8227F870, 0xD0 bytes), a rage::phInst
     void**          vtable;        // +0x00
     ArchetypeView*  archetype;     // +0x04
     uint16_t        levelIndex;    // +0x08
-    uint8_t         _pad0A[0x4B];
-    uint8_t         flag55;        // +0x55  ctor and Reset set it to 1
+    uint8_t         _pad0A[6];
+    gmBallNode::Matrix34 matrix;   // +0x10  row d is the position
+    void**          sinkVtable;    // +0x50  msgMsgSink base (vtable 0x82057094); its slot 1 is HandleMessage
+    uint8_t         _pad54;
+    uint8_t         flag55;        // +0x55  ctor and Reset set it to 1; ProcessCollision reads it
     uint8_t         _pad56[2];
     BallAudioView*  audio;         // +0x58
+    uint8_t         _pad5C[0x64];
+    uint32_t        stamp1;        // +0xC0  sysTimeManager +0x28 when message 1 arrived
+    uint32_t        stamp2;        // +0xC4  ... message 2
+    uint32_t        stamp7;        // +0xC8  ... message 7
+
+    // Slot 3 (0x82280030) copies a matrix to +0x60.
+    void SetMatrix60(const gmBallNode::Matrix34* m) { CallSlot<void>(this, 3, m); }
 };
 
 inline BallInstView* View(pongBallInstance* inst) { return reinterpret_cast<BallInstView*>(inst); }
@@ -1064,6 +1113,51 @@ struct SimulatorView {             // rage::phSimulator
     LevelView* level;              // +0x04
 };
 
+// ── Messages ────────────────────────────────────────────────────────────────
+// What a msgMsgSink's slot 1 receives: an id, then arguments that
+// msgMessage_ReadArgs unpacks by format string.
+struct MessageView {
+    uint16_t id;                   // +0x00
+};
+
+// ── Game state ──────────────────────────────────────────────────────────────
+struct BallPredictView {           // gameState +0x14 (pong_match.cpp: BallPredictData)
+    uint8_t _pad0000[0x25A8];
+    int32_t count25A8;             // +0x25A8  pg_70C8_g loops over this many entries
+};
+
+struct GameStateView {             // *g_game_state_ptr
+    uint8_t          _pad00[0x14];
+    BallPredictView* predict;      // +0x14
+    uint8_t          _pad18[0x14];
+    int32_t          count2C;      // +0x2C  message 1 bumps it; pg_70C8_g compares it with the prediction
+    int32_t          count30;      // +0x30  message 2 bumps it; likewise
+};
+
+struct ReplayDataView {            // *0x8271A2EC
+    uint8_t  _pad00000[0x68CF0];
+    int32_t  mode68CF0;            // +0x68CF0  1 while a replay plays
+};
+
+// *0x825EB2FC: per-frame state, indexed by g_phFrameIndex.
+struct FrameHistoryView {
+    uint8_t _pad000[0x440];
+    uint8_t ballFlag71[1];         // +0x440  gmBallNode::flag71, one byte per frame
+};
+
+struct LoopView {                  // *g_loop_obj_ptr (pong_misc.hpp: LoopObject)
+    uint8_t _pad000[0x242];
+    uint8_t activeFlag;            // +0x242
+};
+
+struct TimeManagerView {           // rage::sysTimeManager at 0x825CAEB8
+    void**   vtable;               // +0x00
+    uint32_t _04;
+    float    frameSeconds;         // +0x08  1/60 in the image
+    uint8_t  _pad0C[0x1C];
+    uint32_t stamp28;              // +0x28  pongBallInstance stamps messages 1, 2 and 7 with it
+};
+
 // ── Effects ─────────────────────────────────────────────────────────────────
 // pongRenderable (vtable 0x82032404): each effect's constructor starts with
 // these three stores.
@@ -1083,6 +1177,7 @@ inline void ConstructRenderable(RenderableView* r) {
 // fxBallTrail (vtable 0x820571B8, 0xB4D0 bytes)
 inline void Trail_Draw(fxBallTrail* t)  { CallSlot<void>(t, 1); }  // 0x82382230
 inline void Trail_Reset(fxBallTrail* t) { CallSlot<void>(t, 2); }  // 0x82381150; its ctor calls it too
+inline void Trail_AddSample(fxBallTrail* t, const Vec4* a, const Vec4* b) { CallSlot<void>(t, 4, a, b); }  // 0x82381238
 // 0x82381208: stores intensity at +0xB470, data at +0x3C2C and entry type+1 of
 // the table at *0x8271A394 at +0x3C28.
 inline void Trail_Setup(fxBallTrail* t, int32_t type, int32_t intensity, void* data) {
@@ -1108,6 +1203,7 @@ inline void SpinTex_Draw(fxBallSpinTex* s)     { CallSlot<void>(s, 1); }  // 0x8
 inline void SpinTex_Register(fxBallSpinTex* s) { CallSlot<void>(s, 2); }  // 0x82388978
 inline void SpinTex_Reset(fxBallSpinTex* s)    { CallSlot<void>(s, 3); }  // 0x82388C58
 inline void SpinTex_SetTexture(fxBallSpinTex* s, void* texture) { CallSlot<void>(s, 4, texture); }  // 0x82280898
+inline void SpinTex_Update(fxBallSpinTex* s)   { CallSlot<void>(s, 5); }  // 0x82388D70
 
 // fxBallSplash2D: msgMsgSink at +0 (slot 1, 0x82389C50, handles the messages),
 // pongRenderable at +4 (0x240 bytes)
@@ -1231,6 +1327,21 @@ extern const int32_t                 lbl_825C9A2C;        // @ 0x825C9A2C
 extern gmball::Options825C5EC8View   lbl_825C5EC8;        // @ 0x825C5EC8
 extern uint8_t                       lbl_82630710[];      // @ 0x82630710  data both trails are set up with
 extern "C" void*                     g_drawBucket;        // @ 0x826064F4
+extern gmball::ReplayDataView*       lbl_8271A2EC;        // @ 0x8271A2EC
+extern gmball::FrameHistoryView*     lbl_825EB2FC;        // @ 0x825EB2FC
+extern "C" uint32_t                  g_phFrameIndex;      // @ 0x826065DC
+extern void*                         g_loop_obj_ptr;      // @ 0x825EAB30  a LoopView
+extern gmball::TimeManagerView       g_sysTimeManager;    // @ 0x825CAEB8
+extern uint8_t                       lbl_8260656D;        // @ 0x8260656D
+// Vector constants. 0x82619BF0 and 0x82606750 are zero in the image and filled at
+// startup; Normalize3 swaps an estimate equal to the first for the second.
+extern const gmBallNode::Vec4        lbl_825CB7C0;        // @ 0x825CB7C0  (1, 1, 1, 0)
+extern const gmBallNode::Vec4        lbl_825CB7D0;        // @ 0x825CB7D0  (0.5, 0.5, 0.5, 0)
+extern const gmBallNode::Matrix34    lbl_825CB800;        // @ 0x825CB800  identity
+extern const gmBallNode::Vec4        lbl_82619BF0;        // @ 0x82619BF0
+extern const gmBallNode::Vec4        lbl_82606750;        // @ 0x82606750
+extern const float                   lbl_825C8138;        // @ 0x825C8138  0.02, the ball's radius at scale 1
+extern const float                   lbl_8207A320;        // @ 0x8207A320  -0.02
 
 // Message-sink list at 0x825F3864..0x825F3A68 (msg_event_handler.cpp names it an
 // event queue): per entry a sink, a mask of message kinds and the byte 0x80.
@@ -1249,6 +1360,8 @@ extern void* g_floatFieldType;  // @ 0x825CAF94  rage::xmlNodeStructFloat
 struct RTTITypeDescriptor;
 extern RTTITypeDescriptor g_typeDescriptor_phBound;        // @ 0x825D2C78  ".?AVphBound@rage@@"
 extern RTTITypeDescriptor g_typeDescriptor_phBoundSphere;  // @ 0x825DE100  ".?AVphBoundSphere@rage@@"
+extern RTTITypeDescriptor g_typeDescriptor_phInst;         // @ 0x825D2CB8  ".?AVphInst@rage@@"
+extern RTTITypeDescriptor g_typeDescriptor_pongBallInstance;  // @ 0x825D2CD4  ".?AVpongBallInstance@@"
 
 // ── Callees ─────────────────────────────────────────────────────────────────
 extern "C" void  sysMemAllocator_InitMainThread(void);                       // @ 0x820C0038
@@ -1271,6 +1384,14 @@ extern int       io_Input_poll_9D68(void* inputObj);                          //
 extern uint32_t  game_A2F8(const char* name, int create);                     // @ 0x8215A2F8  returns a shader-global handle (inferred)
 struct pongDrawBucket;
 void pongDrawBucket_AddEntry(pongDrawBucket* bucket, void* renderable, uint32_t bucketMask);  // @ 0x822278D8
+extern void      gmBallNode_UpdateReplay(gmBallNode* node);                   // @ 0x82282110  puts the ball where the replay has it
+extern void      rage_3E10(void* gameState);                                  // @ 0x821D3E10
+extern void      pg_70C8_g();                                                 // @ 0x822870C8  walks the ball prediction
+extern void      util_2038(const gmBallNode::Matrix34* m, gmBallNode::Vec4* point);  // @ 0x820D2038  point = m * (x, y, z, 1)
+extern void      fxBallSplash2D_Update(fxBallSplash2D* splash);               // @ 0x82389FD8
+extern void      pg_0C98_g(gmball::AudioEmitterView* emitter, const gmBallNode::Vec4* position);  // @ 0x82160C98
+extern void      msgMessage_ReadArgs(const gmball::MessageView* msg, const char* format, ...);  // @ 0x8225E998
+void pongBallInstance_4980_g(void* instance, unsigned short s, int a, int b, int c, int d);  // @ 0x822C4980  activates the object
 
 namespace gmball {
 
@@ -1299,6 +1420,26 @@ inline void SetShaderGlobal(uint32_t handle, const Vec4& value) {
     uint32_t entryWord = table->entries[(handle >> 18) * 2 + 1];
     table->dirtyBits[bit >> 3] |= lbl_825D4C80[bit & 7];
     table->values[entryWord & 0xFFFF] = value;
+}
+
+// v / |v| over x, y, z (XMVector3Normalize): a reciprocal-square-root estimate of
+// |v|², swapped for lbl_82606750 where it equals lbl_82619BF0 (both set at
+// startup), then one Newton-Raphson step against (1, 1, 1, 0) and (0.5, 0.5, 0.5, 0).
+// Those zero w lanes leave w multiplied by the raw estimate.
+inline Vec4 Normalize3(const Vec4& v) {
+    float lengthSq = Dot3(v, v);
+    float estimate = 1.0f / sqrtf(lengthSq);  // vrsqrtefp
+    auto lane = [&](float one, float half, float suspect, float replacement) {
+        float y = (estimate == suspect) ? replacement : estimate;
+        return (one - lengthSq * (y * y)) * (half * y) + y;
+    };
+    const Vec4& one = lbl_825CB7C0;
+    const Vec4& half = lbl_825CB7D0;
+    Vec4 scale{lane(one.x, half.x, lbl_82619BF0.x, lbl_82606750.x),
+               lane(one.y, half.y, lbl_82619BF0.y, lbl_82606750.y),
+               lane(one.z, half.z, lbl_82619BF0.z, lbl_82606750.z),
+               lane(one.w, half.w, lbl_82619BF0.w, lbl_82606750.w)};
+    return Mul(v, scale);
 }
 
 inline fxBallTrail* NewTrail() {
@@ -1368,6 +1509,55 @@ gmBallNode* gmBallNode::ScalarDtor(int flags) {
 gmBallNode* gmBallNode_SecondaryDtorThunk(void* sinkBase, int flags) {
     auto* node = reinterpret_cast<gmBallNode*>(static_cast<uint8_t*>(sinkBase) - 0x80);
     return node->ScalarDtor(flags);
+}
+
+// ── msgMsgSink-base slot 1 @ 0x82281D10 ───────────────────────────────────────
+// The node's messages: show or hide the ball (flag71), hold or release its
+// effects, fade fxScale, reset, and count messages 1 and 2 on the game state.
+void gmBallNode_HandleMessage(void* sinkBase, const MessageView* msg) {
+    auto* node = reinterpret_cast<gmBallNode*>(static_cast<uint8_t*>(sinkBase) - 0x80);
+    switch (msg->id) {
+    case 0x23:
+    case 0x2803:
+    case 0x2802:
+    case 0x86B:
+        CallSlot<void>(node, 35, 1);  // sgPhysicalObject slot 35 (0x823D94B0): flag71 = 1
+        break;
+    case 0x24:
+    case 0x2801:
+        CallSlot<void>(node, 35, 0);
+        break;
+    case 0x81E:
+    case 0x81F:
+        node->effectsHeld = 1;
+        break;
+    case 0x821:
+        node->effectsHeld = 0;
+        break;
+    case 0x29: {
+        float target, duration;
+        msgMessage_ReadArgs(msg, "ff", &target, &duration);
+        node->fxScaleTo = target;
+        node->fxScaleFrom = node->fxScale;
+        if (!(duration <= 0.0f)) {  // a NaN duration fades too
+            node->fxFadeDuration = duration;
+            node->fxFadeTime = 0.0f;
+        } else {
+            node->fxScale = target;
+            node->fxFadeTime = lbl_825C5938;
+        }
+        break;
+    }
+    case 0x810:
+        CallSlot<void>(node, 25);  // Reset
+        break;
+    case 1:
+        ++static_cast<GameStateView*>(g_game_state_ptr)->count2C;
+        break;
+    case 2:
+        ++static_cast<GameStateView*>(g_game_state_ptr)->count30;
+        break;
+    }
 }
 
 // ── [21] LoadProperties @ 0x82280B98 ──────────────────────────────────────────
@@ -1510,11 +1700,11 @@ void gmBallNode::Reset() {
 
     game_3860(g_game_state_ptr, 1, "gmBallNode::Reset");
 
-    f094[2] = 1.0f;
-    f094[1] = 1.0f;
-    f094[0] = 1.0f;
-    f0A0 = 0.0f;
-    f0A4 = lbl_825C5938;
+    fxScaleTo = 1.0f;
+    fxScaleFrom = 1.0f;
+    fxScale = 1.0f;
+    fxFadeDuration = 0.0f;
+    fxFadeTime = lbl_825C5938;
 
     auto* context = static_cast<GameContextView*>(g_input_obj_ptr);
     auto* record = static_cast<LookupRecordView*>(pg_C2A0_g(lbl_8271A310, context->lookupKey28));
@@ -1530,6 +1720,109 @@ void gmBallNode::Reset() {
         newScale = 5.0f;  // the float at 0x8202C504
     }
     g_activeBallNode->SetScale(newScale);
+}
+
+// ── [27] Update @ 0x82281630 ──────────────────────────────────────────────────
+// Once a frame: records flag71 for the rollback history, then either follows the
+// replay or tracks the live ball. Tracking takes the ball's velocity from how far
+// it moved since the last frame, keeps the effects reset while they're held, lays
+// both trails along the ball's path (the first through its centre, the second as
+// a ribbon one radius either side), steps the spin texture and splash, moves the
+// audio emitters to the ball and advances the fxScale fade.
+void gmBallNode::Update() {
+    lbl_825EB2FC->ballFlag71[g_phFrameIndex] = CallSlot<uint8_t>(this, 34);  // slot 34 (0x8223FB18) reads flag71
+
+    if (lbl_8271A2EC->mode68CF0 == 1) {
+        gmBallNode_UpdateReplay(this);
+        rage_3E10(g_game_state_ptr);
+        return;
+    }
+
+    BallInstView* ball = View(inst);
+    velocity = ball->matrix.d;
+    velocity = Sub(velocity, lastMatrix.d);
+    velocity = Mul(velocity, Reciprocal(g_sysTimeManager.frameSeconds, lbl_825CB7C0));
+    lastMatrix = ball->matrix;
+
+    LevelView* level = g_pPhysicsSim->level;
+    if (level->IsActive(View(inst)->levelIndex) && level->GetActiveCollider(View(inst)->levelIndex) != nullptr &&
+        effectsHeld) {
+        if (trails[0]) Trail_Reset(trails[0]);
+        if (trails[1]) Trail_Reset(trails[1]);
+        if (spinTex) SpinTex_Reset(spinTex);
+        if (splash) fxBallSplash2D_ResetSplashes(splash);
+    }
+
+    auto* current = static_cast<BallInstView*>(RTDynamicCast(*g_ppBallInst, 0, &g_typeDescriptor_phInst,
+                                                             &g_typeDescriptor_pongBallInstance, 0));
+    auto* gameState = static_cast<GameStateView*>(g_game_state_ptr);
+    if (gameState->predict->count25A8 > 0) {
+        Vec4 before = View(inst)->matrix.d;
+        pg_70C8_g();
+        Vec4 after = View(inst)->matrix.d;
+
+        // A frame looking along this frame's movement, world up as the hint, at
+        // the published ball's position.
+        Matrix34 frame = current ? current->matrix : lbl_825CB800;
+        Vec4 moved = Sub(after, before);
+        frame.b.x = 0.0f;
+        frame.b.y = 1.0f;
+        frame.b.z = 0.0f;
+        frame.c = Normalize3(moved);
+        frame.a = Normalize3(Cross(frame.b, frame.c));
+        frame.b = Normalize3(Cross(frame.a, frame.c));
+
+        if (trails[0]) {
+            Vec4 centre{0.0f, 0.0f, 0.0f, 0.0f};
+            Vec4 unused{0.0f, 0.0f, 0.0f, 0.0f};  // transformed like `centre`, then never passed on
+            util_2038(&frame, &centre);
+            util_2038(&frame, &unused);
+            Vec4 zero{0.0f, 0.0f, 0.0f, 0.0f};
+            Trail_AddSample(trails[0], &centre, &zero);
+        }
+        if (trails[1]) {
+            Vec4 edgeA{lbl_825C8138, 0.0f, 0.0f, 0.0f};
+            Vec4 edgeB{lbl_8207A320, 0.0f, 0.0f, 0.0f};
+            util_2038(&frame, &edgeA);
+            util_2038(&frame, &edgeB);
+            Trail_AddSample(trails[1], &edgeA, &edgeB);
+        }
+    } else {
+        current->SetMatrix60(&current->matrix);
+        if (trails[0]) Trail_Reset(trails[0]);
+        if (trails[1]) Trail_Reset(trails[1]);
+    }
+
+    if (spinTex) SpinTex_Update(spinTex);
+    if (splash) fxBallSplash2D_Update(splash);
+
+    BallInstView* published = View(*g_ppBallInst);
+    if (BallAudioView* audio = published->audio) {
+        if (audio->emitterAActive) {
+            pg_0C98_g(&audio->emitterA, &published->matrix.d);
+        }
+        const Vec4* position = &published->matrix.d;
+        Vec4 shifted;
+        if (lbl_8260656D) {
+            shifted = published->matrix.d;
+            shifted.x = audio->offsetXB + shifted.x;
+            position = &shifted;
+        }
+        pg_0C98_g(&audio->emitterB, position);
+    }
+
+    if (fxFadeTime >= 0.0f) {
+        float t = fxFadeTime + g_sysTimeManager.frameSeconds;
+        fxFadeTime = t;
+        if (t > fxFadeDuration) {
+            fxScale = fxScaleTo;
+            fxFadeTime = lbl_825C5938;
+        } else {
+            fxScale = (fxScaleTo - fxScaleFrom) / fxFadeDuration * t + fxScaleFrom;
+        }
+    }
+
+    rage_3E10(g_game_state_ptr);
 }
 
 // ── [29] Draw @ 0x82281C10 ────────────────────────────────────────────────────
@@ -1582,6 +1875,98 @@ void gmBallNode::SetScale(float newScale) {
 pongBallInstance* gmBallNode::CreateInst() {
     void* mem = RageNew(0xD0);
     return mem ? pongBallInstance_Construct(mem) : nullptr;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// pongBallInstance message sink
+// ═════════════════════════════════════════════════════════════════════════════
+
+namespace gmball {
+
+// Takes the ball out of the physics level if it's in it (as Reset does).
+inline void RemoveFromLevel(BallInstView* ball) {
+    if (g_pPhysicsLevel->IsActive(ball->levelIndex)) {
+        game_4B60(g_pPhysicsSim, ball->levelIndex);
+    }
+}
+
+}  // namespace gmball
+
+// ── msgMsgSink-base (+0x50) slot 1 @ 0x822803F0 ───────────────────────────────
+// Most messages pick what the ball collides with: they set or change its
+// archetype's include flags, taking it out of the physics level or putting it
+// back as they go. 0x2A, 0x2B, 0x381F and 0x3849 drive flag55 (0x3849 also
+// activates the ball the first time), and messages 1, 2 and 7 are time-stamped;
+// 7 first runs 0x8227FDB0.
+void pongBallInstance_HandleMessage(void* sinkBase, const MessageView* msg) {
+    auto* ball = reinterpret_cast<BallInstView*>(static_cast<uint8_t*>(sinkBase) - 0x50);
+    auto* self = reinterpret_cast<pongBallInstance*>(ball);
+    switch (msg->id) {
+    case 7:
+        self->UpdatePhysicsState();
+        ball->stamp7 = g_sysTimeManager.stamp28;
+        break;
+    case 1:
+        ball->stamp1 = g_sysTimeManager.stamp28;
+        break;
+    case 2:
+        ball->stamp2 = g_sysTimeManager.stamp28;
+        break;
+    case 0x11:
+        ball->archetype->includeFlags &= ~4u;
+        break;
+    case 0x12:
+        ball->archetype->includeFlags |= 4u;
+        break;
+    case 0x13:
+        ball->archetype->includeFlags &= ~1u;
+        break;
+    case 0x14:
+        ball->archetype->includeFlags |= 1u;
+        break;
+    case 0xF:
+    case 0x849:
+    case 0x2801:
+        RemoveFromLevel(ball);
+        ball->archetype->includeFlags = 0;
+        break;
+    case 0x83C:
+    case 0x83B:
+        RemoveFromLevel(ball);
+        ball->archetype->includeFlags = 4;
+        break;
+    case 0x84B:
+    case 0x2803:
+    case 0x2802:
+    case 0x86B:
+        if (static_cast<LoopView*>(g_loop_obj_ptr)->activeFlag) {
+            if (!g_pPhysicsLevel->IsActive(ball->levelIndex)) {
+                pongBallInstance_4980_g(g_pPhysicsSim, ball->levelIndex, 0, 0, 0, 0);
+            }
+            ball->archetype->includeFlags = 0xFFFFFFFFu;
+        }
+        break;
+    case 0x838:
+        RemoveFromLevel(ball);
+        ball->archetype->includeFlags = 0xFFFFFFFFu;
+        break;
+    case 0x10:
+        ball->archetype->includeFlags = 0x1C;
+        break;
+    case 0x2A:
+        ball->flag55 = 0;
+        break;
+    case 0x2B:
+    case 0x381F:
+        ball->flag55 = 1;
+        break;
+    case 0x3849:
+        if (!ball->flag55) {
+            ball->flag55 = 1;
+            self->ActivateBall(nullptr);
+        }
+        break;
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

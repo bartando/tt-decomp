@@ -34,7 +34,7 @@ struct gdBallPredictManager {
 // 31..40 are sgPhysicalObject's (vtable 0x8204F35C), and the sgTraverse* visitors
 // (0x823D9F10..) name slots 23..29: Initialize, Terminate, Reset, Restart, Update,
 // PostUpdate, Draw. +0x80 is a msgMsgSink base (its vtable 0x82027B34 is stored
-// back there by the destructor). Members are plain functions so no vtable is
+// back there by the destructor); its slot 1 is gmBallNode_HandleMessage. Members are plain functions so no vtable is
 // emitted here; each comment gives the slot it fills. Offsets are the game's 32-bit ones.
 // Field names in quotes are the ones LoadProperties registers with the XML loader.
 struct fxBallTrail;
@@ -66,10 +66,16 @@ struct gmBallNode {
     uint8_t            _pad089[3];
     float              scale;                  // +0x08C  "Scale"
     float              visualSpinScale;        // +0x090  "VisualSpinScale"
-    float              f094[3];                // +0x094  Reset sets all three to 1
-    float              f0A0;                   // +0x0A0  Reset sets 0
-    float              f0A4;                   // +0x0A4  Reset copies the float at 0x825C5938 (-1 in the image)
-    uint8_t            effectsEnabled;         // +0x0A8  Update resets the effects only when set (ctor: 1)
+    // A scale the trail and splash draws multiply by (0x82381BB0, 0x82389490).
+    // Message 0x29 fades it to a target over a duration; Update steps the fade.
+    float              fxScale;                // +0x094
+    float              fxScaleFrom;            // +0x098
+    float              fxScaleTo;              // +0x09C
+    float              fxFadeDuration;         // +0x0A0
+    float              fxFadeTime;             // +0x0A4  seconds into the fade; -1 (0x825C5938) when idle
+    uint8_t            effectsHeld;            // +0x0A8  while set, Update keeps the effects reset whenever the
+                                               //         ball is active in the level (ctor: 1; messages 0x81E/0x81F
+                                               //         set it, 0x821 clears it)
     uint8_t            _pad0A9[3];
     fxBallTrail*       trails[2];              // +0x0AC
     fxBallShadow*      shadow;                 // +0x0B4
@@ -86,8 +92,8 @@ struct gmBallNode {
     float              networkFastestBallTravelTime;  // +0x0E0  "NetworkFastestBallTravelTime"
     uint8_t            flagsE4[3];             // +0x0E4  ctor clears them
     uint8_t            _pad0E7[9];
-    Matrix34           matrixF0;               // +0x0F0  ctor: identity, translation 0
-    Vec4               vec130;                 // +0x130  ctor: 0
+    Matrix34           lastMatrix;             // +0x0F0  the ball's matrix as of the last Update (ctor: identity)
+    Vec4               velocity;               // +0x130  (position - last position) / frame time (ctor: 0)
     uint32_t           ballColorVar;           // +0x140  handle of the "Ball_Color" shader global
     uint8_t            _pad144[0x0C];
 
@@ -98,7 +104,7 @@ struct gmBallNode {
     void              Initialize();                    // [23] @ 0x82280D48
     void              Terminate();                     // [24] @ 0x82281368
     void              Reset();                         // [25] @ 0x82281408
-    // [27] Update @ 0x82281630 is not lifted yet.
+    void              Update();                        // [27] @ 0x82281630
     void              Draw();                          // [29] @ 0x82281C10
     pongBallInstance* CreateInst();                    // [37] @ 0x82282430
     void              SetScale(float newScale);        // @ 0x82282318
