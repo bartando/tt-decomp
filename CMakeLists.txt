@@ -182,6 +182,8 @@ set(SOURCES
     src/rage/math/ph_math.cpp
     src/game/input/button_edges.cpp
     src/game/player/player_state_queries.cpp
+    src/game/misc/ccal_ring_buffer.cpp
+    src/game/misc/ccal_movie_player.cpp
 )
 
 # Create executable
