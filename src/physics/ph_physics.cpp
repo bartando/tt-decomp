@@ -38,21 +38,21 @@ static inline const float* phBoundGeometry_Centroid(const void* bound) {
    ====================================================================== */
 
 /* --- Float / double constants --- */
-extern const float g_capsuleVolK1;  // @ .rdata (fmadds multiplier)
-extern const float g_capsuleVolK2;  // @ .rdata (final scale, ~4.189 = 4/3*PI)
+extern const float g_capsuleVolK1;  // @ 0x82079BD0 (.rdata) 4/3
+extern const float g_capsuleVolK2;  // @ 0x82079B30 (.rdata) pi
 extern const float g_dampingScale;   // @ 0x8207A008 (.rdata)
 extern const float g_floatEpsilon;  // @ 0x82079C58 (.rdata)
 extern const float g_phCapsuleShapeK;  // shape constant @ 0x825C8080
-extern const float g_phClampMax;
+extern const float g_phClampMax;  // @ 0x8202D108 (1.0); ph_3E78 loads 300.0 @ 0x8202D114 instead
 extern const float g_phExtentScale;
 extern const float g_phJoint1Dof_angleMin, g_phJoint1Dof_angleMax;
 extern const float g_phJoint1Dof_errTol, g_phJoint1Dof_maxCorr;
 extern const float g_phJoint1Dof_mass, g_phJoint1Dof_stiffness;
 extern const float g_phJoint1Dof_maxTorque;
 extern const float g_phNegThreshold;  // negative threshold @ 0x82079D18
-extern const float g_phSphereInertiaCoeff; // @ 0x82029B60
+extern const float g_phSphereInertiaCoeff; // @ 0x825C9A40
 extern const float g_phSphereVolumeCoeff;  // @ 0x82079C30 — (4/3)*pi
-extern const float g_phTwo;
+extern const float g_phTwo;  // @ 0x8202D10C: misnamed, the value is 0.5
 extern const float g_phTwoPi;   // @ lbl_8202C02C (6.283185...)
 extern const float g_phZeroFloat;
 extern const float g_springScale;    // @ 0x8207A0F4 (.rdata)
@@ -61,10 +61,10 @@ extern const float g_springScale;    // @ 0x8207A0F4 (.rdata)
 extern const char* g_phResolveProfileTag;
 extern const char* g_phResolveProfileTagEnd;
 extern const uint8_t g_phXYZMask[16];     // @ 0x82629E60 — xyz mask (clear w)
-extern const void* g_phJoint3DofTemplate;  // @ 0x82069E70
+extern const void* g_phJoint3DofTemplate;  // not data: ph_DD70 passes the element ctor 0x8225E3F0
 extern float g_phTableA[];            // sine/cosine lookup table
 extern float g_phTableB[];            // second lookup table
-extern uint16_t g_phDefaultStatusId;  // @ 0x82465A58
+extern uint16_t g_phDefaultStatusId;  // @ 0x82005A58
 extern uint32_t g_phActiveCameraPtr;
 extern uint32_t g_phCollisionFlags;  // @ 0x825C48E8
 extern uint32_t g_phCollisionSolver;
@@ -72,7 +72,7 @@ extern uint32_t g_phGlobalStatePtr;
 extern uint32_t g_phRandomSeedPtr;    // global RNG state
 extern uint8_t g_phDisabled;
 extern uint8_t g_physicsDisabled;  // @ 0x826064E0
-extern void* g_phAllocator;  // @ 0x64890018 (constructed from lis+ori)
+extern void* g_phAllocator;  // immediate 0x648A0018 (lis+ori), XMemAlloc attributes
 extern void* g_phBoundGeometryVtable;  // @ 0x82058494
 extern void* g_phBoundRelocVtable;
 extern void* g_phCollisionMgr_vtable;
@@ -8191,7 +8191,7 @@ extern void ph_9BC0(void* thisPtr);                      // Collision manager ba
 extern void ph_1310(void* thisPtr);                      // phBoundGeometry base init
 extern void phBoundSphere_vfn_37(void* thisPtr);         // phBoundSphere finalize init
 
-extern uint8_t g_phBoundInitialized;                     // @ 0x82606060
+extern uint8_t g_phBoundInitialized;                     // @ 0x826064E0
 extern float g_identityVector[4];                        // @ 0x82606740
 
 // Vtable pointers for phBound hierarchy
@@ -9317,7 +9317,7 @@ extern void ph_ctor_ABE8(void* thisPtr);
 extern void rage_debugLog(const char* msg, uint64_t val);
 
 // External globals
-extern uint8_t g_phDisableFlag;          // @ 0x82706460
+extern uint8_t g_phDisableFlag;          // @ 0x826064E0
 extern const float g_physZeroF;          // @ 0x8202D110  (0.0f)
 extern const float g_physOneF;           // @ 0x8202D114  (1.0f)
 
@@ -9957,10 +9957,10 @@ int phInst_1488_sp(void* /*unused*/, uint32_t* outSize)
  *  extended with tapered-endpoint radii.
  * ====================================================================== */
 
-extern const float g_phTaperedCapsuleVolK1;  // @ .rdata (fmadds mid term)
-extern const float g_phTaperedCapsuleVolK2;  // @ .rdata (final scale ~4/3*PI)
+extern const float g_phTaperedCapsuleVolK1;  // @ 0x82079BD0 (.rdata) 4/3; vfn_3/vfn_37 load 0.5 @ 0x8202D10C instead
+extern const float g_phTaperedCapsuleVolK2;  // @ 0x82079B30 (.rdata) pi
 extern void  ph_1B78(void* dst, void* src, float radius, float halfLen);
-extern void* g_phBoundTaperedCapsuleUpdateImpl; // slot 20 of a global manager vtable
+extern void* g_phBoundTaperedCapsuleUpdateImpl; // @ 0x826066E4: object pointer, slot 5 of *its* vtable is called
 // Shared phBound helpers (deferred to ph_math consolidation batch).
 extern void phBound_CalcAABB_Base(void* self, const float* matrix);     // phBound_vfn_3 @ 0x8228D0E8
 extern void phBound_NormalizeTaperedDir(void* self);                    // vrsqrt+vmul helper
@@ -10207,10 +10207,10 @@ void phBoundTaperedCapsule::TestMovingSphere() {
  *  rage::phBoundSurface — virtual-method implementations
  * ========================================================================== */
 
-extern const float g_phBoundSurfaceCellScale;     // +4 of rdata struct
-extern const float g_phBoundSurfaceInvCellScale;  // +8 of rdata struct
-extern const float g_phBoundSurfaceOriginBias;    // +0  (origin/ref height)
-extern const float g_phBoundSurfaceHalfBias;      // +30112 (grid half-bias)
+extern const float g_phBoundSurfaceCellScale;     // @ 0x8202D10C (0.5)
+extern const float g_phBoundSurfaceInvCellScale;  // @ 0x8202D110 (0.0, fallback height)
+extern const float g_phBoundSurfaceOriginBias;    // @ 0x8202D108 (1.0)
+extern const float g_phBoundSurfaceHalfBias;      // @ 0x825C75A0 (16.0)
 
 /**
  * phBoundSurface::SampleHeightBilinear @ 0x822AFE88 | size: 0x12C

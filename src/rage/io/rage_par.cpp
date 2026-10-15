@@ -19,7 +19,7 @@ int RtlMultiByteToUnicodeN_6FA8_w(
     char16_t* dest,
     int destChars
 );
-std::uint32_t* g_sda_base;
+extern "C" std::uint32_t* g_sda_base;  // defined in globals.c
 
 void* cmOperator_CreateString(void* pOwner, const char* pText, int flags);
 void fiAsciiTokenizer_SetString(void* pStringValue, const char* pBegin, const char* pEnd);

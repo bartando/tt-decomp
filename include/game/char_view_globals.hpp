@@ -26,13 +26,12 @@ extern void** g_tls_base;  // @ 0x82600000
 // @ 0x825F3864 (lbl_825F3864)
 extern uint32_t g_ui_state_counter;
 
-// UI object types array [256] - stores type IDs for each UI slot
+// Message-sink registry (64 entries), see globals.c
 // @ 0x825F3868 (lbl_825F3868)
-extern uint32_t g_ui_object_types[256];
+extern void* g_ui_object_ptrs[64];
 
-// UI object pointers array [256] - stores pointers to UI objects
 // @ 0x825F3968 (lbl_825F3968)
-extern void* g_ui_object_ptrs[256];
+extern uint32_t g_ui_object_types[64];
 
 // UI object flags array [64] - stores flags for UI objects
 // @ 0x825F3A68 (lbl_825F3A68)

@@ -722,8 +722,8 @@ void grcTextureFactoryString_FF68(rage::grcTextureFactoryString* pObj, const cha
 // g_grcFormatId matches the sentinel 0x1A220197. Finally dispatches the
 // transform data to grc_5ED0 for GPU submission.
 // ─────────────────────────────────────────────────────────────────────────────
-extern void* g_grcTextureDevice;   // @ 0x825EBA18
-extern uint32_t g_grcFormatId;     // already declared above / @ 0x825E9070
+extern void* g_grcTextureDevice __asm__("_g_binkVideoPlayer");   // @ 0x825EB988, defined in globals.c
+extern uint32_t g_grcFormatId;     // @ 0x825C9030
 extern void rage_6290(void* pDevice, void* pSrc, void* pParam);
 extern void grc_5ED0(void* pDevice, float* pTransformData);
 

@@ -533,7 +533,7 @@ int ph_59C8(void* self, const char* name, int replaceIfDifferent) {
 // If newArch != null and g_physicsInstrument is enabled, bump refcount at
 // +96. If slot already has an occupant, release it via ph_CEE0(..., 1).
 // Then stash newArch in the slot at +12.
-extern uint8_t g_phInstrumentEnabled; // SDA @ 0x825BC7E1
+extern uint8_t g_phInstrumentEnabled; // @ 0x826064E1
 void ph_CEE0(void* target, int releaseFlag); // forward decl
 void ph_9E50(void* host, void* newArchetype) {
     if (newArchetype && g_phInstrumentEnabled) {

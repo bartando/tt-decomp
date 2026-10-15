@@ -60,7 +60,7 @@ extern "C" void atFreeList_Alloc(void* queue, uint32_t size);
 extern uint32_t g_messageEventType;  // @ 0x8271B800 (glob:lbl_8271B800)
 
 // Global event queue state
-extern uint32_t g_eventQueueIndex;   // @ 0x8271A864 (glob:lbl_8271A864)
-extern uint8_t g_eventQueueFlags[256];  // @ 0x8271A968 (glob:lbl_8271A968)
-extern void* g_eventQueuePtrs[256];     // @ 0x8271A868 (glob:lbl_8271A868)
-extern uint32_t g_eventQueueMasks[256]; // @ 0x8271AAE8 (glob:lbl_8271AAE8)
+extern uint32_t g_eventQueueIndex;      // @ 0x825F3864
+extern void* g_eventQueuePtrs[64];      // @ 0x825F3868
+extern uint32_t g_eventQueueMasks[64];  // @ 0x825F3968
+extern uint8_t g_eventQueueFlags[64];   // @ 0x825F3A68

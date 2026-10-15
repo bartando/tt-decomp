@@ -2387,7 +2387,7 @@ extern "C" void* util_E330(void* mem);               // base initializer for dri
 // Float constants
 extern "C" const float lbl_825C4930;   // @ 0x825C4930  (gdDrillSoftShotData +104)
 extern "C" const float lbl_8202CFE8;   // @ 0x8202CFE8  (gdDrillSoftShotData +108)
-extern "C" const float lbl_8202D0F0;   // @ 0x8202D0F0  (gdDrillSoftShotData +112)
+extern "C" const float lbl_8202D110;   // @ 0x8202D110  (gdDrillSoftShotData +112)
 
 // ── rage::cmAngleLerp factory ────────────────────────────────────────────────
 
@@ -2652,7 +2652,7 @@ void* cmOperatorCtor_gdDrillSoftShotData() {
         fields[0]   = (uint32_t)(uintptr_t)&gdDrillSoftShotData_vtable;
         fields[25]  = 3;              // +100  numThresholds
         ffields[27] = lbl_8202CFE8;   // +108  speed
-        ffields[28] = lbl_8202D0F0;   // +112  spin
+        ffields[28] = lbl_8202D110;   // +112  spin
 
         return mem;
     }

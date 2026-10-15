@@ -175,7 +175,7 @@ extern uint8_t  g_networkSentinel;    // @ 0x8271A2CC
 // Float constants from .rdata
 extern const float g_fZeroConst;      // @ 0x8202D110
 // Float data from .data
-extern float g_fDefaultTimer;         // @ 0x825C5948
+extern float g_fDefaultTimer;         // @ 0x825C5938 (-1.0f)
 // String constant
 extern const char g_szScoreMessageFmt[];  // @ 0x8206EE0C
 
@@ -4201,7 +4201,7 @@ void PlayerStopMessage_Deserialise(void* thisPtr, void* client) {
     *(uint8_t*)(obj + 0x20) = (uint8_t)flagByte;
 
     // Default float value from global constant table
-    extern float g_playerStopDefaultFloat;  // @ 0x8252A2A0 (0x8252D110 - 12016)
+    extern const float g_playerStopDefaultFloat;  // @ 0x8202D110 (0.0f)
     float defaultVal = g_playerStopDefaultFloat;
 
     float primaryVal = defaultVal;
@@ -6760,7 +6760,7 @@ static constexpr uint32_t VTABLE_pongNetMessageHolder_FA68 = 0x8206FA68u;  // su
 static constexpr uint32_t VTABLE_pongNetMessageHolder_F5AC = 0x8206F5ACu;  // sub-obj vtable
 
 // Per-holder max-float initial sentinel used for "unused slot" markers.
-extern const float g_pongNetMaxFloatInit_9ADC;  // @ 0x82079ADC (FLT_MAX sentinel)
+extern const float g_pongNetMaxFloatInit_9ADC;  // @ 0x82079AD4 (-FLT_MAX)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // pongNetMessageHolder_4038_h  @ 0x823C4038 | size: 0x78

@@ -182,20 +182,18 @@ void sgTraverseDrawDebug::Apply(sgNode* pNode) {
 
 namespace {
 
-// cmSimple's vtable — used as the opaque type ID by sgNode::IsType.
-// Loaded as a global rdata address (`lis -32163; lwz -27696`), i.e.
-// 0xFFFF82050000 - 27696 sign-extended = 0x820562D0.
-extern void* const kCmSimpleFilterVtable;
+// sgNode's type ID: the word at 0x825C93D0 (.data), which holds its own
+// address (`lis -32163; lwz -27696`). sgNode::IsType compares against the same
+// value through g_sgNode_typeId (globals.c), so it is kept, not nulled.
+void* const kCmSimpleFilterVtable = reinterpret_cast<void*>(uintptr_t{0x825C93D0u});
 
 // Assertion / trace format stub (4-byte `blr`-only stripped helper).
 // Declared here rather than pulled in from pong_player.cpp to keep the
 // scene-graph TU self-contained for lookups during link.
 extern "C" void nop_8240E6D0(const char* fmt, const char* arg);   // @ 0x8240E6D0
 
-// Rodata string passed to nop_8240E6D0 as the fmt arg. 34 bytes at rdata
-// 0x82071DC8 — content not reconstructable from the recomp scaffold, so it
-// is described rather than reproduced here.
-extern const char kTypeMismatchFmt[];   // @ 0x82071DC8
+// @ 0x82071DC8 (.rdata) — fmt passed to nop_8240E6D0
+const char kTypeMismatchFmt[] = "sgIter - Skipping non-sgNode '%s'";
 
 }  // namespace
 

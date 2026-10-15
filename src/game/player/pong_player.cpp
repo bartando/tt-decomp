@@ -45,7 +45,7 @@ extern const vec3  g_kZero_vec3;         // zero vector constant
 extern const float g_kZero;              // zero float constant
 
 // ── Additional external stubs for pong_player.cpp ───────────────────────
-extern void* g_pInputScoreTable;         // global input score table (float array)
+extern float g_pInputScoreTable[];       // @ 0x825EAB40  float per input slot
 extern void* g_pLerpQueue;               // lerp queue global
 extern void* g_pInputObj;               // input object global
 extern void* g_pButtonStateTable;        // button state table (int32_t array)
@@ -141,12 +141,12 @@ extern const float  g_kFloatConst_79FF8;     // @ 0x82079FF8
 extern const float  g_kFloatConst_79FF4;     // @ 0x82079FF4
 
 // .data globals — game state pointers
-extern void*    g_pGlobalClock;              // @ 0x8271A304
+extern void*    g_pTableDims;              // @ 0x8271A304
 extern void*    g_pCourtState;               // @ 0x8271A314
-extern void*    g_pMatchState;               // @ 0x8271A318
+extern void*    g_pCamShotMgr;               // @ 0x8271A318
 extern void*    g_pPlayerRecords;            // @ 0x8271A31C
 extern void*    g_pPlayerRecords2;           // @ 0x8271A324
-extern void*    g_pMatchConfig;              // @ 0x8271A32C
+extern void*    g_pCameraSharedState;        // @ 0x8271A32C
 
 // .data globals — game objects
 extern void**   g_pInputArrayTable;          // @ 0x825EAB28
@@ -161,14 +161,14 @@ extern bool  pongPlayer_99B0_g(float* valuePtr, float startVal, float ratio, flo
 extern float pongPlayer_0508_g(void* obj, int channel, float inputVal);                  // @ 0x821E0508
 
 // ── External globals for batch 10 implementations ────────────────────────
-extern void*       g_pCourtGeomSingleton;     // @ 0x8251A304 — court geometry singleton
+extern void*       g_pCourtGeomSingleton;     // @ 0x8271A304 — court geometry singleton
 extern float       g_kCourtHeightOffset;      // @ 0x825C8078 — court height offset constant
 extern const float g_kFloatConst_D168;        // @ 0x8202D168 — grid reset float constant
 extern float       g_swingSlotGridDefault;    // @ 0x825CAF7C — writable grid default
 extern const float g_kPositiveSideSign;       // @ 0x825C5938 — positive court side sign
 extern const float g_kTransitionStep;         // @ 0x825CAEC0 — transition blend step size
 extern const float g_kSwingTargetConst;       // @ 0x825C80FC — swing target input constant
-extern void*       g_pPlayerSlotLookup;       // @ 0x8251A32C — player slot lookup global
+extern void*       g_pPlayerSlotLookup;       // @ 0x8271A32C — player slot lookup global
 
 // Forward declarations for functions implemented at end of file
 void pongPlayer_E640_g(void* gridSubObj);  // ClearSwingSlotGrid @ 0x8219E640
@@ -1306,9 +1306,8 @@ void pongPlayerState::CancelSwing()
         timing->m_peakTime = kZero;
         timing->m_field18 = kOne;
         timing->m_currentTime = kOne;
-        // globals.c declares both as uint32_t; the asm stores one byte to
-        // 0x8260633C (0x8260633D.. are separate labels) and a word to 0x82606340.
-        *reinterpret_cast<uint8_t*>(&g_swingInFlightFlag) = 0;
+        // The asm stores a byte to 0x8260633C and a word to 0x82606340.
+        g_swingInFlightFlag = 0;
         timing->m_vel0 = kZero;
         timing->m_vel1 = kZero;
         timing->m_vel2 = kZero;
@@ -1455,7 +1454,7 @@ void pongPlayer::UpdateSwingTimingAdjustment() {
     float animPhase = this->m_swingPhaseInput;  // this+68
 
     // Global clock object: +24 = timing value (float)
-    float* clockFloats = static_cast<float*>(g_pGlobalClock);
+    float* clockFloats = static_cast<float*>(g_pTableDims);
     float clockValue = clockFloats[6];  // +24 / 4
     
     // Load constants
@@ -2085,7 +2084,7 @@ extern void pongPlayer_SetupShotTarget(void* target, float f1, float f2);
 extern void pg_E6E0(int code, uint8_t mask, int p3, int p4);
 extern void pongPlayer_9108_g(void* target, void* syncData);
 
-// g_pMatchState @ 0x8271A318 and g_pMatchConfig @ 0x8271A32C declared at file scope
+// g_pCamShotMgr @ 0x8271A318 and g_pCameraSharedState @ 0x8271A32C declared at file scope
 
 
 /**
@@ -2247,7 +2246,7 @@ void pongPlayer::InitMovementAndContact() {  // pongPlayer_5D50_g @ 0x82195D50
 
     // Set up contact zone with scale constants
     extern const float g_kContactScale1;  // @ 0x825C8A50
-    extern const float g_kContactScale2;  // @ 0x82028080
+    extern const float g_kContactScale2;  // @ 0x825C8080
     void* shotState = m_pShotState;  // +496
     pongPlayer_SetupShotTarget(shotState, g_kContactScale1, g_kContactScale2);
 }
@@ -2296,7 +2295,7 @@ void pongPlayer::NotifySlotChangeAndSync(void* slotsBase, uint32_t slotIndex,
     uint8_t* base = reinterpret_cast<uint8_t*>(slotsBase);
 
     // Look up speed value from table indexed by columnIndex
-    extern float g_kSlotSpeedLookup[];  // @ 0x825C76CC
+    extern float g_kSlotSpeedLookup[];  // @ 0x825C76DC
     float speedVal = g_kSlotSpeedLookup[columnIndex];
 
     // Store speed at slot offset (+61 base, *4 stride)
@@ -2335,7 +2334,7 @@ void pongPlayer::NotifySlotChangeAndSync(void* slotsBase, uint32_t slotIndex,
  *   3. Stores result in creature state's speed field (+208).
  */
 void pongPlayer::UpdateServeSpeed() {  // pongPlayer_CD48_g @ 0x8218CD48
-    uint8_t* matchBytes = static_cast<uint8_t*>(g_pMatchState);
+    uint8_t* matchBytes = static_cast<uint8_t*>(g_pCamShotMgr);
     int32_t rallyIndex = *reinterpret_cast<int32_t*>(matchBytes + 28);
 
     bool indexValid = false;
@@ -2353,11 +2352,11 @@ void pongPlayer::UpdateServeSpeed() {  // pongPlayer_CD48_g @ 0x8218CD48
         return;
     }
 
-    uint8_t* configBytes = static_cast<uint8_t*>(g_pMatchConfig);
+    uint8_t* configBytes = static_cast<uint8_t*>(g_pCameraSharedState);
     uint8_t configHandedness = configBytes[6];
 
     if (configHandedness == 0) {
-        extern const float g_kDefaultServeSpeed;
+        extern const float g_kDefaultServeSpeed;  // @ 0x8202D108
         *reinterpret_cast<float*>(creatureBytes + 208) = g_kDefaultServeSpeed;
         return;
     }
@@ -2402,7 +2401,7 @@ void pongPlayer::InitializeReplaySnapshot(void* outSnapshot) {
     // pongPlayer_9420_wrh @ 0x820D9420
     uint8_t* out = reinterpret_cast<uint8_t*>(outSnapshot);
 
-    void** singletonPtr = reinterpret_cast<void**>(g_pMatchState);
+    void** singletonPtr = reinterpret_cast<void**>(g_pCamShotMgr);
     void* singleton = *singletonPtr;
 
     float zero = g_kFloatConst_D110;  // was g_kReplayZero @ 0x8202D110
@@ -2445,9 +2444,9 @@ void pongPlayer::InitializeReplaySnapshot(void* outSnapshot) {
 void pongPlayer::ClampMovementToCourtBounds(float* delta) {
     // pongPlayer_D558_wrh @ 0x8219D558
     // Constants: g_kFloatConst_D110=g_kFloatConst_D110 @ 0x8202D110
-    extern const double g_kCourtMaxDelta;  // @ 0x82079D78
-    extern const double g_kCourtNegMax;    // @ 0x82079B80
-    extern const float g_kCourtMinDelta;   // @ 0x82079D68
+    extern const double g_kCourtMaxDelta;  // @ 0x82079CF8  5.0
+    extern const double g_kCourtNegMax;    // @ 0x82079B00  0.0
+    extern const float g_kCourtMinDelta;   // @ 0x82079CE8  -5.0f
 
     float maxDelta = static_cast<float>(g_kCourtMaxDelta);
     float negMax   = static_cast<float>(g_kCourtNegMax);
@@ -2589,7 +2588,7 @@ bool pongPlayer::IsLocomotionReady() const {  // pongPlayer_2578_g @ 0x82192578
 // pongPlayer_3628_g (SetServeSideFlip) — implemented at end of file
 extern void* game_C690(pongPlayer* player);
 extern void pongMover_Reset(void* mover, void* position);
-extern uint32_t g_kGeomOffset;  // global loaded via lis+lwz
+extern uint32_t g_kGeomOffset;  // @ 0x825EAB28  a pointer in the asm (lwz, then added to the slot index)
 
 void pongPlayer::ResetServePosition() {  // pongPlayer_36D8_g @ 0x821936D8
     uint32_t fieldOffset = static_cast<uint32_t>(this->m_inputSlotIdx);
@@ -2907,7 +2906,7 @@ void pongPlayer::SyncFieldWithCallback(void* target, void* source) {  // pongPla
  * Called from ResetShotTrackingState and the main shot processing loop.
  */
 void pongPlayer::ResetShotSyncFields(void* shotState, uint8_t clearNetFlags) {  // pongPlayer_9310_g @ 0x82199310
-    extern const float g_kZeroFloat;  // @ 0x82079D10 (0.0f)
+    extern const float g_kZeroFloat;  // @ 0x8202D110 (0.0f)
 
     float zero = g_kZeroFloat;
 
@@ -2996,7 +2995,7 @@ void pongPlayer::ClearSwingTrajectoryData(void* trajectoryBlock) {  // pongPlaye
     memset(base + 16, 0, 16);
 
     // Zero global trajectory vector
-    extern uint8_t g_swingTrajectoryGlobal[];  // @ 0x825C6720
+    extern uint8_t g_swingTrajectoryGlobal[];  // @ 0x82606720
     memset(g_swingTrajectoryGlobal, 0, 16);
 
     // Clear byte flags at +0 and +1
@@ -3172,7 +3171,7 @@ void* pongPlayer::LookupElementByFloatKey(void* table, float key) {  // pongPlay
  */
 void pongPlayer::RegisterDebugDrawEntries() {  // pongPlayer_BB38_g @ 0x8218BB38
     extern uint32_t  g_debugDrawCount;        // @ SDA+14436
-    extern uint32_t  g_debugDrawPtrs[];       // @ SDA+14440  (pointer array)
+    extern uintptr_t g_debugDrawPtrs[];       // @ SDA+14440  (pointer array)
     extern uint32_t  g_debugDrawTypes[];      // @ SDA+14696  (type ID array)
     extern uint8_t   g_debugDrawPriority[];   // @ SDA+14952  (priority array)
 
@@ -3449,7 +3448,7 @@ uint8_t pongPlayer_0C58_g() {  // @ 0x821A0C58
 extern void pongPlayer_76E8_g(void* swingDisplay);   // @ 0x821A76E8
 extern const float g_kSwingDisplay0;                 // @ 0x82079AD4 [.rdata]
 extern const float g_kSwingDisplay1;                 // @ 0x82079AD8 [.rdata]
-extern const float g_kSwingDisplay2;                 // @ 0x82085938 [.rdata]
+extern const float g_kSwingDisplay2;                 // @ 0x825C5938 [.data]  -1.0f
 
 void pongPlayer::ResetSwingDisplayValues() {  // pongPlayer_7038 @ 0x821A7038
     uint8_t* base = reinterpret_cast<uint8_t*>(this);
@@ -3475,7 +3474,7 @@ void pongPlayer::ResetSwingDisplayValues() {  // pongPlayer_7038 @ 0x821A7038
  *   - Otherwise returns: (float)(frameCount @ sub+32) * g_kFrameScale
  *                         / (totalDuration @ sub->inner+12)
  */
-extern const float g_kFrameScale;    // @ 0x82079BC8 [.rdata]
+extern const float g_kFrameScale;    // @ 0x82079BB8 [.rdata]  1/30
 
 float pongPlayer_D238_g(void* self) {  // @ 0x820DD238
     uint8_t* base = reinterpret_cast<uint8_t*>(self);
@@ -3670,7 +3669,7 @@ extern const float g_kPercentScale;      // flt_8202D118 @ 0x8202D118 (100.0f, .
  */
 extern "C" void pongPlayer_9C60_g(void* base, int index, uint32_t value) {
     // Get timing state from match config
-    void* clockData = pongPlayer_7CC0_g(g_pMatchConfig);
+    void* clockData = pongPlayer_7CC0_g(g_pCameraSharedState);
 
     // Read metadata byte from caller's data region
     uint8_t metaByte = *reinterpret_cast<uint8_t*>(
@@ -3716,7 +3715,7 @@ extern "C" void* pongPlayer_E7B0_g(void* inputStruct) {
     // Resolve court boundary vectors for the given types
     vec3 boundsA{}, boundsB{};
     pongPlayer_FD20_g(
-        g_pGlobalClock, courtType, &boundsA, &boundsB, courtSubType,
+        g_pTableDims, courtType, &boundsA, &boundsB, courtSubType,
         reinterpret_cast<void*>(static_cast<uintptr_t>(1)), nullptr, 0);
 
     // Pack current position for interpolation
@@ -5541,8 +5540,8 @@ extern "C" bool pongPlayer_7890_g(pongPlayer* self) {
         // parent-frame-index lives at +20 on the inner anim state.
         int32_t frameIndex = *reinterpret_cast<int32_t*>(
             reinterpret_cast<uint8_t*>(parentAnim) + 20);
-        // scale constant @ 0x825E9BB8 (float) in the per-player input table.
-        extern const float g_kSwingProgressScale;  // @ 0x825E9BB8
+        // scale constant: 1/30, the frame duration.
+        extern const float g_kSwingProgressScale;  // @ 0x82079BB8
         float frac = (static_cast<float>(frameIndex) * g_kSwingProgressScale)
                    / parentDuration;
         threshold = frac;
@@ -6647,8 +6646,8 @@ static pongMatchSettingsView* MatchSettings() {
     return reinterpret_cast<pongMatchSettingsView*>(g_pInputArrayTable);
 }
 
-// What 0x8271A304 points at (declared above as g_pGlobalClock, but xe_9DC8
-// fills it with the table's dimensions in metres).
+// What 0x8271A304 (g_pTableDims) points at: xe_9DC8 fills it with the
+// table's dimensions in metres.
 struct pongTableDims {
     uint8_t _pad00[0x10];
     float   width;    // +0x10  1.5224
@@ -6660,7 +6659,7 @@ struct pongTableDims {
 };
 
 static const pongTableDims* TableDims() {
-    return static_cast<const pongTableDims*>(g_pGlobalClock);
+    return static_cast<const pongTableDims*>(g_pTableDims);
 }
 
 extern "C" void* g_pongMatchTiming;  // @ 0x8271A2E8  (named in pong_lerp_queue.cpp)

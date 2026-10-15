@@ -42,28 +42,28 @@ extern uint32_t g_plrPropStorage;          // lbl_825CAF90 — plrPropMgr backin
 
 // Misc data tables / defaults
 extern uint32_t g_defaultData16[4];        // lbl_8261A0C0 — 16-byte zero-init template
-extern float    g_defaultTimestamp;        // lbl_82089A48 + 0xC
-extern float    g_defaultTimestampAlt;     // lbl_82089A58
-extern float    g_defaultTimeout;          // lbl_820358F8 + 0x30
-extern float    g_netSyncTimeout;          // lbl_820330F8 + 0x18
+extern const float g_defaultTimestamp;     // @ 0x82079AD4 (-FLT_MAX)
+extern const float g_defaultTimestampAlt;  // @ 0x82079AD8 (FLT_MAX)
+extern float    g_defaultTimeout;          // @ 0x825C5938 (-1.0f)
+extern const float g_netSyncTimeout;       // @ 0x8202D110 (0.0f)
 
 // plrPropMgr property name strings (.rdata)
 extern char g_plrProp_paddleName[15];      // lbl_820716A8
 extern char g_plrProp_clothingName[17];    // lbl_820716B8
-extern char g_plrProp_propTypeName[];      // lbl_8207327C + 0x40 — name string referenced by GetPropertyName
+extern const char g_plrProp_propTypeName[]; // @ 0x8207169C "plrPropMgr" — returned by GetPropertyName
 
 // ── Vtable externs ──────────────────────────────────────────────────────────
 // FloatAverager has 4 vtables (virtual base / MI)
 extern void* FloatAverager_vtable;              /* lbl_8207166C — primary */
 extern void* FloatAverager_vtable_2;            /* lbl_8203A91C — variant 1 */
 extern void* FloatAverager_vtable_3;            /* lbl_82070D78 — variant 2 */
-extern void* FloatAverager_vtable_4;            /* lbl_8203A910 — variant 3 */
+extern void* FloatAverager_vtable_4;            /* 0x8207166C — the same vtable as FloatAverager_vtable */
 
 extern void* FrameTimeEstimate_vtable;          /* lbl_82071660 */
 extern void* AckHandling_vtable;                /* lbl_82071654 */
 extern void* pongPaddle_vtable;                 /* lbl_82071678 */
 extern void* plrPropMgr_vtable;                /* lbl_820717C4 */
-extern void* atSingleton_plrPropMgr_vtable;    /* lbl_82033C8C — atSingleton<plrPropMgr> base */
+extern void* atSingleton_plrPropMgr_vtable;    /* 0x8203338C (RTTI: sgNode) — atSingleton<plrPropMgr> base */
 
 extern void* SpectatorNetworkClient_vtable;     /* lbl_82070D14 */
 extern void* NetDataQuery_vtable;               /* lbl_8207116C */
@@ -1013,13 +1013,13 @@ void NetDataQuery_InitStateSync(NetDataQuery* self) {
 
     uint8_t* p = (uint8_t*)self;
 
-    extern void* SinglesNetworkClient_intermediate_vtable;  /* lbl_82070C80 + 0x4 */
+    extern void* SinglesNetworkClient_intermediate_vtable;  /* 0x8206C3F4 (RTTI: NetworkClient) */
     *(void**)p = &SinglesNetworkClient_intermediate_vtable;
 
     // Initialize sub-object at +4
     SinglesNetworkClient_DA08(p + 4);
 
-    extern void* SpectatorMessage_vtable;  /* lbl_82070C2C + 0x4 */
+    extern void* SpectatorMessage_vtable;  /* 0x8206C394 (RTTI: LogicNetworkClient) */
     *(void**)p = &SpectatorMessage_vtable;
 
     // Clear state fields
@@ -1061,7 +1061,7 @@ void NetDataQuery_InitNetworkStats(void* obj) {
 
     uint8_t* p = (uint8_t*)obj;
 
-    extern void* NetworkStats_vtable;  /* lbl_820704F0 + 0x10 */
+    extern void* NetworkStats_vtable;  /* 0x8206F500 (RTTI: HitDataMessage) */
     *(void**)p = &NetworkStats_vtable;
 
     // Store default timestamp at +4

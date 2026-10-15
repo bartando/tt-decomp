@@ -20,42 +20,32 @@
 // in per-subsystem headers as they land.
 // ============================================================================
 
-/* .rdata (RTTI vtables) — typed as opaque bytes in C. Real class decls
- * live in C++ headers and are imported via extern "C" when this file is
- * finally converted to .cpp — permanent shape until that conversion. */
-extern const uint8_t lbl_8203A910[12];   /* FloatAverager vtbl #1 */
-extern const uint8_t lbl_8203A91C[12];   /* FloatAverager vtbl #2 */
-extern const uint8_t lbl_82070D78[12];   /* FloatAverager vtbl #3 */
-extern const uint8_t lbl_8207166C[12];   /* FloatAverager vtbl #4 */
-extern const uint8_t lbl_820533CC[16];   /* cmRefreshableCtor vtbl */
-extern const uint8_t lbl_82033094[72];   /* rage::fragDrawable vtbl */
+/* .rdata vtables: null-filled, sized to the original's slots up to its
+ * trailing null (the next word is the following vtable's RTTI locator). */
+void* const lbl_8203A910[2] = {0};    // @ 0x8203A910  FloatAverager
+void* const lbl_8203A91C[2] = {0};    // @ 0x8203A91C  FloatAverager
+void* const lbl_82070D78[2] = {0};    // @ 0x82070D78  FloatAverager
+void* const lbl_8207166C[2] = {0};    // @ 0x8207166C  FloatAverager
+void* const lbl_820533CC[3] = {0};    // @ 0x820533CC  cmRefreshableCtor
+void* const lbl_82033094[18] = {0};   // @ 0x82033094  rage::fragDrawable
 
 /* .rdata scalar/float constants */
 extern const float lbl_8202D110;  /* 4-byte float constant (heavily reused) */
 extern const double lbl_8202CFF4; /* 8-byte .rdata constant */
 
 /* .data SDA globals — untyped raw storage */
-extern uint32_t lbl_825C803C;     /* 8 bytes .data — aiTypeId / attrHash / xmlNodeStruct_typeId alias */
-extern uint32_t lbl_825C8038;     /* 4 bytes .data — aiTypeId / attrHash alias */
 extern uint32_t lbl_825CAF88;     /* 4 bytes .data — resource/string field type slot */
 extern uint32_t lbl_825C93D0;     /* 8 bytes .data — cameraProperty2 / sgNode_typeId alias */
-extern uint8_t  lbl_8261A0C0[16]; /* default viewport rect / scene reset matrix */
 extern uint8_t  lbl_82619BE0[16]; /* SIMD comparison mask */
-extern float    lbl_825C5938[4];  /* 16 bytes .data — input scale / msgSink init */
-extern uint8_t  lbl_825CB800[64]; /* identity matrix ref */
 extern uint32_t lbl_8260641C;     /* SDA+25628 — renderer state ptr slot */
 extern uint8_t  lbl_82607C40[65616]; /* SDA+31808 — TemplateRegistry backing */
 extern uint8_t  lbl_826064CC;     /* SDA+25804 — UI input enable flag */
 extern uint8_t  lbl_826063B8[8];  /* SDA+25528 — creature manager slot */
 
 /* .data — UI/system singleton pointer slots */
-extern void* lbl_8271A81C;  /* grcDevice / ui_context pointer slot */
 extern void* lbl_8271A328;  /* network timing / atSingleton / gameState ptr alias */
-extern void* lbl_8271A7B0;  /* network base/state ptr alias */
-extern void* lbl_8271A358;  /* UI manager pointer slot */
 extern void* lbl_8271A344;  /* rage::cmSampleCamActions ptr (RTTI name nearby) */
 extern void* lbl_8271A2E4;  /* game data manager slot */
-extern void* lbl_8271A2F0;  /* char view data slot */
 extern void* lbl_8271A378;  /* locomotion anim instance slot */
 extern void* lbl_8271A3A8;  /* vibration manager slot */
 
@@ -70,7 +60,6 @@ extern uint8_t        lbl_820176C0[];       /* 0x82017888 = +0x1C8 into this sym
 // Graphics System
 // ============================================================================
 
-void* g_grcDevice = (void*)&lbl_8271A81C;  /* was 0x8271A81C */
 
 /* grcDevice instances — the two device pointers used by the rendering pipeline */
 // REMOVED: g_pGrcDevice_beginScene (in globals_extended.c)  /* full device for beginScene */
@@ -99,8 +88,6 @@ uint32_t g_nScreenHeight = 720;
 uint32_t g_nScreenWidth = 1280;
 void* g_nonWsConfig = NULL;
 
-/* Default viewport rectangle used to reset grcDeviceClear state */
-const uint8_t g_defaultViewportRect[16] = { 0 };  /* @ 0x8261A0C0 */
 
 /* Shader constant data table @ 0x8202C328 (.rdata, 440 bytes)
  * Used by grc_CB48 for GPU shader constant initialization */
@@ -142,9 +129,10 @@ void* g_display_obj_ptr = NULL;
 // UI System
 // ============================================================================
 
-void* g_uiManager = (void*)&lbl_8271A358;  /* was 0x8271A358 */
-void* g_uiManagerPtr = NULL;
-void* g_pHudOverlay = NULL;
+/* Page-group manager (credits roll, fades): a 64-byte object gameLoop_Init
+ * (0x82228F30) allocates; null until then. */
+void* g_uiManager = NULL;  // @ 0x8271A358
+void* g_pCurrentViewport = NULL;  // @ 0x825EBAA0  current grcViewport; ~grcViewport clears it
 void* g_pStencilMgrObj = NULL;
 
 // UI input enable flag
@@ -166,8 +154,8 @@ uint8_t g_bAppStarted = 0;
 uint8_t g_bInitComplete = 0;
 uint8_t g_bRestartPending = 0;
 uint32_t g_initStateFlag = 0;
-uint32_t g_prngState = 0;
-float g_fPrngNormalize = 1.0f / 0xFFFFFFFF;
+uint32_t g_prngState[2] = {1u, 0x10001u};  // @ 0x825CA2C8  seed, carry (main reseeds it)
+const float g_fPrngNormalize = 1.1920929e-07f;  // @ 0x82079E68  2^-23
 
 // ============================================================================
 // Audio System
@@ -214,7 +202,7 @@ uint32_t g_hsmMgr_flags = 0;
 
 void* g_input_obj_ptr = NULL;
 void* g_pInputObj = NULL;
-void* g_pInputScoreTable = NULL;
+float g_pInputScoreTable[2] = {0};  // @ 0x825EAB40  per input slot; the asm indexes it in place (lfsx)
 void* g_pButtonStateTable = NULL;
 void* g_controllerArrayBase = NULL;
 
@@ -241,7 +229,6 @@ void* g_singles_network_client = NULL;
 // Physics System Globals
 // ============================================================================
 
-void* g_pPhysicsWorld = NULL;
 uint32_t g_phFrameCounter = 0;      /* @ 0x825C4898 — per-tick ring cursor */
 uint32_t g_phFrameIndex = 0;        /* @ 0x826065DC — rollback frame cursor */
 void* g_matMgrGuard = NULL;
@@ -267,7 +254,7 @@ const float g_identityMatrixRef[16] = {
     1.0f, 0.0f, 0.0f, 0.0f,
     0.0f, 1.0f, 0.0f, 0.0f,
     0.0f, 0.0f, 1.0f, 0.0f,
-    0.0f, 0.0f, 0.0f, 1.0f
+    0.0f, 0.0f, 0.0f, 0.0f   /* the image's fourth row is all zero */
 };
 
 // SIMD comparison mask @ 0x82619BE0
@@ -300,7 +287,6 @@ uint32_t g_doexit_type = 0;
 // Credits/Dialog System Globals
 // ============================================================================
 
-void* g_creditsRoll = NULL;
 uint8_t g_creditsRollVisible = 0;
 void* g_pCreditsRollObj = NULL;
 uint32_t g_creditsAssetId_A = 0;
@@ -367,8 +353,6 @@ uint32_t g_drillCleanupParam = 0;
 // Shot type validation globals for noSoftShotsTipData
 // Used by PostLoadProperties @ 0x821F2678 to validate allowed shot types
 uint32_t g_shotType1_825C5F50 = 0;  // @ 0x825C5F50 (.data, 4 bytes)
-uint32_t g_shotType2_825C803C = 0;  // @ 0x825C803C (.data, 4 bytes)
-uint32_t g_shotType3_825C8038 = 0;  // @ 0x825C8038 (.data, 4 bytes)
 
 // ============================================================================
 // Threading Globals
@@ -416,7 +400,7 @@ float g_hitVectorFlip = 1.0f;
 // ============================================================================
 
 uint32_t g_swingCountFlag = 0;
-uint32_t g_swingInFlightFlag = 0;
+uint8_t g_swingInFlightFlag = 0;  // @ 0x8260633C  the asm only does lbz/stb
 float g_swingPhaseThreshold = 0.0f;
 const char** g_shotTypeNames = NULL;
 const char* g_szServeStartedTypeName = "ServeStarted";
@@ -434,7 +418,7 @@ float g_kPowerBlend = 0.5f;
 float g_kSwingRadiusConst = 1.0f;
 float g_kSwingScaleFactor = 1.0f;
 float g_kTicksPerSec = 60.0f;
-float g_kZero = 0.0f;
+const float g_kZero = 0.0f;  // @ 0x8202D110
 float g_ticksToSeconds = 1.0f / 60.0f;
 
 // ============================================================================
@@ -482,7 +466,7 @@ void* g_sda_base = NULL;
 // Command Line Globals
 // ============================================================================
 
-void* g_pCmdArgRegistry = NULL;
+void* g_pCmdArgRegistry = NULL;  // @ 0x825EBCF4  head of the command-line option list, built by static initialisers
 const char* g_pExeName = "default.xex";
 const char* g_empty_str = "";
 
@@ -554,17 +538,18 @@ struct SwipePattern {
 
 // AI type IDs
 uint32_t* g_aiTypeId_1 = NULL;             // @ 0x825C60B4
-uint32_t* g_aiTypeId_2 = NULL;             // @ 0x825C803C
-uint32_t* g_aiTypeId_3 = NULL;             // @ 0x825C8038
+/* Type tokens: in the image each of these words holds its own address, and
+ * the code loads it as a unique id. Names that read it as uint32_t get the low
+ * half of the host address, which is still unique. */
+uint32_t* g_aiTypeId_3 = (uint32_t*)&g_aiTypeId_3;   // @ 0x825C8038
+uint32_t* g_aiTypeId_2 = (uint32_t*)&g_aiTypeId_2;   // @ 0x825C803C
 
 // Animation
 const float g_animBlendWeight = 0.0f;      // @ 0x8202D110
 
 // Ball / swing attribute hashes
-uint32_t g_attrHash_HitZone    = 0;        // @ 0x825C761C
-uint32_t g_attrHash_SwingType1 = 0;        // @ 0x825C8038
-uint32_t g_attrHash_SwingType2 = 0;        // @ 0x825C803C
-const float g_alphaMultiplier  = 0.0f;     // @ 0x82079BE0
+void* g_attrHash_HitZone = &g_attrHash_HitZone;  // @ 0x825C761C  type token, see g_aiTypeId_3
+const float g_alphaMultiplier  = 255.0f;     // @ 0x82079BE0
 
 // CRT atexit guards
 int32_t g_atexit_guard_0 = 0;              // @ 0x82733048
@@ -574,7 +559,7 @@ int32_t g_atexit_guard_1 = 0;              // @ 0x8273304C
 void* g_binkVideoPlayer = NULL;            // @ 0x825EB988
 
 // Camera system
-float    g_cameraAdjustment  = 0.0f;       // @ 0x8202CFF4
+float    g_cameraAdjustment  = 1.25f;       // @ 0x8202CFF4
 uint8_t  g_cameraFlagA       = 0;
 uint8_t  g_cameraFlagB       = 0;
 uint8_t  g_cameraFlag_7532   = 0;
@@ -597,13 +582,11 @@ uint32_t g_charViewSelectCounter  = 0;     // @ 0x82606490
 uint32_t g_charViewSelectFlag     = 0;     // @ 0x82606494
 uint32_t g_charViewTypeId         = 0;     // @ 0x825C2BC4
 uint32_t g_character_type_id      = 0;     // @ 0x825C2BC0
-uint32_t g_character_type_id_2    = 0;     // @ 0x825C803C
-uint32_t g_character_type_id_3    = 0;     // @ 0x825C8038
 
 // Network: cmRefreshableCtor vtable (RTTI, 20 vtables / virtual base MI).
 // Typed as const uint8_t* while this file stays in C; the C++ typed form
 // lives alongside cmRefreshableCtor once that class header lands.
-const uint8_t* g_cmRefreshableCtorVtable = lbl_820533CC;  // @ 0x820533CC
+const uint8_t* g_cmRefreshableCtorVtable = (const uint8_t*)lbl_820533CC;  // @ 0x820533CC
 
 // Player contact zone constants
 const float g_contactZoneMinA = 0.0f;
@@ -641,10 +624,10 @@ const char* g_error_unhandled_event   = "";
 void* g_eventTypeTable = NULL;             // @ 0x82017888
 
 // Float constants (network / physics)
-const float g_floatConstant1 = 0.0f;       // @ 0x82079AD4
+const float g_floatConstant1 = -3.40282347e+38f;       // @ 0x82079AD4
 const float g_floatConstant2 = 0.0f;       // @ 0x8202D110
 const float g_floatConstant3 = 0.0f;       // @ 0x8202D110
-const float g_floatConstant4 = 0.0f;       // @ 0x825C7600
+const float g_floatConstant4 = -11.85f;       // @ 0x825C7600
 const float g_floatEpsilon   = 0.0f;       // @ 0x8202D110
 const float g_floatNegOne    = 0.0f;       // @ 0x8202D110
 const float g_floatOne       = 0.0f;       // @ 0x8202D110
@@ -653,14 +636,14 @@ const float g_floatZero      = 0.0f;       // @ 0x8202D110
 // FloatAverager vtables (network classes) — RTTI: FloatAverager (4 vtables, MI).
 // Opaque-byte pointer retained because this file is C; typed C++ decl lands
 // with the FloatAverager class header.
-const uint8_t* g_FloatAverager_vtable_1 = lbl_8203A910;   // @ 0x8203A910
-const uint8_t* g_FloatAverager_vtable_2 = lbl_8203A91C;   // @ 0x8203A91C
-const uint8_t* g_FloatAverager_vtable_3 = lbl_82070D78;   // @ 0x82070D78
-const uint8_t* g_FloatAverager_vtable_4 = lbl_8207166C;   // @ 0x8207166C
+const uint8_t* g_FloatAverager_vtable_1 = (const uint8_t*)lbl_8203A910;   // @ 0x8203A910
+const uint8_t* g_FloatAverager_vtable_2 = (const uint8_t*)lbl_8203A91C;   // @ 0x8203A91C
+const uint8_t* g_FloatAverager_vtable_3 = (const uint8_t*)lbl_82070D78;   // @ 0x82070D78
+const uint8_t* g_FloatAverager_vtable_4 = (const uint8_t*)lbl_8207166C;   // @ 0x8207166C
 
 // Physics: rage::fragDrawable vtable.
 // Opaque bytes while this stays in C — see FloatAverager note above.
-const uint8_t* g_fragDrawableVtable = lbl_82033094;       // @ 0x82033094
+const uint8_t* g_fragDrawableVtable = (const uint8_t*)lbl_82033094;       // @ 0x82033094
 
 // Frame sync object
 void* g_frameSyncObj = NULL;               // @ 0x825F64F4
@@ -689,24 +672,23 @@ void* g_hudFlashBase   = NULL;            // @ 0x82606454
 float g_hudRenderParam = 0.0f;            // @ 0x82140110
 
 // Player adjustment / input / timing constants
-float       g_kAdjustmentScale     = 0.0f;  // @ 0x82079BAC
+float       g_kAdjustmentScale     = 0.0174532924f;  // @ 0x82079BAC
 const float g_kAdjustmentThreshold = 0.0f;  // @ 0x8202D110
-const float g_kInputScale          = 0.0f;  // @ 0x825C5938
 const float g_kInputThresholdHigh  = 0.0f;  // @ 0x8202D110
-const float g_kMaxAdjustment       = 0.0f;  // @ 0x82079CD8
-const float g_kQuantScale1         = 0.0f;  // @ 0x82079FFC
-const float g_kQuantScale2         = 0.0f;  // @ 0x82079FF8
-const float g_kSpecialThreshold    = 0.0f;  // @ 0x825C8A50
+const float g_kMaxAdjustment       = 0.45f;  // @ 0x82079CD8
+const float g_kQuantScale1         = 0.0322580636f;  // @ 0x82079FFC
+const float g_kQuantScale2         = 0.161290318f;  // @ 0x82079FF8
+const float g_kSpecialThreshold    = 10.0f;  // @ 0x825C8A50
 float       g_kTimingConstant      = 0.9f;  // @ 0x825C4930 (image: 0.9)
-const float g_kZeroThreshold       = 0.0f;  // @ 0x8202D108
+const float g_kZeroThreshold       = 1.0f;  // @ 0x8202D108
 
 // Local user pointer
 void* g_localUserPtr = NULL;
 
 // Locomotion / creature animation
 void*       g_locomotionAnimInstance = NULL;  // @ 0x8271A378
-const float g_lookAtMultiplier       = 0.0f;  // @ 0x8202D184
-const float g_lookAtRefAngle         = 0.0f;  // @ 0x8202D10C
+const float g_lookAtMultiplier       = 2.0f;  // @ 0x8202D184
+const float g_lookAtRefAngle         = 0.5f;  // @ 0x8202D10C
 
 // Match result / player select tables
 void* g_matchResultTable  = NULL;          // @ 0x82027884
@@ -716,8 +698,6 @@ void* g_matrixFieldType   = NULL;          // @ 0x825CAFA4
 
 // Message sink
 uint32_t      g_msgSinkBitfield      = 0;        // @ 0x825B0C30
-const float   g_msgSinkInitFloat     = 0.0f;     // @ 0x825C5938
-const uint32_t g_msgSinkTemplate[4]  = {0};      // @ 0x8241A0C0
 
 // Network globals
 uint32_t  g_netMessageHolderCount = 0;     // @ 0x826066A4
@@ -738,8 +718,6 @@ void*     g_pGameStatePtr             = NULL;   // @ 0x8271A328
 void**    g_pInputArrayTable          = NULL;   // @ 0x825EAB28
 void**    g_pMessageQueuePool         = NULL;   // @ 0x825D128C
 void*     g_pNetworkBase              = NULL;   // @ 0x8271A7B0
-void*     g_pNetworkState             = NULL;   // @ 0x8271A7B0
-uint32_t* g_pNetworkStatePtr          = NULL;   // @ 0x8271A7B0
 void*     g_pNetworkTimer             = NULL;   // @ 0x8201A328
 void*     g_pPlayerArrayBase          = NULL;   // @ 0x8211A31C
 uint8_t*  g_pPlayerInputTable         = NULL;
@@ -798,7 +776,7 @@ void* g_sceneRenderObj  = NULL;            // @ 0x82606430
 void* g_sceneRenderObj2 = NULL;            // @ 0x8260641C
 
 // Scene reset matrix
-uint32_t g_sceneResetMatrix[4] = {0};      // @ 0x8261A0C0
+uint32_t g_sceneResetMatrix[4] = {0};      // @ 0x8261A0C0  16 zero bytes, read as a template by several users
 
 // Selected character index
 int32_t g_selectedCharacterIndex = -1;     // @ 0x825C76B8
@@ -843,11 +821,14 @@ void** g_tls_base = NULL;                 // @ 0x82600000
 void* g_uiListManager = NULL;             // @ 0x825D16AC
 
 // UI context / objects
+/* Set by 0x822BE268 at startup; pong_logos passes it to the page-group calls. */
 void*    g_ui_context         = NULL;      // @ 0x8271A81C
-uint8_t  g_ui_object_flags[64]  = {0};     // @ 0x825F3A68
-void*    g_ui_object_ptrs[256]  = {0};     // @ 0x825F3968
-uint32_t g_ui_object_types[256] = {0};     // @ 0x825F3868
+/* Message-sink registry, 64 entries: registrations (e.g. 0x82101810) store
+ * flags[i] = 0x80, ptrs[i] = the sink, types[i] = its id, then bump the count. */
 uint32_t g_ui_state_counter     = 0;       // @ 0x825F3864
+void*    g_ui_object_ptrs[64]   = {0};     // @ 0x825F3868
+uint32_t g_ui_object_types[64]  = {0};     // @ 0x825F3968
+uint8_t  g_ui_object_flags[64]  = {0};     // @ 0x825F3A68
 
 // Vibration system
 void*    g_vibrationMgr        = NULL;     // @ 0x8271A3A8
@@ -862,12 +843,19 @@ void* g_vtable_pong_char_view_context_2  = NULL;
 void* g_vtable_pong_char_view_context_3  = NULL;
 void* g_vtable_pong_char_view_state      = NULL;
 
+// Camera (both set at runtime: pongCameraMgr slots 23/24 store 0x8271A318)
+void* g_pCamShotMgr = NULL;          // @ 0x8271A318  atSingleton<camShotMgr> instance
+void* g_pCameraSharedState = NULL;   // @ 0x8271A32C  camera state gameplay reads (+0x06 CameraHasSides)
+
+// Drills
+void* g_pPracticeTarget = NULL;  // @ 0x826063A8  runtime-initialised (0x821020D8 stores it)
+void* g_pTrainingHud    = NULL;  // @ 0x82606614  runtime-initialised
+void* g_gdDrillMovementData_classId = &g_gdDrillMovementData_classId;  // @ 0x825C6BC4  type token, see g_aiTypeId_3
+
 // XEX exec info
 void* g_xex_exec_info = NULL;             // @ 0x825E6E64
 
 // XML node struct type IDs
-uint32_t g_xmlNodeStruct_typeId  = 0;      // @ 0x825C803C
-uint32_t g_xmlNodeStruct_typeId2 = 0;      // @ 0x825C8038
 
 // Zero / constant floats
 const float g_zeroConstant = 0.0f;         // @ 0x8202D110
@@ -883,6 +871,9 @@ TT_DATA_ALIAS("g_netMessageHolderLiveCount_raw", "g_netMessageHolderCount");  /*
 TT_DATA_ALIAS("g_defaultData16", "g_sceneResetMatrix");                       /* 0x8261A0C0 */
 TT_DATA_ALIAS("g_netMessageHolderBufferPrefix", "g_sceneResetMatrix");
 TT_DATA_ALIAS("g_unlockDialogParams", "g_sceneResetMatrix");
+TT_DATA_ALIAS("g_msgSinkTemplate", "g_sceneResetMatrix");
+TT_DATA_ALIAS("g_defaultViewportRect", "g_sceneResetMatrix");
+TT_DATA_ALIAS("lbl_8261A0C0", "g_sceneResetMatrix");
 TT_DATA_ALIAS("g_cameraLerpFlags", "g_cameraFlags");                          /* 0x826064D0 */
 TT_DATA_ALIAS("g_ReplayActive", "g_pauseFlag");                               /* 0x82606670 */
 TT_DATA_ALIAS("g_cameraMgrSingleton", "g_rendererState");                     /* 0x8260641C */
@@ -891,6 +882,53 @@ TT_DATA_ALIAS("lbl_8260641C", "g_rendererState");
 TT_DATA_ALIAS("g_eventHash_BallCollision", "g_sgNode_typeId");                /* 0x825C93D0 */
 TT_DATA_ALIAS("g_eventHash_BallSpin", "g_sgRMDrawable_typeId");               /* 0x825C2D78 */
 TT_DATA_ALIAS("g_pGrcDevice_beginScene", "g_ui_context");                     /* 0x8271A81C */
+TT_DATA_ALIAS("g_grcDevice", "g_ui_context");
+TT_DATA_ALIAS("g_uiManagerPtr", "g_ui_context");
+TT_DATA_ALIAS("lbl_8271A81C", "g_ui_context");
+TT_DATA_ALIAS("g_creditsRoll", "g_uiManager");                               /* 0x8271A358 */
+TT_DATA_ALIAS("g_pPhysicsWorld", "g_uiManager");
+TT_DATA_ALIAS("lbl_8271A358", "g_uiManager");
+TT_DATA_ALIAS("g_eventQueueIndex", "g_ui_state_counter");                    /* 0x825F3864 */
+TT_DATA_ALIAS("g_eventQueuePtrs", "g_ui_object_ptrs");
+TT_DATA_ALIAS("g_eventQueueMasks", "g_ui_object_types");
+TT_DATA_ALIAS("g_eventQueueFlags", "g_ui_object_flags");
+TT_DATA_ALIAS("g_debugDrawCount", "g_ui_state_counter");
+TT_DATA_ALIAS("g_sceneSlot_count", "g_ui_state_counter");
+TT_DATA_ALIAS("g_sceneSlotPtrTable", "g_ui_object_ptrs");
+TT_DATA_ALIAS("g_sceneSlotTypeTable", "g_ui_object_types");
+TT_DATA_ALIAS("g_sceneSlotTagTable", "g_ui_object_flags");
+TT_DATA_ALIAS("g_debugDrawPtrs", "g_ui_object_ptrs");
+TT_DATA_ALIAS("g_debugDrawTypes", "g_ui_object_types");
+TT_DATA_ALIAS("g_debugDrawPriority", "g_ui_object_flags");
+TT_DATA_ALIAS("g_inputScoreByPlayer", "g_pInputScoreTable");                  /* 0x825EAB40 */
+TT_DATA_ALIAS("g_kGeomOffset", "g_pInputArrayTable");                         /* 0x825EAB28 */
+TT_DATA_ALIAS("g_pPlayerSlotLookup", "g_pCameraSharedState");
+TT_DATA_ALIAS("g_globalCamPtr1", "g_pCameraSharedState");
+TT_DATA_ALIAS("g_globalCamPtr2", "g_pCamShotMgr");
+TT_DATA_ALIAS("g_pNetworkState", "g_pNetworkBase");                            /* 0x8271A7B0 */
+TT_DATA_ALIAS("g_pNetworkStatePtr", "g_pNetworkBase");
+TT_DATA_ALIAS("g_playerDataArray", "g_pNetworkBase");
+TT_DATA_ALIAS("lbl_8271A7B0", "g_pNetworkBase");
+TT_DATA_ALIAS("lbl_8271A2F0", "g_charViewData_ptr");                          /* 0x8271A2F0 */
+TT_DATA_ALIAS("FloatAverager_vtable_4", "lbl_8207166C");                      /* 0x8207166C */
+TT_DATA_ALIAS("g_staticInitListHead", "g_pCmdArgRegistry");                  /* 0x825EBCF4 */
+TT_DATA_ALIAS("g_phActiveCameraPtr", "g_loop_obj_ptr");                        /* 0x825EAB30 */
+TT_DATA_ALIAS("g_phGlobalStatePtr", "g_rendererState");                        /* 0x8260641C */
+TT_DATA_ALIAS("g_phBoundTaperedCapsuleUpdateImpl", "g_display_obj_ptr");       /* 0x826066E4 */
+TT_DATA_ALIAS("g_shotType3_825C8038", "g_aiTypeId_3");  /* 0x825C8038 */
+TT_DATA_ALIAS("g_attrHash_SwingType1", "g_aiTypeId_3");
+TT_DATA_ALIAS("g_character_type_id_3", "g_aiTypeId_3");
+TT_DATA_ALIAS("g_xmlNodeStruct_typeId2", "g_aiTypeId_3");
+TT_DATA_ALIAS("g_pongBallHitData_hashC", "g_aiTypeId_3");
+TT_DATA_ALIAS("lbl_825C8038", "g_aiTypeId_3");
+TT_DATA_ALIAS("g_shotType2_825C803C", "g_aiTypeId_2");  /* 0x825C803C */
+TT_DATA_ALIAS("g_attrHash_SwingType2", "g_aiTypeId_2");
+TT_DATA_ALIAS("g_character_type_id_2", "g_aiTypeId_2");
+TT_DATA_ALIAS("g_xmlNodeStruct_typeId", "g_aiTypeId_2");
+TT_DATA_ALIAS("g_pongBallHitData_hashB", "g_aiTypeId_2");
+TT_DATA_ALIAS("lbl_825C803C", "g_aiTypeId_2");
+TT_DATA_ALIAS("g_pongBallHitData_hashA", "g_attrHash_HitZone");  /* 0x825C761C */
+TT_DATA_ALIAS("lbl_825CB800", "g_identityMatrixRef");  /* 0x825CB800 */
 TT_DATA_ALIAS("lbl_826064F4", "g_drawBucket");                                /* 0x826064F4 */
 TT_DATA_ALIAS("lbl_82606600", "g_globalStreamer");                            /* 0x82606600 */
 TT_DATA_ALIAS("lbl_825C4930", "g_kTimingConstant");                           /* 0x825C4930 */

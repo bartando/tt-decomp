@@ -48,6 +48,7 @@ extern "C" uint32_t g_phCollisionFlags = 0xFFFFFFFFu;
 
 // @ 0x825C8080 (.data)
 extern "C" float g_phCapsuleShapeK = 0.25f;
+TT_DATA_ALIAS("g_kContactScale2", "g_phCapsuleShapeK");
 
 // @ 0x825E7890 (.data)
 extern "C" uint32_t g_mmioStoredValue = 0x0u;
@@ -57,6 +58,9 @@ extern "C" void* g_animState = nullptr;
 
 // @ 0x826064E0 (.data)
 extern "C" uint8_t g_physicsDisabled = 0x0u;
+TT_DATA_ALIAS("g_phDisabled", "g_physicsDisabled");
+TT_DATA_ALIAS("g_phDisableFlag", "g_physicsDisabled");
+TT_DATA_ALIAS("g_phBoundInitialized", "g_physicsDisabled");
 
 // @ 0x826066E4 (.data)
 extern "C" void* g_phMaterialAllocator = nullptr;

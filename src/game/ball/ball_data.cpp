@@ -80,6 +80,7 @@ extern "C" int32_t g_shotSolveState = 0;
 // @ 0x826065E4 (.data)
 extern "C" void* g_pPhysicsLevel = nullptr;
 TT_DATA_ALIAS("lbl_826065E4", "g_pPhysicsLevel");
+TT_DATA_ALIAS("g_playerManagerPtr", "g_pPhysicsLevel");
 
 // @ 0x82630710 (.data)
 extern "C" alignas(16) uint8_t lbl_82630710[32] = {};
