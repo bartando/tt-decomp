@@ -3512,10 +3512,9 @@ extern "C" void pongCreatureInst_E828_v12(void* self, unsigned int flags) {
 // reproduce the recomp control flow at the C++ level.
 
 // Forward-declared free helpers lifted elsewhere in the build.
-extern "C" void rage_C668(void* unk, int flag);                         // @ 0x8225C668
-extern "C" void pongShadowMap_EC70_g(void* a, void* b,
-                                     void* c, void* d,
-                                     void* e, int flags);               // @ 0x8213EC70
+extern "C" void rage_C668(void* charData, void* snapshot, int index);    // @ 0x8225C668
+extern "C" void pongShadowMap_EC70_g(void* emitter, void* atlas, uint32_t charFlags,
+                                     void* snapshot, int flags);        // @ 0x8213EC70
 extern "C" void LocomotionState_CD70_g(void* skeleton, void* poseSnapshot);  // @ 0x8214CD70
 
 // Physics-frame ring-buffer cursors used by the rollback / shadow hooks.
@@ -3611,48 +3610,35 @@ void pongCreature::SavePoseSnapshot() {
 //
 // (Previously named "vfn_5" — renamed for clarity.)
 //
-// Per-frame hook that binds (or rebinds) this creature's shadow-caster
-// instance to the global pongShadowMap. Behaviour:
+// `this` is the phUpdateObject base (creature + 0x10).
 //
-//   1. Fetch the per-player snapshot pointer from the same 50-slot ring
-//      the rollback path uses (g_phFrameCounter + 50) * 4 bytes into this.
-//   2. Walk m_pChar (+144) → collider sub-object (+20):
-//        • primary shadow emitter  : sub +64
-//        • secondary shadow emitter: sub +72  (only used when
-//                                              useSecondaryEmitter is true)
+//   1. Fetch the snapshot for this frame from the same word table the pose
+//      snapshot slot uses, indexed by g_phFrameCounter.
+//   2. Walk character (+0x90) → +0x14:
+//        • primary shadow emitter  : +0x40
+//        • secondary shadow emitter: +0x48 (when useSecondaryEmitter)
 //      A null emitter short-circuits — nothing to register.
-//   3. Drop the previous shadow binding via rage_C668(snapshot, -1)
-//      (single-vector-store cleanup), then call pongShadowMap_EC70_g to
-//      install the new one. The trailing flag word is
-//        `(useSecondaryEmitter ? 0 : 0x10000) | 63`
-//      — low 6 bits are a mask, bit 16 signals "primary path".
+//   3. rage_C668(charData, snapshot, -1), then pongShadowMap_EC70_g(emitter,
+//      atlas, charData's +4 word, snapshot, flags) with flags
+//        `(useSecondaryEmitter ? 0 : 0x10000) | 63`.
 // ─────────────────────────────────────────────────────────────────────────────
 void pongCreature::RegisterShadowCasters(bool useSecondaryEmitter) {
-    const uint8_t flagByte = useSecondaryEmitter ? 1u : 0u;
+    void* const* snapshots = (void* const*)((char*)this + 50 * 4);
+    void* snapshot = snapshots[g_phFrameCounter];
 
-    // Per-tick snapshot slot.
-    uint32_t slotIdx  = g_phFrameCounter + 50;
-    uint32_t snapshot = *((uint32_t*)((char*)this + (slotIdx << 2)));
+    void*    charObj   = *(void**)((char*)this + 0x90);   // creature +0xA0
+    void*    charData  = *(void**)((char*)charObj + 0x14);
+    void*    atlas     = g_phShadowAtlasSlot;
+    uint32_t charFlags = *(uint32_t*)((char*)charData + 0x04);
 
-    void*    charObj  = *(void**)((char*)this + 144);
-    void*    sub      = *(void**)((char*)charObj + 20);
-    void*    atlas    = g_phShadowAtlasSlot;
-    uint32_t subFlags = *(uint32_t*)((char*)sub + 4);
-
-    // Select primary vs secondary emitter.
-    void* emitter = *(void**)((char*)sub + 64);
-    if (flagByte != 0) {
-        emitter = *(void**)((char*)sub + 72);
-    }
+    void* emitter = useSecondaryEmitter ? *(void**)((char*)charData + 0x48)
+                                        : *(void**)((char*)charData + 0x40);
     if (emitter == nullptr) return;
 
-    // Release previous binding, then (re-)register with the shadow map.
-    rage_C668((void*)(uintptr_t)snapshot, -1);
+    rage_C668(charData, snapshot, -1);
 
-    const int composedFlags = ((flagByte == 0) ? 0x10000 : 0) | 63;
-    pongShadowMap_EC70_g(emitter, atlas, (void*)(uintptr_t)subFlags,
-                         (void*)(uintptr_t)snapshot,
-                         nullptr, composedFlags);
+    const int flags = (useSecondaryEmitter ? 0 : 0x10000) | 63;
+    pongShadowMap_EC70_g(emitter, atlas, charFlags, snapshot, flags);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
