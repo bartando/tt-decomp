@@ -19,7 +19,7 @@ from __future__ import annotations
 import random
 import struct
 
-from .machine import ARENA_BASE, ARENA_SIZE, FAKE_BASE, STACK_HI, STACK_LO
+from .machine import ARENA_BASE, ARENA_SIZE, FAKE_BASE, STACK_HI, STACK_LO, STACK_TOP
 
 __all__ = ["stub", "returns", "alloc", "run", "model", "fail", "MODELS"]
 
@@ -42,6 +42,7 @@ class Trial:
         self.fakes: dict[int, str] = {}
         self._fake_next = FAKE_BASE + 0x100
         self.ignored: list[tuple[int, int]] = []
+        self.stack_patches: dict[int, bytes] = {}
 
     # memory -----------------------------------------------------------------
     def alloc(self, size: int, name: str = "", fill: str | bytes = "random", align: int = 16,
@@ -90,6 +91,9 @@ class Trial:
             if 0x82000000 <= addr < 0x82800000:
                 self.image_patches[addr] = bytes(data)
                 return
+            if STACK_LO <= addr < STACK_HI:
+                self.stack_patches[addr] = bytes(data)     # over the random fill
+                return
             raise ValueError(f"0x{addr:08X} isn't in an alloc() or the image")
         self.arena[off: off + len(data)] = data
 
@@ -109,6 +113,11 @@ class Trial:
     def floats(self, addr: int, count: int, lo: float = -100.0, hi: float = 100.0):
         for k in range(count):
             self.wf32(addr + 4 * k, self.rng.uniform(lo, hi))
+
+    @property
+    def sp(self) -> int:
+        """r1 at entry: t.w32(t.sp + 0x54, v) writes the caller's frame (stack arguments)."""
+        return STACK_TOP
 
     def ignore(self, addr: int, size: int = 4):
         """Leave [addr, addr+size) out of this trial's memory comparison."""

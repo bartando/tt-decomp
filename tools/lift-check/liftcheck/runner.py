@@ -364,6 +364,8 @@ class Checker:
         for a, data in t.image_patches.items():
             uc.mem_write(a, data)
         uc.mem_write(STACK_TOP - 0x8000, t.stack_fill)
+        for a, data in t.stack_patches.items():
+            uc.mem_write(a, data)
         m.heap_next = 0x48000000
         counts: dict = {}
         if side == "orig":

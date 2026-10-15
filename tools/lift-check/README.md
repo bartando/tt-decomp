@@ -81,7 +81,8 @@ all fail (about 40 s).
   `t.floats(addr, n, lo, hi)`; `t.args(r3=..., f1=...)`; `t.vtable("name")` returns a table
   of fake functions whose calls show up as `name.vfn_<k>`; `t.fake_fn("name")`;
   `t.sym("g_x")`; `t.w32(t.sym("g_x"), v)` patches a global in the image for this trial;
-  `t.ignore(addr, size)` leaves bytes out of this trial's memory comparison.
+  `t.ignore(addr, size)` leaves bytes out of this trial's memory comparison;
+  `t.w32(t.sp + 0x54, v)` writes the caller's frame (stack arguments) over the random fill.
   Unset registers are random; `r1` is a fresh stack, `r13` a zeroed block.
 - `CALLS`, keyed by symbol name, address or fake-function name:
   - `stub(ret=None|int|float|"void"|fn(ctx), out={"r4": size}, args=("r3", "f1"),
