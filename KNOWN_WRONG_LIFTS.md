@@ -26,8 +26,6 @@ before relying on any of these; fix and delete the entry when done.
 - 0x82134408 (`xe_buffers.c`, `AllocateU32AlignedWithCounter`, stores a pointer as `uint32_t`)
   and 0x821350B8 (`memory.cpp`, `datPtrArray_DestroyAll`) are the strip list's constructor and
   destructor under unrelated names.
-- `pong_match.hpp`: gmPracticeTarget vtable slot 1 (0x82112DF8) is labelled `ScalarDtor` but is
-  the data-file loader; slot 0 (0x82112C70) is the deleting destructor.
 - `pongCameraMgr_6280_g` treats a `grcViewport` as a `pongCameraMgr`.
 - `charViewCS` repeats `camBaseCS`'s fields (CameraFOV/Near/Far at +0xA4..+0xAC) as `m_axisHook*`.
 - `camViewCS` slot 9 is named `OnSourceChanged`, but `pongCameraMgr::Update` calls it every frame.
@@ -77,6 +75,14 @@ before relying on any of these; fix and delete the entry when done.
   table"/"match logic" elsewhere; 0x8271A2F4 is stored as `uint32_t` in `pong_ball`.
 - `pongCreature::Reset`, `RegisterShadowCasters`, `RestorePoseFromRollback` look rough and
   were never checked against the asm.
+- `gmLogicSinglesMatch_MidGame` "@ 0x8238CA38" is jump-table data, not a function; the lift
+  calls vtable slot 0.
+- `message.cpp` calls 0x826063AC `g_gameStateMgr`; it's the practice-target set count.
+- `message.cpp` (`PostGameEvent`) and `ui_page_group.h` (`ProcessPageGroupInput`) declare
+  0x8225E480 wrong; it's a variadic poster driven by a format string ("fff", "ff", …).
+- `gd_data.hpp`: `gdaiMeterLogic` slot 21 is named `Validate`; it registers fields.
+- `gmLogicSinglesMatch`/`gmLogicSpectator` header skeletons mix an explicit `vtable` member
+  with C++ virtuals.
 - `globals.c`: `g_msgSinkTemplate` is at 0x8261A0C0, not 0x8241A0C0.
 
 ## The recomp is not ground truth
