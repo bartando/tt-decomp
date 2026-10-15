@@ -10,6 +10,7 @@
  *       Cross-ref recomp/structured_pass5_final/ for each method.
  */
 #pragma once
+#include <stddef.h>
 #include <stdint.h>
 
 // The classes below carry the game's vtable pointer as an explicit `vtable`
@@ -69,21 +70,26 @@ struct camBaseCS {
     CamMatrix44  m_matrix;         // +0x10 - camera matrix of this source (identity in the ctor)
     uint8_t      _pad_0x50[0x48];  // +0x50..+0x97
     grcViewport* m_viewport;       // +0x98 - viewport this source renders through
-    // Tunables, set by the ctor and registered by 0x8216DBB8 (slot 3 in charViewCS's vtable):
-    // +0x9C "BlendTime", +0xA0 "BlendGoal", +0xB4 "IgnoreTimeWarp" (byte)
-    uint8_t      _pad_0x9C[0x08];  // +0x9C..+0xA3
+    // Tunables, set by the ctor and registered by slot 3 (0x8216DBB8, shared by
+    // camBaseCS's and charViewCS's vtables) under these names:
+    float        m_blendTime;      // +0x9C - "BlendTime"
+    float        m_blendGoal;      // +0xA0 - "BlendGoal"
     float        m_cameraFOV;      // +0xA4 - "CameraFOV"
     float        m_cameraNear;     // +0xA8 - "CameraNear"
     float        m_cameraFar;      // +0xAC - "CameraFar"
+    uint8_t      _pad_0xB0[4];     // +0xB0..+0xB3
+    uint8_t      m_ignoreTimeWarp; // +0xB4 - "IgnoreTimeWarp"
+    uint8_t      _pad_0xB5[3];     // +0xB5..+0xB7
 
     // ── virtual methods ──
-    ~camBaseCS();                  // [0] @ 0x8216daa0
+    // [0] @ 0x8216daa0 destructor; not declared, so derived destructors don't
+    // call it implicitly (they chain to the game's by hand).
 };
 
 // ── CMtoCSAdapter  [vtable @ 0x82036844] ──────────────────────────
 // Camera source driven by the camera machine; ctor @ 0x8216EE68 (base ctor 0x8216D9B8 first).
 struct CMtoCSAdapter : camBaseCS {
-    uint8_t       _pad_0xB0[0x80];  // +0xB0..+0x12F
+    uint8_t       _pad_0xB8[0x78];  // +0xB8..+0x12F
     pongCMCamera* m_cmCamera;       // +0x130 - second ctor argument (pongCameraMgr::m_cmCamera)
 
     // ── virtual methods ──
@@ -165,22 +171,13 @@ struct cameraShake {
 // Character-view camera subsystem. Drives per-frame character positions
 // via a set of axis controllers; interpolates position/bounds from byte
 // inputs (bf18) and writes scaled results into a float grid (c100).
-struct charViewCS {
-    void**      vtable;                 // +0x00
-    uint8_t     _pad_0x04[0x98];        // +0x04..+0x9B
-    float       m_axisHook0;            // +0x9C (+156) - hook registered by vfn_3 slot 0
-    float       m_axisHook1;            // +0xA0 (+160)
-    float       m_axisHook2;            // +0xA4 (+164)
-    float       m_axisHook3;            // +0xA8 (+168)
-    float       m_axisHook4;            // +0xAC (+172)
-    uint8_t     _pad_0xB0[4];           // +0xB0..+0xB3
-    uint8_t     m_enableModeB4;         // +0xB4 (+180) - selects secondary tuning
-    uint8_t     _pad_0xB5[3];           // +0xB5..+0xB7
-    uint8_t     _pad_0xB8[0x2C];        // +0xB8..+0xE3 (up to +228)
-    float       m_blendTime;            // +0xC4 (+196) - used by vfn_9 lerp
-    uint8_t     _pad_0xC8[0x1C];        // +0xC8..+0xE3
+// Derives from camBaseCS: its vtable shares camBaseCS's slots 1..4, 6, 7 and
+// 11, and slot 3 registers camBaseCS's tunables (+0x9C..+0xB4).
+struct charViewCS : camBaseCS {
+    uint8_t     _pad_0xB8[0x0C];        // +0xB8..+0xC3
+    float       m_slotBlendTime;        // +0xC4 (+196) - used by vfn_9 lerp
+    uint8_t     _pad_0xC8[0x30];        // +0xC8..+0xF7
     void*       m_stateTable;           // +0xF8 (+248) - per-character state block base
-    uint8_t     _pad_0xFC[0x20];        // +0xFC..+0x11B
     int32_t     m_slotSourceIdx;        // +0xFC (+252) - used by vfn_10 to skip self
     uint8_t     _pad_0x100[0x1C];       // +0x100..+0x11B
     int32_t     m_transitionPhase;      // +0x11C (+284) - cmp against 1 in vfn_9
@@ -518,3 +515,11 @@ struct pongCineCamMgr {
     // ── non-virtual methods ──
     void StepActiveGovernor();                  // @ 0x82167558
 };
+
+// Offsets checked against the asm; only meaningful on the game's 32-bit layout.
+#if __SIZEOF_POINTER__ == 4
+static_assert(offsetof(camBaseCS, m_blendTime) == 0x9C, "");       // 0x8216DBE4
+static_assert(offsetof(camBaseCS, m_ignoreTimeWarp) == 0xB4, "");  // 0x8216DC84
+static_assert(offsetof(CMtoCSAdapter, m_cmCamera) == 0x130, "");   // 0x82172304
+static_assert(offsetof(charViewCS, m_ownsHeap) == 0x124, "");
+#endif

@@ -10,24 +10,32 @@
  *       Cross-ref recomp/structured_pass5_final/ for each method.
  */
 #pragma once
+#include <stddef.h>
 #include <stdint.h>
+
+// These classes carry the game's vtable pointer as an explicit `vtable`
+// member. Their methods are listed by game slot but declared non-virtual: a
+// C++ virtual would add a hidden vptr in front of `vtable` and shift every
+// member by 4, and C++ slot numbers don't match the game's anyway. Call a
+// slot through the vtable member. The "field access clusters" put every
+// field_0xNNNN at offset NNNN; accesses that overlap share a union.
 
 // ── LocomotionController  [vtable @ 0x8202E244] ──────────────────────────
 struct LocomotionController {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~LocomotionController();                  // [0] @ 0x820e3b20
-    virtual void ScalarDtor(int flags); // [1] @ 0x820e3e48
-    virtual void vfn_3();  // [3] @ 0x820e3ff8
-    virtual void vfn_4();  // [4] @ 0x820e6978
-    virtual void vfn_5();  // [5] @ 0x820df638
-    virtual void vfn_9();  // [9] @ 0x820e4408
-    virtual void vfn_10();  // [10] @ 0x820df5c8
-    virtual void OnEnter();  // [11] @ 0x820e6c48
-    virtual void vfn_12();  // [12] @ 0x820df618
-    virtual void GetName();  // [13] @ 0x820e6c38
-    virtual void vfn_15();  // [15] @ 0x820d3478
+    ~LocomotionController();                  // [0] @ 0x820e3b20
+    void ScalarDtor(int flags); // [1] @ 0x820e3e48
+    void vfn_3();  // [3] @ 0x820e3ff8
+    void vfn_4();  // [4] @ 0x820e6978
+    void vfn_5();  // [5] @ 0x820df638
+    void vfn_9();  // [9] @ 0x820e4408
+    void vfn_10();  // [10] @ 0x820df5c8
+    void OnEnter();  // [11] @ 0x820e6c48
+    void vfn_12();  // [12] @ 0x820df618
+    void GetName();  // [13] @ 0x820e6c38
+    void vfn_15();  // [15] @ 0x820d3478
 };
 
 namespace LocomotionControllerInner {
@@ -37,7 +45,7 @@ struct xmlNodeStructEntryPose {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_5();  // [5] @ 0x820df128
+    void vfn_5();  // [5] @ 0x820df128
 };
 
 } // namespace LocomotionControllerInner
@@ -48,17 +56,17 @@ struct LocomotionState {
     void*       field_0x0004;     // +0x04  linked list head pointer
 
     // ── virtual methods ──
-    virtual ~LocomotionState();                  // [0] @ 0x820df648
-    virtual void ScalarDtor(int flags); // [1] @ 0x8212b088
-    virtual void ClearClip();  // [2] @ 0x820df908 — zeroes clip pointer at +0x3C
-    virtual void LoadFromXml(void* xmlReader);  // [3] @ 0x820df918 — parses XML tags, loads animation clips
-    virtual void UpdateTimer(float dt);  // [4] @ 0x820dfbb8 — decrements timer, destroys clip when expired
-    virtual void DestroyClip();  // [5] @ 0x820dfeb8 — destroys active clip, resets timing
-    virtual void SetActiveClip(void* clip, float duration, float blendTime);  // [6] @ 0x820dfd60 — stores clip, sets duration
-    virtual bool HasActiveClip();  // [7] @ 0x820dfc50 — returns clip->vfn_7 or false
-    virtual void SetupClipAnimation(void* outputState);  // [8] @ 0x820dfde0 — validates clip, sets up animation
-    virtual bool GetClipTransform(void* outMatrix);  // [9] @ 0x820dfe48 — gets clip transform or writes identity
-    virtual float GetNormalizedProgress();  // [12] @ 0x820df138 — computes normalized animation progress
+    ~LocomotionState();                  // [0] @ 0x820df648
+    void ScalarDtor(int flags); // [1] @ 0x8212b088
+    void ClearClip();  // [2] @ 0x820df908 — zeroes clip pointer at +0x3C
+    void LoadFromXml(void* xmlReader);  // [3] @ 0x820df918 — parses XML tags, loads animation clips
+    void UpdateTimer(float dt);  // [4] @ 0x820dfbb8 — decrements timer, destroys clip when expired
+    void DestroyClip();  // [5] @ 0x820dfeb8 — destroys active clip, resets timing
+    void SetActiveClip(void* clip, float duration, float blendTime);  // [6] @ 0x820dfd60 — stores clip, sets duration
+    bool HasActiveClip();  // [7] @ 0x820dfc50 — returns clip->vfn_7 or false
+    void SetupClipAnimation(void* outputState);  // [8] @ 0x820dfde0 — validates clip, sets up animation
+    bool GetClipTransform(void* outMatrix);  // [9] @ 0x820dfe48 — gets clip transform or writes identity
+    float GetNormalizedProgress();  // [12] @ 0x820df138 — computes normalized animation progress
     
     // ── non-virtual methods ──
     void ValidateAnimationTiming(uint32_t& animSetIndex, uint32_t& animIndex, float& outTiming);  // @ 0x820DF220
@@ -69,28 +77,41 @@ struct LocomotionState {
 // ── LocomotionStateAnim  [vtable @ 0x8202E1A4] ──────────────────────────
 // Confirmed methods: Load, Update
 struct LocomotionStateAnim {
-    void**      vtable;           // +0x00
-
     // ── field access clusters ──
-    uint8_t      field_0x0001;  // +0x0001  R:5 W:0
-    uint16_t     field_0x0002;  // +0x0002  R:1 W:0
-    uint32_t     field_0x0004;  // +0x0004  R:35 W:24
-    uint8_t      field_0x0005;  // +0x0005  R:4 W:0
-    uint16_t     field_0x0006;  // +0x0006  R:7 W:0
-    uint64_t     field_0x0008;  // +0x0008  R:24 W:22
-    uint16_t     field_0x000a;  // +0x000a  R:3 W:0
-    uint32_t     field_0x000c;  // +0x000c  R:26 W:16
-    uint32_t     field_0x0010;  // +0x0010  R:7 W:5
-    uint8_t      field_0x0013;  // +0x0013  R:0 W:1
-    uint32_t     field_0x0014;  // +0x0014  R:15 W:10
-    uint16_t     field_0x0016;  // +0x0016  R:0 W:1
-    uint32_t     field_0x0018;  // +0x0018  R:22 W:7
-    uint8_t      field_0x001a;  // +0x001a  R:0 W:1
-    uint8_t      field_0x001b;  // +0x001b  R:0 W:1
+    union {  // overlapping accesses at +0x0000..+0x0004
+        struct { void** vtable; };  // +0x00
+        struct { uint8_t _p0001[0x1]; uint8_t field_0x0001; };  // +0x0001  R:5 W:0
+        struct { uint8_t _p0002[0x2]; uint16_t field_0x0002; };  // +0x0002  R:1 W:0
+    };
+    union {  // overlapping accesses at +0x0004..+0x0008
+        struct { uint32_t field_0x0004; };  // +0x0004  R:35 W:24
+        struct { uint8_t _p0005[0x1]; uint8_t field_0x0005; };  // +0x0005  R:4 W:0
+        struct { uint8_t _p0006[0x2]; uint16_t field_0x0006; };  // +0x0006  R:7 W:0
+    };
+    union {  // overlapping accesses at +0x0008..+0x0010
+        struct { uint64_t field_0x0008; };  // +0x0008  R:24 W:22
+        struct { uint8_t _p000a[0x2]; uint16_t field_0x000a; };  // +0x000a  R:3 W:0
+        struct { uint8_t _p000c[0x4]; uint32_t field_0x000c; };  // +0x000c  R:26 W:16
+    };
+    union {  // overlapping accesses at +0x0010..+0x0014
+        struct { uint32_t field_0x0010; };  // +0x0010  R:7 W:5
+        struct { uint8_t _p0013[0x3]; uint8_t field_0x0013; };  // +0x0013  R:0 W:1
+    };
+    union {  // overlapping accesses at +0x0014..+0x0018
+        struct { uint32_t field_0x0014; };  // +0x0014  R:15 W:10
+        struct { uint8_t _p0016[0x2]; uint16_t field_0x0016; };  // +0x0016  R:0 W:1
+    };
+    union {  // overlapping accesses at +0x0018..+0x001c
+        struct { uint32_t field_0x0018; };  // +0x0018  R:22 W:7
+        struct { uint8_t _p001a[0x2]; uint8_t field_0x001a; };  // +0x001a  R:0 W:1
+        struct { uint8_t _p001b[0x3]; uint8_t field_0x001b; };  // +0x001b  R:0 W:1
+    };
     uint32_t     field_0x001c;  // +0x001c  R:17 W:4
     uint32_t     field_0x0020;  // +0x0020  R:27 W:7
-    uint32_t     field_0x0024;  // +0x0024  R:21 W:6
-    uint8_t      field_0x0025;  // +0x0025  R:3 W:0
+    union {  // overlapping accesses at +0x0024..+0x0028
+        struct { uint32_t field_0x0024; };  // +0x0024  R:21 W:6
+        struct { uint8_t _p0025[0x1]; uint8_t field_0x0025; };  // +0x0025  R:3 W:0
+    };
     uint32_t     field_0x0028;  // +0x0028  R:8 W:3
     uint32_t     field_0x002c;  // +0x002c  R:4 W:2
     uint32_t     field_0x0030;  // +0x0030  R:4 W:4
@@ -128,45 +149,56 @@ struct LocomotionStateAnim {
     uint32_t     field_0x00b0;  // +0x00b0  R:2 W:3
     uint32_t     field_0x00b4;  // +0x00b4  R:2 W:2
     uint32_t     field_0x00b8;  // +0x00b8  R:7 W:6
-    uint8_t     _pad0x00c8[12];
+    uint8_t      _pad0x00bc[0xc];
     uint32_t     field_0x00c8;  // +0x00c8  R:1 W:0
+    uint8_t      _pad0x00cc[0x4];
     uint32_t     field_0x00d0;  // +0x00d0  R:1 W:0
-    uint8_t     _pad0x0120[76];
+    uint8_t      _pad0x00d4[0x4c];
     uint32_t     field_0x0120;  // +0x0120  R:0 W:1
     uint32_t     field_0x0124;  // +0x0124  R:0 W:1
     uint32_t     field_0x0128;  // +0x0128  R:0 W:1
     uint32_t     field_0x012c;  // +0x012c  R:0 W:1
-    uint32_t     field_0x0130;  // +0x0130  R:1 W:1
-    uint16_t     field_0x0132;  // +0x0132  R:0 W:1
-    uint32_t     field_0x0134;  // +0x0134  R:0 W:2
-    uint16_t     field_0x0136;  // +0x0136  R:0 W:1
+    union {  // overlapping accesses at +0x0130..+0x0134
+        struct { uint32_t field_0x0130; };  // +0x0130  R:1 W:1
+        struct { uint8_t _p0132[0x2]; uint16_t field_0x0132; };  // +0x0132  R:0 W:1
+    };
+    union {  // overlapping accesses at +0x0134..+0x0138
+        struct { uint32_t field_0x0134; };  // +0x0134  R:0 W:2
+        struct { uint8_t _p0136[0x2]; uint16_t field_0x0136; };  // +0x0136  R:0 W:1
+    };
     uint8_t      field_0x0138;  // +0x0138  R:0 W:1
     uint8_t      field_0x0139;  // +0x0139  R:0 W:1
     uint8_t      field_0x013a;  // +0x013a  R:0 W:1
+    uint8_t      _pad0x013b[0x5];
     uint32_t     field_0x0140;  // +0x0140  R:9 W:6
     uint32_t     field_0x0144;  // +0x0144  R:1 W:3
     uint8_t      field_0x0148;  // +0x0148  R:5 W:4
+    uint8_t      _pad0x0149[0x3];
     uint32_t     field_0x014c;  // +0x014c  R:1 W:4
-    uint8_t     _pad0x0160[16];
+    uint8_t      _pad0x0150[0x10];
     uint32_t     field_0x0160;  // +0x0160  R:1 W:0
     uint16_t     field_0x0164;  // +0x0164  R:2 W:0
+    uint8_t      _pad0x0166[0x2];
     uint32_t     field_0x0168;  // +0x0168  R:1 W:0
     uint16_t     field_0x016c;  // +0x016c  R:2 W:0
+    uint8_t      _pad0x016e[0x2];
     uint32_t     field_0x0170;  // +0x0170  R:1 W:0
     uint16_t     field_0x0174;  // +0x0174  R:2 W:0
-    uint8_t     _pad0x01b0[56];
+    uint8_t      _pad0x0176[0x3a];
     uint32_t     field_0x01b0;  // +0x01b0  R:1 W:0
     uint32_t     field_0x01b4;  // +0x01b4  R:2 W:0
-    uint8_t     _pad0x01e4[44];
+    uint8_t      _pad0x01b8[0x2c];
     uint32_t     field_0x01e4;  // +0x01e4  R:5 W:0
-    uint8_t     _pad0x0220[56];
+    uint8_t      _pad0x01e8[0x38];
     uint8_t      field_0x0220;  // +0x0220  R:1 W:0
+    uint8_t      _pad0x0221[0x3];
     uint32_t     field_0x0224;  // +0x0224  R:2 W:0
     uint32_t     field_0x0228;  // +0x0228  R:2 W:0
     uint32_t     field_0x022c;  // +0x022c  R:2 W:0
     uint32_t     field_0x0230;  // +0x0230  R:2 W:0
     uint32_t     field_0x0234;  // +0x0234  R:2 W:2
     uint8_t      field_0x0238;  // +0x0238  R:1 W:1
+    uint8_t      _pad0x0239[0x3];
     uint32_t     field_0x023c;  // +0x023c  R:1 W:0
     uint32_t     field_0x0240;  // +0x0240  R:1 W:0
     uint32_t     field_0x0244;  // +0x0244  R:1 W:2
@@ -174,16 +206,16 @@ struct LocomotionStateAnim {
     uint32_t     field_0x024c;  // +0x024c  R:1 W:0
 
     // ── virtual methods ──
-    virtual ~LocomotionStateAnim();                  // [0] @ 0x820dff20
-    virtual void ScalarDtor(int flags); // [1] @ 0x820e0048
-    virtual void Reset();  // [2] @ 0x820e0178
-    virtual void Initialize();  // [5] @ 0x820e0ee8
-    virtual void UpdateAnimation(float dt, void* outputState, float blendWeight);  // [6] @ 0x820e0c10 — sets up timing, random blend, copies matrix
-    virtual bool EvaluateAnimation(void* outputState);  // [7] @ 0x820e0a10 — plays clip, updates bones, dispatches events
-    virtual bool GetAnimTransform(void* outMatrix);  // [9] @ 0x820e0df8 — gets transform from clip or blend
-    virtual float GetAnimationProgress();  // [10] @ 0x820e0fb0
-    virtual float GetAnimationDuration();  // [11] @ 0x820e0fd0
-    virtual bool IsAnimationComplete();  // [15] @ 0x820df208
+    ~LocomotionStateAnim();                  // [0] @ 0x820dff20
+    void ScalarDtor(int flags); // [1] @ 0x820e0048
+    void Reset();  // [2] @ 0x820e0178
+    void Initialize();  // [5] @ 0x820e0ee8
+    void UpdateAnimation(float dt, void* outputState, float blendWeight);  // [6] @ 0x820e0c10 — sets up timing, random blend, copies matrix
+    bool EvaluateAnimation(void* outputState);  // [7] @ 0x820e0a10 — plays clip, updates bones, dispatches events
+    bool GetAnimTransform(void* outMatrix);  // [9] @ 0x820e0df8 — gets transform from clip or blend
+    float GetAnimationProgress();  // [10] @ 0x820e0fb0
+    float GetAnimationDuration();  // [11] @ 0x820e0fd0
+    bool IsAnimationComplete();  // [15] @ 0x820df208
 
     // ── non-virtual methods (from debug strings) ──
     bool Load(void* parentState, void* fileLoader);
@@ -219,23 +251,23 @@ struct LocomotionStateMf {
     void**      vtable;           // +0x00
     uint32_t    field_0x0004;     // +0x04
     char*       field_0x0008;     // +0x08  end pointer (EraseRange)
-    uint8_t     _pad_mf_0c[32];
+    uint8_t     _pad_mf_0c[28];
     float       field_0x0028;     // +0x28  scale factor (ComputeWeightedSum)
 
     // ── virtual methods ──
-    virtual ~LocomotionStateMf();                  // [0] @ 0x820e1310
-    virtual void ScalarDtor(int flags); // [1] @ 0x820e1570
-    virtual void vfn_2();  // [2] @ 0x820e15d8
-    virtual void vfn_4();  // [4] @ 0x820e2120
-    virtual void vfn_6();  // [6] @ 0x820e23a8
-    virtual void vfn_7();  // [7] @ 0x820e2218
-    virtual void vfn_9();  // [9] @ 0x820e2598
-    virtual void vfn_10();  // [10] @ 0x820e2658
-    virtual void OnEnter();  // [11] @ 0x820e26c8
-    virtual void vfn_12();  // [12] @ 0x820e2718
-    virtual void GetName();  // [13] @ 0x820e3140
-    virtual void vfn_14();  // [14] @ 0x820e31b0
-    virtual void vfn_16();  // [16] @ 0x820e2820
+    ~LocomotionStateMf();                  // [0] @ 0x820e1310
+    void ScalarDtor(int flags); // [1] @ 0x820e1570
+    void vfn_2();  // [2] @ 0x820e15d8
+    void vfn_4();  // [4] @ 0x820e2120
+    void vfn_6();  // [6] @ 0x820e23a8
+    void vfn_7();  // [7] @ 0x820e2218
+    void vfn_9();  // [9] @ 0x820e2598
+    void vfn_10();  // [10] @ 0x820e2658
+    void OnEnter();  // [11] @ 0x820e26c8
+    void vfn_12();  // [12] @ 0x820e2718
+    void GetName();  // [13] @ 0x820e3140
+    void vfn_14();  // [14] @ 0x820e31b0
+    void vfn_16();  // [16] @ 0x820e2820
 
     // ── non-virtual methods (from debug strings) ──
     void Load();
@@ -252,12 +284,12 @@ struct xmlNodeStructCategory {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x82227b88
-    virtual void vfn_2();  // [2] @ 0x82227ba8
-    virtual void vfn_3();  // [3] @ 0x82227bf8
-    virtual void vfn_4();  // [4] @ 0x82227cd0
-    virtual void vfn_5();  // [5] @ 0x820d4f78
-    virtual void vfn_6();  // [6] @ 0x82348870
+    void ScalarDtor(int flags); // [1] @ 0x82227b88
+    void vfn_2();  // [2] @ 0x82227ba8
+    void vfn_3();  // [3] @ 0x82227bf8
+    void vfn_4();  // [4] @ 0x82227cd0
+    void vfn_5();  // [5] @ 0x820d4f78
+    void vfn_6();  // [6] @ 0x82348870
 };
 
 } // namespace pcrActivationCategory
@@ -277,9 +309,9 @@ struct pcrAnimEvent {
     uint16_t     m_valueCap;    // +0x22
     const char*  m_extra;       // +0x24  raw ptr (not heap-owned here)
 
-    virtual ~pcrAnimEvent();                           // [0]  @ 0x820DE640
-    virtual bool MatchesType(uint32_t type) const;     // [20] @ 0x820DE7D8
-    virtual void Process();                            // [21] @ 0x820DE820
+    ~pcrAnimEvent();                           // [0]  @ 0x820DE640
+    bool MatchesType(uint32_t type) const;     // [20] @ 0x820DE7D8
+    void Process();                            // [21] @ 0x820DE820
 
     // Fixup serialised string offsets to runtime pointers after pack load.
     // @ 0x820DE8A8
@@ -295,56 +327,60 @@ struct pcrAnimEventFootAud {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pcrAnimEventFootAud();                  // [0] @ 0x820ebd48
-    virtual bool IsTypeOf(uint32_t type) const;  // [20] @ 0x820ebbd8
-    virtual void LoadProperties();               // [21] @ 0x820ebc30
-    virtual void ProcessEvent();                  // [23] @ 0x820ebc80
+    ~pcrAnimEventFootAud();                  // [0] @ 0x820ebd48
+    bool IsTypeOf(uint32_t type) const;  // [20] @ 0x820ebbd8
+    void LoadProperties();               // [21] @ 0x820ebc30
+    void ProcessEvent();                  // [23] @ 0x820ebc80
 };
 
 // ── pcrAnimEventFootContact  [vtable @ 0x8202EC4C] ──────────────────────────
 struct pcrAnimEventFootContact : pcrAnimEvent {
-    virtual const char* GetTypeName() const;  // [22] @ 0x820DEAD8  returns "FootContact"
-    virtual int GetSoundId() const;             // [24] @ 0x820EBDA8
+    const char* GetTypeName() const;  // [22] @ 0x820DEAD8  returns "FootContact"
+    int GetSoundId() const;             // [24] @ 0x820EBDA8
 };
 
 // ── pcrAnimEventFootScuff  [vtable @ 0x8202ECBC] ──────────────────────────
 struct pcrAnimEventFootScuff : pcrAnimEvent {
-    virtual const char* GetTypeName() const;  // [22] @ 0x820DEAE8  returns "FootScuff"
-    virtual int GetSoundId() const;           // [24] @ 0x820EBDB0
+    const char* GetTypeName() const;  // [22] @ 0x820DEAE8  returns "FootScuff"
+    int GetSoundId() const;           // [24] @ 0x820EBDB0
 };
 
 // ── pcrAnimEventFootStep  [vtable @ 0x8202ED2C] ──────────────────────────
 struct pcrAnimEventFootStep : pcrAnimEvent {
-    virtual const char* GetTypeName() const;  // [22] @ 0x820DEAF8  returns "FootStep"
-    virtual int GetSoundId() const;           // [24] @ 0x820EBDB8
+    const char* GetTypeName() const;  // [22] @ 0x820DEAF8  returns "FootStep"
+    int GetSoundId() const;           // [24] @ 0x820EBDB8
 };
 
 // ── pcrAnimEventFootStomp  [vtable @ 0x8202ED9C] ──────────────────────────
 struct pcrAnimEventFootStomp : pcrAnimEvent {
-    virtual const char* GetTypeName() const;  // [22] @ 0x820DEB08  returns "FootStomp"
-    virtual int GetSoundId() const;           // [24] @ 0x820EBDC0
+    const char* GetTypeName() const;  // [22] @ 0x820DEB08  returns "FootStomp"
+    int GetSoundId() const;           // [24] @ 0x820EBDC0
 };
 
 // ── pcrAnimEventMsg  [vtable @ 0x8202EE3C] ──────────────────────────
 struct pcrAnimEventMsg : pcrAnimEvent {
-    virtual ~pcrAnimEventMsg();                        // [0]  @ 0x820EBDC8
-    virtual void PostLoad();                            // [2]  @ 0x820EBED8
-    virtual bool MatchesType(uint32_t type) const;     // [20] @ 0x820EBE30
-    virtual void Process();                            // [21] @ 0x820EBE88
-    virtual const char* GetTypeName() const;           // [22] @ 0x820DEB18  returns "Msg"
-    virtual void ProcessEvent();                       // [23] @ 0x820EBF30
-    virtual void SendMessage();                        // [24] @ 0x820EBF50
+    const char*  m_message;      // +0x28  atString ptr, fixed up from the pack (0x820EC0FC)
+    int16_t      m_messageLen;   // +0x2C
+    uint16_t     m_messageCap;   // +0x2E
+
+    ~pcrAnimEventMsg();                        // [0]  @ 0x820EBDC8
+    void PostLoad();                            // [2]  @ 0x820EBED8
+    bool MatchesType(uint32_t type) const;     // [20] @ 0x820EBE30
+    void Process();                            // [21] @ 0x820EBE88
+    const char* GetTypeName() const;           // [22] @ 0x820DEB18  returns "Msg"
+    void ProcessEvent();                       // [23] @ 0x820EBF30
+    void SendMessage();                        // [24] @ 0x820EBF50
 };
 
 // ── pcrAnimEventMsg_s  [vtable @ 0x8202EEAC] ──────────────────────────
 struct pcrAnimEventMsg_s : pcrAnimEventMsg {
     const char*  m_stringParam;  // +0x30  extra string; fixed up from pack if non-null
 
-    virtual ~pcrAnimEventMsg_s();                        // [0]  @ 0x820EBF70
-    virtual bool MatchesType(uint32_t type) const;       // [20] @ 0x820EBFF0
-    virtual void Process();                              // [21] @ 0x820EC010
-    virtual const char* GetTypeName() const;             // [22] @ 0x820DEB28  returns "Msg_s"
-    virtual void SendMessage();                          // [24] @ 0x820EC088
+    ~pcrAnimEventMsg_s();                        // [0]  @ 0x820EBF70
+    bool MatchesType(uint32_t type) const;       // [20] @ 0x820EBFF0
+    void Process();                              // [21] @ 0x820EC010
+    const char* GetTypeName() const;             // [22] @ 0x820DEB28  returns "Msg_s"
+    void SendMessage();                          // [24] @ 0x820EC088
 };
 
 // ── pcrAnimObserved  [vtable @ 0x82028354] ──────────────────────────
@@ -352,11 +388,11 @@ struct pcrAnimObserved {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pcrAnimObserved();                  // [0] @ 0x820ceca8
-    virtual void ResolveChildren();                      // [3] @ 0x820cede8
-    virtual bool IsTypeOf(uint32_t type) const;          // [20] @ 0x820ced38
-    virtual void LoadProperties();                       // [21] @ 0x820ced80
-    virtual const char* GetTypeName() const;             // [22] @ 0x820ced28
+    ~pcrAnimObserved();                  // [0] @ 0x820ceca8
+    void ResolveChildren();                      // [3] @ 0x820cede8
+    bool IsTypeOf(uint32_t type) const;          // [20] @ 0x820ced38
+    void LoadProperties();                       // [21] @ 0x820ced80
+    const char* GetTypeName() const;             // [22] @ 0x820ced28
 };
 
 // ── pcrAnimObserver  [vtable @ 0x820283B8] ──────────────────────────
@@ -364,7 +400,7 @@ struct pcrAnimObserver {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pcrAnimObserver();                  // [0] @ 0x820cf3a8
+    ~pcrAnimObserver();                  // [0] @ 0x820cf3a8
 };
 
 // ── pcrAnimObserverHash  [vtable @ 0x820283C4] ──────────────────────────
@@ -372,7 +408,7 @@ struct pcrAnimObserverHash {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pcrAnimObserverHash();                  // [0] @ 0x820cf038
+    ~pcrAnimObserverHash();                  // [0] @ 0x820cf038
 };
 
 // ── pcrEmoteBlender  [vtable @ 0x82028220] ──────────────────────────
@@ -381,32 +417,35 @@ struct pcrAnimObserverHash {
 struct pcrEmoteBlender {
     void**       vtable;           // +0x00  primary vtable
     void*        m_pPlayer;        // +0x04  owning pongPlayer
-    // ... (+0x08..+0x0F omitted, base fields) ...
-    void*        m_animSubStruct;  // +0x10  inline locomotion-blender sub-object
-    // ... (+0x14..+0x53 omitted, sub-struct body) ...
+    uint8_t      _pad08[8];        // +0x08..+0x0F base fields
+    void*        m_animSubStruct;  // +0x10  inline locomotion-blender sub-object (its vtable)
+    uint8_t      _pad14[0x40];     // +0x14..+0x53 sub-struct body
     void*        m_pCurrentClip;   // +0x54  active crAnimClip*
-    void*        m_pSessionInfo;   // +0x5C
     uint16_t     m_state;          // +0x58  playback state (1 = active)
     uint16_t     m_bShouldStop;    // +0x5A  stop-after-cycle flag
-    float        m_blendWeightA;   // +0x60  (in sub-struct at +16+80)
-    float        m_blendWeightB;   // +0x64  (in sub-struct at +16+84)
-    float        m_targetBlend;    // +0x68  target blend weight (at +100)
+    void*        m_pSessionInfo;   // +0x5C
+    float        m_blendWeightA;   // +0x60  (sub-struct +0x50)
+    union {
+        float    m_blendWeightB;   // +0x64  (sub-struct +0x54)
+        float    m_targetBlend;    // +0x64  StartEmote stores both here, the constant last
+    };
+    uint8_t      _pad68[0x118];    // +0x68..+0x17F
     uint32_t     m_emoteIndex;     // +0x180 (384) which emote anim is active
 
-    virtual ~pcrEmoteBlender();                            // [0]  @ 0x820CB878
-    virtual void SetPlayer(void* pPlayer, void* pSes);    // [1]  @ 0x820DB508
-    virtual void SetEmoteIndex(uint32_t index);            // [2]  @ 0x820CB8D0
-    virtual void Reset();                                  // [3]  @ 0x820DB518
-    virtual void Update();                                 // [4]  @ 0x820DB520
-    virtual void StartEmote(const void* clip,
+    ~pcrEmoteBlender();                            // [0]  @ 0x820CB878
+    void SetPlayer(void* pPlayer, void* pSes);    // [1]  @ 0x820DB508
+    void SetEmoteIndex(uint32_t index);            // [2]  @ 0x820CB8D0
+    void Reset();                                  // [3]  @ 0x820DB518
+    void Update();                                 // [4]  @ 0x820DB520
+    void StartEmote(const void* clip,
                             uint32_t flags,
                             float blendDur);               // [5]  @ 0x820DB620
-    virtual bool IsActive() const;                         // [6]  @ 0x820CB8D8
-    virtual bool IsFinished() const;                       // [7]  @ 0x820DB5F8
-    virtual void* GetCurrentClip();                        // [8]  @ 0x820CB908
-    virtual bool GetBlendWeights(float* outA,
+    bool IsActive() const;                         // [6]  @ 0x820CB8D8
+    bool IsFinished() const;                       // [7]  @ 0x820DB5F8
+    void* GetCurrentClip();                        // [8]  @ 0x820CB908
+    bool GetBlendWeights(float* outA,
                                  float* outB) const;       // [9]  @ 0x820DB6E8
-    virtual void ComputeBlend(void* outVec);               // [10] @ 0x820DB728
+    void ComputeBlend(void* outVec);               // [10] @ 0x820DB728
 };
 
 // ── pcrEmoteData  [vtable @ 0x8202EB64] ──────────────────────────
@@ -414,10 +453,10 @@ struct pcrEmoteData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pcrEmoteData();                  // [0] @ 0x820eb8e8
-    virtual void vfn_20();  // [20] @ 0x820eb9e8
-    virtual void vfn_21();  // [21] @ 0x820eba30
-    virtual void vfn_22();  // [22] @ 0x820eb948
+    ~pcrEmoteData();                  // [0] @ 0x820eb8e8
+    void vfn_20();  // [20] @ 0x820eb9e8
+    void vfn_21();  // [21] @ 0x820eba30
+    void vfn_22();  // [22] @ 0x820eb948
 };
 
 // ── pcrCreatureState  (internal data block, no vtable) ──────────────────────
@@ -426,11 +465,11 @@ struct pcrEmoteData {
 //
 // Key fields confirmed from StartPostPoint and related scaffolding:
 struct pcrCreatureState {
-    // +0x00..+0x03  reserved / flags
+    uint8_t      _pad00[4];           // +0x00..+0x03  reserved / flags
     bool         m_bFaceAnimEnabled;  // +0x04  gates face-anim path in StartPostPoint
-    // +0x05..+0x3F  (other creature state fields omitted)
+    uint8_t      _pad05[0x3F];        // +0x05..+0x43  (other creature state fields omitted)
     void*        m_pFaceAnimHandle;   // +0x44  active face-anim handle (timer at handle+0x14)
-    // +0x48..+0xAF  (other fields)
+    uint8_t      _pad48[0x68];        // +0x48..+0xAF  (other fields)
     // +0xB0  phFaceMaterialTable m_faceMaterial
     //        — hash table mapping clip data ptrs → face material entries
     //        — passed to atHashMap_Find as the first argument
@@ -442,12 +481,12 @@ struct pcrCreatureState {
 // Inherits from crAnimDof (base dtor @ 0x820C1188).
 struct pcrFaceAnimBlender {
     void**            vtable;            // +0x00
-    // ... (crAnimDof base fields +0x04..+0x83 omitted) ...
+    uint8_t           _pad04[0x80];      // +0x04..+0x83 crAnimDof base fields
     void*             m_pCreatureState;  // +0x84 (132)  pcrCreatureState*
-    // ... (+0x88..+0x8F omitted) ...
+    uint8_t           _pad88[8];         // +0x88..+0x8F
     void*             m_pAnimObj;        // +0x90 (144)  crAnimDof-family object
 
-    virtual ~pcrFaceAnimBlender();  // [0] @ 0x820C0C50
+    ~pcrFaceAnimBlender();  // [0] @ 0x820C0C50
 
     // Activate the post-point body clip and install the matching face material.
     // @ 0x820CC490
@@ -459,9 +498,9 @@ struct pcrJunkSwingData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_20();  // [20] @ 0x820eb788
-    virtual void vfn_21();  // [21] @ 0x820eb7e0
-    virtual void vfn_22();  // [22] @ 0x820eb778
+    void vfn_20();  // [20] @ 0x820eb788
+    void vfn_21();  // [21] @ 0x820eb7e0
+    void vfn_22();  // [22] @ 0x820eb778
 };
 
 // ── pcrPostPointBlender  [vtable @ 0x82028C64] ──────────────────────────
@@ -470,37 +509,47 @@ struct pcrJunkSwingData {
 struct pcrPostPointBlender {
     void**       vtable;             // +0x00  primary vtable
     void*        m_pPlayer;          // +0x04  owning pongPlayer
-    // ... (+0x08..+0x0F omitted, base fields) ...
-    void*        m_animSubStruct;    // +0x10  inline crAnimBlender sub-object
-    // ... (+0x14..+0x53 omitted, sub-struct body) ...
-    void*        m_pCurrentClip;     // +0x54  (in sub-struct; active clip)
-    void*        m_pSessionInfo;     // +0x5C
+    uint8_t      _pad08[8];          // +0x08..+0x0F base fields
+    void*        m_animSubStruct;    // +0x10  inline crAnimBlender sub-object (its vtable)
+    uint8_t      _pad14[0x40];       // +0x14..+0x53 sub-struct body
+    union {
+        void*    m_pCurrentClip;     // +0x54  (in sub-struct; active clip)
+        void*    m_pActiveClipObj;   // +0x54
+    };
     uint16_t     m_currentState;     // +0x58  (at +88)
     uint16_t     m_bShouldStop;      // +0x5A  (at +90) bit 0 = active
+    void*        m_pSessionInfo;     // +0x5C
+    uint8_t      _pad60[0x10];       // +0x60..+0x6F
     float        m_blendWeight;      // +0x70  blend weight for this layer
-    void*        m_pActiveClipObj;   // +0x54  active clip obj ptr (at +84)
-    void*        m_clipArray;        // +0x190 (400)  crAnimClip* array
-    uint32_t*    m_clipRefCounts;    // +0x1A0 (416)  per-slot play-count array (uint32_t[], indexed by activeClipIdx)
-    void*        m_pRefCountArray;   // +0x1AC_area   at +432
-    int32_t      m_activeClipIdx;    // +0x1AC (428)  -1 = none
+    uint8_t      _pad74[0x10C];      // +0x74..+0x17F
+    uint32_t     m_emoteIndex;       // +0x180 mirrored from pcrEmoteBlender context
+    uint8_t      _pad184[0xC];       // +0x184..+0x18F
+    // Three atArrays {ptr, u16 count, u16 capacity}; the dtor frees each
+    // buffer when its capacity is non-zero (0x820DDCF0..0x820DDD28).
+    void*        m_clipArray;        // +0x190 crAnimClip* array
+    uint16_t     m_clipCount;        // +0x194
+    uint16_t     m_clipCap;          // +0x196
+    void*        m_array198;         // +0x198
+    uint16_t     m_array198Count;    // +0x19C
+    uint16_t     m_array198Cap;      // +0x19E
+    uint32_t*    m_clipRefCounts;    // +0x1A0 per-slot play counts, indexed by m_activeClipIdx
+    uint16_t     m_clipRefCountsCount;  // +0x1A4
+    uint16_t     m_clipRefCountsCap; // +0x1A6
     uint8_t      m_bForced;          // +0x1A8 (424)  set when force-started
-    uint32_t     m_emoteIndex;       // mirrored from pcrEmoteBlender context
-    // atString fields for celebratory clip name lookup
-    const char*  m_pCelebNameC;      // +0x190 (400)
-    uint16_t     m_celebNameCCap;    // +0x406
-    const char*  m_pCelebNameB;      // +0x408
-    uint16_t     m_celebNameBCap;    // +0x414
-    const char*  m_pCelebNameA;      // +0x416 area
-    uint16_t     m_celebNameCap;     // +0x422
-    void*        m_animSubStruct2;   // +0x436  second sub-struct (atArray_Clear managed)
+    uint8_t      _pad1A9[3];
+    int32_t      m_activeClipIdx;    // +0x1AC (428)  -1 = none
+    void*        m_pRefCountArray;   // +0x1B0 (432) freed by the dtor
+    void*        m_animSubStruct2;   // +0x1B4 (436) atArray, cleared by the dtor
+    uint8_t      _pad1B8[4];         // +0x1B8
+    uint8_t      m_descriptors[0x10];  // +0x1BC Init allocates two 16-byte descriptors here
 
-    virtual ~pcrPostPointBlender();                      // [0] @ 0x820DDCB8
-    virtual void Init(void* pPlayer, void* pSes);        // [1] @ 0x820DDD78
-    virtual void ResetState();                           // [3] @ 0x820DDE28
-    virtual bool IsPlaying() const;                      // [4] @ 0x820DDE48
-    virtual void Update();                               // [5] @ 0x820DDE60
-    virtual bool IsActive() const;                       // [6] @ 0x820DDFF8
-    virtual bool IsFinished() const;                     // [7] @ 0x820DDFB0
+    ~pcrPostPointBlender();                      // [0] @ 0x820DDCB8
+    void Init(void* pPlayer, void* pSes);        // [1] @ 0x820DDD78
+    void ResetState();                           // [3] @ 0x820DDE28
+    bool IsPlaying() const;                      // [4] @ 0x820DDE48
+    void Update();                               // [5] @ 0x820DDE60
+    bool IsActive() const;                       // [6] @ 0x820DDFF8
+    bool IsFinished() const;                     // [7] @ 0x820DDFB0
 };
 
 // ── pcrServeBlender  [vtable @ 0x82028B0C] ──────────────────────────
@@ -508,7 +557,7 @@ struct pcrServeBlender {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pcrServeBlender();                  // [0] @ 0x820dcc60
+    ~pcrServeBlender();                  // [0] @ 0x820dcc60
 };
 
 // ── pcrServeData  [vtable @ 0x82028B9C] ──────────────────────────
@@ -516,11 +565,11 @@ struct pcrServeData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pcrServeData();                  // [0] @ 0x820dd900
-    virtual void Serialize(void* serializer);  // [2] @ 0x821e9370 — forwards to xmlNodeStruct serialize
-    virtual bool MatchesType(uint32_t type) const;  // [20] @ 0x820dda00 — compares against static type tag
-    virtual void RegisterAttributes(void* xmlWriter);  // [21] @ 0x820dda68 — registers XML attributes for serialization
-    virtual const char* GetTypeName();  // [22] @ 0x820dd9f0 — returns static type name string
+    ~pcrServeData();                  // [0] @ 0x820dd900
+    void Serialize(void* serializer);  // [2] @ 0x821e9370 — forwards to xmlNodeStruct serialize
+    bool MatchesType(uint32_t type) const;  // [20] @ 0x820dda00 — compares against static type tag
+    void RegisterAttributes(void* xmlWriter);  // [21] @ 0x820dda68 — registers XML attributes for serialization
+    const char* GetTypeName();  // [22] @ 0x820dd9f0 — returns static type name string
 };
 
 namespace pcrServeDataInner {
@@ -530,8 +579,8 @@ struct xmlNodeStructServeType {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_5();  // [5] @ 0x820dd8f0
-    virtual void vfn_6();  // [6] @ 0x8210cc08
+    void vfn_5();  // [5] @ 0x820dd8f0
+    void vfn_6();  // [6] @ 0x8210cc08
 };
 
 } // namespace pcrServeDataInner
@@ -541,10 +590,10 @@ struct pcrSwingAbortData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pcrSwingAbortData();                  // [0] @ 0x820eb4b0
-    virtual void vfn_20();  // [20] @ 0x820eb520
-    virtual void vfn_21();  // [21] @ 0x820eb568
-    virtual void vfn_22();  // [22] @ 0x820eb510
+    ~pcrSwingAbortData();                  // [0] @ 0x820eb4b0
+    void vfn_20();  // [20] @ 0x820eb520
+    void vfn_21();  // [21] @ 0x820eb568
+    void vfn_22();  // [22] @ 0x820eb510
 };
 
 namespace pcrSwingAbortDataInner {
@@ -554,8 +603,8 @@ struct xmlNodeStructApproxHitZone {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_5();  // [5] @ 0x820eb618
-    virtual void vfn_6();  // [6] @ 0x8210cca8
+    void vfn_5();  // [5] @ 0x820eb618
+    void vfn_6();  // [6] @ 0x8210cca8
 };
 
 } // namespace pcrSwingAbortDataInner
@@ -565,11 +614,11 @@ struct pcrSwingAbortSet {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pcrSwingAbortSet();                  // [0] @ 0x820e8f70
-    virtual void ResolveChildren();                       // [3] @ 0x820e95b0
-    virtual void vfn_20();  // [20] @ 0x820e94f8
-    virtual void vfn_21();  // [21] @ 0x820e9540
-    virtual void vfn_22();  // [22] @ 0x820e94e8
+    ~pcrSwingAbortSet();                  // [0] @ 0x820e8f70
+    void ResolveChildren();                       // [3] @ 0x820e95b0
+    void vfn_20();  // [20] @ 0x820e94f8
+    void vfn_21();  // [21] @ 0x820e9540
+    void vfn_22();  // [22] @ 0x820e94e8
 };
 
 // ── pcrSwingBlend  [vtable @ 0x82028A84] ──────────────────────────
@@ -577,10 +626,10 @@ struct pcrSwingBlend {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pcrSwingBlend();                  // [0] @ 0x820db990
-    virtual void vfn_20();  // [20] @ 0x820dc280
-    virtual void vfn_21();  // [21] @ 0x820dc2c8
-    virtual void vfn_22();  // [22] @ 0x820dc270
+    ~pcrSwingBlend();                  // [0] @ 0x820db990
+    void vfn_20();  // [20] @ 0x820dc280
+    void vfn_21();  // [21] @ 0x820dc2c8
+    void vfn_22();  // [22] @ 0x820dc270
 };
 
 // ── pcrSwingBlender  [2 vtables — template/MI] ──────────────────────────
@@ -589,7 +638,7 @@ struct pcrSwingBlender {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pcrSwingBlender();                  // [0] @ 0x820da170
+    ~pcrSwingBlender();                  // [0] @ 0x820da170
 
     // ── non-virtual methods (from debug strings) ──
     void UpdatePhase();
@@ -600,10 +649,10 @@ struct pcrSwingData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pcrSwingData();                  // [0] @ 0x820eb718
-    virtual void vfn_20();  // [20] @ 0x820eb448
-    virtual void vfn_21();  // [21] @ 0x820eb490
-    virtual void vfn_22();  // [22] @ 0x820eb438
+    ~pcrSwingData();                  // [0] @ 0x820eb718
+    void vfn_20();  // [20] @ 0x820eb448
+    void vfn_21();  // [21] @ 0x820eb490
+    void vfn_22();  // [22] @ 0x820eb438
 };
 
 // ── pcrSwingMissData  [vtable @ 0x8202E3FC] ──────────────────────────
@@ -611,11 +660,11 @@ struct pcrSwingMissData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pcrSwingMissData();                  // [0] @ 0x820e7cb8
-    virtual void vfn_3();  // [3] @ 0x820e83f8
-    virtual void vfn_20();  // [20] @ 0x820e8268
-    virtual void vfn_21();  // [21] @ 0x820e82b0
-    virtual void vfn_22();  // [22] @ 0x820e8258
+    ~pcrSwingMissData();                  // [0] @ 0x820e7cb8
+    void vfn_3();  // [3] @ 0x820e83f8
+    void vfn_20();  // [20] @ 0x820e8268
+    void vfn_21();  // [21] @ 0x820e82b0
+    void vfn_22();  // [22] @ 0x820e8258
 };
 
 // ── pcrSwingMissRange  [vtable @ 0x8202EF54] ──────────────────────────
@@ -623,7 +672,7 @@ struct pcrSwingMissRange {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pcrSwingMissRange();                  // [0] @ 0x820ec2f8
+    ~pcrSwingMissRange();                  // [0] @ 0x820ec2f8
 };
 
 // ── pcrSwingMissRangeHeading  [vtable @ 0x8202F034] ──────────────────────────
@@ -631,11 +680,11 @@ struct pcrSwingMissRangeHeading {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_20();  // [20] @ 0x820ec4e0
-    virtual void vfn_21();  // [21] @ 0x820ec528
-    virtual void vfn_22();  // [22] @ 0x820e7ca8
-    virtual void vfn_23();  // [23] @ 0x820ec358
-    virtual void vfn_24();  // [24] @ 0x820ec3b0
+    void vfn_20();  // [20] @ 0x820ec4e0
+    void vfn_21();  // [21] @ 0x820ec528
+    void vfn_22();  // [22] @ 0x820e7ca8
+    void vfn_23();  // [23] @ 0x820ec358
+    void vfn_24();  // [24] @ 0x820ec3b0
 };
 
 // ── pcrSwingMissRangeSphere  [vtable @ 0x8202EFC4] ──────────────────────────
@@ -643,11 +692,11 @@ struct pcrSwingMissRangeSphere {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_20();  // [20] @ 0x820ec248
-    virtual void vfn_21();  // [21] @ 0x820ec290
-    virtual void vfn_22();  // [22] @ 0x820e7c98
-    virtual void vfn_23();  // [23] @ 0x820ec158
-    virtual void vfn_24();  // [24] @ 0x820ec1f8
+    void vfn_20();  // [20] @ 0x820ec248
+    void vfn_21();  // [21] @ 0x820ec290
+    void vfn_22();  // [22] @ 0x820e7c98
+    void vfn_23();  // [23] @ 0x820ec158
+    void vfn_24();  // [24] @ 0x820ec1f8
 };
 
 // ── pcrSwingMissSet  [vtable @ 0x8202E2CC] ──────────────────────────
@@ -655,10 +704,10 @@ struct pcrSwingMissSet {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pcrSwingMissSet();                  // [0] @ 0x820e79a8
-    virtual void vfn_3();  // [3] @ 0x820e7a78
-    virtual void vfn_20();  // [20] @ 0x820e7a30
-    virtual void vfn_22();  // [22] @ 0x820e7a20
+    ~pcrSwingMissSet();                  // [0] @ 0x820e79a8
+    void vfn_3();  // [3] @ 0x820e7a78
+    void vfn_20();  // [20] @ 0x820e7a30
+    void vfn_22();  // [22] @ 0x820e7a20
 };
 
 // ── pcrSwingSet  [vtable @ 0x8202E914] ──────────────────────────
@@ -666,11 +715,11 @@ struct pcrSwingSet {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pcrSwingSet();                  // [0] @ 0x820ea1b8
-    virtual void vfn_3();  // [3] @ 0x820ea4d0
-    virtual void vfn_20();  // [20] @ 0x820ea248
-    virtual void vfn_21();  // [21] @ 0x820ea290
-    virtual void vfn_22();  // [22] @ 0x820ea238
+    ~pcrSwingSet();                  // [0] @ 0x820ea1b8
+    void vfn_3();  // [3] @ 0x820ea4d0
+    void vfn_20();  // [20] @ 0x820ea248
+    void vfn_21();  // [21] @ 0x820ea290
+    void vfn_22();  // [22] @ 0x820ea238
 };
 
 namespace pcrSwingSetInner {
@@ -680,7 +729,7 @@ struct xmlNodeStructSpecialty {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_5();  // [5] @ 0x820eb200
+    void vfn_5();  // [5] @ 0x820eb200
 };
 
 } // namespace pcrSwingSetInner
@@ -690,7 +739,7 @@ struct pcrSwingSolver {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pcrSwingSolver();                  // [0] @ 0x820d7e68
+    ~pcrSwingSolver();                  // [0] @ 0x820d7e68
 };
 
 // ── pcrSwingSpace  [vtable @ 0x8202E514] ──────────────────────────
@@ -698,11 +747,11 @@ struct pcrSwingSpace {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pcrSwingSpace();                  // [0] @ 0x820e9808
-    virtual void vfn_3();  // [3] @ 0x820e9d78
-    virtual void vfn_20();  // [20] @ 0x820e9ca0
-    virtual void vfn_21();  // [21] @ 0x820e9ce8
-    virtual void vfn_22();  // [22] @ 0x820e9c90
+    ~pcrSwingSpace();                  // [0] @ 0x820e9808
+    void vfn_3();  // [3] @ 0x820e9d78
+    void vfn_20();  // [20] @ 0x820e9ca0
+    void vfn_21();  // [21] @ 0x820e9ce8
+    void vfn_22();  // [22] @ 0x820e9c90
 };
 
 // ── pcrSwingSpaceMgr  [vtable @ 0x82028CCC] ──────────────────────────
@@ -710,7 +759,7 @@ struct pcrSwingSpaceMgr {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pcrSwingSpaceMgr();                  // [0] @ 0x820de500
+    ~pcrSwingSpaceMgr();                  // [0] @ 0x820de500
 };
 
 // ── pongAnimationInfo  [vtable @ 0x82027760] ──────────────────────────
@@ -718,7 +767,7 @@ struct pongAnimationInfo {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongAnimationInfo();                  // [0] @ 0x820c3040
+    ~pongAnimationInfo();                  // [0] @ 0x820c3040
 };
 
 // ── pongBlendLookAtDriver  [vtable @ 0x820285A4] ──────────────────────────
@@ -729,21 +778,21 @@ struct pongBlendLookAtDriver {
     uint32_t    field_0x0008;     // +0x08
     uint32_t    field_0x000c;     // +0x0C
     float       field_0x0010;     // +0x10  blend weight
-    uint8_t     _pad_blad_14[208];
+    uint8_t     _pad_blad_14[204];
     float       field_0x00e0;     // +0xE0  current look-at angle
 
     // ── virtual methods ──
-    virtual ~pongBlendLookAtDriver();                  // [0] @ 0x820d0740
-    virtual void ScalarDtor(int flags); // [1] @ 0x820d0c20
-    virtual void vfn_4();  // [4] @ 0x820d12b0
-    virtual void vfn_5();  // [5] @ 0x820d16f8
-    virtual void vfn_6();  // [6] @ 0x820d1738
-    virtual void vfn_7();  // [7] @ 0x820d1750
-    virtual void vfn_9();  // [9] @ 0x820d1758
-    virtual void vfn_12();  // [12] @ 0x820d0c80
-    virtual void GetName();  // [13] @ 0x820d0c90
-    virtual void vfn_18();  // [18] @ 0x820d0ca0
-    virtual void vfn_20();  // [20] @ 0x820d0cd0
+    ~pongBlendLookAtDriver();                  // [0] @ 0x820d0740
+    void ScalarDtor(int flags); // [1] @ 0x820d0c20
+    void vfn_4();  // [4] @ 0x820d12b0
+    void vfn_5();  // [5] @ 0x820d16f8
+    void vfn_6();  // [6] @ 0x820d1738
+    void vfn_7();  // [7] @ 0x820d1750
+    void vfn_9();  // [9] @ 0x820d1758
+    void vfn_12();  // [12] @ 0x820d0c80
+    void GetName();  // [13] @ 0x820d0c90
+    void vfn_18();  // [18] @ 0x820d0ca0
+    void vfn_20();  // [20] @ 0x820d0cd0
 
     // ── non-virtual methods (from debug strings) ──
     void UpdateBody();
@@ -758,7 +807,7 @@ struct pongBlender {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongBlender();                  // [0] @ 0x820cb910
+    ~pongBlender();                  // [0] @ 0x820cb910
 };
 
 struct pongCreatureMatrix;  // 4x4 floats, rows a, b, c and the translation d (pong_creature.cpp)
@@ -767,50 +816,57 @@ struct pongCreatureMatrix;  // 4x4 floats, rows a, b, c and the translation d (p
 // Confirmed methods: Activate, Draw, StartEmote, Teleport
 // Field hints: m_pCreature:ptr, m_playerIndex:int, m_position:Vector3
 struct pongCreature {
-    void**      vtable;           // +0x00
-
     // ── field access clusters ──
+    void**       vtable;  // +0x00
     uint32_t     field_0x0004;  // +0x0004  R:2 W:1
     uint16_t     field_0x0008;  // +0x0008  R:1 W:0
-    uint8_t     _pad0x0011[5];
+    uint8_t      _pad0x000a[0x7];
     uint8_t      field_0x0011;  // +0x0011  R:1 W:0
-    uint8_t     _pad0x0024[15];
+    uint8_t      _pad0x0012[0x12];
     uint32_t     field_0x0024;  // +0x0024  R:1 W:0
-    uint8_t     _pad0x0040[24];
+    uint8_t      _pad0x0028[0x18];
     uint32_t     field_0x0040;  // +0x0040  R:1 W:0
+    uint8_t      _pad0x0044[0x4];
     uint32_t     field_0x0048;  // +0x0048  R:1 W:0
-    uint8_t     _pad0x0090[68];
+    uint8_t      _pad0x004c[0x44];
     uint32_t     field_0x0090;  // +0x0090  R:1 W:0
     uint32_t     field_0x0094;  // +0x0094  R:3 W:0
     uint32_t     field_0x0098;  // +0x0098  R:1 W:0
     uint32_t     field_0x009c;  // +0x009c  R:4 W:0
     uint32_t     field_0x00a0;  // +0x00a0  R:6 W:0
     uint32_t     field_0x00a4;  // +0x00a4  R:7 W:0
+    uint8_t      _pad0x00a8[0x4];
     uint32_t     field_0x00ac;  // +0x00ac  R:9 W:0
+    uint8_t      _pad0x00b0[0x4];
     uint8_t      field_0x00b4;  // +0x00b4  R:0 W:1
     uint8_t      field_0x00b5;  // +0x00b5  R:0 W:1
+    uint8_t      _pad0x00b6[0x6];
     uint32_t     field_0x00bc;  // +0x00bc  R:4 W:0
-    uint8_t     _pad0x00cc[12];
+    uint8_t      _pad0x00c0[0xc];
     uint32_t     field_0x00cc;  // +0x00cc  R:11 W:0
     uint32_t     field_0x00d0;  // +0x00d0  R:2 W:0
+    uint8_t      _pad0x00d4[0x1];
     uint8_t      field_0x00d5;  // +0x00d5  R:1 W:1
     uint8_t      field_0x00d6;  // +0x00d6  R:0 W:1
     uint8_t      field_0x00d7;  // +0x00d7  R:0 W:1
-    uint8_t     _pad0x00e0[5];
+    uint8_t      _pad0x00d8[0x8];
     uint8_t      field_0x00e0;  // +0x00e0  R:1 W:0
-    uint32_t     field_0x00e4;  // +0x00e4  R:2 W:0
-    uint8_t      field_0x00e5;  // +0x00e5  R:1 W:2
-    uint8_t      field_0x00e6;  // +0x00e6  R:0 W:1
+    uint8_t      _pad0x00e1[0x3];
+    union {  // overlapping accesses at +0x00e4..+0x00e8
+        struct { uint32_t field_0x00e4; };  // +0x00e4  R:2 W:0
+        struct { uint8_t _p00e5[0x1]; uint8_t field_0x00e5; };  // +0x00e5  R:1 W:2
+        struct { uint8_t _p00e6[0x2]; uint8_t field_0x00e6; };  // +0x00e6  R:0 W:1
+    };
     uint32_t     field_0x00e8;  // +0x00e8  R:1 W:0
-    uint8_t     _pad0x0140[84];
+    uint8_t      _pad0x00ec[0x54];
     uint8_t      field_0x0140;  // +0x0140  R:1 W:0
-    uint8_t     _pad0x0150[12];
+    uint8_t      _pad0x0141[0xf];
     uint8_t      field_0x0150;  // +0x0150  R:1 W:0
     uint8_t      field_0x0151;  // +0x0151  R:1 W:0
     uint8_t      field_0x0152;  // +0x0152  R:1 W:1
-    uint8_t     _pad0x0160[10];
+    uint8_t      _pad0x0153[0xd];
     uint32_t     field_0x0160;  // +0x0160  R:3 W:0
-    uint8_t     _pad0x0970[2060];
+    uint8_t      _pad0x0164[0x80c];
     uint32_t     field_0x0970;  // +0x0970  R:5 W:1
 
     // ── virtual methods ──
@@ -830,13 +886,13 @@ struct pongCreature {
     //   [8] nullsub                          @ 0x8240E6D0
     //
     // The declarations below don't reproduce that order.
-    virtual void UpdateWithIdentity(int updateMode);               // [0] @ 0x820C6358
-    virtual void SavePoseSnapshot();                               // [1] @ 0x820C67C0
-    virtual void DestroyThunk(int flags);                          // [2] @ 0x820C8618
-    virtual void Reset(void* world, void* scene);                  // [3] @ 0x820C6840
-    virtual void RegisterShadowCasters(bool useSecondaryEmitter);  // [5] @ 0x820C60C8
-    virtual void UpdateShadowAndAnimState(const float* matrix, int updateMode);  // [6] @ 0x820C6378  (TODO-body)
-    virtual void StepLocomotion();                                 // [7] @ 0x820C5D18
+    void UpdateWithIdentity(int updateMode);               // [0] @ 0x820C6358
+    void SavePoseSnapshot();                               // [1] @ 0x820C67C0
+    void DestroyThunk(int flags);                          // [2] @ 0x820C8618
+    void Reset(void* world, void* scene);                  // [3] @ 0x820C6840
+    void RegisterShadowCasters(bool useSecondaryEmitter);  // [5] @ 0x820C60C8
+    void UpdateShadowAndAnimState(const float* matrix, int updateMode);  // [6] @ 0x820C6378  (TODO-body)
+    void StepLocomotion();                                 // [7] @ 0x820C5D18
 
     // ── non-virtual methods (from debug strings) ──
     void Teleport();
@@ -865,11 +921,12 @@ struct fragCacheEntry;  // fragment cache entry handed out by the pool at g_crea
 // rage::phInst. The field list below also holds rage::fragType members;
 // pong_creature.cpp describes the real layout in pongCreatureInstLayout.
 struct pongCreatureInst {
-    void**      vtable;           // +0x00
-
     // ── field access clusters ──
-    uint32_t     field_0x0004;  // +0x0004  R:26 W:8
-    uint8_t      field_0x0006;  // +0x0006  R:1 W:0
+    void**       vtable;  // +0x00
+    union {  // overlapping accesses at +0x0004..+0x0008
+        struct { uint32_t field_0x0004; };  // +0x0004  R:26 W:8
+        struct { uint8_t _p0006[0x2]; uint8_t field_0x0006; };  // +0x0006  R:1 W:0
+    };
     uint32_t     field_0x0008;  // +0x0008  R:20 W:7
     uint32_t     field_0x000c;  // +0x000c  R:11 W:2
     uint32_t     field_0x0010;  // +0x0010  R:7 W:2
@@ -879,12 +936,15 @@ struct pongCreatureInst {
     uint32_t     field_0x0020;  // +0x0020  R:1 W:1
     uint32_t     field_0x0024;  // +0x0024  R:4 W:2
     uint32_t     field_0x0028;  // +0x0028  R:2 W:2
+    uint8_t      _pad0x002c[0x4];
     uint32_t     field_0x0030;  // +0x0030  R:0 W:1
     uint32_t     field_0x0034;  // +0x0034  R:0 W:1
     uint32_t     field_0x0038;  // +0x0038  R:0 W:1
+    uint8_t      _pad0x003c[0x4];
     uint32_t     field_0x0040;  // +0x0040  R:0 W:1
     uint32_t     field_0x0044;  // +0x0044  R:1 W:1
     uint32_t     field_0x0048;  // +0x0048  R:1 W:1
+    uint8_t      _pad0x004c[0x4];
     uint32_t     field_0x0050;  // +0x0050  R:7 W:8
     uint32_t     field_0x0054;  // +0x0054  R:10 W:1
     uint32_t     field_0x0058;  // +0x0058  R:0 W:2
@@ -892,17 +952,24 @@ struct pongCreatureInst {
     uint32_t     field_0x0060;  // +0x0060  R:0 W:1
     uint32_t     field_0x0064;  // +0x0064  R:0 W:1
     uint32_t     field_0x0068;  // +0x0068  R:0 W:1
+    uint8_t      _pad0x006c[0x4];
     uint32_t     field_0x0070;  // +0x0070  R:7 W:1
     uint32_t     field_0x0074;  // +0x0074  R:0 W:1
     uint32_t     field_0x0078;  // +0x0078  R:1 W:1
-    uint32_t     field_0x0080;  // +0x0080  R:2 W:3
-    uint16_t     field_0x0082;  // +0x0082  R:1 W:0
+    uint8_t      _pad0x007c[0x4];
+    union {  // overlapping accesses at +0x0080..+0x0084
+        struct { uint32_t field_0x0080; };  // +0x0080  R:2 W:3
+        struct { uint8_t _p0082[0x2]; uint16_t field_0x0082; };  // +0x0082  R:1 W:0
+    };
     uint32_t     field_0x0084;  // +0x0084  R:0 W:1
     uint32_t     field_0x0088;  // +0x0088  R:0 W:1
+    uint8_t      _pad0x008c[0x4];
     uint32_t     field_0x0090;  // +0x0090  R:11 W:1
     uint32_t     field_0x0094;  // +0x0094  R:11 W:1
-    uint32_t     field_0x0098;  // +0x0098  R:1 W:1
-    uint16_t     field_0x009a;  // +0x009a  R:1 W:0
+    union {  // overlapping accesses at +0x0098..+0x009c
+        struct { uint32_t field_0x0098; };  // +0x0098  R:1 W:1
+        struct { uint8_t _p009a[0x2]; uint16_t field_0x009a; };  // +0x009a  R:1 W:0
+    };
     uint32_t     field_0x009c;  // +0x009c  R:1 W:0
     uint32_t     field_0x00a0;  // +0x00a0  R:1 W:1
     uint32_t     field_0x00a4;  // +0x00a4  R:0 W:1
@@ -919,31 +986,38 @@ struct pongCreatureInst {
     uint32_t     field_0x00d0;  // +0x00d0  R:1 W:1
     uint32_t     field_0x00d4;  // +0x00d4  R:1 W:1
     uint32_t     field_0x00d8;  // +0x00d8  R:0 W:1
-    uint8_t     _pad0x0104[40];
+    uint8_t      _pad0x00dc[0x28];
     uint32_t     field_0x0104;  // +0x0104  R:0 W:1
     uint32_t     field_0x0108;  // +0x0108  R:0 W:1
     uint32_t     field_0x010c;  // +0x010c  R:0 W:1
+    uint8_t      _pad0x0110[0x4];
     uint16_t     field_0x0114;  // +0x0114  R:1 W:0
+    uint8_t      _pad0x0116[0x2];
     uint32_t     field_0x0118;  // +0x0118  R:1 W:0
-    uint8_t     _pad0x0124[8];
+    uint8_t      _pad0x011c[0x8];
     uint32_t     field_0x0124;  // +0x0124  R:1 W:0
+    uint8_t      _pad0x0128[0x2];
     uint16_t     field_0x012a;  // +0x012a  R:1 W:0
-    uint8_t     _pad0x0134[6];
+    uint8_t      _pad0x012c[0x8];
     uint32_t     field_0x0134;  // +0x0134  R:0 W:1
-    uint8_t     _pad0x017c[68];
+    uint8_t      _pad0x0138[0x44];
     uint32_t     field_0x017c;  // +0x017c  R:0 W:1
     uint32_t     field_0x0180;  // +0x0180  R:0 W:1
     uint32_t     field_0x0184;  // +0x0184  R:0 W:1
-    uint8_t     _pad0x01a4[28];
+    uint8_t      _pad0x0188[0x1c];
     uint32_t     field_0x01a4;  // +0x01a4  R:0 W:1
-    uint32_t     field_0x01a8;  // +0x01a8  R:1 W:3
-    uint8_t      field_0x01a9;  // +0x01a9  R:0 W:1
-    uint8_t      field_0x01aa;  // +0x01aa  R:2 W:1
-    uint8_t      field_0x01ab;  // +0x01ab  R:0 W:1
-    uint32_t     field_0x01ac;  // +0x01ac  R:0 W:2
-    uint8_t      field_0x01ad;  // +0x01ad  R:0 W:1
-    uint8_t      field_0x01ae;  // +0x01ae  R:0 W:1
-    uint8_t      field_0x01af;  // +0x01af  R:3 W:3
+    union {  // overlapping accesses at +0x01a8..+0x01ac
+        struct { uint32_t field_0x01a8; };  // +0x01a8  R:1 W:3
+        struct { uint8_t _p01a9[0x1]; uint8_t field_0x01a9; };  // +0x01a9  R:0 W:1
+        struct { uint8_t _p01aa[0x2]; uint8_t field_0x01aa; };  // +0x01aa  R:2 W:1
+        struct { uint8_t _p01ab[0x3]; uint8_t field_0x01ab; };  // +0x01ab  R:0 W:1
+    };
+    union {  // overlapping accesses at +0x01ac..+0x01b0
+        struct { uint32_t field_0x01ac; };  // +0x01ac  R:0 W:2
+        struct { uint8_t _p01ad[0x1]; uint8_t field_0x01ad; };  // +0x01ad  R:0 W:1
+        struct { uint8_t _p01ae[0x2]; uint8_t field_0x01ae; };  // +0x01ae  R:0 W:1
+        struct { uint8_t _p01af[0x3]; uint8_t field_0x01af; };  // +0x01af  R:3 W:3
+    };
     uint32_t     field_0x01b0;  // +0x01b0  R:7 W:2
     uint32_t     field_0x01b4;  // +0x01b4  R:10 W:2
     uint32_t     field_0x01b8;  // +0x01b8  R:0 W:2
@@ -954,51 +1028,51 @@ struct pongCreatureInst {
     uint64_t     field_0x01c0;  // +0x01c0  R:0 W:1
     uint64_t     field_0x01c8;  // +0x01c8  R:0 W:1
     uint32_t     field_0x01d0;  // +0x01d0  R:1 W:0
-    uint8_t     _pad0x01e4[16];
+    uint8_t      _pad0x01d4[0x10];
     uint32_t     field_0x01e4;  // +0x01e4  R:1 W:0
-    uint8_t     _pad0x01f0[8];
+    uint8_t      _pad0x01e8[0x8];
     uint32_t     field_0x01f0;  // +0x01f0  R:1 W:0
     uint32_t     field_0x01f4;  // +0x01f4  R:1 W:0
     uint32_t     field_0x01f8;  // +0x01f8  R:1 W:0
     uint32_t     field_0x01fc;  // +0x01fc  R:2 W:0
     uint32_t     field_0x0200;  // +0x0200  R:1 W:0
-    uint8_t     _pad0x06f4[1264];
+    uint8_t      _pad0x0204[0x4f0];
     uint32_t     field_0x06f4;  // +0x06f4  R:0 W:1
-    uint8_t     _pad0x0754[92];
+    uint8_t      _pad0x06f8[0x5c];
     uint32_t     field_0x0754;  // +0x0754  R:0 W:1
     uint32_t     field_0x0758;  // +0x0758  R:0 W:1
     uint32_t     field_0x075c;  // +0x075c  R:0 W:1
     uint32_t     field_0x0760;  // +0x0760  R:0 W:1
     uint32_t     field_0x0764;  // +0x0764  R:0 W:1
     uint32_t     field_0x0768;  // +0x0768  R:0 W:1
-    uint8_t     _pad0x0cf0[1412];
+    uint8_t      _pad0x076c[0x584];
     uint32_t     field_0x0cf0;  // +0x0cf0  R:0 W:1
     uint32_t     field_0x0cf4;  // +0x0cf4  R:0 W:1
     uint32_t     field_0x0cf8;  // +0x0cf8  R:0 W:1
-    uint8_t     _pad0x0dd8[220];
+    uint8_t      _pad0x0cfc[0xdc];
     uint64_t     field_0x0dd8;  // +0x0dd8  R:0 W:1
-    uint8_t     _pad0x0de8[12];
+    uint8_t      _pad0x0de0[0x8];
     uint64_t     field_0x0de8;  // +0x0de8  R:0 W:1
     uint64_t     field_0x0df0;  // +0x0df0  R:0 W:1
-    uint8_t     _pad0x0e08[20];
+    uint8_t      _pad0x0df8[0x10];
     uint32_t     field_0x0e08;  // +0x0e08  R:0 W:1
-    uint8_t     _pad0x0e14[8];
+    uint8_t      _pad0x0e0c[0x8];
     uint32_t     field_0x0e14;  // +0x0e14  R:0 W:1
-    uint8_t     _pad0x0e28[16];
+    uint8_t      _pad0x0e18[0x10];
     uint32_t     field_0x0e28;  // +0x0e28  R:0 W:1
     uint32_t     field_0x0e2c;  // +0x0e2c  R:0 W:1
     uint32_t     field_0x0e30;  // +0x0e30  R:0 W:1
     uint32_t     field_0x0e34;  // +0x0e34  R:0 W:1
     uint32_t     field_0x0e38;  // +0x0e38  R:0 W:1
-    uint8_t     _pad0x0f04[200];
+    uint8_t      _pad0x0e3c[0xc8];
     uint32_t     field_0x0f04;  // +0x0f04  R:0 W:1
     uint32_t     field_0x0f08;  // +0x0f08  R:0 W:1
     uint32_t     field_0x0f0c;  // +0x0f0c  R:0 W:1
     uint32_t     field_0x0f10;  // +0x0f10  R:0 W:1
     uint32_t     field_0x0f14;  // +0x0f14  R:0 W:1
-    uint8_t     _pad0x0f40[40];
+    uint8_t      _pad0x0f18[0x28];
     uint32_t     field_0x0f40;  // +0x0f40  R:0 W:1
-    uint8_t     _pad0x3c60[11548];
+    uint8_t      _pad0x0f44[0x2d1c];
     uint32_t     field_0x3c60;  // +0x3c60  R:0 W:1
     uint32_t     field_0x3c64;  // +0x3c64  R:0 W:1
     uint32_t     field_0x3c68;  // +0x3c68  R:0 W:1
@@ -1008,49 +1082,49 @@ struct pongCreatureInst {
     uint32_t     field_0x3c78;  // +0x3c78  R:0 W:1
     uint32_t     field_0x3c7c;  // +0x3c7c  R:0 W:1
     uint32_t     field_0x3c80;  // +0x3c80  R:0 W:1
-    uint8_t     _pad0x3c8c[8];
+    uint8_t      _pad0x3c84[0x8];
     uint32_t     field_0x3c8c;  // +0x3c8c  R:0 W:1
-    uint8_t     _pad0x3d58[200];
+    uint8_t      _pad0x3c90[0xc8];
     uint32_t     field_0x3d58;  // +0x3d58  R:0 W:1
-    uint8_t     _pad0x4cac[3920];
+    uint8_t      _pad0x3d5c[0xf50];
     uint32_t     field_0x4cac;  // +0x4cac  R:0 W:1
     uint32_t     field_0x4cb0;  // +0x4cb0  R:0 W:1
     uint32_t     field_0x4cb4;  // +0x4cb4  R:0 W:1
-    uint8_t     _pad0x4d7c[196];
+    uint8_t      _pad0x4cb8[0xc4];
     uint32_t     field_0x4d7c;  // +0x4d7c  R:0 W:4
-    uint8_t     _pad0x65e4[6244];
+    uint8_t      _pad0x4d80[0x1864];
     uint32_t     field_0x65e4;  // +0x65e4  R:1 W:0
 
     // ── virtual methods ──
-    virtual ~pongCreatureInst();                  // [0] @ 0x820c8ee0 — body lifted as ScalarDeletingDtor
-    virtual int GetType();              // [1] @ 0x8210cc40
-    virtual const float* GetLastMatrix();  // [2] @ 0x820c8ed8 — the 4x4 kept at +0xE0
-    virtual void SetLastMatrix(const float* matrix);  // [3] @ 0x820c8e98 — copies a 4x4 into +0xE0
-    virtual void ClearBoundingVector(void* outVector);  // [4] @ 0x822c90f8
-    virtual void TransformBoundingVector(void* inOutVector, void* transform);  // [6] @ 0x822c9108 — cross-product transform on bounding vector
-    virtual void ApplyAtPosition(const float* vec);  // [9] @ 0x822c90b0 — slot 10 at the matrix translation
-    virtual void ApplyAt(const float* vec, const float* point, int component, int element);  // [10] @ 0x822c90a0 — forwards to slot 15
-    virtual void ApplyToRope(const float* vec, const float* point, int component);  // [11] @ 0x821210a8 — slot 16, then the phRope behaviour
-    virtual void ApplyAtComponent(const float* vec, const float* point, int component);  // [14] @ 0x822c90e0 — slot 10 with element 0
-    virtual int GetDefaultIndex();  // [19] @ 0x824ff7c8
-    virtual bool TouchCacheEntry();  // [22] @ 0x8211ddb8 — stamps the cache entry with the pool's current stamp
-    virtual void SelectBestBone(void* boneData);  // [26] @ 0x8211ddf8 — iterates bones, selects by weight
-    virtual void UpdateBoneTransforms();  // [28] @ 0x8211f2a0 — transposes matrix, transforms bones
-    virtual void* PrepareForActivation(void** outObject, void* arg2, void* arg3, void* arg4);  // [30] @ 0x820c8f80 — runs fragInst's, returns null
-    virtual void FillMatrixFromConstant(float* outMatrix);  // [31] @ 0x822c9200 — four copies of the vector at 0x82606750
-    virtual bool ComputeCollisionRadius(void* rayOrigin, void* outRadius, void* outByte, float* outFraction);  // [34] @ 0x8211d760 — physics bound check, normalizes, divides radius
-    virtual void UpdateCollisionFlags(void* flagData);  // [35] @ 0x82120880 — sets dirty bit, checks collision type
-    virtual bool ResolveCollision(void* player, void* rayData, void* hitList, void* hitCount, void* outHit, void* colGroup, void* mask);  // [36] @ 0x82120408 — resolves collision, updates flags
-    virtual int CountBoundParts();  // [37] @ 0x822c92d8 — non-null part pointers of the archetype's bound
-    virtual void* GetEntityByIndex(int index);  // [38] @ 0x822c9318
-    virtual bool AttachToScene(bool rejectIfKeyCached);  // [41] @ 0x8211d0e0 — sets attached flag, notifies manager, links into type holder's list
-    virtual void DetachFromScene();  // [42] @ 0x8211ecc0 — removes from physics, updates color/transform
-    virtual fragCacheEntry* AcquireCacheEntry();  // [43] @ 0x8211efc0 — takes a fragment cache entry from the pool
-    virtual void UpdateWorldBound();  // [46] @ 0x82121530 — world bound sphere = bound centroid × matrix, notifies manager
-    virtual void SyncBoneMatrices();  // [47] @ 0x8211fac8 — iterates bones, copies and transforms matrices
-    virtual void InitializeTransform();  // [48] @ 0x82121138 — reads scale, sets dirty flag, calls UpdateBoneTransforms
-    virtual void* GetPhysicsAllocator();  // [53] @ 0x821214e0 — returns creature_data->+484 allocator ptr
-    virtual void ApplyBoneDamage(void* damageInfo);  // [56] @ 0x8211e3f0 — computes bone damage/weight distribution
+    ~pongCreatureInst();                  // [0] @ 0x820c8ee0 — body lifted as ScalarDeletingDtor
+    int GetType();              // [1] @ 0x8210cc40
+    const float* GetLastMatrix();  // [2] @ 0x820c8ed8 — the 4x4 kept at +0xE0
+    void SetLastMatrix(const float* matrix);  // [3] @ 0x820c8e98 — copies a 4x4 into +0xE0
+    void ClearBoundingVector(void* outVector);  // [4] @ 0x822c90f8
+    void TransformBoundingVector(void* inOutVector, void* transform);  // [6] @ 0x822c9108 — cross-product transform on bounding vector
+    void ApplyAtPosition(const float* vec);  // [9] @ 0x822c90b0 — slot 10 at the matrix translation
+    void ApplyAt(const float* vec, const float* point, int component, int element);  // [10] @ 0x822c90a0 — forwards to slot 15
+    void ApplyToRope(const float* vec, const float* point, int component);  // [11] @ 0x821210a8 — slot 16, then the phRope behaviour
+    void ApplyAtComponent(const float* vec, const float* point, int component);  // [14] @ 0x822c90e0 — slot 10 with element 0
+    int GetDefaultIndex();  // [19] @ 0x824ff7c8
+    bool TouchCacheEntry();  // [22] @ 0x8211ddb8 — stamps the cache entry with the pool's current stamp
+    void SelectBestBone(void* boneData);  // [26] @ 0x8211ddf8 — iterates bones, selects by weight
+    void UpdateBoneTransforms();  // [28] @ 0x8211f2a0 — transposes matrix, transforms bones
+    void* PrepareForActivation(void** outObject, void* arg2, void* arg3, void* arg4);  // [30] @ 0x820c8f80 — runs fragInst's, returns null
+    void FillMatrixFromConstant(float* outMatrix);  // [31] @ 0x822c9200 — four copies of the vector at 0x82606750
+    bool ComputeCollisionRadius(void* rayOrigin, void* outRadius, void* outByte, float* outFraction);  // [34] @ 0x8211d760 — physics bound check, normalizes, divides radius
+    void UpdateCollisionFlags(void* flagData);  // [35] @ 0x82120880 — sets dirty bit, checks collision type
+    bool ResolveCollision(void* player, void* rayData, void* hitList, void* hitCount, void* outHit, void* colGroup, void* mask);  // [36] @ 0x82120408 — resolves collision, updates flags
+    int CountBoundParts();  // [37] @ 0x822c92d8 — non-null part pointers of the archetype's bound
+    void* GetEntityByIndex(int index);  // [38] @ 0x822c9318
+    bool AttachToScene(bool rejectIfKeyCached);  // [41] @ 0x8211d0e0 — sets attached flag, notifies manager, links into type holder's list
+    void DetachFromScene();  // [42] @ 0x8211ecc0 — removes from physics, updates color/transform
+    fragCacheEntry* AcquireCacheEntry();  // [43] @ 0x8211efc0 — takes a fragment cache entry from the pool
+    void UpdateWorldBound();  // [46] @ 0x82121530 — world bound sphere = bound centroid × matrix, notifies manager
+    void SyncBoneMatrices();  // [47] @ 0x8211fac8 — iterates bones, copies and transforms matrices
+    void InitializeTransform();  // [48] @ 0x82121138 — reads scale, sets dirty flag, calls UpdateBoneTransforms
+    void* GetPhysicsAllocator();  // [53] @ 0x821214e0 — returns creature_data->+484 allocator ptr
+    void ApplyBoneDamage(void* damageInfo);  // [56] @ 0x8211e3f0 — computes bone damage/weight distribution
 
     // ── non-virtual methods ──
     void* ScalarDeletingDtor(int flags);  // @ 0x820C8EE0 — vtable slot 0
@@ -1108,11 +1182,11 @@ struct pongCreatureType {
     uint16_t    m_hashMapCap;     // +0x12  capacity/flags
     void*       m_pChild20;       // +0x14  owned child (freed in dtor)
     void*       m_pChild24;       // +0x18  owned child (freed in dtor)
-    uint8_t     _pad001C[60];
+    uint8_t     _pad001C[68];
     void*       m_pChild96;       // +0x60  owned child (freed in dtor)  (+96 decimal)
 
     // ── virtual methods ──
-    virtual ~pongCreatureType();                  // [0] @ 0x820c2da0
+    ~pongCreatureType();                  // [0] @ 0x820c2da0
 };
 
 // ── pongHairData  [vtable @ 0x820284F4] ──────────────────────────
@@ -1120,12 +1194,12 @@ struct pongHairData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongHairData();                  // [0] @ 0x820cfc08
-    virtual void ScalarDtor(int flags); // [1] @ 0x82177688
-    virtual void vfn_2();  // [2] @ 0x82177760
-    virtual void vfn_3();  // [3] @ 0x820cfc68
-    virtual void vfn_6();  // [6] @ 0x820cfbe8
-    virtual void vfn_7();  // [7] @ 0x820cfbf8
+    ~pongHairData();                  // [0] @ 0x820cfc08
+    void ScalarDtor(int flags); // [1] @ 0x82177688
+    void vfn_2();  // [2] @ 0x82177760
+    void vfn_3();  // [3] @ 0x820cfc68
+    void vfn_6();  // [6] @ 0x820cfbe8
+    void vfn_7();  // [7] @ 0x820cfbf8
 };
 
 // ── pongLocomotionController  [vtable @ 0x8202863C] ──────────────────────────
@@ -1133,24 +1207,24 @@ struct pongLocomotionController {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongLocomotionController();                  // [0] @ 0x820d34f0
-    virtual void ScalarDtor(int flags); // [1] @ 0x820d37c0
-    virtual void vfn_2();  // [2] @ 0x820d3468
-    virtual void vfn_3();  // [3] @ 0x820d3e40
-    virtual void vfn_4();  // [4] @ 0x820d3fc0
-    virtual void vfn_5();  // [5] @ 0x820d4040
-    virtual void vfn_6();  // [6] @ 0x820d41f8
-    virtual void vfn_7();  // [7] @ 0x820d4490
-    virtual void vfn_8();  // [8] @ 0x820d44a0
-    virtual void vfn_9();  // [9] @ 0x820d3550
-    virtual void vfn_10();  // [10] @ 0x820d34e8
-    virtual void OnEnter();  // [11] @ 0x820d3f18
-    virtual void vfn_12();  // [12] @ 0x820d3f68
-    virtual void GetName();  // [13] @ 0x820d3fa8
-    virtual void vfn_14();  // [14] @ 0x820d3ef0
-    virtual void vfn_15();  // [15] @ 0x820d4050
-    virtual void vfn_16();  // [16] @ 0x822c94f0
-    virtual void vfn_17();  // [17] @ 0x820d4430
+    ~pongLocomotionController();                  // [0] @ 0x820d34f0
+    void ScalarDtor(int flags); // [1] @ 0x820d37c0
+    void vfn_2();  // [2] @ 0x820d3468
+    void vfn_3();  // [3] @ 0x820d3e40
+    void vfn_4();  // [4] @ 0x820d3fc0
+    void vfn_5();  // [5] @ 0x820d4040
+    void vfn_6();  // [6] @ 0x820d41f8
+    void vfn_7();  // [7] @ 0x820d4490
+    void vfn_8();  // [8] @ 0x820d44a0
+    void vfn_9();  // [9] @ 0x820d3550
+    void vfn_10();  // [10] @ 0x820d34e8
+    void OnEnter();  // [11] @ 0x820d3f18
+    void vfn_12();  // [12] @ 0x820d3f68
+    void GetName();  // [13] @ 0x820d3fa8
+    void vfn_14();  // [14] @ 0x820d3ef0
+    void vfn_15();  // [15] @ 0x820d4050
+    void vfn_16();  // [16] @ 0x822c94f0
+    void vfn_17();  // [17] @ 0x820d4430
 };
 
 // ── pongLookAtController  [vtable @ 0x82027AEC] ──────────────────────────
@@ -1164,22 +1238,22 @@ struct pongLookAtDriver {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongLookAtDriver();                  // [0] @ 0x820d5238
-    virtual void ScalarDtor(int flags); // [1] @ 0x820c9e88
-    virtual void vfn_5();  // [5] @ 0x820c9a10
-    virtual void vfn_8();  // [8] @ 0x820c9a20
-    virtual void vfn_9();  // [9] @ 0x820c9a28
-    virtual void vfn_10();  // [10] @ 0x820c9a38
-    virtual void OnEnter();  // [11] @ 0x820c9a48
-    virtual void vfn_12();  // [12] @ 0x820c9a50
-    virtual void GetName();  // [13] @ 0x820c9a60
-    virtual void vfn_14();  // [14] @ 0x820c9a70
-    virtual void vfn_15();  // [15] @ 0x820c9a78
-    virtual void vfn_16();  // [16] @ 0x820c9a90
-    virtual void vfn_17();  // [17] @ 0x820c9aa0
-    virtual void vfn_18();  // [18] @ 0x820c9ab0
-    virtual void vfn_19();  // [19] @ 0x820c9ab8
-    virtual void vfn_20();  // [20] @ 0x820c9ec0
+    ~pongLookAtDriver();                  // [0] @ 0x820d5238
+    void ScalarDtor(int flags); // [1] @ 0x820c9e88
+    void vfn_5();  // [5] @ 0x820c9a10
+    void vfn_8();  // [8] @ 0x820c9a20
+    void vfn_9();  // [9] @ 0x820c9a28
+    void vfn_10();  // [10] @ 0x820c9a38
+    void OnEnter();  // [11] @ 0x820c9a48
+    void vfn_12();  // [12] @ 0x820c9a50
+    void GetName();  // [13] @ 0x820c9a60
+    void vfn_14();  // [14] @ 0x820c9a70
+    void vfn_15();  // [15] @ 0x820c9a78
+    void vfn_16();  // [16] @ 0x820c9a90
+    void vfn_17();  // [17] @ 0x820c9aa0
+    void vfn_18();  // [18] @ 0x820c9ab0
+    void vfn_19();  // [19] @ 0x820c9ab8
+    void vfn_20();  // [20] @ 0x820c9ec0
 
     // ── non-virtual methods (from debug strings) ──
     void VirtualConstructFromPtr();
@@ -1278,13 +1352,29 @@ struct pongSkelLookAtDriver {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x820d54c0
-    virtual void vfn_3();  // [3] @ 0x820d5bd0
-    virtual void vfn_4();  // [4] @ 0x820d5948
-    virtual void vfn_5();  // [5] @ 0x820d5518
-    virtual void vfn_6();  // [6] @ 0x820d55b0
-    virtual void vfn_7();  // [7] @ 0x820d55c8
+    void ScalarDtor(int flags); // [1] @ 0x820d54c0
+    void vfn_3();  // [3] @ 0x820d5bd0
+    void vfn_4();  // [4] @ 0x820d5948
+    void vfn_5();  // [5] @ 0x820d5518
+    void vfn_6();  // [6] @ 0x820d55b0
+    void vfn_7();  // [7] @ 0x820d55c8
 
     // ── non-virtual methods (from debug strings) ──
     void UpdateBody();
 };
+
+// Offsets checked against the asm; only meaningful on the game's 32-bit layout.
+#if __SIZEOF_POINTER__ == 4
+static_assert(offsetof(LocomotionStateMf, field_0x0028) == 0x28, "");
+static_assert(offsetof(pcrAnimEventMsg, m_message) == 0x28, "");
+static_assert(offsetof(pcrAnimEventMsg_s, m_stringParam) == 0x30, "");
+static_assert(offsetof(pcrFaceAnimBlender, m_pAnimObj) == 0x90, "");
+static_assert(offsetof(pcrEmoteBlender, m_pSessionInfo) == 0x5C, "");
+static_assert(offsetof(pcrEmoteBlender, m_emoteIndex) == 0x180, "");
+static_assert(offsetof(pcrPostPointBlender, m_bForced) == 0x1A8, "");
+static_assert(offsetof(pcrPostPointBlender, m_descriptors) == 0x1BC, "");
+static_assert(offsetof(pongBlendLookAtDriver, field_0x00e0) == 0xE0, "");
+static_assert(offsetof(pongCreatureType, m_pChild96) == 0x60, "");
+static_assert(offsetof(LocomotionStateAnim, field_0x0024) == 0x24, "");
+static_assert(offsetof(pongCreatureInst, field_0x01b0) == 0x1B0, "");
+#endif

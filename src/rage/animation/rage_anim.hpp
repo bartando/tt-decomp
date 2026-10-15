@@ -10,6 +10,11 @@
  * recomp/structured_pass5_final/ when lifting individual slots.
  */
 #pragma once
+
+// Structs that carry the game's vtable as an explicit `vtable` member list
+// their slots as plain (non-virtual) methods: a C++ virtual would add a hidden
+// vptr in front of `vtable` and shift every member by 4. Generated field lists
+// put every member at its commented offset; overlapping accesses share a union.
 #include <stdint.h>
 
 namespace rage {
@@ -19,7 +24,7 @@ struct crAnimChannel {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~crAnimChannel();                  // [0] @ 0x82244040
+    ~crAnimChannel();                  // [0] @ 0x82244040
 };
 
 // ── rage::crAnimChannelCurveFloat  [vtable @ 0x8204F964] ──────────────────────────
@@ -27,13 +32,13 @@ struct crAnimChannelCurveFloat {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~crAnimChannelCurveFloat();                  // [0] @ 0x822449b8
-    virtual void ScalarDtor(int flags); // [1] @ 0x82246730
-    virtual void vfn_2();  // [2] @ 0x822448f8
-    virtual void vfn_5();  // [5] @ 0x822467f8
-    virtual void vfn_8();  // [8] @ 0x82246938
-    virtual void vfn_13();  // [13] @ 0x82247560
-    virtual void vfn_14();  // [14] @ 0x822475a0
+    ~crAnimChannelCurveFloat();                  // [0] @ 0x822449b8
+    void ScalarDtor(int flags); // [1] @ 0x82246730
+    void vfn_2();  // [2] @ 0x822448f8
+    void vfn_5();  // [5] @ 0x822467f8
+    void vfn_8();  // [8] @ 0x82246938
+    void vfn_13();  // [13] @ 0x82247560
+    void vfn_14();  // [14] @ 0x822475a0
 };
 
 // ── rage::crAnimChannelQuantizeFloat  [vtable @ 0x8204F9AC] ──────────────────────────
@@ -41,13 +46,13 @@ struct crAnimChannelQuantizeFloat {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~crAnimChannelQuantizeFloat();                  // [0] @ 0x82244aa0
-    virtual void ScalarDtor(int flags); // [1] @ 0x82247888
-    virtual void vfn_2();  // [2] @ 0x82244a28
-    virtual void vfn_5();  // [5] @ 0x822478e0
-    virtual void vfn_8();  // [8] @ 0x822479b0
-    virtual void vfn_13();  // [13] @ 0x82247b00
-    virtual void vfn_14();  // [14] @ 0x82247b10
+    ~crAnimChannelQuantizeFloat();                  // [0] @ 0x82244aa0
+    void ScalarDtor(int flags); // [1] @ 0x82247888
+    void vfn_2();  // [2] @ 0x82244a28
+    void vfn_5();  // [5] @ 0x822478e0
+    void vfn_8();  // [8] @ 0x822479b0
+    void vfn_13();  // [13] @ 0x82247b00
+    void vfn_14();  // [14] @ 0x82247b10
 };
 
 // ── rage::crAnimChannelRawBool  [vtable @ 0x8204F88C] ──────────────────────────
@@ -55,13 +60,13 @@ struct crAnimChannelRawBool {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~crAnimChannelRawBool();                  // [0] @ 0x82244710
-    virtual void ScalarDtor(int flags); // [1] @ 0x82246208
-    virtual void vfn_2();  // [2] @ 0x82244620
-    virtual void vfn_7();  // [7] @ 0x82246260
-    virtual void vfn_12();  // [12] @ 0x822462c8
-    virtual void vfn_13();  // [13] @ 0x822464a0
-    virtual void vfn_14();  // [14] @ 0x822464b0
+    ~crAnimChannelRawBool();                  // [0] @ 0x82244710
+    void ScalarDtor(int flags); // [1] @ 0x82246208
+    void vfn_2();  // [2] @ 0x82244620
+    void vfn_7();  // [7] @ 0x82246260
+    void vfn_12();  // [12] @ 0x822462c8
+    void vfn_13();  // [13] @ 0x822464a0
+    void vfn_14();  // [14] @ 0x822464b0
 };
 
 // ── rage::crAnimChannelRawFloat  [vtable @ 0x8204F76C] ──────────────────────────
@@ -69,13 +74,13 @@ struct crAnimChannelRawFloat {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~crAnimChannelRawFloat();                  // [0] @ 0x82244180
-    virtual void ScalarDtor(int flags); // [1] @ 0x822454c8
-    virtual void vfn_2();  // [2] @ 0x82244088
-    virtual void vfn_5();  // [5] @ 0x82245520
-    virtual void vfn_8();  // [8] @ 0x82245650
-    virtual void vfn_13();  // [13] @ 0x822461f8
-    virtual void vfn_14();  // [14] @ 0x82245758
+    ~crAnimChannelRawFloat();                  // [0] @ 0x82244180
+    void ScalarDtor(int flags); // [1] @ 0x822454c8
+    void vfn_2();  // [2] @ 0x82244088
+    void vfn_5();  // [5] @ 0x82245520
+    void vfn_8();  // [8] @ 0x82245650
+    void vfn_13();  // [13] @ 0x822461f8
+    void vfn_14();  // [14] @ 0x82245758
 };
 
 // ── rage::crAnimChannelRawInt  [vtable @ 0x8204F844] ──────────────────────────
@@ -83,11 +88,11 @@ struct crAnimChannelRawInt {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~crAnimChannelRawInt();                  // [0] @ 0x822445a8
-    virtual void ScalarDtor(int flags); // [1] @ 0x822460c0
-    virtual void vfn_2();  // [2] @ 0x822444f8
-    virtual void vfn_6();  // [6] @ 0x82246118
-    virtual void vfn_11();  // [11] @ 0x82246180
+    ~crAnimChannelRawInt();                  // [0] @ 0x822445a8
+    void ScalarDtor(int flags); // [1] @ 0x822460c0
+    void vfn_2();  // [2] @ 0x822444f8
+    void vfn_6();  // [6] @ 0x82246118
+    void vfn_11();  // [11] @ 0x82246180
 };
 
 // ── rage::crAnimChannelRawQuaternion  [vtable @ 0x8204F7FC] ──────────────────────────
@@ -95,12 +100,12 @@ struct crAnimChannelRawQuaternion {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~crAnimChannelRawQuaternion();                  // [0] @ 0x82244398
-    virtual void ScalarDtor(int flags); // [1] @ 0x82245af0
-    virtual void vfn_2();  // [2] @ 0x82244320
-    virtual void vfn_4();  // [4] @ 0x82245b48
-    virtual void vfn_10();  // [10] @ 0x82245cd8
-    virtual void vfn_14();  // [14] @ 0x82246028
+    ~crAnimChannelRawQuaternion();                  // [0] @ 0x82244398
+    void ScalarDtor(int flags); // [1] @ 0x82245af0
+    void vfn_2();  // [2] @ 0x82244320
+    void vfn_4();  // [4] @ 0x82245b48
+    void vfn_10();  // [10] @ 0x82245cd8
+    void vfn_14();  // [14] @ 0x82246028
 };
 
 // ── rage::crAnimChannelRawVector3  [vtable @ 0x8204F7B4] ──────────────────────────
@@ -108,13 +113,13 @@ struct crAnimChannelRawVector3 {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~crAnimChannelRawVector3();                  // [0] @ 0x822442a8
-    virtual void ScalarDtor(int flags); // [1] @ 0x82245820
-    virtual void vfn_2();  // [2] @ 0x822441f8
-    virtual void vfn_3();  // [3] @ 0x82245878
-    virtual void vfn_9();  // [9] @ 0x822459e0
-    virtual void vfn_13();  // [13] @ 0x82246018
-    virtual void vfn_14();  // [14] @ 0x82245a58
+    ~crAnimChannelRawVector3();                  // [0] @ 0x822442a8
+    void ScalarDtor(int flags); // [1] @ 0x82245820
+    void vfn_2();  // [2] @ 0x822441f8
+    void vfn_3();  // [3] @ 0x82245878
+    void vfn_9();  // [9] @ 0x822459e0
+    void vfn_13();  // [13] @ 0x82246018
+    void vfn_14();  // [14] @ 0x82245a58
 };
 
 // ── rage::crAnimChannelStaticFloat  [vtable @ 0x8204F8D4] ──────────────────────────
@@ -122,11 +127,11 @@ struct crAnimChannelStaticFloat {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x82246578
-    virtual void vfn_2();  // [2] @ 0x82244788
-    virtual void vfn_5();  // [5] @ 0x82246590
-    virtual void vfn_8();  // [8] @ 0x822465a0
-    virtual void vfn_14();  // [14] @ 0x82246600
+    void ScalarDtor(int flags); // [1] @ 0x82246578
+    void vfn_2();  // [2] @ 0x82244788
+    void vfn_5();  // [5] @ 0x82246590
+    void vfn_8();  // [8] @ 0x822465a0
+    void vfn_14();  // [14] @ 0x82246600
 };
 
 // ── rage::crAnimChannelStaticQuaternion  [vtable @ 0x8204F91C] ──────────────────────────
@@ -134,11 +139,11 @@ struct crAnimChannelStaticQuaternion {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x82246640
-    virtual void vfn_2();  // [2] @ 0x82244830
-    virtual void vfn_4();  // [4] @ 0x82246658
-    virtual void vfn_10();  // [10] @ 0x82246670
-    virtual void vfn_14();  // [14] @ 0x82246720
+    void ScalarDtor(int flags); // [1] @ 0x82246640
+    void vfn_2();  // [2] @ 0x82244830
+    void vfn_4();  // [4] @ 0x82246658
+    void vfn_10();  // [10] @ 0x82246670
+    void vfn_14();  // [14] @ 0x82246720
 };
 
 // ── rage::crAnimDof  [vtable @ 0x82027B44] ──────────────────────────
@@ -146,256 +151,249 @@ struct crAnimDof {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~crAnimDof();                  // [0] @ 0x8216ee20
-    virtual void vfn_14();  // [14] @ 0x820c4688
-    virtual void vfn_15();  // [15] @ 0x820c46c8
-    virtual void vfn_16();  // [16] @ 0x8228ce28
+    ~crAnimDof();                  // [0] @ 0x8216ee20
+    void vfn_14();  // [14] @ 0x820c4688
+    void vfn_15();  // [15] @ 0x820c46c8
+    void vfn_16();  // [16] @ 0x8228ce28
 };
 
 // ── rage::crAnimDofFloat  [vtable @ 0x82036884] ──────────────────────────
 // Degree-of-freedom for a single float channel. Size returned by GetChannelCount = 12.
 struct crAnimDofFloat {
-    void**      vtable;           // +0x00
-
-    // ── base DOF fields (shared layout with crAnimDofVector3/Quaternion) ──
-    uint8_t      m_flags;          // +0x0004  DOF type/mode flags  R:49 W:21
+    void**       vtable;  // +0x0000
+    uint8_t      m_flags;  // +0x0004  DOF type/mode flags  R:49 W:21
     uint8_t      m_channelConfig;  // +0x0005  Channel configuration  R:1 W:0
-    uint16_t     m_tag;            // +0x0006  DOF identifier/index  R:1 W:0
-    float        m_value;          // +0x0008  R:20 W:15  Current animated value
-
-    // ── channel pointers (crAnimChannel*) ──
-    uint32_t     m_channel0;       // +0x000c  Primary animation channel  R:13 W:5
-    uint32_t     m_channel1;       // +0x0010  Secondary channel (multi-channel mode)  R:15 W:8
-    uint32_t     m_channel2;       // +0x0014  Tertiary channel  R:11 W:6
-
-    // ── blend/evaluation state ──
-    uint32_t     m_blendWeight;    // +0x0018  Blend weight / mix factor  R:9 W:7
-    uint32_t     m_blendFlags;     // +0x001c  Blend control flags  R:7 W:6
-    uint32_t     m_evalState;      // +0x0020  Evaluation state / frame counter  R:6 W:4
-    uint32_t     m_prevValue;      // +0x0024  Previous frame value for interpolation  R:0 W:3
-    uint32_t     m_targetValue;    // +0x0028  Target value for blending  R:1 W:4
-    uint32_t     m_deltaValue;     // +0x002c  Delta / rate of change  R:0 W:2
-    uint32_t     m_accumValue;     // +0x0030  Accumulated value  R:1 W:4
-    uint32_t     m_scaleValue;     // +0x0034  Scale multiplier  R:2 W:3
-    uint32_t     m_minLimit;       // +0x0038  Minimum clamp limit  R:6 W:5
-    uint32_t     m_maxLimit;       // +0x003c  Maximum clamp limit  R:4 W:3
-    uint32_t     m_defaultValue;   // +0x0040  Default / rest value  R:2 W:2
-    uint32_t     m_rangeScale;     // +0x0044  Range scaling factor  R:3 W:3
-    uint32_t     m_rangeOffset;    // +0x0048  Range offset  R:2 W:1
-    uint16_t     m_rangeFlags;     // +0x004a  Range configuration flags  R:1 W:1
-
-    // ── expression / driver data ──
+    uint16_t     m_tag;  // +0x0006  DOF identifier/index  R:1 W:0
+    float        m_value;  // +0x0008  R:20 W:15  Current animated value
+    uint32_t     m_channel0;  // +0x000c  Primary animation channel  R:13 W:5
+    uint32_t     m_channel1;  // +0x0010  Secondary channel (multi-channel mode)  R:15 W:8
+    uint32_t     m_channel2;  // +0x0014  Tertiary channel  R:11 W:6
+    uint32_t     m_blendWeight;  // +0x0018  Blend weight / mix factor  R:9 W:7
+    uint32_t     m_blendFlags;  // +0x001c  Blend control flags  R:7 W:6
+    uint32_t     m_evalState;  // +0x0020  Evaluation state / frame counter  R:6 W:4
+    uint32_t     m_prevValue;  // +0x0024  Previous frame value for interpolation  R:0 W:3
+    uint32_t     m_targetValue;  // +0x0028  Target value for blending  R:1 W:4
+    uint32_t     m_deltaValue;  // +0x002c  Delta / rate of change  R:0 W:2
+    uint32_t     m_accumValue;  // +0x0030  Accumulated value  R:1 W:4
+    uint32_t     m_scaleValue;  // +0x0034  Scale multiplier  R:2 W:3
+    uint32_t     m_minLimit;  // +0x0038  Minimum clamp limit  R:6 W:5
+    uint32_t     m_maxLimit;  // +0x003c  Maximum clamp limit  R:4 W:3
+    uint32_t     m_defaultValue;  // +0x0040  Default / rest value  R:2 W:2
+    uint32_t     m_rangeScale;  // +0x0044  Range scaling factor  R:3 W:3
+    union {  // overlapping accesses at +0x0048..+0x004c
+        struct { uint32_t m_rangeOffset; };  // +0x0048  Range offset  R:2 W:1
+        struct { uint8_t _p004a[0x2]; uint16_t m_rangeFlags; };  // +0x004a  Range configuration flags  R:1 W:1
+    };
     uint32_t     m_expressionPtr;  // +0x004c  Expression driver pointer  R:25 W:2
-    uint32_t     m_expressionData; // +0x0050  Expression data  R:0 W:2
-    uint32_t     m_driverParam0;   // +0x0054  Driver parameter 0  R:2 W:3
-    uint32_t     m_driverParam1;   // +0x0058  Driver parameter 1  R:2 W:3
-    uint32_t     m_driverParam2;   // +0x005c  Driver parameter 2  R:1 W:2
-
-    // ── layer / weight data ──
-    uint32_t     m_layerWeight0;   // +0x0060  Layer weight 0  R:5 W:6
-    uint32_t     m_layerWeight1;   // +0x0064  Layer weight 1  R:5 W:4
-    uint32_t     m_layerWeight2;   // +0x0068  Layer weight 2  R:3 W:3
-    uint32_t     m_layerWeight3;   // +0x006c  Layer weight 3  R:2 W:3
-    uint32_t     m_layerBlend0;    // +0x0070  Layer blend factor 0  R:2 W:2
-    uint32_t     m_layerBlend1;    // +0x0074  Layer blend factor 1  R:2 W:2
-    uint32_t     m_layerBlend2;    // +0x0078  Layer blend factor 2  R:1 W:1
-    uint32_t     m_layerBlend3;    // +0x007c  Layer blend factor 3  R:1 W:1
-    uint32_t     m_layerMask0;     // +0x0080  Layer mask / enable 0  R:2 W:2
-    uint32_t     m_layerMask1;     // +0x0084  Layer mask / enable 1  R:1 W:1
-    uint8_t      m_layerCount;     // +0x0086  Number of active layers  R:1 W:0
-    uint32_t     m_layerMask2;     // +0x0088  Layer mask / enable 2  R:1 W:1
-    uint32_t     m_layerMask3;     // +0x008c  Layer mask / enable 3  R:1 W:1
-
-    // ── constraint / limit data ──
+    uint32_t     m_expressionData;  // +0x0050  Expression data  R:0 W:2
+    uint32_t     m_driverParam0;  // +0x0054  Driver parameter 0  R:2 W:3
+    uint32_t     m_driverParam1;  // +0x0058  Driver parameter 1  R:2 W:3
+    uint32_t     m_driverParam2;  // +0x005c  Driver parameter 2  R:1 W:2
+    uint32_t     m_layerWeight0;  // +0x0060  Layer weight 0  R:5 W:6
+    uint32_t     m_layerWeight1;  // +0x0064  Layer weight 1  R:5 W:4
+    uint32_t     m_layerWeight2;  // +0x0068  Layer weight 2  R:3 W:3
+    uint32_t     m_layerWeight3;  // +0x006c  Layer weight 3  R:2 W:3
+    uint32_t     m_layerBlend0;  // +0x0070  Layer blend factor 0  R:2 W:2
+    uint32_t     m_layerBlend1;  // +0x0074  Layer blend factor 1  R:2 W:2
+    uint32_t     m_layerBlend2;  // +0x0078  Layer blend factor 2  R:1 W:1
+    uint32_t     m_layerBlend3;  // +0x007c  Layer blend factor 3  R:1 W:1
+    uint32_t     m_layerMask0;  // +0x0080  Layer mask / enable 0  R:2 W:2
+    union {  // overlapping accesses at +0x0084..+0x0088
+        struct { uint32_t m_layerMask1; };  // +0x0084  Layer mask / enable 1  R:1 W:1
+        struct { uint8_t _p0086[0x2]; uint8_t m_layerCount; };  // +0x0086  Number of active layers  R:1 W:0
+    };
+    uint32_t     m_layerMask2;  // +0x0088  Layer mask / enable 2  R:1 W:1
+    uint32_t     m_layerMask3;  // +0x008c  Layer mask / enable 3  R:1 W:1
     uint32_t     m_constraintMin;  // +0x0090  Constraint minimum  R:2 W:2
     uint32_t     m_constraintMax;  // +0x0094  Constraint maximum  R:2 W:2
-    uint32_t     m_constraintDamp; // +0x009c  Constraint damping  R:2 W:1
-    uint32_t     m_constraintStiff;// +0x00a0  Constraint stiffness  R:1 W:1
-    uint32_t     m_constraintParam0;// +0x00a4  Constraint parameter 0  R:1 W:1
-    uint32_t     m_constraintParam1;// +0x00a8  Constraint parameter 1  R:1 W:1
-    uint32_t     m_constraintParam2;// +0x00ac  Constraint parameter 2  R:1 W:1
-
-    // ── IK / procedural animation data ──
-    uint32_t     m_ikWeight;       // +0x00b0  IK blend weight  R:2 W:2
-    uint32_t     m_ikTarget;       // +0x00b8  IK target value  R:2 W:3
-    uint32_t     m_ikGain;         // +0x00bc  IK gain / feedback  R:4 W:1
-    uint32_t     m_procAnim0;      // +0x00c0  Procedural animation param 0  R:6 W:2
-    uint32_t     m_procAnim1;      // +0x00c4  Procedural animation param 1  R:6 W:1
-    uint32_t     m_procAnim2;      // +0x00c8  Procedural animation param 2  R:3 W:3
-    uint32_t     m_procAnim3;      // +0x00cc  Procedural animation param 3  R:2 W:1
-    uint32_t     m_procAnim4;      // +0x00d0  Procedural animation param 4  R:3 W:2
-    uint32_t     m_procAnim5;      // +0x00d4  Procedural animation param 5  R:1 W:1
-    uint32_t     m_procAnim6;      // +0x00d8  Procedural animation param 6  R:1 W:1
-    uint32_t     m_procAnim7;      // +0x00dc  Procedural animation param 7  R:1 W:1
-    uint32_t     m_procAnim8;      // +0x00e0  Procedural animation param 8  R:1 W:1
-    uint32_t     m_procAnim9;      // +0x00e4  Procedural animation param 9  R:1 W:1
-    uint8_t     _pad0x0130[72];
-    uint32_t     m_trackRef0;      // +0x0130  Track reference 0  R:2 W:1
-    uint8_t     _pad0x0190[92];
-    uint32_t     m_trackRef1;      // +0x0190  Track reference 1  R:3 W:1
-    uint16_t     m_trackIndex;     // +0x0194  Track index  R:4 W:0
-    uint32_t     m_trackData;      // +0x0198  Track data pointer  R:2 W:1
-    uint32_t     m_animRef0;       // +0x01a0  Animation reference 0  R:2 W:2
-    uint32_t     m_animRef1;       // +0x01a8  Animation reference 1  R:0 W:1
-    uint32_t     m_animRef2;       // +0x01b0  Animation reference 2  R:1 W:1
-    uint32_t     m_animRef3;       // +0x01b8  Animation reference 3  R:0 W:1
-    uint8_t     _pad0x01c4[8];
-    uint32_t     m_animRef4;       // +0x01c4  Animation reference 4  R:3 W:1
+    uint8_t      _pad0098[0x4];
+    uint32_t     m_constraintDamp;  // +0x009c  Constraint damping  R:2 W:1
+    uint32_t     m_constraintStiff;  // +0x00a0  Constraint stiffness  R:1 W:1
+    uint32_t     m_constraintParam0;  // +0x00a4  Constraint parameter 0  R:1 W:1
+    uint32_t     m_constraintParam1;  // +0x00a8  Constraint parameter 1  R:1 W:1
+    uint32_t     m_constraintParam2;  // +0x00ac  Constraint parameter 2  R:1 W:1
+    uint32_t     m_ikWeight;  // +0x00b0  IK blend weight  R:2 W:2
+    uint8_t      _pad00b4[0x4];
+    uint32_t     m_ikTarget;  // +0x00b8  IK target value  R:2 W:3
+    uint32_t     m_ikGain;  // +0x00bc  IK gain / feedback  R:4 W:1
+    uint32_t     m_procAnim0;  // +0x00c0  Procedural animation param 0  R:6 W:2
+    uint32_t     m_procAnim1;  // +0x00c4  Procedural animation param 1  R:6 W:1
+    uint32_t     m_procAnim2;  // +0x00c8  Procedural animation param 2  R:3 W:3
+    uint32_t     m_procAnim3;  // +0x00cc  Procedural animation param 3  R:2 W:1
+    uint32_t     m_procAnim4;  // +0x00d0  Procedural animation param 4  R:3 W:2
+    uint32_t     m_procAnim5;  // +0x00d4  Procedural animation param 5  R:1 W:1
+    uint32_t     m_procAnim6;  // +0x00d8  Procedural animation param 6  R:1 W:1
+    uint32_t     m_procAnim7;  // +0x00dc  Procedural animation param 7  R:1 W:1
+    uint32_t     m_procAnim8;  // +0x00e0  Procedural animation param 8  R:1 W:1
+    uint32_t     m_procAnim9;  // +0x00e4  Procedural animation param 9  R:1 W:1
+    uint8_t      _pad00e8[0x48];
+    uint32_t     m_trackRef0;  // +0x0130  Track reference 0  R:2 W:1
+    uint8_t      _pad0134[0x5c];
+    uint32_t     m_trackRef1;  // +0x0190  Track reference 1  R:3 W:1
+    uint16_t     m_trackIndex;  // +0x0194  Track index  R:4 W:0
+    uint8_t      _pad0196[0x2];
+    uint32_t     m_trackData;  // +0x0198  Track data pointer  R:2 W:1
+    uint8_t      _pad019c[0x4];
+    uint32_t     m_animRef0;  // +0x01a0  Animation reference 0  R:2 W:2
+    uint8_t      _pad01a4[0x4];
+    uint32_t     m_animRef1;  // +0x01a8  Animation reference 1  R:0 W:1
+    uint8_t      _pad01ac[0x4];
+    uint32_t     m_animRef2;  // +0x01b0  Animation reference 2  R:1 W:1
+    uint8_t      _pad01b4[0x4];
+    uint32_t     m_animRef3;  // +0x01b8  Animation reference 3  R:0 W:1
+    uint8_t      _pad01bc[0x8];
+    uint32_t     m_animRef4;  // +0x01c4  Animation reference 4  R:3 W:1
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x8224c7f8
-    virtual void* GetValue();           // [2] @ 0x8216ea78
-    virtual int GetChannelCount();      // [3] @ 0x8216eb20
-    virtual void Evaluate(void* animContext, float time, float* outValue); // [4] @ 0x8216eb28
-    virtual void Blend(void* animContext, float blendFactor, float* outValue); // [5] @ 0x8216eb58
-    virtual void CopyFrom(void* sourceAnimDof);        // [6] @ 0x8216ebf0
-    virtual void Blend(void* targetObj, float blendFactor);  // [7] @ 0x8216ec30
-    virtual void ScaleFrom(void* sourceAnimDof, float scaleFactor); // [8] @ 0x8216eca8
-    virtual void ThresholdFrom(void* sourceAnimDof, float threshold); // [9] @ 0x8216ed00
-    virtual void ScaleInPlace(float scaleFactor);      // [10] @ 0x8216ed80
-    virtual void TransformBy(void* transformAnimDof);  // [12] @ 0x8216ed90
-    virtual void Normalize();          // [13] @ 0x8216ee00
-    virtual void vfn_16();  // [16] @ 0x8216ee10
-    virtual void vfn_19();  // [19] @ 0x8216ee18
+    void ScalarDtor(int flags); // [1] @ 0x8224c7f8
+    void* GetValue();           // [2] @ 0x8216ea78
+    int GetChannelCount();      // [3] @ 0x8216eb20
+    void Evaluate(void* animContext, float time, float* outValue); // [4] @ 0x8216eb28
+    void Blend(void* animContext, float blendFactor, float* outValue); // [5] @ 0x8216eb58
+    void CopyFrom(void* sourceAnimDof);        // [6] @ 0x8216ebf0
+    void Blend(void* targetObj, float blendFactor);  // [7] @ 0x8216ec30
+    void ScaleFrom(void* sourceAnimDof, float scaleFactor); // [8] @ 0x8216eca8
+    void ThresholdFrom(void* sourceAnimDof, float threshold); // [9] @ 0x8216ed00
+    void ScaleInPlace(float scaleFactor);      // [10] @ 0x8216ed80
+    void TransformBy(void* transformAnimDof);  // [12] @ 0x8216ed90
+    void Normalize();          // [13] @ 0x8216ee00
+    void vfn_16();  // [16] @ 0x8216ee10
+    void vfn_19();  // [19] @ 0x8216ee18
 };
 
 // ── rage::crAnimDofQuaternion  [vtable @ 0x82027BF4] ──────────────────────────
 // Degree-of-freedom for quaternion rotation. Stores a 4-component quaternion at +0x10.
 struct crAnimDofQuaternion {
-    void**      vtable;           // +0x00
-
-    // ── base DOF fields (shared layout with crAnimDofFloat/Vector3) ──
-    uint8_t      m_flags;          // +0x0004  DOF type/mode flags  R:7 W:2
+    void**       vtable;  // +0x0000
+    uint8_t      m_flags;  // +0x0004  DOF type/mode flags  R:7 W:2
     uint8_t      m_channelConfig;  // +0x0005  Channel configuration  R:1 W:0
-    uint16_t     m_tag;            // +0x0006  DOF identifier/index  R:1 W:0
-
-    // ── channel pointers (crAnimChannel*) ──
-    uint32_t     m_channel0;       // +0x0008  Primary animation channel  R:12 W:3
-    uint32_t     m_channel1;       // +0x000c  Secondary channel  R:10 W:2
-
-    // ── quaternion value (x, y, z, w) at +0x10..+0x1F ──
-    float        m_quatX;          // +0x0010  Quaternion X component  R:13 W:5
-    float        m_quatY;          // +0x0014  Quaternion Y component  R:0 W:1
-    float        m_quatZ;          // +0x0018  Quaternion Z component  R:0 W:1
-    float        m_quatW;          // +0x001c  Quaternion W component  R:0 W:1
-
-    // ── blend / evaluation state ──
-    uint8_t      m_evalMode;       // +0x0020  Evaluation mode  R:1 W:0
-    uint8_t      _pad_0021;
-    uint16_t     m_blendState;     // +0x0022  Blend state flags  R:15 W:2
-    uint8_t     _pad_0024[4];
-    uint32_t     m_blendWeight;    // +0x0028  Blend weight  R:1 W:0
-    uint32_t     m_blendTarget;    // +0x002c  Blend target  R:1 W:2
-    uint32_t     m_blendSource;    // +0x0030  Blend source  R:1 W:0
-    uint32_t     m_blendDelta;     // +0x0034  Blend delta  R:1 W:2
-    uint32_t     m_blendAccum;     // +0x0038  Blend accumulator  R:0 W:2
-    uint8_t     _pad0x0048[12];
-
-    // ── constraint / limit data ──
+    uint16_t     m_tag;  // +0x0006  DOF identifier/index  R:1 W:0
+    uint32_t     m_channel0;  // +0x0008  Primary animation channel  R:12 W:3
+    uint32_t     m_channel1;  // +0x000c  Secondary channel  R:10 W:2
+    float        m_quatX;  // +0x0010  Quaternion X component  R:13 W:5
+    float        m_quatY;  // +0x0014  Quaternion Y component  R:0 W:1
+    float        m_quatZ;  // +0x0018  Quaternion Z component  R:0 W:1
+    float        m_quatW;  // +0x001c  Quaternion W component  R:0 W:1
+    uint8_t      m_evalMode;  // +0x0020  Evaluation mode  R:1 W:0
+    uint8_t      _pad0021[0x1];
+    uint16_t     m_blendState;  // +0x0022  Blend state flags  R:15 W:2
+    uint8_t      _pad0024[0x4];
+    uint32_t     m_blendWeight;  // +0x0028  Blend weight  R:1 W:0
+    uint32_t     m_blendTarget;  // +0x002c  Blend target  R:1 W:2
+    uint32_t     m_blendSource;  // +0x0030  Blend source  R:1 W:0
+    uint32_t     m_blendDelta;  // +0x0034  Blend delta  R:1 W:2
+    uint32_t     m_blendAccum;  // +0x0038  Blend accumulator  R:0 W:2
+    uint8_t      _pad003c[0xc];
     uint32_t     m_constraintMin;  // +0x0048  Constraint minimum  R:1 W:1
     uint32_t     m_constraintMax;  // +0x004c  Constraint maximum  R:1 W:1
-    uint32_t     m_constraintDamp; // +0x0050  Constraint damping  R:0 W:1
-    uint32_t     m_constraintRef0; // +0x0058  Constraint reference 0  R:1 W:0
-    uint32_t     m_constraintRef1; // +0x0060  Constraint reference 1  R:1 W:0
-    uint32_t     m_constraintRef2; // +0x0068  Constraint reference 2  R:2 W:0
-    uint32_t     m_constraintRef3; // +0x006c  Constraint reference 3  R:1 W:0
-
-    // ── layer / weight data ──
-    uint32_t     m_layerWeight0;   // +0x0070  Layer weight 0  R:4 W:4
-    uint32_t     m_layerWeight1;   // +0x0074  Layer weight 1  R:1 W:1
-    uint32_t     m_layerWeight2;   // +0x0078  Layer weight 2  R:1 W:1
-    uint32_t     m_layerBlend0;    // +0x007c  Layer blend factor 0  R:1 W:0
-    uint32_t     m_layerBlend1;    // +0x0080  Layer blend factor 1  R:1 W:0
-    uint32_t     m_layerBlend2;    // +0x0084  Layer blend factor 2  R:1 W:0
-    uint32_t     m_layerMask0;     // +0x008c  Layer mask 0  R:1 W:0
-    uint32_t     m_layerMask1;     // +0x0090  Layer mask 1  R:1 W:0
-    uint32_t     m_layerMask2;     // +0x0094  Layer mask 2  R:1 W:0
-    uint32_t     m_layerMask3;     // +0x0098  Layer mask 3  R:1 W:0
-    uint8_t     _pad0x00b0[20];
-
-    // ── IK / procedural data ──
-    uint32_t     m_ikWeight;       // +0x00b0  IK blend weight  R:2 W:0
-    uint64_t     m_ikTarget;       // +0x00b8  IK target quaternion (packed)  R:2 W:1
-    uint32_t     m_ikGain;         // +0x00c0  IK gain  R:1 W:0
-    uint8_t     _pad0x00cc[8];
-    uint32_t     m_procAnim0;      // +0x00cc  Procedural anim param 0  R:1 W:0
-    uint32_t     m_procAnim1;      // +0x00d0  Procedural anim param 1  R:1 W:0
-    uint16_t     m_procAnimFlags;  // +0x00d2  Procedural anim flags  R:4 W:1
-    uint32_t     m_procAnim2;      // +0x00d8  Procedural anim param 2  R:0 W:2
-    uint32_t     m_procAnim3;      // +0x00e0  Procedural anim param 3  R:1 W:0
-    uint8_t     _pad0x00ee[10];
+    uint32_t     m_constraintDamp;  // +0x0050  Constraint damping  R:0 W:1
+    uint8_t      _pad0054[0x4];
+    uint32_t     m_constraintRef0;  // +0x0058  Constraint reference 0  R:1 W:0
+    uint8_t      _pad005c[0x4];
+    uint32_t     m_constraintRef1;  // +0x0060  Constraint reference 1  R:1 W:0
+    uint8_t      _pad0064[0x4];
+    uint32_t     m_constraintRef2;  // +0x0068  Constraint reference 2  R:2 W:0
+    uint32_t     m_constraintRef3;  // +0x006c  Constraint reference 3  R:1 W:0
+    uint32_t     m_layerWeight0;  // +0x0070  Layer weight 0  R:4 W:4
+    uint32_t     m_layerWeight1;  // +0x0074  Layer weight 1  R:1 W:1
+    uint32_t     m_layerWeight2;  // +0x0078  Layer weight 2  R:1 W:1
+    uint32_t     m_layerBlend0;  // +0x007c  Layer blend factor 0  R:1 W:0
+    uint32_t     m_layerBlend1;  // +0x0080  Layer blend factor 1  R:1 W:0
+    uint32_t     m_layerBlend2;  // +0x0084  Layer blend factor 2  R:1 W:0
+    uint8_t      _pad0088[0x4];
+    uint32_t     m_layerMask0;  // +0x008c  Layer mask 0  R:1 W:0
+    uint32_t     m_layerMask1;  // +0x0090  Layer mask 1  R:1 W:0
+    uint32_t     m_layerMask2;  // +0x0094  Layer mask 2  R:1 W:0
+    uint32_t     m_layerMask3;  // +0x0098  Layer mask 3  R:1 W:0
+    uint8_t      _pad009c[0x14];
+    uint32_t     m_ikWeight;  // +0x00b0  IK blend weight  R:2 W:0
+    uint8_t      _pad00b4[0x4];
+    uint64_t     m_ikTarget;  // +0x00b8  IK target quaternion (packed)  R:2 W:1
+    uint32_t     m_ikGain;  // +0x00c0  IK gain  R:1 W:0
+    uint8_t      _pad00c4[0x8];
+    uint32_t     m_procAnim0;  // +0x00cc  Procedural anim param 0  R:1 W:0
+    union {  // overlapping accesses at +0x00d0..+0x00d4
+        struct { uint32_t m_procAnim1; };  // +0x00d0  Procedural anim param 1  R:1 W:0
+        struct { uint8_t _p00d2[0x2]; uint16_t m_procAnimFlags; };  // +0x00d2  Procedural anim flags  R:4 W:1
+    };
+    uint8_t      _pad00d4[0x4];
+    uint32_t     m_procAnim2;  // +0x00d8  Procedural anim param 2  R:0 W:2
+    uint8_t      _pad00dc[0x4];
+    uint32_t     m_procAnim3;  // +0x00e0  Procedural anim param 3  R:1 W:0
+    uint8_t      _pad00e4[0xa];
     uint16_t     m_procAnimIndex;  // +0x00ee  Procedural anim index  R:1 W:0
-    uint8_t     _pad0x0100[14];
-
-    // ── expression / driver data ──
+    uint8_t      _pad00f0[0x10];
     uint32_t     m_expressionPtr;  // +0x0100  Expression driver pointer  R:4 W:0
-    uint8_t     _pad0x013c[56];
-    uint32_t     m_driverRef0;     // +0x013c  Driver reference 0  R:1 W:0
-    uint32_t     m_driverRef1;     // +0x0140  Driver reference 1  R:5 W:0
-    uint32_t     m_driverRef2;     // +0x0144  Driver reference 2  R:3 W:0
-    uint32_t     m_driverRef3;     // +0x0148  Driver reference 3  R:1 W:0
-    uint32_t     m_driverRef4;     // +0x014c  Driver reference 4  R:1 W:0
-    uint32_t     m_driverRef5;     // +0x0150  Driver reference 5  R:2 W:0
-    uint32_t     m_driverRef6;     // +0x0158  Driver reference 6  R:2 W:0
-    uint32_t     m_driverRef7;     // +0x0160  Driver reference 7  R:1 W:0
-
-    // ── track / animation references ──
-    uint32_t     m_trackRef0;      // +0x0164  Track reference 0  R:4 W:0
-    uint32_t     m_trackRef1;      // +0x0168  Track reference 1  R:5 W:0
-    uint32_t     m_trackRef2;      // +0x0170  Track reference 2  R:2 W:0
-    uint8_t     _pad0x0184[16];
-    uint32_t     m_animBlendIn;    // +0x0184  Animation blend-in weight  R:5 W:2
-    uint32_t     m_animBlendOut;   // +0x0188  Animation blend-out weight  R:4 W:5
-    uint8_t     _pad0x019c[16];
-    uint32_t     m_animWriteBack0; // +0x019c  Animation write-back 0  R:0 W:3
-    uint32_t     m_animReadRef0;   // +0x01a0  Animation read reference 0  R:1 W:0
-    uint32_t     m_animReadRef1;   // +0x01a4  Animation read reference 1  R:2 W:0
-    uint32_t     m_animReadRef2;   // +0x01a8  Animation read reference 2  R:2 W:0
-    uint8_t     _pad0x01c0[20];
-    uint32_t     m_animReadRef3;   // +0x01c0  Animation read reference 3  R:1 W:0
-    uint32_t     m_animReadRef4;   // +0x01c8  Animation read reference 4  R:2 W:0
-    uint32_t     m_animReadRef5;   // +0x01cc  Animation read reference 5  R:1 W:0
-    uint32_t     m_animReadRef6;   // +0x01d4  Animation read reference 6  R:3 W:0
-    uint8_t     _pad0x01e8[16];
-    uint32_t     m_animReadRef7;   // +0x01e8  Animation read reference 7  R:1 W:0
-    uint32_t     m_animReadRef8;   // +0x01ec  Animation read reference 8  R:2 W:0
-    uint8_t     _pad0x0200[16];
-    uint32_t     m_animReadRef9;   // +0x0200  Animation read reference 9  R:1 W:0
-    uint8_t     _pad0x022c[40];
-    uint32_t     m_animWriteBack1; // +0x022c  Animation write-back 1  R:0 W:3
-    uint8_t     _pad0x0248[24];
+    uint8_t      _pad0104[0x38];
+    uint32_t     m_driverRef0;  // +0x013c  Driver reference 0  R:1 W:0
+    uint32_t     m_driverRef1;  // +0x0140  Driver reference 1  R:5 W:0
+    uint32_t     m_driverRef2;  // +0x0144  Driver reference 2  R:3 W:0
+    uint32_t     m_driverRef3;  // +0x0148  Driver reference 3  R:1 W:0
+    uint32_t     m_driverRef4;  // +0x014c  Driver reference 4  R:1 W:0
+    uint32_t     m_driverRef5;  // +0x0150  Driver reference 5  R:2 W:0
+    uint8_t      _pad0154[0x4];
+    uint32_t     m_driverRef6;  // +0x0158  Driver reference 6  R:2 W:0
+    uint8_t      _pad015c[0x4];
+    uint32_t     m_driverRef7;  // +0x0160  Driver reference 7  R:1 W:0
+    uint32_t     m_trackRef0;  // +0x0164  Track reference 0  R:4 W:0
+    uint32_t     m_trackRef1;  // +0x0168  Track reference 1  R:5 W:0
+    uint8_t      _pad016c[0x4];
+    uint32_t     m_trackRef2;  // +0x0170  Track reference 2  R:2 W:0
+    uint8_t      _pad0174[0x10];
+    uint32_t     m_animBlendIn;  // +0x0184  Animation blend-in weight  R:5 W:2
+    uint32_t     m_animBlendOut;  // +0x0188  Animation blend-out weight  R:4 W:5
+    uint8_t      _pad018c[0x10];
+    uint32_t     m_animWriteBack0;  // +0x019c  Animation write-back 0  R:0 W:3
+    uint32_t     m_animReadRef0;  // +0x01a0  Animation read reference 0  R:1 W:0
+    uint32_t     m_animReadRef1;  // +0x01a4  Animation read reference 1  R:2 W:0
+    uint32_t     m_animReadRef2;  // +0x01a8  Animation read reference 2  R:2 W:0
+    uint8_t      _pad01ac[0x14];
+    uint32_t     m_animReadRef3;  // +0x01c0  Animation read reference 3  R:1 W:0
+    uint8_t      _pad01c4[0x4];
+    uint32_t     m_animReadRef4;  // +0x01c8  Animation read reference 4  R:2 W:0
+    uint32_t     m_animReadRef5;  // +0x01cc  Animation read reference 5  R:1 W:0
+    uint8_t      _pad01d0[0x4];
+    uint32_t     m_animReadRef6;  // +0x01d4  Animation read reference 6  R:3 W:0
+    uint8_t      _pad01d8[0x10];
+    uint32_t     m_animReadRef7;  // +0x01e8  Animation read reference 7  R:1 W:0
+    uint32_t     m_animReadRef8;  // +0x01ec  Animation read reference 8  R:2 W:0
+    uint8_t      _pad01f0[0x10];
+    uint32_t     m_animReadRef9;  // +0x0200  Animation read reference 9  R:1 W:0
+    uint8_t      _pad0204[0x28];
+    uint32_t     m_animWriteBack1;  // +0x022c  Animation write-back 1  R:0 W:3
+    uint8_t      _pad0230[0x18];
     uint32_t     m_animReadRef10;  // +0x0248  Animation read reference 10  R:5 W:0
-    uint8_t     _pad0x0268[28];
+    uint8_t      _pad024c[0x1c];
     uint32_t     m_animReadRef11;  // +0x0268  Animation read reference 11  R:2 W:0
-    uint8_t     _pad0x0294[40];
-    uint32_t     m_animWriteBack2; // +0x0294  Animation write-back 2  R:0 W:3
-    uint32_t     m_animWriteBack3; // +0x0298  Animation write-back 3  R:0 W:3
+    uint8_t      _pad026c[0x28];
+    uint32_t     m_animWriteBack2;  // +0x0294  Animation write-back 2  R:0 W:3
+    uint32_t     m_animWriteBack3;  // +0x0298  Animation write-back 3  R:0 W:3
     uint32_t     m_animMixParam0;  // +0x029c  Animation mix parameter 0  R:1 W:2
     uint32_t     m_animMixParam1;  // +0x02a0  Animation mix parameter 1  R:1 W:3
-    uint8_t     _pad0x02b4[16];
+    uint8_t      _pad02a4[0x10];
     uint32_t     m_animMixParam2;  // +0x02b4  Animation mix parameter 2  R:3 W:4
     uint32_t     m_animMixParam3;  // +0x02b8  Animation mix parameter 3  R:1 W:0
     uint32_t     m_animMixParam4;  // +0x02bc  Animation mix parameter 4  R:1 W:2
     uint32_t     m_animMixParam5;  // +0x02c0  Animation mix parameter 5  R:1 W:0
     uint32_t     m_animMixParam6;  // +0x02c4  Animation mix parameter 6  R:1 W:0
-    uint8_t     _pad0x02e4[28];
+    uint8_t      _pad02c8[0x1c];
     uint32_t     m_animMixParam7;  // +0x02e4  Animation mix parameter 7  R:1 W:0
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x8224c7c8
-    virtual void* GetValue();           // [2] @ 0x820c4b20
-    virtual void Evaluate(void* animContext, float time, float* outQuat); // [4] @ 0x820c4bf0
-    virtual void Blend(void* animContext, float blendFactor, float* outQuat); // [5] @ 0x820c4c00
-    virtual void CopyFrom(void* sourceAnimDof);        // [6] @ 0x820c4d30
-    virtual void BlendFrom(void* sourceAnimDof, float blendFactor); // [7] @ 0x820c4d80
-    virtual void ScaleFrom(void* sourceAnimDof, float scaleFactor); // [8] @ 0x820c4ec8
-    virtual void ThresholdFrom(void* sourceAnimDof, float threshold); // [9] @ 0x820c5120
-    virtual void vfn_10();  // [10] @ 0x820c51a0
-    virtual void vfn_11();  // [11] @ 0x820c51a8
-    virtual void TransformBy(void* transformAnimDof);  // [12] @ 0x820c5220
-    virtual void Normalize();          // [13] @ 0x820c52b0
-    virtual void SetValue(const float* sourceQuat);    // [18] @ 0x820c52d8
-    virtual int  IsQuaternion();       // [20] @ 0x8210cbd0
+    void ScalarDtor(int flags); // [1] @ 0x8224c7c8
+    void* GetValue();           // [2] @ 0x820c4b20
+    void Evaluate(void* animContext, float time, float* outQuat); // [4] @ 0x820c4bf0
+    void Blend(void* animContext, float blendFactor, float* outQuat); // [5] @ 0x820c4c00
+    void CopyFrom(void* sourceAnimDof);        // [6] @ 0x820c4d30
+    void BlendFrom(void* sourceAnimDof, float blendFactor); // [7] @ 0x820c4d80
+    void ScaleFrom(void* sourceAnimDof, float scaleFactor); // [8] @ 0x820c4ec8
+    void ThresholdFrom(void* sourceAnimDof, float threshold); // [9] @ 0x820c5120
+    void vfn_10();  // [10] @ 0x820c51a0
+    void vfn_11();  // [11] @ 0x820c51a8
+    void TransformBy(void* transformAnimDof);  // [12] @ 0x820c5220
+    void Normalize();          // [13] @ 0x820c52b0
+    void SetValue(const float* sourceQuat);    // [18] @ 0x820c52d8
+    int  IsQuaternion();       // [20] @ 0x8210cbd0
 
     // ── non-virtual helper methods ──
     void EvaluateChannels(void* animContext, float time, float* outQuat);
@@ -406,21 +404,21 @@ struct crAnimDofVector3 {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x8224c7e0
-    virtual void* GetValue();           // [2] @ 0x820c46f0
-    virtual int GetChannelCount();      // [3] @ 0x820c4be8
-    virtual void Evaluate(void* animContext, float time, float* outVector); // [4] @ 0x820c47a0
-    virtual void Blend(void* animContext, float blendFactor, float* outVector); // [5] @ 0x820c47b0
-    virtual void CopyFrom(void* sourceAnimDof);        // [6] @ 0x820c4850
-    virtual void BlendFrom(void* sourceAnimDof, float blendFactor); // [7] @ 0x820c4898
-    virtual void ScaleFrom(void* sourceAnimDof, float scaleFactor); // [8] @ 0x820c4948
-    virtual void ThresholdFrom(void* sourceAnimDof, float threshold); // [9] @ 0x820c49d0
-    virtual void ScaleInPlace(float scaleFactor);      // [10] @ 0x820c4a38
-    virtual void Reset();              // [11] @ 0x820c4a60
-    virtual void TransformBy(void* transformAnimDof);  // [12] @ 0x820c4a78
-    virtual void Normalize();          // [13] @ 0x820c4af8
-    virtual void vfn_14();             // [14] @ 0x823d8cd0
-    virtual void SetValue(const float* sourceVec);     // [17] @ 0x820c4b10
+    void ScalarDtor(int flags); // [1] @ 0x8224c7e0
+    void* GetValue();           // [2] @ 0x820c46f0
+    int GetChannelCount();      // [3] @ 0x820c4be8
+    void Evaluate(void* animContext, float time, float* outVector); // [4] @ 0x820c47a0
+    void Blend(void* animContext, float blendFactor, float* outVector); // [5] @ 0x820c47b0
+    void CopyFrom(void* sourceAnimDof);        // [6] @ 0x820c4850
+    void BlendFrom(void* sourceAnimDof, float blendFactor); // [7] @ 0x820c4898
+    void ScaleFrom(void* sourceAnimDof, float scaleFactor); // [8] @ 0x820c4948
+    void ThresholdFrom(void* sourceAnimDof, float threshold); // [9] @ 0x820c49d0
+    void ScaleInPlace(float scaleFactor);      // [10] @ 0x820c4a38
+    void Reset();              // [11] @ 0x820c4a60
+    void TransformBy(void* transformAnimDof);  // [12] @ 0x820c4a78
+    void Normalize();          // [13] @ 0x820c4af8
+    void vfn_14();             // [14] @ 0x823d8cd0
+    void SetValue(const float* sourceVec);     // [17] @ 0x820c4b10
 
     // ── non-virtual helper methods ──
     void EvaluateChannels(void* animContext, float time, float* outVector);
@@ -431,9 +429,9 @@ struct crAnimFrame {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~crAnimFrame();                  // [0] @ 0x822e1020
-    virtual void ScalarDtor(int flags); // [1] @ 0x8224c0f8
-    virtual void vfn_2();  // [2] @ 0x8224c100
+    ~crAnimFrame();                  // [0] @ 0x822e1020
+    void ScalarDtor(int flags); // [1] @ 0x8224c0f8
+    void vfn_2();  // [2] @ 0x8224c100
 };
 
 // ── rage::crAnimPlayer  [vtable @ 0x8204FD00] ──────────────────────────
@@ -441,9 +439,9 @@ struct crAnimPlayer {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~crAnimPlayer();                  // [0] @ 0x8224e0f8
-    virtual void ScalarDtor(int flags); // [1] @ 0x8224d048
-    virtual void vfn_2();  // [2] @ 0x8224d060
+    ~crAnimPlayer();                  // [0] @ 0x8224e0f8
+    void ScalarDtor(int flags); // [1] @ 0x8224d048
+    void vfn_2();  // [2] @ 0x8224d060
 };
 
 // ── rage::crAnimWeightSet  [vtable @ 0x8204FD14] ──────────────────────────
@@ -451,7 +449,7 @@ struct crAnimWeightSet {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~crAnimWeightSet();                  // [0] @ 0x8224d3d8
+    ~crAnimWeightSet();                  // [0] @ 0x8224d3d8
 };
 
 // ── rage::crAnimation  [vtable @ 0x8204FCB0] ──────────────────────────
@@ -459,7 +457,7 @@ struct crAnimation {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~crAnimation();                  // [0] @ 0x82248438
+    ~crAnimation();                  // [0] @ 0x82248438
 };
 
 // ── rage::crIKArm  [vtable @ 0x82033724] ──────────────────────────
@@ -472,7 +470,7 @@ struct crIKBodyBase {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~crIKBodyBase();                  // [0] @ 0x82135b20
+    ~crIKBodyBase();                  // [0] @ 0x82135b20
 };
 
 // ── rage::crIKBodyBoneFinder  [vtable @ 0x82033BF0] ──────────────────────────
@@ -480,7 +478,7 @@ struct crIKBodyBoneFinder {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~crIKBodyBoneFinder();                  // [0] @ 0x82136568
+    ~crIKBodyBoneFinder();                  // [0] @ 0x82136568
 };
 
 // ── rage::crIKBodyBoneFinderByName  [vtable @ 0x82033C28] ──────────────────────────
@@ -488,9 +486,9 @@ struct crIKBodyBoneFinderByName {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~crIKBodyBoneFinderByName();                  // [0] @ 0x82136618
-    virtual void ScalarDtor(int flags); // [1] @ 0x82137748
-    virtual void vfn_2();  // [2] @ 0x82137838
+    ~crIKBodyBoneFinderByName();                  // [0] @ 0x82136618
+    void ScalarDtor(int flags); // [1] @ 0x82137748
+    void vfn_2();  // [2] @ 0x82137838
 };
 
 // ── rage::crIKBodyHumanoid  [vtable @ 0x82033794] ──────────────────────────
@@ -498,17 +496,16 @@ struct crIKBodyHumanoid {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~crIKBodyHumanoid();                  // [0] @ 0x82135d50
-    virtual void vfn_3();  // [3] @ 0x82136248
-    virtual void vfn_4();  // [4] @ 0x82135ec0
+    ~crIKBodyHumanoid();                  // [0] @ 0x82135d50
+    void vfn_3();  // [3] @ 0x82136248
+    void vfn_4();  // [4] @ 0x82135ec0
 };
 
 // ── rage::crIKHead  [vtable @ 0x820336D4] ──────────────────────────
 // Confirmed methods: Init, LoadConfig
 struct crIKHead {
-    void**      vtable;           // +0x00
-
     // ── field access clusters ──
+    void**       vtable;  // +0x00
     uint32_t     m_headBoneIndex;  // +0x0004  Head bone index  R:1 W:1
     uint32_t     m_neckBones;      // +0x0008  Neck bone array (ptr)  R:2 W:0
     uint16_t     m_neckBoneCount;  // +0x000c  Number of neck bones  R:1 W:0
@@ -516,8 +513,8 @@ struct crIKHead {
     uint32_t     m_spineBoneIndex; // +0x0010  Spine bone index  R:1 W:1
 
     // ── virtual methods ──
-    virtual ~crIKHead();                  // [0] @ 0x82135aa0
-    virtual void vfn_4();  // [4] @ 0x82136ad8
+    ~crIKHead();                  // [0] @ 0x82135aa0
+    void vfn_4();  // [4] @ 0x82136ad8
 
     // ── non-virtual methods (from debug strings) ──
     void LoadConfig();
@@ -536,6 +533,7 @@ struct crIKLeg {
 struct crIKLimb {
     void**      vtable;           // +0x00
 
+    uint8_t      _pad04[0x0C];     // +0x04..+0x0F
     // ── bone indices (set by Init via bone finder) ──
     uint32_t     m_bone0;          // +0x0010  Bone index 0 (shoulder/hip)  R:2 W:1
     uint32_t     m_bone1;          // +0x0014  Bone index 1 (upper arm/thigh)  R:1 W:1
@@ -550,20 +548,22 @@ struct crIKLimb {
     float        m_targetX;        // +0x0030  Target position X  R:1 W:6
     float        m_targetY;        // +0x0034  Target position Y  R:1 W:6
     float        m_targetZ;        // +0x0038  Target position Z  R:1 W:6
+    uint8_t      _pad3C[4];        // +0x3C..+0x3F
 
     // ── pole vector (float[3], controls elbow/knee direction) ──
     float        m_poleX;          // +0x0040  Pole vector X  R:0 W:4
     float        m_poleY;          // +0x0044  Pole vector Y  R:0 W:5
     float        m_poleZ;          // +0x0048  Pole vector Z  R:0 W:5
+    uint8_t      _pad4C[4];        // +0x4C..+0x4F
 
     // ── limb type identifier ──
     uint8_t      m_limbType;       // +0x0050  Limb type (arm=0/leg=1, controls bone lookup)  R:13 W:0
 
     // ── virtual methods ──
-    virtual ~crIKLimb();                  // [0] @ 0x82136520
-    virtual void vfn_4();  // [4] @ 0x82137178
-    virtual void vfn_5();  // [5] @ 0x82135b18
-    virtual void vfn_6();  // [6] @ 0x82488838
+    ~crIKLimb();                  // [0] @ 0x82136520
+    void vfn_4();  // [4] @ 0x82137178
+    void vfn_5();  // [5] @ 0x82135b18
+    void vfn_6();  // [6] @ 0x82488838
 
     // ── non-virtual methods (from debug strings) ──
     void LoadConfig();
@@ -584,9 +584,9 @@ struct crIKSolverGleicherLimb {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x8213a4d8
-    virtual void vfn_2();  // [2] @ 0x8213a570
-    virtual void vfn_3();  // [3] @ 0x8213bfa0
+    void ScalarDtor(int flags); // [1] @ 0x8213a4d8
+    void vfn_2();  // [2] @ 0x8213a570
+    void vfn_3();  // [3] @ 0x8213bfa0
 };
 
 // ── rage::crIKSolverIterativeLimb  [vtable @ 0x82033CC4] ──────────────────────────
@@ -594,8 +594,8 @@ struct crIKSolverIterativeLimb {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x8213c538
-    virtual void vfn_3();  // [3] @ 0x8213c700
+    void ScalarDtor(int flags); // [1] @ 0x8213c538
+    void vfn_3();  // [3] @ 0x8213c700
 };
 
 // ── rage::crIKSolverSimpleHead  [vtable @ 0x82033C98] ──────────────────────────
@@ -603,9 +603,9 @@ struct crIKSolverSimpleHead {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~crIKSolverSimpleHead();                  // [0] @ 0x82137f60
-    virtual void ScalarDtor(int flags); // [1] @ 0x82138f40
-    virtual void vfn_2();  // [2] @ 0x82138fd8
+    ~crIKSolverSimpleHead();                  // [0] @ 0x82137f60
+    void ScalarDtor(int flags); // [1] @ 0x82138f40
+    void vfn_2();  // [2] @ 0x82138fd8
 };
 
 // ── rage::crIKSolverSimpleSpine  [vtable @ 0x82033C84] ──────────────────────────
@@ -613,17 +613,16 @@ struct crIKSolverSimpleSpine {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~crIKSolverSimpleSpine();                  // [0] @ 0x82137ee8
-    virtual void ScalarDtor(int flags); // [1] @ 0x821381a0
-    virtual void vfn_2();  // [2] @ 0x82138238
+    ~crIKSolverSimpleSpine();                  // [0] @ 0x82137ee8
+    void ScalarDtor(int flags); // [1] @ 0x821381a0
+    void vfn_2();  // [2] @ 0x82138238
 };
 
 // ── rage::crIKSpine  [vtable @ 0x820336B0] ──────────────────────────
 // Confirmed methods: Init, LoadConfig
 struct crIKSpine {
-    void**      vtable;           // +0x00
-
     // ── field access clusters ──
+    void**       vtable;  // +0x00
     uint32_t     m_pelvisBoneIndex;// +0x0004  Pelvis bone index  R:1 W:1
     uint32_t     m_spineBones;     // +0x0008  Spine bone array (ptr)  R:3 W:0
     uint16_t     m_spineBoneCount; // +0x000c  Number of spine bones  R:3 W:0
@@ -631,10 +630,10 @@ struct crIKSpine {
     uint32_t     m_rootBoneIndex;  // +0x0010  Root bone index  R:1 W:1
 
     // ── virtual methods ──
-    virtual ~crIKSpine();                  // [0] @ 0x82135a28
-    virtual void vfn_3();  // [3] @ 0x821359e0
-    virtual void vfn_4();  // [4] @ 0x82136878
-    virtual void vfn_5();  // [5] @ 0x821359f0
+    ~crIKSpine();                  // [0] @ 0x82135a28
+    void vfn_3();  // [3] @ 0x821359e0
+    void vfn_4();  // [4] @ 0x82136878
+    void vfn_5();  // [5] @ 0x821359f0
 
     // ── non-virtual methods (from debug strings) ──
     void LoadConfig();

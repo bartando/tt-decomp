@@ -12,6 +12,10 @@
 #pragma once
 #include <stdint.h>
 
+// Structs that carry the game's vtable as an explicit `vtable` member list
+// their slots as plain (non-virtual) methods: a C++ virtual would add a hidden
+// vptr in front of `vtable` and shift every member by 4.
+
 // Forward declarations (full definition below)
 
 /**
@@ -19,6 +23,7 @@
  * Layout verified from pongDrawBucket_AddEntry @ 0x822278D8
  */
 struct pongDrawBucket {
+    uint8_t     _pad00[8];     // +0x00..+0x07
     void**      m_pData;       // +0x08  ptr to layer descriptor array
     uint16_t    m_numLayers;   // +0x0C  number of layers in this bucket
     uint16_t    _pad0E;
@@ -58,7 +63,7 @@ struct pongDrawBucketManager {
     char             m_configBasename[32];  // +0x10  strncpy'd from .rdata ptr
     char             m_configExt[32];       // +0x30  strncpy'd from .rdata ptr
 
-    virtual ~pongDrawBucketManager();       // [0] @ 0x822272B0 — singleton cleanup + free
+    ~pongDrawBucketManager();       // [0] @ 0x822272B0 — singleton cleanup + free
 
     void Load();                            // @ 0x82227430 — parse XML, alloc & fill buckets
     void AddEntry(pongDrawBucket* bucket,
@@ -75,7 +80,7 @@ struct pongDrawable {
     void**      vtable;           // +0x00
 
     // ── virtual methods ── (15 slots total)
-    virtual ~pongDrawable();                  // [0] @ 0x8225B880
+    ~pongDrawable();                  // [0] @ 0x8225B880
 };
 
 // ── pongGammaControl  [vtable @ 0x820346E4] ──────────────────────────
@@ -89,10 +94,10 @@ struct pongLightGlowCapsule {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongLightGlowCapsule();                  // [0] @ 0x823795f0
-    virtual void PostLoadProperties();  // [20] @ 0x8237ca50
-    virtual void Validate();  // [21] @ 0x8237cb68
-    virtual void PostLoadChildren();  // [22] @ 0x8237ca98
+    ~pongLightGlowCapsule();                  // [0] @ 0x823795f0
+    void PostLoadProperties();  // [20] @ 0x8237ca50
+    void Validate();  // [21] @ 0x8237cb68
+    void PostLoadChildren();  // [22] @ 0x8237ca98
 };
 
 // ── pongLightGlowMgr  [vtable @ 0x8206A768] ──────────────────────────
@@ -102,7 +107,7 @@ struct pongLightGlowMgr {
     // ── virtual methods ──
     // [0] PPC32 scalar-deleting-dtor — takes hidden `flags` arg.
     // Split out as Dtor(int flags) per pongGameContext convention.
-    virtual void Dtor(int flags);                 // [0] @ 0x8237d060
+    void Dtor(int flags);                 // [0] @ 0x8237d060
 };
 
 // ── pongLightGlowSquare  [vtable @ 0x8206A704] ──────────────────────────
@@ -110,10 +115,10 @@ struct pongLightGlowSquare {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongLightGlowSquare();                  // [0] @ 0x82379650
-    virtual void PostLoadProperties();  // [20] @ 0x8237c8a0
-    virtual void Validate();  // [21] @ 0x8237c9a8
-    virtual void PostLoadChildren();  // [22] @ 0x8237c8e8
+    ~pongLightGlowSquare();                  // [0] @ 0x82379650
+    void PostLoadProperties();  // [20] @ 0x8237c8a0
+    void Validate();  // [21] @ 0x8237c9a8
+    void PostLoadChildren();  // [22] @ 0x8237c8e8
 };
 
 // ── pongPostEffects  [vtable @ 0x820342F0] ──────────────────────────
@@ -121,7 +126,7 @@ struct pongPostEffects {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongPostEffects();                  // [0] @ 0x8213f4b0
+    ~pongPostEffects();                  // [0] @ 0x8213f4b0
 };
 
 // ── pongRenderThread  [vtable @ 0x820581D8] ──────────────────────────
@@ -136,7 +141,7 @@ struct pongRenderable {
     void**      vtable;           // +0x00
 
     // ── virtual methods ── (1 slot, nullsub)
-    virtual void vfn_0();  // [0] nullsub
+    void vfn_0();  // [0] nullsub
 };
 
 // ── pongScreenCapture  [vtable @ 0x8205B0EC] ──────────────────────────
@@ -150,7 +155,7 @@ struct pongScreenCaptureMgr {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongScreenCaptureMgr();                  // [0] @ 0x822bc288
+    ~pongScreenCaptureMgr();                  // [0] @ 0x822bc288
 };
 
 // ── pongScrnTransFadeIn  [vtable @ 0x8206A19C] ──────────────────────────
@@ -158,11 +163,11 @@ struct pongScrnTransFadeIn {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x82378718
-    virtual void vfn_3();  // [3] @ 0x82378778
-    virtual void vfn_4();  // [4] @ 0x823787d8
-    virtual void vfn_5();  // [5] @ 0x82378460
-    virtual void vfn_6();  // [6] @ 0x82378900
+    void vfn_2();  // [2] @ 0x82378718
+    void vfn_3();  // [3] @ 0x82378778
+    void vfn_4();  // [4] @ 0x823787d8
+    void vfn_5();  // [5] @ 0x82378460
+    void vfn_6();  // [6] @ 0x82378900
 };
 
 // ── pongScrnTransFreezeAndCrossFade  [vtable @ 0x8206A1C0] ──────────────────────────
@@ -177,11 +182,11 @@ struct pongScrnTransFreezeAndCrossFade {
     float    m_alpha;          // +0x34  fade alpha (1.0 - progress)
 
     // ── virtual methods ──
-    virtual void Begin();      // [2] @ 0x82378938
-    virtual void Update(float deltaTime);  // [3] @ 0x823789a8
-    virtual void Render();     // [4] @ 0x82378a18
-    virtual void End();        // [5] @ 0x82378a78
-    virtual void Reset();      // [6] @ 0x82378a80
+    void Begin();      // [2] @ 0x82378938
+    void Update(float deltaTime);  // [3] @ 0x823789a8
+    void Render();     // [4] @ 0x82378a18
+    void End();        // [5] @ 0x82378a78
+    void Reset();      // [6] @ 0x82378a80
 };
 
 // ── pongScrnTransSwipe  [vtable @ 0x8206A1E4] ──────────────────────────
@@ -203,11 +208,11 @@ struct pongScrnTransSwipe {
     uint8_t  _pad39[3];        // padding
 
     // ── virtual methods ──
-    virtual void Begin();      // [2] @ 0x82378ab0 - Initialize/reset transition
-    virtual void Update(float deltaTime);  // [3] @ 0x82378bd0 - Update elapsed time and progress
-    virtual void Render();     // [4] @ 0x82378c20 - Render the swipe effect
-    virtual void OnComplete(); // [5] @ 0x82378d98 - Called when transition finishes
-    virtual void Reset();      // [6] @ 0x82378de0 - Reset to initial state
+    void Begin();      // [2] @ 0x82378ab0 - Initialize/reset transition
+    void Update(float deltaTime);  // [3] @ 0x82378bd0 - Update elapsed time and progress
+    void Render();     // [4] @ 0x82378c20 - Render the swipe effect
+    void OnComplete(); // [5] @ 0x82378d98 - Called when transition finishes
+    void Reset();      // [6] @ 0x82378de0 - Reset to initial state
 };
 
 // ── pongScrnTransFreezeAndFadeOut  [vtable @ 0x8206A178] ──────────────────────────
@@ -217,12 +222,12 @@ struct pongScrnTransFreezeAndFadeOut {
     // ── virtual methods ──
     // [0] PPC32 scalar-deleting-dtor — takes hidden `flags` arg.
     // Split out as Dtor(int flags) per pongGameContext convention.
-    virtual void Dtor(int flags);                              // [0] @ 0x82378450
-    virtual void vfn_2();  // [2] @ 0x823784f0
-    virtual void vfn_3();  // [3] @ 0x82378578
-    virtual void vfn_4();  // [4] @ 0x82378610
-    virtual void vfn_5();  // [5] @ 0x823786a8
-    virtual void vfn_6();  // [6] @ 0x823786c8
+    void Dtor(int flags);                              // [0] @ 0x82378450
+    void vfn_2();  // [2] @ 0x823784f0
+    void vfn_3();  // [3] @ 0x82378578
+    void vfn_4();  // [4] @ 0x82378610
+    void vfn_5();  // [5] @ 0x823786a8
+    void vfn_6();  // [6] @ 0x823786c8
 };
 
 
@@ -317,7 +322,7 @@ struct pongShadowMap {
     uint32_t     m_tail_460;           // +0x460  R:0 W:1
 
     // ── virtual methods ──
-    virtual ~pongShadowMap();                  // [0] @ 0x82144660
+    ~pongShadowMap();                  // [0] @ 0x82144660
 
     // ── non-virtual methods (from debug strings) ──
     void GenerateShadowMaps();
@@ -329,7 +334,7 @@ struct pongSurface {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongSurface();                  // [0] @ 0x8222a960
-    virtual void ScalarDtor(int flags); // [1] @ 0x82243ea8
-    virtual void vfn_2();  // [2] @ 0x82243f78
+    ~pongSurface();                  // [0] @ 0x8222a960
+    void ScalarDtor(int flags); // [1] @ 0x82243ea8
+    void vfn_2();  // [2] @ 0x82243f78
 };

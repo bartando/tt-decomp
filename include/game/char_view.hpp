@@ -36,6 +36,7 @@
 
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 #include "rage/hsmState.hpp"
 #include "rage/atSingleton.hpp"
@@ -58,63 +59,57 @@
  * 
  * Size: 0x1C (28 bytes) = hsmState (0x18) + m_pScreenObject (0x4)
  */
-class pongAttractState : public hsmState {
+class pongAttractState {
 public:
-    // Virtual methods
-    
-    /**
-     * GetContext @ 0x823057E8 | size: 0x18
-     * Returns the UI context object, forwarding to screen object's vtable slot 4
-     */
-    virtual void* GetContext();
-    
-    /**
-     * OnExit @ 0x82306EA8 | size: 0x6C
-     * Called when leaving this state - cleans up UI screen object
-     */
-    virtual void OnExit() override;
-    
-    /**
-     * OnEvent @ 0x823058E0 | size: 0xC8
-     * Handles input and system events
-     * Event 6: Creates UI state
-     * Events 9, 12: No-op
-     * Other events: Forwarded to manager
-     */
-    virtual void OnEvent(int32_t eventType) override;
-    
-    /**
-     * OnExitEvent @ 0x823059A8 | size: 0xB4
-     * Handles exit-phase events (event 6 triggers fade-out, events 8/12 ignored)
-     */
-    virtual void OnExitEvent(int32_t eventType);
+    // Slot methods, by the game's slot number (vtable 0x8205E0AC); not C++
+    // virtuals. The game's pongAttractState isn't a rage::hsmState: its slots
+    // 1..6 differ, and its fields are just the two below (0x823057E8 reads
+    // +0x08, 0x8230592C +0x04). pong_states.hpp's names for the same slots
+    // are in brackets.
 
     /**
-     * GetStateName @ 0x82305A60 | size: 0xC
-     * Returns the state name string (e.g. "point_off_serves")
+     * GetContext @ 0x823057E8 | size: 0x18  [7, Reset]
+     * Tail-calls the context object's slot 4 with r4 = 0.
      */
-    virtual const char* GetStateName() const;
-    
-    /**
-     * OnEnter @ 0x82305800 | size: 0xE0
-     * Called when entering this state - allocates and initializes UI screen object
-     */
-    virtual void OnEnter() override;
+    void* GetContext();
 
-protected:
-    // Inherits from hsmState:
-    //   +0x00: vtable
-    //   +0x04: m_pManager
-    //   +0x08: m_pParentState
-    //   +0x0C: m_pChildState
-    //   +0x10: m_field_10
-    //   +0x14: m_field_14
-    
-    void* m_pScreenObject;        // +0x18 - UI screen object (32 bytes)
+    /**
+     * OnExit @ 0x82306EA8 | size: 0x6C  [8, Shutdown]
+     * Releases and destroys the context object.
+     */
+    void OnExit();
+
+    /**
+     * OnEvent @ 0x823058E0 | size: 0xC8  [11, OnEnter(int)]
+     * Event 6: creates UI state; events 9, 12: no-op; others go to the manager.
+     */
+    void OnEvent(int32_t eventType);
+
+    /**
+     * OnExitEvent @ 0x823059A8 | size: 0xB4  [12, OnExit(int)]
+     */
+    void OnExitEvent(int32_t eventType);
+
+    /**
+     * GetStateName @ 0x82305A60 | size: 0xC  [13, GetName]
+     */
+    const char* GetStateName() const;
+
+    /**
+     * OnEnter @ 0x82305800 | size: 0xE0  [14, ProcessInput]
+     * Allocates the 32-byte context object (back-pointer to this at its
+     * +0x18) and stores it at +0x08.
+     */
+    void OnEnter();
+
+    void**  vtable;               // +0x00
+    void*   m_pManager;           // +0x04 - hsm context the state posts transitions to
+    void*   m_pScreenObject;      // +0x08 - context object (32 bytes), owned
 };
 
-// Verify struct size matches PowerPC layout
-// static_assert(sizeof(pongAttractState) == 0x1C, "pongAttractState size mismatch");  // PPC-only
+#if __SIZEOF_POINTER__ == 4
+static_assert(offsetof(pongAttractState, m_pScreenObject) == 0x08, "");  // 0x823057E8
+#endif
 
 // ────────────────────────────────────────────────────────────────────────────
 // charViewCharData — Per-Character View Data
@@ -133,25 +128,25 @@ protected:
 class charViewCharData {
 public:
     // Virtual methods
-    virtual ~charViewCharData() = default;
+    ~charViewCharData() = default;
     
     /**
      * IsCharacterType @ 0x8240B238 | size: 0x48
      * Type checking function - compares input ID against known character types
      */
-    virtual bool IsCharacterType(uint32_t typeId);
+    bool IsCharacterType(uint32_t typeId);
     
     /**
      * Serialize @ 0x8240B280 | size: 0x8C
      * Serialize character view data to XML/binary format
      */
-    virtual void Serialize(void* serializer);
+    void Serialize(void* serializer);
     
     /**
      * GetDataInfo @ 0x8230A4F8 | size: 0xC
      * Get character view data size or type info
      */
-    virtual uint32_t GetDataInfo();
+    uint32_t GetDataInfo();
 
 protected:
     void** m_vtable;              // +0x00
@@ -191,7 +186,7 @@ protected:
  * 
  * Size: 0x184 (388 bytes)
  */
-class charViewData : public rage::atSingleton {
+class charViewData {
 public:
     // Virtual methods
     
@@ -199,38 +194,38 @@ public:
      * ~charViewData @ 0x8240B530 | size: 0x68
      * Destructor - frees allocated view data array
      */
-    virtual ~charViewData();
+    ~charViewData();
     
     /**
      * Initialize @ 0x8240B598 | size: 0x24
      * Initialize or reset view data
      */
-    virtual void Initialize();
+    void Initialize();
     
     /**
      * LoadViewData @ 0x8240B5C0 | size: 0x1AC
      * Load and populate character view data from game data
      * Allocates array, initializes elements, processes linked list
      */
-    virtual void LoadViewData();
+    void LoadViewData();
     
     /**
      * ValidateData @ 0x8240B310 | size: 0x48
      * Type checking or validation function
      */
-    virtual bool ValidateData(uint32_t param);
+    bool ValidateData(uint32_t param);
     
     /**
      * Serialize @ 0x8240B770 | size: 0x47C
      * Serialize all character view data (22+ fields)
      */
-    virtual void Serialize(void* serializer);
+    void Serialize(void* serializer);
     
     /**
      * GetDataInfo @ 0x8231F408 | size: 0xC
      * Get data info or size
      */
-    virtual uint32_t GetDataInfo();
+    uint32_t GetDataInfo();
 
 protected:
     void** m_vtable;              // +0x00
@@ -247,36 +242,31 @@ protected:
     uint32_t m_field_24;          // +0x24
     uint32_t m_field_28;          // +0x28
     uint32_t m_field_2C;          // +0x2C
+    uint8_t  _pad30[0x10];       // +0x30..+0x3F
     uint32_t m_field_40;          // +0x40
     uint32_t m_field_44;          // +0x44
+    uint8_t  _pad48[0x4];       // +0x48..+0x4B
     uint32_t m_field_4C;          // +0x4C
     uint32_t m_field_50;          // +0x50
+    uint8_t  _pad54[0x4];       // +0x54..+0x57
     uint32_t m_field_58;          // +0x58
     uint32_t m_field_5C;          // +0x5C
     uint32_t m_field_60;          // +0x60
     uint32_t m_field_64;          // +0x64
-    
-    uint8_t m_padding2[140];      // +0x68-0xEF
-    
-    uint32_t m_field_F0;          // +0xF0 (240)
-    uint32_t m_field_F4;          // +0xF4 (244)
-    
-    uint8_t m_padding3[44];       // +0xF8-0x11F
-    
-    uint32_t m_field_120;         // +0x120 (288)
-    uint32_t m_field_124;         // +0x124 (292)
-    
-    uint8_t m_padding4[44];       // +0x128-0x14F
-    
-    uint32_t m_field_150;         // +0x150 (336)
-    uint32_t m_field_154;         // +0x154 (340)
-    
-    uint8_t m_padding5[36];       // +0x158-0x17B
-    
-    // Dynamic array management
+    uint8_t  _pad68[0x88];       // +0x68..+0xEF
+    uint32_t m_field_F0;          // +0xF0
+    uint32_t m_field_F4;          // +0xF4
+    uint8_t  _padF8[0x28];       // +0xF8..+0x11F
+    uint32_t m_field_120;          // +0x120
+    uint32_t m_field_124;          // +0x124
+    uint8_t  _pad128[0x28];       // +0x128..+0x14F
+    uint32_t m_field_150;          // +0x150
+    uint32_t m_field_154;          // +0x154
+    uint8_t  _pad158[0x24];      // +0x158..+0x17B
+
     void* m_pAllocatedData;       // +0x17C (380) - array of 2D position elements
     uint16_t m_currentCount;      // +0x180 (384) - current element count
-    uint16_t m_allocatedSize;     // +0x182 (386) - allocated array size
+    uint16_t m_allocatedSize;     // +0x182 (386) - allocated array size; the dtor frees +0x17C when non-zero (0x8240B54C)
 };
 
 // static_assert(sizeof(charViewData) == 0x184, "charViewData size mismatch");  // PPC-only
@@ -300,7 +290,7 @@ public:
      * ~charViewCS @ 0x8216BD20 | size: 0x68
      * Destructor - cleans up embedded object at +292
      */
-    virtual ~charViewCS();
+    ~charViewCS();
     
     // TODO: Research and rename these methods
     /**
@@ -309,38 +299,38 @@ public:
      * parser infrastructure. Calls pongHairData_7B60_g for each field at
      * offsets +156, +160, +164, +168, +172, +180.
      */
-    virtual void RegisterXmlFields(void* parser);   // vfn_3 @ 0x8216DBB8
+    void RegisterXmlFields(void* parser);   // vfn_3 @ 0x8216DBB8
 
     /**
      * Validate @ 0x8216DCB0
      * Tail-calls phBoundCapsule_DB10_g to validate bound data.
      */
-    virtual void Validate();                        // vfn_4 @ 0x8216DCB0
+    void Validate();                        // vfn_4 @ 0x8216DCB0
 
     /**
      * GetName @ 0x8216DB00
      * Returns a constant string "many bounds specified (Max=%d)" (class/error label).
      */
-    virtual const char* GetName();                  // vfn_6 @ 0x8216DB00
+    const char* GetName();                  // vfn_6 @ 0x8216DB00
 
     /**
      * GetVariantName @ 0x82177840
      * Returns a constant string "Shadows:" (configuration block name).
      */
-    virtual const char* GetVariantName();           // vfn_7 @ 0x82177840
+    const char* GetVariantName();           // vfn_7 @ 0x82177840
 
     /**
      * Update @ 0x8216C200 (size: 0x510)
      * Large per-frame update routine — animation/blend and driver dispatch.
      */
-    virtual void Update();                          // vfn_9 @ 0x8216C200
+    void Update();                          // vfn_9 @ 0x8216C200
 
     /**
      * RecalcBounds @ 0x8216BED0
      * Iterates 4 bound slots; if bound count matches slot index and count >= 4,
      * calls RecalcBoundSlot(slot).
      */
-    virtual void RecalcBounds();                    // vfn_10 @ 0x8216BED0
+    void RecalcBounds();                    // vfn_10 @ 0x8216BED0
 
     /**
      * PurgeFilteredNodes @ 0x8216DB88
@@ -348,7 +338,7 @@ public:
      * nodes whose type is one of {5, 6, 12, 13, 14, 16} and recycling the rest
      * to the free list. Returns true if any kept node was found.
      */
-    virtual bool PurgeFilteredNodes();              // vfn_11 @ 0x8216DB88
+    bool PurgeFilteredNodes();              // vfn_11 @ 0x8216DB88
 
     // ── non-virtual helpers ──
     /**
@@ -401,31 +391,31 @@ public:
      * ~pongCharViewState @ 0x8230C490 | size: 0x68
      * Destructor - calls parent OnExit for cleanup
      */
-    virtual ~pongCharViewState();
+    ~pongCharViewState();
 
     /**
      * OnEnterEvent @ 0x8230C5F8 | size: 0xB8
      * Handles enter-phase events (event 6 sets up char view display)
      */
-    virtual void OnEnterEvent(int32_t eventType);
+    void OnEnterEvent(int32_t eventType);
 
     /**
      * OnExitEvent @ 0x8230C6B0 | size: 0xD8
      * Handles exit-phase events (event 6 cleans up char view display)
      */
-    virtual void OnExitEvent(int32_t eventType);
+    void OnExitEvent(int32_t eventType);
 
     /**
      * GetStateName @ 0x8230A4E8 | size: 0xC
      * Returns the state name string for this char view state
      */
-    virtual const char* GetStateName() const;
+    const char* GetStateName() const;
 
     /**
      * OnEnter @ 0x8230C4F8 | size: 0x100
      * Allocates and initializes pongCharViewContext (100 bytes)
      */
-    virtual void OnEnter();
+    void OnEnter();
 
 protected:
     // Inherits all fields from pongAttractState
@@ -453,7 +443,7 @@ public:
      * ~pongCharViewContext @ 0x8230A600 | size: 0xAC
      * Destructor - cleans up managed object at +44 and embedded object at +80
      */
-    virtual ~pongCharViewContext();
+    ~pongCharViewContext();
 
     /**
      * RegisterSceneSlot (vfn_11)
@@ -464,7 +454,7 @@ public:
      * a tag byte (=128), type code (=20), and slot pointer into the three
      * parallel arrays. Returns 1 on success.
      */
-    virtual bool RegisterSceneSlot();
+    bool RegisterSceneSlot();
 
     /**
      * ReleasePoseSource (vfn_12)
@@ -473,7 +463,7 @@ public:
      * slot 0 destructor (with deleting flag = 1) and nulls the pointer.
      * Returns 1 unconditionally.
      */
-    virtual bool ReleasePoseSource();
+    bool ReleasePoseSource();
 
     /**
      * TickScene (vfn_16)
@@ -486,7 +476,7 @@ public:
      * rebinds bound capsule + camera shot. Unlifted body kept as thunk due
      * to vector/float intensity; logic path is documented inline.
      */
-    virtual void TickScene();
+    void TickScene();
 
     /**
      * UpdateMountedChars (vfn_17)
@@ -497,7 +487,7 @@ public:
      * offset 25648 and calls vtable slot 6 on it (the per-character tick
      * that drives the pose/animation in the preview scene).
      */
-    virtual void UpdateMountedChars();
+    void UpdateMountedChars();
 
     /**
      * UnmountCharSlots (vfn_18)
@@ -509,7 +499,7 @@ public:
      * the game data manager. Used on state exit to return the preview rig
      * to idle.
      */
-    virtual void UnmountCharSlots();
+    void UnmountCharSlots();
 
     /**
      * InitScene (vfn_23)
@@ -521,7 +511,7 @@ public:
      * (vtable slot 20), records it at this+96, and cleans up temporary
      * xmlTree buffers. Called from pongCharViewState::OnEnter.
      */
-    virtual void InitScene();
+    void InitScene();
 
 protected:
     void** m_vtable;              // +0x00 - primary vtable
@@ -574,13 +564,12 @@ void AdvanceCharSlot(void* ctx, int slot);
  */
 class hudCharView {
 public:
-    virtual ~hudCharView() = default;
+    ~hudCharView() = default;
     
     // TODO: Research and rename these methods
-    virtual void vfn_2();         // @ 0x82320D68
-    virtual void vfn_5();         // @ 0x82320BE0
+    void vfn_2();         // @ 0x82320D68
+    void vfn_5();         // @ 0x82320BE0
 
 protected:
     void** m_vtable;              // +0x00
 };
-

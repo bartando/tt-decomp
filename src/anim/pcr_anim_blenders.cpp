@@ -481,7 +481,7 @@ void pcrEmoteBlender::ComputeBlend(void* outBlendVec)
  * @ 0x820DDCB8 | size: ~0xA0
  *
  * Frees the clip-data sub-struct (at +436), the ref-count array (at +432),
- * and the three atString buffers for the celebratory clip names
+ * and the three atArray buffers
  * (at +416/+408/+400), then tears down the two base-class vtable chains
  * and optionally frees the allocation.
  */
@@ -494,9 +494,9 @@ pcrPostPointBlender::~pcrPostPointBlender()
     rage_free(m_pRefCountArray);
 
     // Free atString buffers conditionally on their length fields.
-    if (m_celebNameCap)   rage_free((void*)m_pCelebNameA);  // +416 if +422 != 0
-    if (m_celebNameBCap)  rage_free((void*)m_pCelebNameB);  // +408 if +414 != 0
-    if (m_celebNameCCap)  rage_free((void*)m_pCelebNameC);  // +400 if +406 != 0
+    if (m_clipRefCountsCap) rage_free(m_clipRefCounts);  // +0x1A0 if +0x1A6 != 0
+    if (m_array198Cap)      rage_free(m_array198);       // +0x198 if +0x19E != 0
+    if (m_clipCap)          rage_free(m_clipArray);      // +0x190 if +0x196 != 0
 
     // The base-class destructors restore the vtable pair and, if the
     // free-flag bit is set in r4, call rage_free on the object itself.

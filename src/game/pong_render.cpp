@@ -219,48 +219,42 @@ void pongDrawBucketManager::Load()
 // Before the layer loop, vtable slot 1 is called on `renderable`:
 //   VCALL(renderable, 1)  — likely some "prepare for render bucket" callback.
 // ─────────────────────────────────────────────────────────────────────────────
+extern "C" uint32_t g_phFrameIndex;  // @ 0x826065DC — render buffer the entries go into
+extern void rage_debugLog(const char* fmt, ...);  // @ 0x8240E6D0 (empty in this build)
+
+// @ 0x822278D8
 void pongDrawBucket_AddEntry(pongDrawBucket* bucket, void* renderable, uint32_t bucketMask)
 {
     if (!bucket->m_bEnabled)  // +0x50
         return;
 
-    // Prepare renderable — vtable slot 1 (VCALL pattern-B @ +0x04)
-    // Call vtable slot 1 on renderable (prepare-for-render callback)
+    // Prepare renderable — vtable slot 1
     typedef void(*VoidFn)(void*); ((VoidFn)(*(void***)renderable)[1])(renderable);
 
-    int numLayers = bucket->m_numLayers;  // lhz @ +0x0C
-    if (numLayers <= 0)
+    if ((int)bucket->m_numLayers <= 0)
         return;
 
-    void** pData = bucket->m_pData;       // lwz @ +0x08
-
+    // Each layer descriptor keeps one entry list per buffer: count words from
+    // +0x34, {u16 capacity at +0x28, entries at +0x24} pairs every 8 bytes.
+    const int buf = (int)g_phFrameIndex;
     uint32_t mask = bucketMask;
-    for (int layerIdx = 0; layerIdx < numLayers; layerIdx++, mask >>= 1) {
+    for (int layerIdx = 0; layerIdx < (int)bucket->m_numLayers; layerIdx++, mask >>= 1) {
+        if (mask == 0)
+            return;
         if (!(mask & 1))
-            continue;  // this layer not selected in mask
+            continue;
 
-        // Fetch the layer descriptor pointer
-        void* pLayerDesc = ((void**)pData)[layerIdx];  // lwzx r31, r7, r28 (r28 = layerIdx*4)
-
-        // entry_count at (layerIdx+13)*4 from pLayerDesc
-        // capacity    at (layerIdx+5)*8 from pLayerDesc  (u16 halfword)
-        // Verified for layerIdx=0: count@+0x34, cap@+0x28
-        uint32_t& entryCount = *(uint32_t*)((uint8_t*)pLayerDesc + (layerIdx + 13) * 4);
-        uint16_t  capacity   = *(uint16_t*)((uint8_t*)pLayerDesc + (layerIdx + 5)  * 8);
-
-        entryCount++;
-
-        if ((int32_t)entryCount > (int32_t)capacity) {
-            // "pongDrawBucket::AddEntry() - adding more than %d entries to bucket '%s'"
-            ASSERT_MSG(false,
+        uint8_t* desc = (uint8_t*)bucket->m_pData[layerIdx];
+        int32_t& count = *(int32_t*)(desc + (buf + 13) * 4);
+        count++;
+        uint16_t capacity = *(uint16_t*)(desc + (buf + 5) * 8);
+        if (count > (int32_t)capacity) {
+            rage_debugLog(
                 "pongDrawBucket::AddEntry() - adding more than %d entries to bucket '%s'",
-                capacity, (char*)pLayerDesc);
+                capacity, (const char*)desc);
         }
-
-        // entries base ptr: *(pLayerDesc + layerIdx*8 + 36)
-        // stores renderable at entries[entryCount - 1]
-        void** pEntriesBase = *(void***)((uint8_t*)pLayerDesc + layerIdx * 8 + 36);
-        pEntriesBase[entryCount - 1] = renderable;
+        void** entries = *(void***)(desc + buf * 8 + 0x24);
+        entries[count - 1] = renderable;
     }
 }
 

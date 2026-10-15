@@ -118,7 +118,7 @@ emulator, the example specs, and nine mutated lifts that must all fail (about 40
 - **Comparison.** Bytes written outside the stack, with floats in `ctype`/`wf32` words and
   float arguments compared to `FTOL` relative to max(1, |a|, |b|); ints exactly. Pointer
   arguments into the stack compare as `<stack>`, plus the pointee if it's `const`; string
-  pointers compare by content.
+  pointers (arguments and pointer return values) compare by content.
 
 ## Limits
 

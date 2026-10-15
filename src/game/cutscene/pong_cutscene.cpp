@@ -5,6 +5,20 @@
 
 #include "pong_cutscene.hpp"
 
+// pongCSAction's methods aren't C++ virtuals (see pong_cutscene.hpp); calls
+// that dispatch through the game's vtable (0x82065674) go through these.
+template <typename R = void, typename... A>
+static inline R CS_Slot(void* obj, int slot, A... args) {
+    return ((R (*)(void*, A...))(*(void***)obj)[slot])(obj, args...);
+}
+#define CS_SLOT_Init(a)      CS_Slot(a, 3)
+#define CS_SLOT_Update(a)    CS_Slot(a, 4)
+#define CS_SLOT_Play(a)      CS_Slot(a, 5)
+#define CS_SLOT_Stop(a)      CS_Slot(a, 6)
+#define CS_SLOT_Pause(a, dt) CS_Slot(a, 7, (float)(dt))
+#define CS_SLOT_Resume(a)    CS_Slot<bool>(a, 8)
+#define CS_SLOT_Seek(a, tag) CS_Slot(a, 9, (int)(tag))
+
 // ─────────────────────────────────────────────────────────────────────────────
 // pongCSActionLoop::Resume() [vtable slot 8 @ 0x82349998]
 // Checks if the loop should continue or has completed
@@ -62,28 +76,28 @@ namespace {
 // ── pongCSAction::Update() [vtable 4 @ 0x82349200] ──────────────────────────
 void pongCSAction::Update() {
     for (int i = 0, n = m_nChildCount; i < n; ++i) {
-        m_pChildren[i]->Update();
+        CS_SLOT_Update(m_pChildren[i]);
     }
 }
 
 // ── pongCSAction::Play() [vtable 5 @ 0x82349258] ────────────────────────────
 void pongCSAction::Play() {
     for (int i = 0, n = m_nChildCount; i < n; ++i) {
-        m_pChildren[i]->Play();
+        CS_SLOT_Play(m_pChildren[i]);
     }
 }
 
 // ── pongCSAction::Stop() [vtable 6 @ 0x82349318] ────────────────────────────
 void pongCSAction::Stop() {
     for (int i = 0, n = m_nChildCount; i < n; ++i) {
-        m_pChildren[i]->Stop();
+        CS_SLOT_Stop(m_pChildren[i]);
     }
 }
 
 // ── pongCSAction::Pause(float dt) [vtable 7 @ 0x823492b0] ───────────────────
 void pongCSAction::Pause(float dt) {
     for (int i = 0, n = m_nChildCount; i < n; ++i) {
-        m_pChildren[i]->Pause(dt);
+        CS_SLOT_Pause(m_pChildren[i], dt);
     }
 }
 
@@ -95,7 +109,7 @@ bool pongCSAction::Resume() {
         return true;
     }
     for (int i = 0, n = m_nChildCount; i < n; ++i) {
-        if (!m_pChildren[i]->Resume()) {
+        if (!CS_SLOT_Resume(m_pChildren[i])) {
             return false;
         }
     }
@@ -103,9 +117,9 @@ bool pongCSAction::Resume() {
 }
 
 // ── pongCSAction::Seek(float t) [vtable 9 @ 0x823493f8] ─────────────────────
-void pongCSAction::Seek(float t) {
+void pongCSAction::Seek(int tag) {
     for (int i = 0, n = m_nChildCount; i < n; ++i) {
-        m_pChildren[i]->Seek(t);
+        CS_SLOT_Seek(m_pChildren[i], tag);
     }
 }
 
@@ -123,7 +137,7 @@ void pongCSActionDoInOrder::Stop() {
     if (m_nCurrentChild >= m_nChildCount) {
         return;
     }
-    m_pChildren[m_nCurrentChild]->Stop();
+    CS_SLOT_Stop(m_pChildren[m_nCurrentChild]);
 }
 
 // ── pongCSActionDoInOrder::Resume() [vtable 8 @ 0x82349798] ─────────────────
@@ -180,27 +194,24 @@ void pongCSActionDoInOrder::Pause(float dt) {
         return;
     }
     pongCSAction* active = m_pChildren[m_nCurrentChild];
-    active->Pause(dt);
+    CS_SLOT_Pause(active, dt);
     // Re-read the array slot; a Pause() implementation may have swapped it.
     active = m_pChildren[m_nCurrentChild];
-    if (!active->Resume()) {
+    if (!CS_SLOT_Resume(active)) {
         return;  // still running
     }
     ++m_nCurrentChild;
     if (m_nCurrentChild >= m_nChildCount) {
         return;
     }
-    this->Stop();  // virtual dispatch via slot 6
+    CS_SLOT_Stop(this);
 }
 
-// ── pongCSActionDoInOrder::Seek(float t) [vtable 9 @ 0x82349790] ────────────
-// Forward Seek to the currently active child only. Finished children are
-// already past their end-time so re-seeking them would be wasted work.
-void pongCSActionDoInOrder::Seek(float t) {
-    if (m_nCurrentChild >= m_nChildCount) {
-        return;
-    }
-    m_pChildren[m_nCurrentChild]->Seek(t);
+// ── pongCSActionDoInOrder::Seek(int) [vtable 9 @ 0x82349790] ──────────────
+// A bare blr in the game: an in-order sequence ignores Seek.
+// @ 0x82349790
+void pongCSActionDoInOrder::Seek(int tag) {
+    (void)tag;
 }
 
 // ── pongCSActionDoInOrder::OnComplete() [vtable 12 @ 0x823497a0] ────────────
@@ -217,7 +228,7 @@ void pongCSActionDoInOrder::OnComplete() {
 void pongCSActionLoop::Play() {
     pongCSAction** children = reinterpret_cast<pongCSAction**>(m_pActionArray);
     for (uint16_t i = 0, n = m_nActionCount; i < n; ++i) {
-        children[i]->Play();
+        CS_SLOT_Play(children[i]);
     }
     m_nCurrentIteration = 0;
 }
@@ -236,7 +247,7 @@ void pongCSActionLoop::Stop() {
     }
     pongCSAction** children = reinterpret_cast<pongCSAction**>(m_pActionArray);
     for (uint16_t i = 0, n = m_nActionCount; i < n; ++i) {
-        children[i]->Stop();
+        CS_SLOT_Stop(children[i]);
     }
 }
 
@@ -291,7 +302,7 @@ void pongCSActionIf::Pause() {
     pongCSActionIfLayout* self = AsIf(this);
     if (self->m_bResolved) {
         if (self->m_pActiveChild != nullptr) {
-            self->m_pActiveChild->Pause(0.0f);
+            CS_SLOT_Pause(self->m_pActiveChild, 0.0f);
         }
         return;
     }
@@ -300,7 +311,7 @@ void pongCSActionIf::Pause() {
         if (child == self->m_pActiveChild) {
             continue;
         }
-        child->Pause(0.0f);
+        CS_SLOT_Pause(child, 0.0f);
     }
 }
 
@@ -320,14 +331,14 @@ bool pongCSActionIf::Resume() {
         if (self->m_pActiveChild == nullptr) {
             return true;
         }
-        return self->m_pActiveChild->Resume();
+        return CS_SLOT_Resume(self->m_pActiveChild);
     }
     for (int i = 0, n = self->m_nChildCount; i < n; ++i) {
         pongCSAction* child = self->m_pChildren[i];
         if (child == self->m_pActiveChild) {
             continue;
         }
-        if (!child->Resume()) {
+        if (!CS_SLOT_Resume(child)) {
             return false;
         }
     }
@@ -343,11 +354,11 @@ bool pongCSActionIf::Resume() {
 //       slot 9). Header alignment pending; the Seek(0.0f) calls below are
 //       placeholders because the override is declared void().
 //       source: pass5_final pongCSActionIf_vfn_9 @ 0x82349E70
-void pongCSActionIf::Seek() {
+void pongCSActionIf::Seek(int tag) {
     pongCSActionIfLayout* self = AsIf(this);
     if (self->m_bResolved) {
         if (self->m_pActiveChild != nullptr) {
-            self->m_pActiveChild->Seek(0.0f);
+            CS_SLOT_Seek(self->m_pActiveChild, tag);
         }
         return;
     }
@@ -356,7 +367,7 @@ void pongCSActionIf::Seek() {
         if (child == self->m_pActiveChild) {
             continue;
         }
-        child->Seek(0.0f);
+        CS_SLOT_Seek(child, tag);
     }
 }
 

@@ -2839,7 +2839,7 @@ extern "C" {
     void  rage_7630(void* self);                        // @ 0x82177630 — base class dtor
     void  rage_free_00C0(void* p);                      // @ 0x820c00c0 — operator delete wrapper
     void  pongHairData_7B60_g(void* host, int valueKind, const char* name,
-                              void* addr, int flag1, int unused, int zero); // @ 0x82177b60 — register tunable param hook
+                              void* addr, int flag1, int zero); // @ 0x82177b60 — register tunable param hook
     void  phBoundCapsule_DB10_g(void* self);            // @ 0x8216db10 — capsule-collision pass (vfn_4 target)
 }
 
@@ -2848,18 +2848,16 @@ extern "C" {
 extern const char  charViewCS_typeName[];   // @ 0x82036E40 — "charViewCS"
 extern const char  charViewCS_debugLabel[]; // @ 0x82045380 — debug-name text
 
-// Static parameter names used by RegisterAxisHooks.
-// These are fixed .rdata literals whose layout is dictated by PPC addi-strides
-// of 12 bytes between successive literal slots.
-extern const char  charViewCS_paramName0[]; // @ 0x82036E44 slot 0
-extern const char  charViewCS_paramName1[]; // @ 0x82036E50 slot 1
-extern const char  charViewCS_paramName2[]; // @ 0x82036E5C slot 2
-extern const char  charViewCS_paramName3[]; // @ 0x82036E68 slot 3
-extern const char  charViewCS_paramName4[]; // @ 0x82036E74 slot 4
-extern const char  charViewCS_paramName5[]; // @ 0x82036E80 slot 5 (last, kind=1 instead of 6)
+// camBaseCS's tunable names in .rdata (0x8216DBDC..0x8216DC7C).
+extern const char  charViewCS_paramName0[]; // @ 0x82036404 "BlendTime"
+extern const char  charViewCS_paramName1[]; // @ 0x82036410 "BlendGoal"
+extern const char  charViewCS_paramName2[]; // @ 0x8203641C "CameraFOV"
+extern const char  charViewCS_paramName3[]; // @ 0x82036428 "CameraNear"
+extern const char  charViewCS_paramName4[]; // @ 0x82036434 "CameraFar"
+extern const char  charViewCS_paramName5[]; // @ 0x82036440 "IgnoreTimeWarp" (kind 1, not 6)
 
 // Tuning-table base used by vfn_9 / ApplyAxisScaled to pick a scale factor.
-// When m_enableModeB4 is set, we pick the secondary entry (offset +84 from base);
+// When m_ignoreTimeWarp is set, we pick the secondary entry (offset +84 from base);
 // otherwise the primary entry (offset +8). Base is at 0x8204A5F8 (big data blob).
 extern const float charViewCS_scaleTable[]; // @ 0x8204A5F8 — 100-byte tuning struct
 
@@ -2918,18 +2916,18 @@ charViewCS::~charViewCS() {
  *
  * Registers six tunable parameters with a host "param registry" (typically a
  * pongHairData-style reflection object). The first five describe float axes
- * backed by m_axisHook0..4; the sixth describes an integer/flag at +180
- * (m_enableModeB4) with a different kind-tag (1 vs 6).
+ * backed by camBaseCS's BlendTime..CameraFar; the sixth describes an integer/flag at +180
+ * (m_ignoreTimeWarp) with a different kind-tag (1 vs 6).
  */
 void charViewCS::RegisterAxisHooks(void* paramHost) {
     // Kind-6 = float axis. flag1 = 1 everywhere (treat as tunable).
-    pongHairData_7B60_g(paramHost, 6, charViewCS_paramName0, &m_axisHook0, 1, 0, 0);
-    pongHairData_7B60_g(paramHost, 6, charViewCS_paramName1, &m_axisHook1, 1, 0, 0);
-    pongHairData_7B60_g(paramHost, 6, charViewCS_paramName2, &m_axisHook2, 1, 0, 0);
-    pongHairData_7B60_g(paramHost, 6, charViewCS_paramName3, &m_axisHook3, 1, 0, 0);
-    pongHairData_7B60_g(paramHost, 6, charViewCS_paramName4, &m_axisHook4, 1, 0, 0);
+    pongHairData_7B60_g(paramHost, 6, charViewCS_paramName0, &m_blendTime, 1, 0);
+    pongHairData_7B60_g(paramHost, 6, charViewCS_paramName1, &m_blendGoal, 1, 0);
+    pongHairData_7B60_g(paramHost, 6, charViewCS_paramName2, &m_cameraFOV, 1, 0);
+    pongHairData_7B60_g(paramHost, 6, charViewCS_paramName3, &m_cameraNear, 1, 0);
+    pongHairData_7B60_g(paramHost, 6, charViewCS_paramName4, &m_cameraFar, 1, 0);
     // Last entry uses kind-1 (bool/uint8) and points at the mode byte.
-    pongHairData_7B60_g(paramHost, 1, charViewCS_paramName5, &m_enableModeB4, 1, 0, 0);
+    pongHairData_7B60_g(paramHost, 1, charViewCS_paramName5, &m_ignoreTimeWarp, 1, 0);
 }
 
 /**
@@ -2978,7 +2976,7 @@ const char* charViewCS::GetDebugLabel() {
  * Because the decompiled form is ~800 lines of dense FP/vector arithmetic
  * with multiple fused-multiply-add chains, a faithful literal rewrite
  * would not add comprehension value here — the intent is a per-axis
- * bounded lerp toward a per-slot target, rate-limited by m_blendTime
+ * bounded lerp toward a per-slot target, rate-limited by m_slotBlendTime
  * and gated on m_transitionPhase.
  *
  * KNOWN LIMITATION: the faithful body awaits lfsx/fsel/fmadds idiomatic
@@ -2990,7 +2988,7 @@ void charViewCS::UpdatePositions() {
     // ~811-line faithful implementation is gated behind the PPC hook.
     // Behavior: for slot in [0..6], if m_stateTable[slot].kind == 1:
     //   - special-case slot == 2 && m_transitionPhase == 1: parametric lerp
-    //     from field_0x60 toward field_0x64 based on m_blendTime vs
+    //     from field_0x60 toward field_0x64 based on m_slotBlendTime vs
     //     stateTable[slot].t0/t1.
     //   - otherwise: ratio-blend with clamped fsel pattern.
     //   Finally accumulates (this + (slot+48)*4) += axisScale * (this + (slot+64)*4).
@@ -3101,7 +3099,7 @@ void charViewCS::ProcessAxisInputs(int slotIndex) {
  * Target slot index comes from `axis`; the cap is read from the stateTable
  * entry at (+68 from its base + axis*16).
  *
- * Chosen scale depends on m_enableModeB4:
+ * Chosen scale depends on m_ignoreTimeWarp:
  *   - set  → scale = charViewCS_scaleTable[+84/4]   (secondary)
  *   - clr  → scale = charViewCS_scaleTable[+8/4]    (primary)
  *
@@ -3110,7 +3108,7 @@ void charViewCS::ProcessAxisInputs(int slotIndex) {
  */
 void charViewCS::ApplyAxisScaled(float factor, int axis) {
     // Pick scale from tuning table.
-    const float scale = (m_enableModeB4 != 0)
+    const float scale = (m_ignoreTimeWarp != 0)
                       ? charViewCS_scaleTable[84 / sizeof(float)]
                       : charViewCS_scaleTable[ 8 / sizeof(float)];
 
