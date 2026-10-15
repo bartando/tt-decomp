@@ -36,7 +36,6 @@ extern const double lbl_8202CFF4; /* 8-byte .rdata constant */
 /* .data SDA globals — untyped raw storage */
 extern uint32_t lbl_825CAF88;     /* 4 bytes .data — resource/string field type slot */
 extern uint32_t lbl_825C93D0;     /* 8 bytes .data — cameraProperty2 / sgNode_typeId alias */
-extern uint8_t  lbl_8261A0C0[16]; /* default viewport rect / scene reset matrix */
 extern uint8_t  lbl_82619BE0[16]; /* SIMD comparison mask */
 extern uint32_t lbl_8260641C;     /* SDA+25628 — renderer state ptr slot */
 extern uint8_t  lbl_82607C40[65616]; /* SDA+31808 — TemplateRegistry backing */
@@ -91,8 +90,6 @@ uint32_t g_nScreenHeight = 720;
 uint32_t g_nScreenWidth = 1280;
 void* g_nonWsConfig = NULL;
 
-/* Default viewport rectangle used to reset grcDeviceClear state */
-const uint8_t g_defaultViewportRect[16] = { 0 };  /* @ 0x8261A0C0 */
 
 /* Shader constant data table @ 0x8202C328 (.rdata, 440 bytes)
  * Used by grc_CB48 for GPU shader constant initialization */
@@ -703,7 +700,6 @@ void* g_matrixFieldType   = NULL;          // @ 0x825CAFA4
 
 // Message sink
 uint32_t      g_msgSinkBitfield      = 0;        // @ 0x825B0C30
-const uint32_t g_msgSinkTemplate[4]  = {0};      // @ 0x8241A0C0
 
 // Network globals
 uint32_t  g_netMessageHolderCount = 0;     // @ 0x826066A4
@@ -784,7 +780,7 @@ void* g_sceneRenderObj  = NULL;            // @ 0x82606430
 void* g_sceneRenderObj2 = NULL;            // @ 0x8260641C
 
 // Scene reset matrix
-uint32_t g_sceneResetMatrix[4] = {0};      // @ 0x8261A0C0
+uint32_t g_sceneResetMatrix[4] = {0};      // @ 0x8261A0C0  16 zero bytes, read as a template by several users
 
 // Selected character index
 int32_t g_selectedCharacterIndex = -1;     // @ 0x825C76B8
@@ -870,6 +866,9 @@ TT_DATA_ALIAS("g_netMessageHolderLiveCount_raw", "g_netMessageHolderCount");  /*
 TT_DATA_ALIAS("g_defaultData16", "g_sceneResetMatrix");                       /* 0x8261A0C0 */
 TT_DATA_ALIAS("g_netMessageHolderBufferPrefix", "g_sceneResetMatrix");
 TT_DATA_ALIAS("g_unlockDialogParams", "g_sceneResetMatrix");
+TT_DATA_ALIAS("g_msgSinkTemplate", "g_sceneResetMatrix");
+TT_DATA_ALIAS("g_defaultViewportRect", "g_sceneResetMatrix");
+TT_DATA_ALIAS("lbl_8261A0C0", "g_sceneResetMatrix");
 TT_DATA_ALIAS("g_cameraLerpFlags", "g_cameraFlags");                          /* 0x826064D0 */
 TT_DATA_ALIAS("g_ReplayActive", "g_pauseFlag");                               /* 0x82606670 */
 TT_DATA_ALIAS("g_cameraMgrSingleton", "g_rendererState");                     /* 0x8260641C */
