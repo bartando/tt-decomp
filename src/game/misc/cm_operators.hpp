@@ -13,6 +13,11 @@
 #pragma once
 #include <stdint.h>
 
+// The classes below carry the game's vtable pointer as an explicit `vtable`
+// member. Their slot methods are listed by game slot but declared non-virtual:
+// a C++ virtual would add a second vtable pointer in front of `vtable` and
+// shift every member by 4. Dispatch through `vtable` by hand.
+
 // ── cmPort — 8-byte data-flow graph port ────────────────────────────────────
 // Each port is a {pointer, type} pair used in CM condition/lookup nodes.
 //   type==1 (DIRECT): pData points to raw data object
@@ -38,7 +43,7 @@ struct cmAndReporter {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x82273a60
+    void vfn_3();  // [3] @ 0x82273a60
 };
 
 // ── cmApproach2Ctor  [8 vtables — template/MI] ──────────────────────────
@@ -46,7 +51,7 @@ struct cmApproach2Ctor {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmApproach2Ctor();                  // [0] @ 0x8226c658
+    ~cmApproach2Ctor();                  // [0] @ 0x8226c658
 };
 
 // ── cmAvgReporter  [vtable @ 0x8205643C] ──────────────────────────
@@ -54,7 +59,7 @@ struct cmAvgReporter {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x82273cb0
+    void ScalarDtor(int flags); // [1] @ 0x82273cb0
 };
 
 // ── cmBitwiseAndReporter  [vtable @ 0x82056574] ──────────────────────────
@@ -62,7 +67,7 @@ struct cmBitwiseAndReporter {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x82273b10
+    void vfn_3();  // [3] @ 0x82273b10
 };
 
 // ── cmBitwiseOrReporter  [vtable @ 0x8205658C] ──────────────────────────
@@ -70,7 +75,7 @@ struct cmBitwiseOrReporter {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x82273b58
+    void vfn_3();  // [3] @ 0x82273b58
 };
 
 // ── cmCond  [5 vtables — template/MI] ──────────────────────────
@@ -91,13 +96,13 @@ struct cmCond {
     // After entries[N-1]: default port
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x8226ceb0
-    virtual void vfn_2();  // [2] @ 0x8226ce28
-    virtual void vfn_3();  // [3] @ 0x8226cdb8
-    virtual void vfn_4();  // [4] @ 0x8226cd48
-    virtual void vfn_5();  // [5] @ 0x8226ccd8
-    virtual void vfn_16();  // [16] @ 0x8226cc98
-    virtual void vfn_18();  // [18] @ 0x82270c10
+    void ScalarDtor(int flags); // [1] @ 0x8226ceb0
+    void vfn_2();  // [2] @ 0x8226ce28
+    void vfn_3();  // [3] @ 0x8226cdb8
+    void vfn_4();  // [4] @ 0x8226cd48
+    void vfn_5();  // [5] @ 0x8226ccd8
+    void vfn_16();  // [16] @ 0x8226cc98
+    void vfn_18();  // [18] @ 0x82270c10
 };
 
 // ── cmFirstReporter  [vtable @ 0x82056514] ──────────────────────────
@@ -105,7 +110,7 @@ struct cmFirstReporter {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x82273a40
+    void vfn_3();  // [3] @ 0x82273a40
 };
 
 // ── cmFurthestFromReporter  [vtable @ 0x82056604] ──────────────────────────
@@ -118,7 +123,7 @@ struct cmLastReporter {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x82273a58
+    void vfn_3();  // [3] @ 0x82273a58
 };
 
 // ── cmLinearRemap  [5 vtables — template/MI] ──────────────────────────
@@ -126,8 +131,8 @@ struct cmLinearRemap {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x8226f5c8
-    virtual void vfn_4();  // [4] @ 0x8226f4c8
+    void vfn_2();  // [2] @ 0x8226f5c8
+    void vfn_4();  // [4] @ 0x8226f4c8
 };
 
 // ── cmLookup  [5 vtables — template/MI] ──────────────────────────
@@ -149,13 +154,13 @@ struct cmLookup {
     cmPort      m_defaultPort;   // +0x44  default port (3-entry); 2-entry uses (cmPort*)&m_entries[2]
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x8226db18
-    virtual void vfn_2();  // [2] @ 0x8226d9c0
-    virtual void vfn_3();  // [3] @ 0x8226da78
-    virtual void vfn_4();  // [4] @ 0x8226d920
-    virtual void vfn_5();  // [5] @ 0x8226d880
-    virtual void vfn_16();  // [16] @ 0x8226d840
-    virtual void vfn_18();  // [18] @ 0x82270d10
+    void ScalarDtor(int flags); // [1] @ 0x8226db18
+    void vfn_2();  // [2] @ 0x8226d9c0
+    void vfn_3();  // [3] @ 0x8226da78
+    void vfn_4();  // [4] @ 0x8226d920
+    void vfn_5();  // [5] @ 0x8226d880
+    void vfn_16();  // [16] @ 0x8226d840
+    void vfn_18();  // [18] @ 0x82270d10
 
     // ── non-virtual methods (lifted in cm_operators.cpp) ──
     void RegisterPorts();
@@ -172,7 +177,7 @@ struct cmMaxReporter {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x82273fe8
+    void vfn_3();  // [3] @ 0x82273fe8
 };
 
 // ── cmMinReporter  [vtable @ 0x820565BC] ──────────────────────────
@@ -180,7 +185,7 @@ struct cmMinReporter {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x82273ec0
+    void vfn_3();  // [3] @ 0x82273ec0
 };
 
 // ── cmMostReporter  [vtable @ 0x820565A4] ──────────────────────────
@@ -188,9 +193,9 @@ struct cmMostReporter {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmMostReporter();                  // [0] @ 0x82273d98
-    virtual void ScalarDtor(int flags); // [1] @ 0x82273dc8
-    virtual void vfn_3();  // [3] @ 0x82273e10
+    ~cmMostReporter();                  // [0] @ 0x82273d98
+    void ScalarDtor(int flags); // [1] @ 0x82273dc8
+    void vfn_3();  // [3] @ 0x82273e10
 };
 
 // ── cmNaryOperator  [4 vtables — template/MI] ──────────────────────────
@@ -207,8 +212,8 @@ struct cmNearestToReporter {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmNearestToReporter();                  // [0] @ 0x82274110
-    virtual void vfn_3();  // [3] @ 0x82274138
+    ~cmNearestToReporter();                  // [0] @ 0x82274110
+    void vfn_3();  // [3] @ 0x82274138
 };
 
 // ── cmNoneReporter  [vtable @ 0x820564FC] ──────────────────────────
@@ -216,7 +221,7 @@ struct cmNoneReporter {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x82273a28
+    void ScalarDtor(int flags); // [1] @ 0x82273a28
 };
 
 // ── cmOperatorCtor  [113 vtables — template/MI] ──────────────────────────
@@ -224,7 +229,7 @@ struct cmOperatorCtor {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmOperatorCtor();                  // [0] @ 0x82185a38
+    ~cmOperatorCtor();                  // [0] @ 0x82185a38
 };
 
 // ── cmOrReporter  [vtable @ 0x8205655C] ──────────────────────────
@@ -232,7 +237,7 @@ struct cmOrReporter {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x82273ab8
+    void vfn_3();  // [3] @ 0x82273ab8
 };
 
 // ── cmRefreshableCtor  [20 vtables — template/MI] ──────────────────────────
@@ -240,7 +245,7 @@ struct cmRefreshableCtor {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmRefreshableCtor();                  // [0] @ 0x82267ea0
+    ~cmRefreshableCtor();                  // [0] @ 0x82267ea0
 };
 
 // ── cmReporterCtor  [14 vtables — template/MI] ──────────────────────────
@@ -253,8 +258,8 @@ struct cmSmoothRemap {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x822700f0
-    virtual void vfn_4();  // [4] @ 0x8226ffe0
+    void vfn_2();  // [2] @ 0x822700f0
+    void vfn_4();  // [4] @ 0x8226ffe0
 };
 
 // ── cmSumReporter  [vtable @ 0x82056424] ──────────────────────────
@@ -262,7 +267,7 @@ struct cmSumReporter {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x82273c00
+    void vfn_3();  // [3] @ 0x82273c00
 };
 
 // ── cmSwitch  [5 vtables — template/MI] ──────────────────────────
@@ -270,11 +275,11 @@ struct cmSwitch {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x8226ea90
-    virtual void vfn_2();  // [2] @ 0x8226e988
-    virtual void vfn_3();  // [3] @ 0x8226ea18
-    virtual void vfn_4();  // [4] @ 0x8226e910
-    virtual void vfn_5();  // [5] @ 0x8226e898
+    void ScalarDtor(int flags); // [1] @ 0x8226ea90
+    void vfn_2();  // [2] @ 0x8226e988
+    void vfn_3();  // [3] @ 0x8226ea18
+    void vfn_4();  // [4] @ 0x8226e910
+    void vfn_5();  // [5] @ 0x8226e898
 };
 
 // ── cmWorldApproach2Ctor  [8 vtables — template/MI] ──────────────────────────
@@ -282,7 +287,7 @@ struct cmWorldApproach2Ctor {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmWorldApproach2Ctor();                  // [0] @ 0x8226c068
+    ~cmWorldApproach2Ctor();                  // [0] @ 0x8226c068
 };
 
 // ── cmWorldRefreshableCtor  [18 vtables — template/MI] ──────────────────────────
@@ -290,5 +295,5 @@ struct cmWorldRefreshableCtor {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmWorldRefreshableCtor();                  // [0] @ 0x82267f40
+    ~cmWorldRefreshableCtor();                  // [0] @ 0x82267f40
 };

@@ -83,8 +83,8 @@ void* cmWorldRefreshableCtor_Destructor()
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Forward declarations for utility functions
-extern "C" float cmOperator_EvalFloat(void* port);    // Evaluates a cmPort and returns float
-extern "C" int cmNode_GetDim_stub(void* port);              // Evaluates a cmPort and returns int
+extern "C" float cmOperator_EvalFloat(void* port);    // @ 0x82179350 — evaluates a cmPort as float
+extern "C" int cmNode_GetDim_stub(void* port);              // @ 0x82184B60 — evaluates a cmPort as int
 extern "C" int cmNode_GetInt(void* port);              // Evaluates a cmPort and returns int
 extern "C" bool cmCond_21B0(void* port);               // Evaluates a cmPort as bool
 extern "C" void cmNode_GetVector(void* dest, void* port);  // Evaluates a cmPort into vector
