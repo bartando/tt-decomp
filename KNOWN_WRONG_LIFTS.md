@@ -41,14 +41,18 @@ before relying on any of these; fix and delete the entry when done.
 - `rage_grm.hpp` still names `grmShader` slot 0 `IsOfType` (asm: scalar deleting destructor)
   and slot 6 `IsOfTypeExt` (asm: stores `this` as the active shader, returns 1).
 - `rage_free` (0x820C00C0) is declared `extern "C"` in some files and with C++ linkage in others.
-- `pongPlayer::CancelSwing`, `IsBeforeSwingPeak`, `IsSwingSystemIdle`, `IsInReturnPosition`
-  have the swing-timer test inverted (their `pongPlayerState::` duplicates at the same
-  addresses are right); `CancelSwing` also writes the wrong constants.
-- `SetupRecoverySlots` (0x820C7248): `this` is a `pongCreature`, the two arguments are 16-byte
-  callbacks, not `vec3`s; it copies them unconditionally, then passes a position and two bools
-  to `game_D060`. Its timer test is inverted too.
-- `ComputeShotSpeedForType` (0x821D6100) runs on the per-player shot record, not `pongPlayer`;
-  `FinalizeServeSetup` (0x8219F9C0) is a `shotTarget` method.
+- `FinalizeServeSetup` (0x8219F9C0) and `ResetSwingTrackingState` (0x8219FA40) are
+  `shotTarget` methods still declared on `pongPlayer`; callers go through a cast.
+- `pongPlayer::CheckHandednessDifference` (0x821E04B0) really takes a pad record and a
+  button id and tests one of the button's bits.
+- `pongPlayer::IsSwingApexReached` / `pongPlayerState::IsSwingApexReached` are another
+  duplicate pair at 0x820CDA58, unchecked.
+- `pcr_anim_blenders.cpp` declares `pongPlayer_DE98_g` with C++ linkage; it's defined `extern "C"`.
+- `pong_player_swing.cpp` (not built) defines `pongPlayer_AB48_g` returning void; it returns
+  its first argument.
+- `pong_match.cpp` reads `g_render_obj_ptr`'s `+0x1C`/`+0x20` both as player scores and as
+  round counts.
+- `IsRecovering` uses `<` where the asm tests `!(>= 1.0)` (differs only for NaN).
 - `PostPageGroupMessage`: `pg_E6E0` takes 4 arguments, the declaration has 5.
 - `pong_player.hpp`: the `pongPlayer` layout below +0x100 is really `pongCreature`'s;
   `m_pOpponent` (+0x1C4) is the player's own creature, `m_pActionState` (+0x1F0) is an
@@ -94,7 +98,8 @@ against the recomp or the raw bytes in the game image.
 | 0x8271A32C | `g_pMatchConfig` | shared camera state |
 | 0x825EBAA0 | `g_pHudOverlay` | current `grcViewport` |
 | 0x8271A304 | `g_pGlobalClock` | table dimensions |
-| 0x8202D10C | `g_kZero` | 0.5 (0.0 is at 0x8202D110) |
+| 0x8202D10C | `g_kZero` (defined 0.0f in `globals.c`) | 0.5 (0.0 is at 0x8202D110) |
+| 0x8260633C | `g_swingInFlightFlag` (word) | a byte |
 
 ## Not game code
 
