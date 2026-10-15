@@ -179,6 +179,7 @@ set(SOURCES
     src/rage/data/dat_resource_fixup.cpp
     src/rage/network/sn_event.cpp
     src/xam/kernel_import_thunks.c
+    src/rage/math/ph_math.cpp
 )
 
 # Create executable
