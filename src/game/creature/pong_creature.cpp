@@ -2096,8 +2096,10 @@ void pongCreatureInst::UpdateWorldBound() {
 
     // The original transposes the matrix and takes three 4-wide dot products
     // with (centroid.xyz, w): the mask at 0x82619BE0 keeps xyz and the
-    // constant at 0x82619BD0 supplies w, assumed 1.0 since row 3 (the
-    // translation) has to count. Unverified: the .data bytes aren't in the repo.
+    // constant at 0x82619BD0 supplies w = 1.0. Both are zero in the image and
+    // filled by static initializers: 0x8257DBF8 copies (0, 0, 0, 1) from
+    // 0x825C5850, 0x8257DBD8 copies 0x82619C20, whose xyz 0x8257DB68 sets to
+    // the all-ones word at 0x825CB7F0.
     const float cx = bound->centroidOffset[0];
     const float cy = bound->centroidOffset[1];
     const float cz = bound->centroidOffset[2];
@@ -2110,7 +2112,9 @@ void pongCreatureInst::UpdateWorldBound() {
     fragInstManager* manager = FragInstManager();
     manager->onBoundMoved.thunk(&manager->onBoundMoved, self->managerHandle);
 
-    SyncBoneMatrices();  // vtable slot 47
+    // The game's slot 47 (SyncBoneMatrices); a C++ virtual call would use the
+    // header's slot order, which isn't the game's.
+    VCALL(this, 47, void (*)(pongCreatureInst*))(this);
 }
 
 // Slots 2 and 3: phInst's own slot 2 (0x823D8CD0) returns the current matrix at
