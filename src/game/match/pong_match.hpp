@@ -12,6 +12,12 @@
 #pragma once
 #include <stdint.h>
 
+// Structs that carry the game's vtable as an explicit `vtable` member list
+// their slots as plain (non-virtual) methods: a C++ virtual would add a hidden
+// vptr in front of `vtable` and shift every member by 4, and C++ slot numbers
+// don't match the game's anyway. The "field access clusters" put every
+// field_0xNNNN at offset NNNN; accesses that overlap share a union.
+
 // ── MatchData  [vtable @ 0x8203008C] ──────────────────────────
 struct MatchData {
     void**      vtable;           // +0x00
@@ -22,11 +28,11 @@ struct MatchDataMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bf248
-    virtual void vfn_2();  // [2] @ 0x823bf2c8
-    virtual void vfn_5();  // [5] @ 0x823bf140
-    virtual void vfn_6();  // [6] @ 0x823bf228
-    virtual void vfn_7();  // [7] @ 0x823bf238
+    void ScalarDtor(int flags); // [1] @ 0x823bf248
+    void vfn_2();  // [2] @ 0x823bf2c8
+    void vfn_5();  // [5] @ 0x823bf140
+    void vfn_6();  // [6] @ 0x823bf228
+    void vfn_7();  // [7] @ 0x823bf238
 };
 
 // ── MatchDataSyncMessage  [vtable @ 0x8206F998] ──────────────────────────
@@ -34,9 +40,9 @@ struct MatchDataSyncMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_5();  // [5] @ 0x823bc960
-    virtual void vfn_6();  // [6] @ 0x823bca68
-    virtual void vfn_7();  // [7] @ 0x823bca78
+    void vfn_5();  // [5] @ 0x823bc960
+    void vfn_6();  // [6] @ 0x823bca68
+    void vfn_7();  // [7] @ 0x823bca78
 };
 
 // ── MatchDataSyncResponseMessage  [vtable @ 0x8206F9C0] ──────────────────────────
@@ -44,12 +50,12 @@ struct MatchDataSyncResponseMessage {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x823bcbb0
-    virtual void vfn_2();  // [2] @ 0x823bcc50
-    virtual void vfn_4();  // [4] @ 0x823bccc8
-    virtual void vfn_5();  // [5] @ 0x823bca88
-    virtual void vfn_6();  // [6] @ 0x823bcb90
-    virtual void vfn_7();  // [7] @ 0x823bcba0
+    void ScalarDtor(int flags); // [1] @ 0x823bcbb0
+    void vfn_2();  // [2] @ 0x823bcc50
+    void vfn_4();  // [4] @ 0x823bccc8
+    void vfn_5();  // [5] @ 0x823bca88
+    void vfn_6();  // [6] @ 0x823bcb90
+    void vfn_7();  // [7] @ 0x823bcba0
 };
 
 // ── gdDifficultyLadder  [vtable @ 0x82042F94] ──────────────────────────
@@ -58,9 +64,9 @@ struct gdDifficultyLadder {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~gdDifficultyLadder();                  // [0] @ 0x821f1c58
-    virtual void PostLoadProperties();  // [20] @ 0x821f1b70
-    virtual void Validate();  // [21] @ 0x821f1d10
+    ~gdDifficultyLadder();                  // [0] @ 0x821f1c58
+    void PostLoadProperties();  // [20] @ 0x821f1b70
+    void Validate();  // [21] @ 0x821f1d10
 };
 
 // ── gdGameData  [vtable @ 0x8203CDF4] ──────────────────────────
@@ -78,9 +84,9 @@ struct gdLadder {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~gdLadder();                  // [0] @ 0x82115128
-    virtual void PostLoadProperties();  // [20] @ 0x821f1ea0
-    virtual void PostLoadChildren();  // [22] @ 0x821f1ee8
+    ~gdLadder();                  // [0] @ 0x82115128
+    void PostLoadProperties();  // [20] @ 0x821f1ea0
+    void PostLoadChildren();  // [22] @ 0x821f1ee8
 };
 
 // ── gdLadderCommonData  [vtable @ 0x82042EC4] ──────────────────────────
@@ -88,9 +94,9 @@ struct gdLadderCommonData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~gdLadderCommonData();                  // [0] @ 0x821f1118
-    virtual void PostLoadProperties();  // [20] @ 0x821f1030
-    virtual void PostLoadChildren();  // [22] @ 0x821f1078
+    ~gdLadderCommonData();                  // [0] @ 0x821f1118
+    void PostLoadProperties();  // [20] @ 0x821f1030
+    void PostLoadChildren();  // [22] @ 0x821f1078
 };
 
 // ── gdLadderMatch  [vtable @ 0x82042F2C] ──────────────────────────
@@ -98,10 +104,10 @@ struct gdLadderMatch {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~gdLadderMatch();                  // [0] @ 0x821f14a0
-    virtual void PostLoadProperties();  // [20] @ 0x821f1390
-    virtual void Validate();  // [21] @ 0x821f14f0
-    virtual void PostLoadChildren();  // [22] @ 0x821f13d8
+    ~gdLadderMatch();                  // [0] @ 0x821f14a0
+    void PostLoadProperties();  // [20] @ 0x821f1390
+    void Validate();  // [21] @ 0x821f14f0
+    void PostLoadChildren();  // [22] @ 0x821f13d8
 };
 
 // ── gdRivalry  [vtable @ 0x820325AC] ──────────────────────────
@@ -109,9 +115,9 @@ struct gdRivalry {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~gdRivalry();                  // [0] @ 0x82115088
-    virtual void PostLoadProperties();  // [20] @ 0x821f0888
-    virtual void PostLoadChildren();  // [22] @ 0x821f08d0
+    ~gdRivalry();                  // [0] @ 0x82115088
+    void PostLoadProperties();  // [20] @ 0x821f0888
+    void PostLoadChildren();  // [22] @ 0x821f08d0
 };
 
 // ── gdRivalryData  [vtable @ 0x82042DF4] ──────────────────────────
@@ -120,9 +126,9 @@ struct gdRivalryData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x821f0650
-    virtual void Validate();  // [21] @ 0x821f0738
-    virtual void PostLoadChildren();  // [22] @ 0x821f0698
+    void PostLoadProperties();  // [20] @ 0x821f0650
+    void Validate();  // [21] @ 0x821f0738
+    void PostLoadChildren();  // [22] @ 0x821f0698
 };
 
 // ── gdTier  [vtable @ 0x82032614] ──────────────────────────
@@ -131,10 +137,10 @@ struct gdTier {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~gdTier();                  // [0] @ 0x821150d8
-    virtual void PostLoadProperties();  // [20] @ 0x821f0d28
-    virtual void Validate();  // [21] @ 0x821f0e80
-    virtual void PostLoadChildren();  // [22] @ 0x821f0d70
+    ~gdTier();                  // [0] @ 0x821150d8
+    void PostLoadProperties();  // [20] @ 0x821f0d28
+    void Validate();  // [21] @ 0x821f0e80
+    void PostLoadChildren();  // [22] @ 0x821f0d70
 };
 
 // ── gdTierMember  [vtable @ 0x82042E5C] ──────────────────────────
@@ -143,9 +149,9 @@ struct gdTierMember {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void PostLoadProperties();  // [20] @ 0x821f0b88
-    virtual void Validate();  // [21] @ 0x821f0c68
-    virtual void PostLoadChildren();  // [22] @ 0x821f0bd0
+    void PostLoadProperties();  // [20] @ 0x821f0b88
+    void Validate();  // [21] @ 0x821f0c68
+    void PostLoadChildren();  // [22] @ 0x821f0bd0
 };
 
 // ── gmLogic  [vtable @ 0x820300EC] ──────────────────────────
@@ -153,13 +159,13 @@ struct gmLogic {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~gmLogic();                  // [0] @ 0x82104718
-    virtual void vfn_3();  // [3] @ 0x82222a78
-    virtual void vfn_4();  // [4] @ 0x82222b20
-    virtual void vfn_5();  // [5] @ 0x82222ba0
-    virtual void vfn_7();  // [7] @ 0x82222c18
-    virtual void vfn_9();  // [9] @ 0x82222cc8
-    virtual void vfn_17();  // [17] @ 0x82101ee8
+    ~gmLogic();                  // [0] @ 0x82104718
+    void vfn_3();  // [3] @ 0x82222a78
+    void vfn_4();  // [4] @ 0x82222b20
+    void vfn_5();  // [5] @ 0x82222ba0
+    void vfn_7();  // [7] @ 0x82222c18
+    void vfn_9();  // [9] @ 0x82222cc8
+    void vfn_17();  // [17] @ 0x82101ee8
 };
 
 // ── gmLogicNode  [2 vtables — template/MI] ──────────────────────────
@@ -167,51 +173,55 @@ struct gmLogicNode {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~gmLogicNode();                  // [0] @ 0x82101758
-    virtual void PostLoadProperties();  // [20] @ 0x82101e00
-    virtual void PostLoadChildren();  // [22] @ 0x82101e38
-    virtual void vfn_24();  // [24] @ 0x82101a50
-    virtual void vfn_25();  // [25] @ 0x82101ad0
-    virtual void vfn_27();  // [27] @ 0x82101ae8
-    virtual void vfn_29();  // [29] @ 0x82101b18
-    virtual void vfn_30();  // [30] @ 0x82101b30
-    virtual void vfn_31();  // [31] @ 0x82101b00
+    ~gmLogicNode();                  // [0] @ 0x82101758
+    void PostLoadProperties();  // [20] @ 0x82101e00
+    void PostLoadChildren();  // [22] @ 0x82101e38
+    void vfn_24();  // [24] @ 0x82101a50
+    void vfn_25();  // [25] @ 0x82101ad0
+    void vfn_27();  // [27] @ 0x82101ae8
+    void vfn_29();  // [29] @ 0x82101b18
+    void vfn_30();  // [30] @ 0x82101b30
+    void vfn_31();  // [31] @ 0x82101b00
 };
 
 // ── gmLogicSinglesMatch  [vtable @ 0x82030CC4] ──────────────────────────
 // Confirmed methods: MidGame
 // Field hints: m_PointsPerGame:enum
 struct gmLogicSinglesMatch {
-    void**      vtable;           // +0x00
-
     // ── field access clusters ──
+    void**       vtable;  // +0x00
     uint32_t     field_0x0004;  // +0x0004  R:1 W:1
     uint32_t     field_0x0008;  // +0x0008  R:36 W:1
     uint32_t     field_0x000c;  // +0x000c  R:4 W:0
-    uint32_t     field_0x0010;  // +0x0010  R:2 W:2
-    uint8_t      field_0x0011;  // +0x0011  R:0 W:1
-    uint8_t      field_0x0012;  // +0x0012  R:0 W:1
-    uint8_t      field_0x0013;  // +0x0013  R:0 W:1
-    uint8_t     _pad0x001c[5];
+    union {  // overlapping accesses at +0x0010..+0x0014
+        struct { uint32_t field_0x0010; };  // +0x0010  R:2 W:2
+        struct { uint8_t _p0011[0x1]; uint8_t field_0x0011; };  // +0x0011  R:0 W:1
+        struct { uint8_t _p0012[0x2]; uint8_t field_0x0012; };  // +0x0012  R:0 W:1
+        struct { uint8_t _p0013[0x3]; uint8_t field_0x0013; };  // +0x0013  R:0 W:1
+    };
+    uint8_t      _pad0x0014[0x8];
     uint32_t     field_0x001c;  // +0x001c  R:1 W:1
     uint8_t      field_0x0020;  // +0x0020  R:1 W:0
+    uint8_t      _pad0x0021[0x3];
     uint32_t     field_0x0024;  // +0x0024  R:1 W:1
     uint32_t     field_0x0028;  // +0x0028  R:1 W:1
     uint8_t      field_0x002c;  // +0x002c  R:0 W:1
+    uint8_t      _pad0x002d[0x3];
     uint32_t     field_0x0030;  // +0x0030  R:6 W:3
     uint8_t      field_0x0034;  // +0x0034  R:3 W:4
     uint8_t      field_0x0035;  // +0x0035  R:0 W:3
     uint8_t      field_0x0036;  // +0x0036  R:0 W:1
+    uint8_t      _pad0x0037[0x1];
     uint32_t     field_0x0038;  // +0x0038  R:0 W:1
 
     // ── virtual methods ──
-    virtual void vfn_8();  // [8] @ 0x82104778
-    virtual void vfn_10();  // [10] @ 0x82105aa8
-    virtual void OnEnter();  // [11] @ 0x82105568
-    virtual void vfn_12();  // [12] @ 0x821057c0
-    virtual void GetName();  // [13] @ 0x82105af8
-    virtual void vfn_18();  // [18] @ 0x82106458
-    virtual void PostLoadProperties();  // [20] @ 0x82106788
+    void vfn_8();  // [8] @ 0x82104778
+    void vfn_10();  // [10] @ 0x82105aa8
+    void OnEnter();  // [11] @ 0x82105568
+    void vfn_12();  // [12] @ 0x821057c0
+    void GetName();  // [13] @ 0x82105af8
+    void vfn_18();  // [18] @ 0x82106458
+    void PostLoadProperties();  // [20] @ 0x82106788
 
     // ── non-virtual methods (from debug strings) ──
     void MidGame();
@@ -224,11 +234,11 @@ struct stateAnticipationCam {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x82107528
-    virtual void vfn_12();  // [12] @ 0x8210b560
-    virtual void GetName();  // [13] @ 0x82107708
-    virtual void vfn_15();  // [15] @ 0x821076f0
-    virtual void vfn_16();  // [16] @ 0x82107660
+    void OnEnter();  // [11] @ 0x82107528
+    void vfn_12();  // [12] @ 0x8210b560
+    void GetName();  // [13] @ 0x82107708
+    void vfn_15();  // [15] @ 0x821076f0
+    void vfn_16();  // [16] @ 0x82107660
 };
 
 // ── gmLogicSinglesMatch::stateAwaitReturnHit  [vtable @ 0x8203125C] ──────────────────────────
@@ -236,10 +246,10 @@ struct stateAwaitReturnHit {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x8238edb0
-    virtual void GetName();  // [13] @ 0x82101f50
-    virtual void vfn_15();  // [15] @ 0x82103ea0
-    virtual void vfn_16();  // [16] @ 0x82103ec0
+    void OnEnter();  // [11] @ 0x8238edb0
+    void GetName();  // [13] @ 0x82101f50
+    void vfn_15();  // [15] @ 0x82103ea0
+    void vfn_16();  // [16] @ 0x82103ec0
 };
 
 // ── gmLogicSinglesMatch::stateAwaitServeReturnHit  [vtable @ 0x820311FC] ──────────────────────────
@@ -247,14 +257,14 @@ struct stateAwaitServeReturnHit {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x82108a78
-    virtual void OnEnter();  // [11] @ 0x82109318
-    virtual void vfn_12();  // [12] @ 0x82108a10
-    virtual void GetName();  // [13] @ 0x82109308
-    virtual void vfn_15();  // [15] @ 0x821090a0
-    virtual void vfn_16();  // [16] @ 0x821090d0
-    virtual void vfn_18();  // [18] @ 0x82109090
-    virtual void vfn_19();  // [19] @ 0x821092c8
+    void vfn_10();  // [10] @ 0x82108a78
+    void OnEnter();  // [11] @ 0x82109318
+    void vfn_12();  // [12] @ 0x82108a10
+    void GetName();  // [13] @ 0x82109308
+    void vfn_15();  // [15] @ 0x821090a0
+    void vfn_16();  // [16] @ 0x821090d0
+    void vfn_18();  // [18] @ 0x82109090
+    void vfn_19();  // [19] @ 0x821092c8
 };
 
 // ── gmLogicSinglesMatch::stateHelpTips  [vtable @ 0x8203131C] ──────────────────────────
@@ -262,11 +272,11 @@ struct stateHelpTips {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x8210a930
-    virtual void OnEnter();  // [11] @ 0x8210a8e8
-    virtual void GetName();  // [13] @ 0x8210aae8
-    virtual void vfn_14();  // [14] @ 0x8210aa40
-    virtual void vfn_16();  // [16] @ 0x8210a9b0
+    void vfn_10();  // [10] @ 0x8210a930
+    void OnEnter();  // [11] @ 0x8210a8e8
+    void GetName();  // [13] @ 0x8210aae8
+    void vfn_14();  // [14] @ 0x8210aa40
+    void vfn_16();  // [16] @ 0x8210a9b0
 };
 
 // ── gmLogicSinglesMatch::stateHitNetServe  [vtable @ 0x8203114C] ──────────────────────────
@@ -274,9 +284,9 @@ struct stateHitNetServe {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void GetName();  // [13] @ 0x821088f8
-    virtual void vfn_15();  // [15] @ 0x821086b8
-    virtual void vfn_16();  // [16] @ 0x821086e8
+    void GetName();  // [13] @ 0x821088f8
+    void vfn_15();  // [15] @ 0x821086b8
+    void vfn_16();  // [16] @ 0x821086e8
 };
 
 // ── gmLogicSinglesMatch::stateInit  [vtable @ 0x82030D2C] ──────────────────────────
@@ -284,15 +294,15 @@ struct stateInit {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x8238dbe8
-    virtual void OnEnter();  // [11] @ 0x821036a0
-    virtual void vfn_12();  // [12] @ 0x82106b18
-    virtual void GetName();  // [13] @ 0x823d1958
-    virtual void vfn_14();  // [14] @ 0x823d1f70
-    virtual void vfn_15();  // [15] @ 0x821071f0
-    virtual void vfn_16();  // [16] @ 0x821037a8
-    virtual void vfn_17();  // [17] @ 0x82106bb8
-    virtual void vfn_18();  // [18] @ 0x82107040
+    void vfn_10();  // [10] @ 0x8238dbe8
+    void OnEnter();  // [11] @ 0x821036a0
+    void vfn_12();  // [12] @ 0x82106b18
+    void GetName();  // [13] @ 0x823d1958
+    void vfn_14();  // [14] @ 0x823d1f70
+    void vfn_15();  // [15] @ 0x821071f0
+    void vfn_16();  // [16] @ 0x821037a8
+    void vfn_17();  // [17] @ 0x82106bb8
+    void vfn_18();  // [18] @ 0x82107040
 };
 
 // ── gmLogicSinglesMatch::stateLet  [vtable @ 0x820311A4] ──────────────────────────
@@ -300,9 +310,9 @@ struct stateLet {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x82108928
-    virtual void GetName();  // [13] @ 0x82108a00
-    virtual void vfn_15();  // [15] @ 0x82108908
+    void OnEnter();  // [11] @ 0x82108928
+    void GetName();  // [13] @ 0x82108a00
+    void vfn_15();  // [15] @ 0x82108908
 };
 
 // ── gmLogicSinglesMatch::statePointScoring  [vtable @ 0x820313CC] ──────────────────────────
@@ -310,9 +320,9 @@ struct statePointScoring {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x82109ba8
-    virtual void GetName();  // [13] @ 0x82109ca0
-    virtual void vfn_15();  // [15] @ 0x82109c88
+    void OnEnter();  // [11] @ 0x82109ba8
+    void GetName();  // [13] @ 0x82109ca0
+    void vfn_15();  // [15] @ 0x82109c88
 };
 
 // ── gmLogicSinglesMatch::statePointScoringNet  [vtable @ 0x82031424] ──────────────────────────
@@ -320,10 +330,10 @@ struct statePointScoringNet {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x82109da8
-    virtual void OnEnter();  // [11] @ 0x82109cb0
-    virtual void GetName();  // [13] @ 0x82109f30
-    virtual void vfn_15();  // [15] @ 0x82109d88
+    void vfn_10();  // [10] @ 0x82109da8
+    void OnEnter();  // [11] @ 0x82109cb0
+    void GetName();  // [13] @ 0x82109f30
+    void vfn_15();  // [15] @ 0x82109d88
 };
 
 // ── gmLogicSinglesMatch::statePointScoringSync  [vtable @ 0x82031374] ──────────────────────────
@@ -331,10 +341,10 @@ struct statePointScoringSync {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x82109b30
-    virtual void OnEnter();  // [11] @ 0x82109a58
-    virtual void GetName();  // [13] @ 0x82109b98
-    virtual void vfn_15();  // [15] @ 0x82109b10
+    void vfn_10();  // [10] @ 0x82109b30
+    void OnEnter();  // [11] @ 0x82109a58
+    void GetName();  // [13] @ 0x82109b98
+    void vfn_15();  // [15] @ 0x82109b10
 };
 
 // ── gmLogicSinglesMatch::statePostGame  [vtable @ 0x8203168C] ──────────────────────────
@@ -342,12 +352,12 @@ struct statePostGame {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x8210bbd8
-    virtual void OnEnter();  // [11] @ 0x8210b988
-    virtual void GetName();  // [13] @ 0x8210bd48
-    virtual void vfn_14();  // [14] @ 0x8210be90
-    virtual void vfn_15();  // [15] @ 0x8210bd20
-    virtual void vfn_16();  // [16] @ 0x8210bc70
+    void vfn_10();  // [10] @ 0x8210bbd8
+    void OnEnter();  // [11] @ 0x8210b988
+    void GetName();  // [13] @ 0x8210bd48
+    void vfn_14();  // [14] @ 0x8210be90
+    void vfn_15();  // [15] @ 0x8210bd20
+    void vfn_16();  // [16] @ 0x8210bc70
 };
 
 // ── gmLogicSinglesMatch::statePostMatch  [vtable @ 0x82031844] ──────────────────────────
@@ -355,11 +365,11 @@ struct statePostMatch {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x8210c530
-    virtual void OnEnter();  // [11] @ 0x8210c368
-    virtual void GetName();  // [13] @ 0x8210c5a0
-    virtual void vfn_15();  // [15] @ 0x8210c588
-    virtual void vfn_16();  // [16] @ 0x8210c558
+    void vfn_10();  // [10] @ 0x8210c530
+    void OnEnter();  // [11] @ 0x8210c368
+    void GetName();  // [13] @ 0x8210c5a0
+    void vfn_15();  // [15] @ 0x8210c588
+    void vfn_16();  // [16] @ 0x8210c558
 };
 
 // ── gmLogicSinglesMatch::statePostPoint  [vtable @ 0x820314D4] ──────────────────────────
@@ -367,13 +377,13 @@ struct statePostPoint {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x821042b0
-    virtual void OnEnter();  // [11] @ 0x821041e8
-    virtual void vfn_12();  // [12] @ 0x8210a3b8
-    virtual void GetName();  // [13] @ 0x82101f70
-    virtual void vfn_14();  // [14] @ 0x8210a518
-    virtual void vfn_15();  // [15] @ 0x821044f0
-    virtual void vfn_16();  // [16] @ 0x8210a698
+    void vfn_10();  // [10] @ 0x821042b0
+    void OnEnter();  // [11] @ 0x821041e8
+    void vfn_12();  // [12] @ 0x8210a3b8
+    void GetName();  // [13] @ 0x82101f70
+    void vfn_14();  // [14] @ 0x8210a518
+    void vfn_15();  // [15] @ 0x821044f0
+    void vfn_16();  // [16] @ 0x8210a698
 };
 
 // ── gmLogicSinglesMatch::statePostPointCS  [vtable @ 0x82031634] ──────────────────────────
@@ -381,13 +391,13 @@ struct statePostPointCS {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_9();  // [9] @ 0x8210b410
-    virtual void vfn_10();  // [10] @ 0x8238fd60
-    virtual void OnEnter();  // [11] @ 0x8210b420
-    virtual void vfn_12();  // [12] @ 0x8238fd58
-    virtual void GetName();  // [13] @ 0x8210b690
-    virtual void vfn_15();  // [15] @ 0x8210b670
-    virtual void vfn_16();  // [16] @ 0x8210b568
+    void vfn_9();  // [9] @ 0x8210b410
+    void vfn_10();  // [10] @ 0x8238fd60
+    void OnEnter();  // [11] @ 0x8210b420
+    void vfn_12();  // [12] @ 0x8238fd58
+    void GetName();  // [13] @ 0x8210b690
+    void vfn_15();  // [15] @ 0x8210b670
+    void vfn_16();  // [16] @ 0x8210b568
 };
 
 // ── gmLogicSinglesMatch::statePostPointScoringSync  [vtable @ 0x8203147C] ──────────────────────────
@@ -395,9 +405,9 @@ struct statePostPointScoringSync {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x8210a150
-    virtual void OnEnter();  // [11] @ 0x8210a0f0
-    virtual void GetName();  // [13] @ 0x8210a1e0
+    void vfn_10();  // [10] @ 0x8210a150
+    void OnEnter();  // [11] @ 0x8210a0f0
+    void GetName();  // [13] @ 0x8210a1e0
 };
 
 // ── gmLogicSinglesMatch::statePostPostGame  [vtable @ 0x820316E4] ──────────────────────────
@@ -405,10 +415,10 @@ struct statePostPostGame {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x8210bf98
-    virtual void OnEnter();  // [11] @ 0x8210bed8
-    virtual void GetName();  // [13] @ 0x8210c038
-    virtual void vfn_15();  // [15] @ 0x8210c000
+    void vfn_10();  // [10] @ 0x8210bf98
+    void OnEnter();  // [11] @ 0x8210bed8
+    void GetName();  // [13] @ 0x8210c038
+    void vfn_15();  // [15] @ 0x8210c000
 };
 
 // ── gmLogicSinglesMatch::statePostTourney  [vtable @ 0x8203189C] ──────────────────────────
@@ -416,11 +426,11 @@ struct statePostTourney {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x8210c8f8
-    virtual void OnEnter();  // [11] @ 0x8210c870
-    virtual void GetName();  // [13] @ 0x8210cb00
-    virtual void vfn_14();  // [14] @ 0x8210cae0
-    virtual void vfn_16();  // [16] @ 0x8210caa8
+    void vfn_10();  // [10] @ 0x8210c8f8
+    void OnEnter();  // [11] @ 0x8210c870
+    void GetName();  // [13] @ 0x8210cb00
+    void vfn_14();  // [14] @ 0x8210cae0
+    void vfn_16();  // [16] @ 0x8210caa8
 };
 
 // ── gmLogicSinglesMatch::statePostTourneyMovie  [vtable @ 0x8203173C] ──────────────────────────
@@ -428,10 +438,10 @@ struct statePostTourneyMovie {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x8210c048
-    virtual void GetName();  // [13] @ 0x8210c140
-    virtual void vfn_15();  // [15] @ 0x8210c128
-    virtual void vfn_16();  // [16] @ 0x8210c0a0
+    void OnEnter();  // [11] @ 0x8210c048
+    void GetName();  // [13] @ 0x8210c140
+    void vfn_15();  // [15] @ 0x8210c128
+    void vfn_16();  // [16] @ 0x8210c0a0
 };
 
 // ── gmLogicSinglesMatch::statePreGame  [vtable @ 0x82030E34] ──────────────────────────
@@ -439,9 +449,9 @@ struct statePreGame {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x821073e8
-    virtual void GetName();  // [13] @ 0x8238df80
-    virtual void vfn_15();  // [15] @ 0x821073d0
+    void OnEnter();  // [11] @ 0x821073e8
+    void GetName();  // [13] @ 0x8238df80
+    void vfn_15();  // [15] @ 0x821073d0
 };
 
 // ── gmLogicSinglesMatch::statePreMatch  [vtable @ 0x82030DDC] ──────────────────────────
@@ -449,11 +459,11 @@ struct statePreMatch {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x82107260
-    virtual void GetName();  // [13] @ 0x8238ddc8
-    virtual void vfn_14();  // [14] @ 0x821070c0
-    virtual void vfn_15();  // [15] @ 0x8238dd98
-    virtual void vfn_16();  // [16] @ 0x82107378
+    void OnEnter();  // [11] @ 0x82107260
+    void GetName();  // [13] @ 0x8238ddc8
+    void vfn_14();  // [14] @ 0x821070c0
+    void vfn_15();  // [15] @ 0x8238dd98
+    void vfn_16();  // [16] @ 0x82107378
 };
 
 // ── gmLogicSinglesMatch::statePreMatchSync  [vtable @ 0x82030D84] ──────────────────────────
@@ -461,9 +471,9 @@ struct statePreMatchSync {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x82107210
-    virtual void OnEnter();  // [11] @ 0x82107178
-    virtual void GetName();  // [13] @ 0x82107250
+    void vfn_10();  // [10] @ 0x82107210
+    void OnEnter();  // [11] @ 0x82107178
+    void GetName();  // [13] @ 0x82107250
 };
 
 // ── gmLogicSinglesMatch::statePrePreServe  [vtable @ 0x82030EE4] ──────────────────────────
@@ -471,11 +481,11 @@ struct statePrePreServe {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x82107718
-    virtual void vfn_10();  // [10] @ 0x82107948
-    virtual void OnEnter();  // [11] @ 0x82107768
-    virtual void GetName();  // [13] @ 0x82107a80
-    virtual void vfn_15();  // [15] @ 0x82107928
+    void vfn_3();  // [3] @ 0x82107718
+    void vfn_10();  // [10] @ 0x82107948
+    void OnEnter();  // [11] @ 0x82107768
+    void GetName();  // [13] @ 0x82107a80
+    void vfn_15();  // [15] @ 0x82107928
 };
 
 // ── gmLogicSinglesMatch::statePreServe  [vtable @ 0x82030FEC] ──────────────────────────
@@ -483,10 +493,10 @@ struct statePreServe {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x82107cd0
-    virtual void GetName();  // [13] @ 0x8238e860
-    virtual void vfn_15();  // [15] @ 0x82107cb8
-    virtual void vfn_16();  // [16] @ 0x82107d50
+    void OnEnter();  // [11] @ 0x82107cd0
+    void GetName();  // [13] @ 0x8238e860
+    void vfn_15();  // [15] @ 0x82107cb8
+    void vfn_16();  // [16] @ 0x82107d50
 };
 
 // ── gmLogicSinglesMatch::statePreServeSpectatorSyncState  [vtable @ 0x82030F3C] ──────────────────────────
@@ -494,10 +504,10 @@ struct statePreServeSpectatorSyncState {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x82107ab8
-    virtual void OnEnter();  // [11] @ 0x82107a90
-    virtual void GetName();  // [13] @ 0x82107b90
-    virtual void vfn_15();  // [15] @ 0x82107a98
+    void vfn_10();  // [10] @ 0x82107ab8
+    void OnEnter();  // [11] @ 0x82107a90
+    void GetName();  // [13] @ 0x82107b90
+    void vfn_15();  // [15] @ 0x82107a98
 };
 
 // ── gmLogicSinglesMatch::statePreServeSync  [vtable @ 0x82030F94] ──────────────────────────
@@ -505,10 +515,10 @@ struct statePreServeSync {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x82107c40
-    virtual void OnEnter();  // [11] @ 0x82107ba0
-    virtual void GetName();  // [13] @ 0x82107ca8
-    virtual void vfn_15();  // [15] @ 0x82107c28
+    void vfn_10();  // [10] @ 0x82107c40
+    void OnEnter();  // [11] @ 0x82107ba0
+    void GetName();  // [13] @ 0x82107ca8
+    void vfn_15();  // [15] @ 0x82107c28
 };
 
 // ── gmLogicSinglesMatch::stateReplay  [vtable @ 0x820315DC] ──────────────────────────
@@ -516,12 +526,12 @@ struct stateReplay {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x8210b170
-    virtual void vfn_12();  // [12] @ 0x8210b138
-    virtual void GetName();  // [13] @ 0x8210b400
-    virtual void vfn_14();  // [14] @ 0x8210af70
-    virtual void vfn_15();  // [15] @ 0x8210b3e0
-    virtual void vfn_16();  // [16] @ 0x8210b398
+    void vfn_10();  // [10] @ 0x8210b170
+    void vfn_12();  // [12] @ 0x8210b138
+    void GetName();  // [13] @ 0x8210b400
+    void vfn_14();  // [14] @ 0x8210af70
+    void vfn_15();  // [15] @ 0x8210b3e0
+    void vfn_16();  // [16] @ 0x8210b398
 };
 
 // ── gmLogicSinglesMatch::stateReplayNegotiation  [vtable @ 0x82031584] ──────────────────────────
@@ -529,11 +539,11 @@ struct stateReplayNegotiation {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x8210ad70
-    virtual void OnEnter();  // [11] @ 0x8210ac90
-    virtual void vfn_12();  // [12] @ 0x8210ad58
-    virtual void GetName();  // [13] @ 0x8210af48
-    virtual void vfn_15();  // [15] @ 0x8210af30
+    void vfn_10();  // [10] @ 0x8210ad70
+    void OnEnter();  // [11] @ 0x8210ac90
+    void vfn_12();  // [12] @ 0x8210ad58
+    void GetName();  // [13] @ 0x8210af48
+    void vfn_15();  // [15] @ 0x8210af30
 };
 
 // ── gmLogicSinglesMatch::stateReplayNegotiationPreSync  [vtable @ 0x8203152C] ──────────────────────────
@@ -541,11 +551,11 @@ struct stateReplayNegotiationPreSync {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x8210abb8
-    virtual void OnEnter();  // [11] @ 0x8210aaf8
-    virtual void vfn_12();  // [12] @ 0x8210ab98
-    virtual void GetName();  // [13] @ 0x8210ac80
-    virtual void vfn_15();  // [15] @ 0x8210ac60
+    void vfn_10();  // [10] @ 0x8210abb8
+    void OnEnter();  // [11] @ 0x8210aaf8
+    void vfn_12();  // [12] @ 0x8210ab98
+    void GetName();  // [13] @ 0x8210ac80
+    void vfn_15();  // [15] @ 0x8210ac60
 };
 
 // ── gmLogicSinglesMatch::stateReturnHit  [vtable @ 0x820312BC] ──────────────────────────
@@ -553,11 +563,11 @@ struct stateReturnHit {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x82109560
-    virtual void GetName();  // [13] @ 0x82101f60
-    virtual void vfn_15();  // [15] @ 0x82103fc0
-    virtual void vfn_16();  // [16] @ 0x82103fd8
-    virtual void PostLoadProperties();  // [20] @ 0x82109a10
+    void OnEnter();  // [11] @ 0x82109560
+    void GetName();  // [13] @ 0x82101f60
+    void vfn_15();  // [15] @ 0x82103fc0
+    void vfn_16();  // [16] @ 0x82103fd8
+    void PostLoadProperties();  // [20] @ 0x82109a10
 };
 
 // ── gmLogicSinglesMatch::stateSaveDialog  [vtable @ 0x820317EC] ──────────────────────────
@@ -565,10 +575,10 @@ struct stateSaveDialog {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x8210c2e8
-    virtual void OnEnter();  // [11] @ 0x8210c2a0
-    virtual void GetName();  // [13] @ 0x8210c358
-    virtual void vfn_15();  // [15] @ 0x8210c340
+    void vfn_10();  // [10] @ 0x8210c2e8
+    void OnEnter();  // [11] @ 0x8210c2a0
+    void GetName();  // [13] @ 0x8210c358
+    void vfn_15();  // [15] @ 0x8210c340
 };
 
 // ── gmLogicSinglesMatch::stateServeBounce  [vtable @ 0x820310F4] ──────────────────────────
@@ -576,10 +586,10 @@ struct stateServeBounce {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x82106a60
-    virtual void GetName();  // [13] @ 0x821086a8
-    virtual void vfn_15();  // [15] @ 0x82108308
-    virtual void vfn_16();  // [16] @ 0x82108340
+    void OnEnter();  // [11] @ 0x82106a60
+    void GetName();  // [13] @ 0x821086a8
+    void vfn_15();  // [15] @ 0x82108308
+    void vfn_16();  // [16] @ 0x82108340
 };
 
 // ── gmLogicSinglesMatch::stateServeHit  [vtable @ 0x8203109C] ──────────────────────────
@@ -587,10 +597,10 @@ struct stateServeHit {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x82108018
-    virtual void GetName();  // [13] @ 0x821082f8
-    virtual void vfn_15();  // [15] @ 0x82108070
-    virtual void vfn_16();  // [16] @ 0x821080a0
+    void OnEnter();  // [11] @ 0x82108018
+    void GetName();  // [13] @ 0x821082f8
+    void vfn_15();  // [15] @ 0x82108070
+    void vfn_16();  // [16] @ 0x821080a0
 };
 
 // ── gmLogicSinglesMatch::stateServeToss  [vtable @ 0x82031044] ──────────────────────────
@@ -598,10 +608,10 @@ struct stateServeToss {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x82107dc0
-    virtual void GetName();  // [13] @ 0x82108008
-    virtual void vfn_15();  // [15] @ 0x82107e18
-    virtual void vfn_16();  // [16] @ 0x82107e38
+    void OnEnter();  // [11] @ 0x82107dc0
+    void GetName();  // [13] @ 0x82108008
+    void vfn_15();  // [15] @ 0x82107e18
+    void vfn_16();  // [16] @ 0x82107e38
 };
 
 // ── gmLogicSinglesMatch::stateUnlockDialog  [vtable @ 0x82031794] ──────────────────────────
@@ -609,10 +619,10 @@ struct stateUnlockDialog {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x8210c198
-    virtual void OnEnter();  // [11] @ 0x8210c150
-    virtual void GetName();  // [13] @ 0x8210c290
-    virtual void vfn_15();  // [15] @ 0x8210c278
+    void vfn_10();  // [10] @ 0x8210c198
+    void OnEnter();  // [11] @ 0x8210c150
+    void GetName();  // [13] @ 0x8210c290
+    void vfn_15();  // [15] @ 0x8210c278
 };
 
 }; // gmLogicSinglesMatch
@@ -637,15 +647,15 @@ struct gmLogicSpectator {
     uint32_t    m_spectatorModeActive;  // +0x38 - Spectator mode flag
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x8238c860
-    virtual void vfn_4();  // [4] @ 0x8238c1e0
-    virtual void vfn_8();  // [8] @ 0x8238c230
-    virtual void OnEnter();  // [11] @ 0x8238c0e8
-    virtual void vfn_12();  // [12] @ 0x8238c1a0
-    virtual void GetName();  // [13] @ 0x8238c958
-    virtual void vfn_17();  // [17] @ 0x8238c8e8
-    virtual void ProcessEvent(void* event);  // [18] @ 0x8238d660
-    virtual void PostLoadProperties();  // [20] @ 0x8238d990
+    void vfn_3();  // [3] @ 0x8238c860
+    void vfn_4();  // [4] @ 0x8238c1e0
+    void vfn_8();  // [8] @ 0x8238c230
+    void OnEnter();  // [11] @ 0x8238c0e8
+    void vfn_12();  // [12] @ 0x8238c1a0
+    void GetName();  // [13] @ 0x8238c958
+    void vfn_17();  // [17] @ 0x8238c8e8
+    void ProcessEvent(void* event);  // [18] @ 0x8238d660
+    void PostLoadProperties();  // [20] @ 0x8238d990
 
     // ── non-virtual methods (from debug strings) ──
     // ("stateReplay" in the debug strings is the nested state below, not a method)
@@ -658,10 +668,10 @@ struct stateAwaitReturnHit {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x8238edb0
-    virtual void GetName();  // [13] @ 0x82101f50
-    virtual void vfn_15();  // [15] @ 0x82103ea0
-    virtual void vfn_16();  // [16] @ 0x82103ec0
+    void OnEnter();  // [11] @ 0x8238edb0
+    void GetName();  // [13] @ 0x82101f50
+    void vfn_15();  // [15] @ 0x82103ea0
+    void vfn_16();  // [16] @ 0x82103ec0
 };
 
 // ── gmLogicSpectator::stateInit  [vtable @ 0x8206B97C] ──────────────────────────
@@ -669,15 +679,15 @@ struct stateInit {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x8238dbe8
-    virtual void OnEnter();  // [11] @ 0x821036a0
-    virtual void vfn_12();  // [12] @ 0x82106b18
-    virtual void GetName();  // [13] @ 0x823d1958
-    virtual void vfn_14();  // [14] @ 0x823d1f70
-    virtual void vfn_15();  // [15] @ 0x821071f0
-    virtual void vfn_16();  // [16] @ 0x821037a8
-    virtual void vfn_17();  // [17] @ 0x82106bb8
-    virtual void vfn_18();  // [18] @ 0x82107040
+    void vfn_10();  // [10] @ 0x8238dbe8
+    void OnEnter();  // [11] @ 0x821036a0
+    void vfn_12();  // [12] @ 0x82106b18
+    void GetName();  // [13] @ 0x823d1958
+    void vfn_14();  // [14] @ 0x823d1f70
+    void vfn_15();  // [15] @ 0x821071f0
+    void vfn_16();  // [16] @ 0x821037a8
+    void vfn_17();  // [17] @ 0x82106bb8
+    void vfn_18();  // [18] @ 0x82107040
 };
 
 // ── gmLogicSpectator::stateMatchEnded  [vtable @ 0x8206BE2C] ──────────────────────────
@@ -685,10 +695,10 @@ struct stateMatchEnded {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x82390280
-    virtual void vfn_12();  // [12] @ 0x82390378
-    virtual void GetName();  // [13] @ 0x82390448
-    virtual void vfn_16();  // [16] @ 0x823903c8
+    void OnEnter();  // [11] @ 0x82390280
+    void vfn_12();  // [12] @ 0x82390378
+    void GetName();  // [13] @ 0x82390448
+    void vfn_16();  // [16] @ 0x823903c8
 };
 
 // ── gmLogicSpectator::statePostGame  [vtable @ 0x8206BDDC] ──────────────────────────
@@ -696,12 +706,12 @@ struct statePostGame {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x8210bbd8
-    virtual void OnEnter();  // [11] @ 0x8210b988
-    virtual void GetName();  // [13] @ 0x8210bd48
-    virtual void vfn_14();  // [14] @ 0x8210be90
-    virtual void vfn_15();  // [15] @ 0x8210bd20
-    virtual void vfn_16();  // [16] @ 0x8210bc70
+    void vfn_10();  // [10] @ 0x8210bbd8
+    void OnEnter();  // [11] @ 0x8210b988
+    void GetName();  // [13] @ 0x8210bd48
+    void vfn_14();  // [14] @ 0x8210be90
+    void vfn_15();  // [15] @ 0x8210bd20
+    void vfn_16();  // [16] @ 0x8210bc70
 };
 
 // ── gmLogicSpectator::statePostPoint  [vtable @ 0x8206BCEC] ──────────────────────────
@@ -709,13 +719,13 @@ struct statePostPoint {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x821042b0
-    virtual void OnEnter();  // [11] @ 0x821041e8
-    virtual void vfn_12();  // [12] @ 0x8210a3b8
-    virtual void GetName();  // [13] @ 0x82101f70
-    virtual void vfn_14();  // [14] @ 0x8210a518
-    virtual void vfn_15();  // [15] @ 0x821044f0
-    virtual void vfn_16();  // [16] @ 0x8210a698
+    void vfn_10();  // [10] @ 0x821042b0
+    void OnEnter();  // [11] @ 0x821041e8
+    void vfn_12();  // [12] @ 0x8210a3b8
+    void GetName();  // [13] @ 0x82101f70
+    void vfn_14();  // [14] @ 0x8210a518
+    void vfn_15();  // [15] @ 0x821044f0
+    void vfn_16();  // [16] @ 0x8210a698
 };
 
 // ── gmLogicSpectator::statePostPointCS  [vtable @ 0x8206BD8C] ──────────────────────────
@@ -723,13 +733,13 @@ struct statePostPointCS {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_9();  // [9] @ 0x8210b410
-    virtual void vfn_10();  // [10] @ 0x8238fd60
-    virtual void OnEnter();  // [11] @ 0x8210b420
-    virtual void vfn_12();  // [12] @ 0x8238fd58
-    virtual void GetName();  // [13] @ 0x8210b690
-    virtual void vfn_15();  // [15] @ 0x8210b670
-    virtual void vfn_16();  // [16] @ 0x8210b568
+    void vfn_9();  // [9] @ 0x8210b410
+    void vfn_10();  // [10] @ 0x8238fd60
+    void OnEnter();  // [11] @ 0x8210b420
+    void vfn_12();  // [12] @ 0x8238fd58
+    void GetName();  // [13] @ 0x8210b690
+    void vfn_15();  // [15] @ 0x8210b670
+    void vfn_16();  // [16] @ 0x8210b568
 };
 
 // ── gmLogicSpectator::statePreGame  [vtable @ 0x8206BA1C] ──────────────────────────
@@ -737,9 +747,9 @@ struct statePreGame {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x821073e8
-    virtual void GetName();  // [13] @ 0x8238df80
-    virtual void vfn_15();  // [15] @ 0x821073d0
+    void OnEnter();  // [11] @ 0x821073e8
+    void GetName();  // [13] @ 0x8238df80
+    void vfn_15();  // [15] @ 0x821073d0
 };
 
 // ── gmLogicSpectator::statePreGameSync  [vtable @ 0x8206BA6C] ──────────────────────────
@@ -747,12 +757,12 @@ struct statePreGameSync {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x8238e258
-    virtual void OnEnter();  // [11] @ 0x8238df90
-    virtual void vfn_12();  // [12] @ 0x8238e118
-    virtual void GetName();  // [13] @ 0x8238e520
-    virtual void vfn_14();  // [14] @ 0x8238e530
-    virtual void vfn_15();  // [15] @ 0x8238e4f8
+    void vfn_10();  // [10] @ 0x8238e258
+    void OnEnter();  // [11] @ 0x8238df90
+    void vfn_12();  // [12] @ 0x8238e118
+    void GetName();  // [13] @ 0x8238e520
+    void vfn_14();  // [14] @ 0x8238e530
+    void vfn_15();  // [15] @ 0x8238e4f8
 };
 
 // ── gmLogicSpectator::statePreInit  [vtable @ 0x8206B92C] ──────────────────────────
@@ -760,17 +770,17 @@ struct statePreInit {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~statePreInit();                  // [0] @ 0x823083f8
-    virtual void ScalarDtor(int flags); // [1] @ 0x82222d48
-    virtual void vfn_2();  // [2] @ 0x82222d68
-    virtual void vfn_3();  // [3] @ 0x82222d78
-    virtual void vfn_4();  // [4] @ 0x82222d88
-    virtual void vfn_5();  // [5] @ 0x82228bd8
-    virtual void vfn_6();  // [6] @ 0x82494130
-    virtual void OnEnter();  // [11] @ 0x82103628
-    virtual void vfn_12();  // [12] @ 0x8238da18
-    virtual void GetName();  // [13] @ 0x82101f10
-    virtual void vfn_15();  // [15] @ 0x82103688
+    ~statePreInit();                  // [0] @ 0x823083f8
+    void ScalarDtor(int flags); // [1] @ 0x82222d48
+    void vfn_2();  // [2] @ 0x82222d68
+    void vfn_3();  // [3] @ 0x82222d78
+    void vfn_4();  // [4] @ 0x82222d88
+    void vfn_5();  // [5] @ 0x82228bd8
+    void vfn_6();  // [6] @ 0x82494130
+    void OnEnter();  // [11] @ 0x82103628
+    void vfn_12();  // [12] @ 0x8238da18
+    void GetName();  // [13] @ 0x82101f10
+    void vfn_15();  // [15] @ 0x82103688
 };
 
 // ── gmLogicSpectator::statePreMatch  [vtable @ 0x8206B9CC] ──────────────────────────
@@ -778,11 +788,11 @@ struct statePreMatch {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x82107260
-    virtual void GetName();  // [13] @ 0x8238ddc8
-    virtual void vfn_14();  // [14] @ 0x821070c0
-    virtual void vfn_15();  // [15] @ 0x8238dd98
-    virtual void vfn_16();  // [16] @ 0x82107378
+    void OnEnter();  // [11] @ 0x82107260
+    void GetName();  // [13] @ 0x8238ddc8
+    void vfn_14();  // [14] @ 0x821070c0
+    void vfn_15();  // [15] @ 0x8238dd98
+    void vfn_16();  // [16] @ 0x82107378
 };
 
 // ── gmLogicSpectator::statePreServe  [vtable @ 0x8206BABC] ──────────────────────────
@@ -790,10 +800,10 @@ struct statePreServe {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x82107cd0
-    virtual void GetName();  // [13] @ 0x8238e860
-    virtual void vfn_15();  // [15] @ 0x82107cb8
-    virtual void vfn_16();  // [16] @ 0x82107d50
+    void OnEnter();  // [11] @ 0x82107cd0
+    void GetName();  // [13] @ 0x8238e860
+    void vfn_15();  // [15] @ 0x82107cb8
+    void vfn_16();  // [16] @ 0x82107d50
 };
 
 // ── gmLogicSpectator::stateQuit  [vtable @ 0x8206BE7C] ──────────────────────────
@@ -801,9 +811,9 @@ struct stateQuit {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x82390510
-    virtual void OnEnter();  // [11] @ 0x82390458
-    virtual void GetName();  // [13] @ 0x82390588
+    void vfn_10();  // [10] @ 0x82390510
+    void OnEnter();  // [11] @ 0x82390458
+    void GetName();  // [13] @ 0x82390588
 };
 
 // ── gmLogicSpectator::stateReplay  [vtable @ 0x8206BD3C] ──────────────────────────
@@ -811,12 +821,12 @@ struct stateReplay {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x8210b170
-    virtual void vfn_12();  // [12] @ 0x8210b138
-    virtual void GetName();  // [13] @ 0x8210b400
-    virtual void vfn_14();  // [14] @ 0x8210af70
-    virtual void vfn_15();  // [15] @ 0x8210b3e0
-    virtual void vfn_16();  // [16] @ 0x8210b398
+    void vfn_10();  // [10] @ 0x8210b170
+    void vfn_12();  // [12] @ 0x8210b138
+    void GetName();  // [13] @ 0x8210b400
+    void vfn_14();  // [14] @ 0x8210af70
+    void vfn_15();  // [15] @ 0x8210b3e0
+    void vfn_16();  // [16] @ 0x8210b398
 };
 
 // ── gmLogicSpectator::stateReturnHit  [vtable @ 0x8206BC4C] ──────────────────────────
@@ -824,11 +834,11 @@ struct stateReturnHit {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x82109560
-    virtual void GetName();  // [13] @ 0x82101f60
-    virtual void vfn_15();  // [15] @ 0x82103fc0
-    virtual void vfn_16();  // [16] @ 0x82103fd8
-    virtual void PostLoadProperties();  // [20] @ 0x82109a10
+    void OnEnter();  // [11] @ 0x82109560
+    void GetName();  // [13] @ 0x82101f60
+    void vfn_15();  // [15] @ 0x82103fc0
+    void vfn_16();  // [16] @ 0x82103fd8
+    void PostLoadProperties();  // [20] @ 0x82109a10
 };
 
 // ── gmLogicSpectator::stateScoring  [vtable @ 0x8206BC9C] ──────────────────────────
@@ -836,9 +846,9 @@ struct stateScoring {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x8238f150
-    virtual void GetName();  // [13] @ 0x8238f1b0
-    virtual void vfn_15();  // [15] @ 0x8238f190
+    void OnEnter();  // [11] @ 0x8238f150
+    void GetName();  // [13] @ 0x8238f1b0
+    void vfn_15();  // [15] @ 0x8238f190
 };
 
 // ── gmLogicSpectator::stateServeBounce  [vtable @ 0x8206BBAC] ──────────────────────────
@@ -846,10 +856,10 @@ struct stateServeBounce {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x82106a60
-    virtual void GetName();  // [13] @ 0x821086a8
-    virtual void vfn_15();  // [15] @ 0x82108308
-    virtual void vfn_16();  // [16] @ 0x82108340
+    void OnEnter();  // [11] @ 0x82106a60
+    void GetName();  // [13] @ 0x821086a8
+    void vfn_15();  // [15] @ 0x82108308
+    void vfn_16();  // [16] @ 0x82108340
 };
 
 // ── gmLogicSpectator::stateServeHit  [vtable @ 0x8206BB5C] ──────────────────────────
@@ -857,10 +867,10 @@ struct stateServeHit {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x82108018
-    virtual void GetName();  // [13] @ 0x821082f8
-    virtual void vfn_15();  // [15] @ 0x82108070
-    virtual void vfn_16();  // [16] @ 0x821080a0
+    void OnEnter();  // [11] @ 0x82108018
+    void GetName();  // [13] @ 0x821082f8
+    void vfn_15();  // [15] @ 0x82108070
+    void vfn_16();  // [16] @ 0x821080a0
 };
 
 // ── gmLogicSpectator::stateServeToss  [vtable @ 0x8206BB0C] ──────────────────────────
@@ -868,10 +878,10 @@ struct stateServeToss {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x82107dc0
-    virtual void GetName();  // [13] @ 0x82108008
-    virtual void vfn_15();  // [15] @ 0x82107e18
-    virtual void vfn_16();  // [16] @ 0x82107e38
+    void OnEnter();  // [11] @ 0x82107dc0
+    void GetName();  // [13] @ 0x82108008
+    void vfn_15();  // [15] @ 0x82107e18
+    void vfn_16();  // [16] @ 0x82107e38
 };
 
 }; // gmLogicSpectator
@@ -936,10 +946,10 @@ struct stateAwaitReturnHit {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x8238edb0
-    virtual void GetName();  // [13] @ 0x82101f50
-    virtual void vfn_15();  // [15] @ 0x82103ea0
-    virtual void vfn_16();  // [16] @ 0x82103ec0
+    void OnEnter();  // [11] @ 0x8238edb0
+    void GetName();  // [13] @ 0x82101f50
+    void vfn_15();  // [15] @ 0x82103ea0
+    void vfn_16();  // [16] @ 0x82103ec0
 };
 
 // ── gmLogicSwingPractice::stateInit  [vtable @ 0x820304AC] ──────────────────────────
@@ -947,15 +957,15 @@ struct stateInit {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x8238dbe8
-    virtual void OnEnter();  // [11] @ 0x821036a0
-    virtual void vfn_12();  // [12] @ 0x82106b18
-    virtual void GetName();  // [13] @ 0x823d1958
-    virtual void vfn_14();  // [14] @ 0x823d1f70
-    virtual void vfn_15();  // [15] @ 0x821071f0
-    virtual void vfn_16();  // [16] @ 0x821037a8
-    virtual void vfn_17();  // [17] @ 0x82106bb8
-    virtual void vfn_18();  // [18] @ 0x82107040
+    void vfn_10();  // [10] @ 0x8238dbe8
+    void OnEnter();  // [11] @ 0x821036a0
+    void vfn_12();  // [12] @ 0x82106b18
+    void GetName();  // [13] @ 0x823d1958
+    void vfn_14();  // [14] @ 0x823d1f70
+    void vfn_15();  // [15] @ 0x821071f0
+    void vfn_16();  // [16] @ 0x821037a8
+    void vfn_17();  // [17] @ 0x82106bb8
+    void vfn_18();  // [18] @ 0x82107040
 };
 
 // ── gmLogicSwingPractice::stateMainMenu  [vtable @ 0x820304FC] ──────────────────────────
@@ -963,11 +973,11 @@ struct stateMainMenu {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x821037d8
-    virtual void vfn_12();  // [12] @ 0x82103800
-    virtual void GetName();  // [13] @ 0x82101f20
-    virtual void vfn_15();  // [15] @ 0x82103808
-    virtual void vfn_16();  // [16] @ 0x82103820
+    void OnEnter();  // [11] @ 0x821037d8
+    void vfn_12();  // [12] @ 0x82103800
+    void GetName();  // [13] @ 0x82101f20
+    void vfn_15();  // [15] @ 0x82103808
+    void vfn_16();  // [16] @ 0x82103820
 };
 
 // ── gmLogicSwingPractice::statePostPoint  [vtable @ 0x8203068C] ──────────────────────────
@@ -975,13 +985,13 @@ struct statePostPoint {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x821042b0
-    virtual void OnEnter();  // [11] @ 0x821041e8
-    virtual void vfn_12();  // [12] @ 0x8210a3b8
-    virtual void GetName();  // [13] @ 0x82101f70
-    virtual void vfn_14();  // [14] @ 0x8210a518
-    virtual void vfn_15();  // [15] @ 0x821044f0
-    virtual void vfn_16();  // [16] @ 0x8210a698
+    void vfn_10();  // [10] @ 0x821042b0
+    void OnEnter();  // [11] @ 0x821041e8
+    void vfn_12();  // [12] @ 0x8210a3b8
+    void GetName();  // [13] @ 0x82101f70
+    void vfn_14();  // [14] @ 0x8210a518
+    void vfn_15();  // [15] @ 0x821044f0
+    void vfn_16();  // [16] @ 0x8210a698
 };
 
 // ── gmLogicSwingPractice::statePreInit  [vtable @ 0x8203045C] ──────────────────────────
@@ -989,17 +999,17 @@ struct statePreInit {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~statePreInit();                  // [0] @ 0x823083f8
-    virtual void ScalarDtor(int flags); // [1] @ 0x82222d48
-    virtual void vfn_2();  // [2] @ 0x82222d68
-    virtual void vfn_3();  // [3] @ 0x82222d78
-    virtual void vfn_4();  // [4] @ 0x82222d88
-    virtual void vfn_5();  // [5] @ 0x82228bd8
-    virtual void vfn_6();  // [6] @ 0x82494130
-    virtual void OnEnter();  // [11] @ 0x82103628
-    virtual void vfn_12();  // [12] @ 0x8238da18
-    virtual void GetName();  // [13] @ 0x82101f10
-    virtual void vfn_15();  // [15] @ 0x82103688
+    ~statePreInit();                  // [0] @ 0x823083f8
+    void ScalarDtor(int flags); // [1] @ 0x82222d48
+    void vfn_2();  // [2] @ 0x82222d68
+    void vfn_3();  // [3] @ 0x82222d78
+    void vfn_4();  // [4] @ 0x82222d88
+    void vfn_5();  // [5] @ 0x82228bd8
+    void vfn_6();  // [6] @ 0x82494130
+    void OnEnter();  // [11] @ 0x82103628
+    void vfn_12();  // [12] @ 0x8238da18
+    void GetName();  // [13] @ 0x82101f10
+    void vfn_15();  // [15] @ 0x82103688
 };
 
 // ── gmLogicSwingPractice::stateReturnHit  [vtable @ 0x8203063C] ──────────────────────────
@@ -1007,11 +1017,11 @@ struct stateReturnHit {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x82109560
-    virtual void GetName();  // [13] @ 0x82101f60
-    virtual void vfn_15();  // [15] @ 0x82103fc0
-    virtual void vfn_16();  // [16] @ 0x82103fd8
-    virtual void PostLoadProperties();  // [20] @ 0x82109a10
+    void OnEnter();  // [11] @ 0x82109560
+    void GetName();  // [13] @ 0x82101f60
+    void vfn_15();  // [15] @ 0x82103fc0
+    void vfn_16();  // [16] @ 0x82103fd8
+    void PostLoadProperties();  // [20] @ 0x82109a10
 };
 
 // ── gmLogicSwingPractice::stateShoot  [vtable @ 0x8203059C] ──────────────────────────
@@ -1019,10 +1029,10 @@ struct stateShoot {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x82103cc0
-    virtual void GetName();  // [13] @ 0x82101f40
-    virtual void vfn_15();  // [15] @ 0x82103d40
-    virtual void vfn_16();  // [16] @ 0x82103d60
+    void OnEnter();  // [11] @ 0x82103cc0
+    void GetName();  // [13] @ 0x82101f40
+    void vfn_15();  // [15] @ 0x82103d40
+    void vfn_16();  // [16] @ 0x82103d60
 };
 
 }; // gmLogicSwingPractice
@@ -1110,10 +1120,10 @@ struct powerZoneAttr {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~powerZoneAttr();                  // [0] @ 0x8220d640
-    virtual void vfn_3();  // [3] @ 0x8220d798
-    virtual void PostLoadProperties();  // [20] @ 0x8220d750
-    virtual void PostLoadChildren();  // [22] @ 0x8220d6a0
+    ~powerZoneAttr();                  // [0] @ 0x8220d640
+    void vfn_3();  // [3] @ 0x8220d798
+    void PostLoadProperties();  // [20] @ 0x8220d750
+    void PostLoadChildren();  // [22] @ 0x8220d6a0
 };
 
 // ── powerZoneData  [vtable @ 0x820499DC] ──────────────────────────
@@ -1121,10 +1131,10 @@ struct powerZoneData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~powerZoneData();                  // [0] @ 0x8220d7f8
-    virtual void PostLoadProperties();  // [20] @ 0x8220d910
-    virtual void Validate();  // [21] @ 0x8220d958
-    virtual void PostLoadChildren();  // [22] @ 0x8220d860
+    ~powerZoneData();                  // [0] @ 0x8220d7f8
+    void PostLoadProperties();  // [20] @ 0x8220d910
+    void Validate();  // [21] @ 0x8220d958
+    void PostLoadChildren();  // [22] @ 0x8220d860
 };
 
 // ── shotTarget  [vtable @ 0x8203A824] ──────────────────────────
