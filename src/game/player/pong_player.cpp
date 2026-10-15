@@ -5882,8 +5882,8 @@ extern "C" void pongPlayer_StateHandler_91E8(void* /*self*/) {}  // @ 0x821991E8
 // ── Externals specific to this batch ─────────────────────────────────────
 extern "C" bool pongPlayer_D598_g(pongPlayer* self);                 // IsRecovering (already lifted at method level)
 extern "C" void phBoundCapsule_A080_g(void* bound);                  // @ 0x820CA080 — rebuild bound pose from body
-extern "C" void pongPlayer_B208_g(void* state, vec3* swingVec,
-                                   uint8_t suppressFlip);            // @ 0x820CB208 — apply swing vec (stub above)
+extern void pongPlayer_B208_g(void* state, vec3* swingVec,
+                              uint8_t suppressFlip);                 // @ 0x820CB208 — apply swing vec (stub above)
 extern "C" void pongPlayer_9CD0_g(void*, int, void*, void*);         // @ 0x821C9CD0 — per-player input poll (stub above)
 
 // g_kSwingRadiusConst is declared near the top of the file at +8 of a 0x60
