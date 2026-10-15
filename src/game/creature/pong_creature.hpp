@@ -844,7 +844,12 @@ struct pongCreature {
     void Relocate(void* relocator);      // @ 0x820C8858
 };
 
+struct fragCacheEntry;  // fragment cache entry handed out by the pool at g_creatureManager+0x2F0
+
 // ── pongCreatureInst  [vtable @ 0x82027DAC] ──────────────────────────
+// Derives from rage::fragInst (vtable 0x82032D2C), which derives from
+// rage::phInst. The field list below also holds rage::fragType members;
+// pong_creature.cpp describes the real layout in pongCreatureInstLayout.
 struct pongCreatureInst {
     void**      vtable;           // +0x00
 
@@ -1003,7 +1008,7 @@ struct pongCreatureInst {
     uint32_t     field_0x65e4;  // +0x65e4  R:1 W:0
 
     // ── virtual methods ──
-    virtual ~pongCreatureInst();                  // [0] @ 0x820c8ee0
+    virtual ~pongCreatureInst();                  // [0] @ 0x820c8ee0 — body lifted as ScalarDeletingDtor
     virtual int GetType();              // [1] @ 0x8210cc40
     virtual void* GetEmbeddedObject();  // [2] @ 0x820c8ed8
     virtual void* GetSubObjectTransform(int index);  // [3] @ 0x820c8e98
@@ -1024,16 +1029,17 @@ struct pongCreatureInst {
     virtual bool ResolveCollision(void* player, void* rayData, void* hitList, void* hitCount, void* outHit, void* colGroup, void* mask);  // [36] @ 0x82120408 — resolves collision, updates flags
     virtual uint32_t GetCollisionFlags();  // [37] @ 0x822c92d8
     virtual void* GetEntityByIndex(int index);  // [38] @ 0x822c9318
-    virtual bool AttachToScene(bool updatePhysics);  // [41] @ 0x8211d0e0 — sets flag |=1, links into scene list
+    virtual bool AttachToScene(bool rejectIfKeyCached);  // [41] @ 0x8211d0e0 — sets attached flag, notifies manager, links into type holder's list
     virtual void DetachFromScene();  // [42] @ 0x8211ecc0 — removes from physics, updates color/transform
-    virtual void* CreatePhysicsBound();  // [43] @ 0x8211efc0 — allocates physics bound from creature data
-    virtual void UpdateWorldTransform();  // [46] @ 0x82121530 — transposes self matrix, transforms position
+    virtual fragCacheEntry* AcquireCacheEntry();  // [43] @ 0x8211efc0 — takes a fragment cache entry from the pool
+    virtual void UpdateWorldBound();  // [46] @ 0x82121530 — world bound sphere = bound centroid × matrix, notifies manager
     virtual void SyncBoneMatrices();  // [47] @ 0x8211fac8 — iterates bones, copies and transforms matrices
     virtual void InitializeTransform();  // [48] @ 0x82121138 — reads scale, sets dirty flag, calls UpdateBoneTransforms
     virtual void* GetPhysicsAllocator();  // [53] @ 0x821214e0 — returns creature_data->+484 allocator ptr
     virtual void ApplyBoneDamage(void* damageInfo);  // [56] @ 0x8211e3f0 — computes bone damage/weight distribution
 
     // ── non-virtual methods ──
+    void* ScalarDeletingDtor(int flags);  // @ 0x820C8EE0 — vtable slot 0
     bool HasVisibilityFlag();   // @ 0x820C5378
     bool IsNetworkActive();     // @ 0x8211C9C8
     bool IsIndexValid();        // @ 0x8211CF90

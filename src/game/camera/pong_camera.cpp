@@ -1575,9 +1575,8 @@ extern void sysMemAllocator_Free(void* ptr);                        // @ 0x820C0
 extern void atSingleton_9420(void* obj);                      // @ 0x821A9420
 extern void pongCameraMgr_3E98_g(void* obj);                  // @ 0x82143E98 (GetAspectRatio)
 extern void phBoundCapsule_3598_g(void* obj);                  // @ 0x82153598
-extern void pongCameraMgr_39F0_g(void* dst, void* src);       // @ 0x821539F0
 extern uint8_t pongCameraMgr_C450_g(void* node);              // @ 0x8220C450
-extern void pongCameraMgr_7EA8_g(void* mgr, void* state, int flag); // @ 0x82167EA8
+extern bool pongCameraMgr_7EA8_g(void* mgr, void* state, int flag); // @ 0x82167EA8
 extern void pg_7CE0(void* mgr, void* node);                   // @ 0x82167CE0
 extern void game_85F0(void* flags);                            // @ 0x821685F0
 extern bool pongCameraMgr_3500_fw(pongCameraMgr* mgr, void* gameState, int mode);  // @ 0x821F3500
@@ -1596,6 +1595,111 @@ extern uint32_t g_cameraDataBasePtr;    // @ 0x8271A2EC  (global data base)
 extern float    g_cameraFloatTable[];   // @ data table base (lis r10,-32253 + offset)
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Support for pongCameraMgr::Shutdown / Update and the helpers they call
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Original-game objects keep their vtable pointer in their first word; this
+// fetches entry `slot` of it as a typed function pointer.
+template <typename Fn>
+static Fn GameVirtual(const void* object, int slot) {
+    void* const* vtable = *static_cast<void* const* const*>(object);
+    return reinterpret_cast<Fn>(vtable[slot]);
+}
+
+// Scalar deleting destructor: vtable slot 0 with flag 1.
+static void DeleteGameObject(void* object) {
+    GameVirtual<void (*)(void*, int)>(object, 0)(object, 1);
+}
+
+template <typename T>
+static T& FieldAt(void* base, uint32_t offset) {
+    return *reinterpret_cast<T*>(static_cast<uint8_t*>(base) + offset);
+}
+
+// lbl_825EBAA0 holds the current grcViewport: ~grcViewport clears it and
+// 0x82153070 re-uploads a viewport that is current. globals.c defines the slot
+// as g_pHudOverlay.
+extern "C" void* g_pHudOverlay;
+static void*& g_currentViewport = g_pHudOverlay;
+
+// lbl_8271A318 is the atSingleton<camShotMgr> instance. camShotMgr is an
+// fsmMachine whose base sits at +0x04, so the shot indices are fsmMachine
+// fields. pong_player.cpp declares the same slot as g_pMatchState.
+struct CamShotMgrInstance {
+    void**   vtable;          // +0x00
+    void**   fsmVtable;       // +0x04 - fsmMachine base; Update calls its slot 4
+    int32_t  m_shotCount;     // +0x08
+    void**   m_shots;         // +0x0C
+    int32_t  m_currentShot;   // +0x10 - fsmMachine current state, indexes m_shots (0x82222B20)
+    int32_t  m_requestedShot; // +0x14 - pending state set by 0x82222800
+    int32_t  m_latchedShot;   // +0x18 - camShotMgr slot 4 (0x82165458) copies m_currentShot here
+};
+extern void* g_pMatchState;
+static CamShotMgrInstance* ShotMgr() { return static_cast<CamShotMgrInstance*>(g_pMatchState); }
+
+// lbl_8271A32C: camera state shared with gameplay code. pong_player.cpp declares
+// the same slot as g_pMatchConfig and reads +0x06.
+struct CameraSharedState {
+    const CamMatrix44* m_cameraMtx;      // +0x00 - matrix of the source camViewCS is viewing
+    uint8_t            field_0x04;       // +0x04 - set to 1 by every Update
+    uint8_t            field_0x05;       // +0x05
+    uint8_t            m_cameraHasSides; // +0x06 - "CameraHasSides" flag of the current shot
+};
+extern void* g_pMatchConfig;
+static CameraSharedState* SharedCameraState() { return static_cast<CameraSharedState*>(g_pMatchConfig); }
+
+// Entry returned by the name lookup at 0x82274870; flag entries hold their value at +0x20.
+struct CameraNamedFlag {
+    uint8_t _pad_0x00[0x20];
+    uint8_t m_value;          // +0x20
+};
+
+// In/out value of the shot-condition evaluator. Type 6 carries a float (read
+// back by StepActiveGovernor), type 3 an int (0x821F7818).
+struct CamCondValue {
+    int32_t type;             // +0x00
+    float   value;            // +0x04
+};
+
+// Ids in pongCMCamera::m_values, named by the table 0x82175248 registers.
+enum CamValueId {
+    kCamValue_DesiredCameraPos = 58,
+    kCamValue_CameraRight      = 59,
+    kCamValue_CameraUp         = 60,
+    kCamValue_CameraForward    = 61,
+    kCamValue_CameraPos        = 62,
+};
+
+// cmNamedValueSet vtable slot 1 returns the 16-byte storage of value `id`.
+static CamVec4* CamValueSlot(rage::cmNamedValueSet* values, int id) {
+    return GameVirtual<CamVec4* (*)(rage::cmNamedValueSet*, int)>(values, 1)(values, id);
+}
+
+// Offsets into the game-data block behind lbl_8271A2EC (the slot
+// g_cameraDataBasePtr also names). Only the offsets are known.
+static const uint32_t kGameData_Vec0E900      = 0xE900;   // CamVec4 sampled into g_cineSampleVec
+static const uint32_t kGameData_Float68D04    = 0x68D04;  // reset to 0.8 by 0x82168CB0; mode 1 may override it
+static const uint32_t kGameData_ShotEvaluator = 0x68D18;  // shot-condition evaluator (0x82216F68 / 0x82217278)
+extern void* lbl_8271A2EC;
+
+extern uint8_t  g_camMachineSignal;    // @ 0x82606419 - raised by 0x82167180 / 0x82167EA8
+extern uint32_t g_camMachineRecord;    // @ 0x82606420 - 4 bytes 0x82167EA8 fills as byte/halfword/byte
+extern CamVec4  g_cineSampleVec;       // @ 0x82619AE0
+extern CamVec4  g_cineSampleVecPrev;   // @ 0x82619AD0
+extern float    g_cineSampleInterval;  // @ 0x826064C8 - 0x821F3C44 divides (vec.z - prev.z) by it
+
+extern void  pongCreatureInst_50A0_g(CamMatrix44* out, const CamMatrix44* in);  // @ 0x820D50A0 - rigid inverse
+extern void  game_3070(grcViewport* viewport);     // @ 0x82153070 - rebuild composites, upload if current
+extern void  game_7180(pongCineCamMgr* cine);      // @ 0x82167180 - per-frame cine update, sets m_mode
+extern void* pongCSActionCamAnim_4870_g(const void* table, const char* name);  // @ 0x82274870 - null if absent
+extern void  PostGameMessage(uint32_t messageId, uint32_t flags,
+                             uint32_t param1, uint32_t param2);  // @ 0x8225E6E0 (pg_E6E0)
+extern void  pg_7818(CamShotKey* key);             // @ 0x821F7818 - checks condition 5, bumps lbl_826064C4
+extern void  pongCameraMgr_78D8_2h(CamShotKey* key);  // @ 0x821F78D8
+extern bool  pongCameraMgr_7278_2h(void* evaluator, CamShotKey key, int conditionId,
+                                   CamCondValue* value, int flag);  // @ 0x82217278
+
+// ─────────────────────────────────────────────────────────────────────────────
 // pongCameraMgr::~pongCameraMgr()  [vfn_0] @ 0x821658E0 | size: 0x80
 // Destructor: sets vtables, clears singleton, calls base dtor, optionally frees
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1606,6 +1710,49 @@ pongCameraMgr::~pongCameraMgr() {
     atSingleton_9420(this);
     // Note: sysMemAllocator_Free called conditionally based on deletion mode flag,
     // which the compiler handles via the deleting-destructor thunk.
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// pongCameraMgr::Shutdown()  [vtable slot 24] @ 0x82165F30 | size: 0x134
+// Frees what vfn_23 built: the camShotMgr singleton, both camera sources, the
+// camera-machine wrapper and the three viewports. camViewCS (+0x28) and the
+// cine manager (+0x2C) are left alone, and no member is cleared afterwards.
+// ─────────────────────────────────────────────────────────────────────────────
+void pongCameraMgr::Shutdown() {
+    if (g_pMatchState != nullptr) {
+        DeleteGameObject(g_pMatchState);
+    }
+    g_pMatchState = nullptr;
+
+    if (m_sources[0] != nullptr) {
+        DeleteGameObject(m_sources[0]);
+    }
+    if (m_sources[1] != nullptr) {
+        DeleteGameObject(m_sources[1]);
+    }
+    if (m_cmCamera != nullptr) {
+        DeleteGameObject(m_cmCamera);
+    }
+
+    // delete[] with ~grcViewport inlined: walking back from the last element,
+    // an element that is the current viewport clears that global.
+    if (m_slotsBase != nullptr) {
+        uint8_t* block = reinterpret_cast<uint8_t*>(m_slotsBase) - 16;
+        int32_t count = *reinterpret_cast<int32_t*>(block);
+        for (int32_t i = count - 1; i >= 0; --i) {
+            if (g_currentViewport == &m_slotsBase[i]) {
+                g_currentViewport = nullptr;
+            }
+        }
+        sysMemAllocator_Free(block);
+    }
+
+    if (m_viewport != nullptr) {
+        if (g_currentViewport == m_viewport) {
+            g_currentViewport = nullptr;
+        }
+        sysMemAllocator_Free(m_viewport);
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1688,7 +1835,141 @@ void pongCameraMgr_6280_g(void* selfPtr) {
     idx = (int)g_cameraActiveIndex;
     slotsBase = (pongCameraMgr*)self->m_slotsBase;
     dest = (char*)slotsBase + idx * 912;
-    pongCameraMgr_39F0_g(dest, (char*)activeCamera + 64);
+    ((grcViewport*)dest)->SetCameraMtx(*(const CamMatrix44*)((char*)activeCamera + 64));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// pongCameraMgr::Update()  [vtable slot 27] @ 0x82166118 | size: 0x168
+// Per-frame camera update: ticks the active source and the shot machine, keeps
+// the camera machine fed with the char-view camera, steps the cinematic cameras,
+// reports a shot change to gameplay code, then publishes the viewed source's
+// matrix and copies its viewport into the active render viewport (6280_g).
+// ─────────────────────────────────────────────────────────────────────────────
+void pongCameraMgr::Update() {
+    camBaseCS* active = m_sources[m_activeSourceIndex];
+    GameVirtual<void (*)(camBaseCS*)>(active, 10)(active);
+
+    // Slot 4 of the fsmMachine base; probably camShotMgr's 0x82165458, which
+    // latches the current shot before running the machine (vtable not verified).
+    void* shotMachine = &ShotMgr()->fsmVtable;
+    GameVirtual<void (*)(void*)>(shotMachine, 4)(shotMachine);
+
+    // While the char-view source drives the view, the camera machine gets its matrix.
+    if (m_activeSourceIndex != 0) {
+        CMtoCSAdapter* machineSource = static_cast<CMtoCSAdapter*>(m_sources[0]);
+        machineSource->PublishCameraMatrix(m_sources[m_activeSourceIndex]->m_matrix);
+    }
+
+    // camViewCS slot 9 (0x8216CD30) passes the tick on to the viewed source.
+    GameVirtual<void (*)(camViewCS*)>(m_cameraObj, 9)(m_cameraObj);
+
+    g_camMachineSignal = 0;
+    g_camMachineRecord = 0;
+    pongCineCamMgr* cine = m_subState;
+    game_7180(cine);
+    cine->StepActiveGovernor();
+
+    CamShotMgrInstance* shotMgr = ShotMgr();
+    bool shotChanged = shotMgr->m_latchedShot != shotMgr->m_currentShot;
+    g_cameraFlagB = 0;
+    g_cameraFlagA = 0;
+    if (shotChanged) {
+        const CameraNamedFlag* hasSides = static_cast<const CameraNamedFlag*>(
+            pongCSActionCamAnim_4870_g(m_cmCamera->m_machine->m_flagTable, "CameraHasSides"));
+        SharedCameraState()->m_cameraHasSides = hasSides != nullptr ? hasSides->m_value : 0;
+        PostGameMessage(2076, 64, 0, 0);  // message 0x81C; what listens to it isn't known
+    }
+
+    camBaseCS* viewed = m_cameraObj->m_source;
+    CameraSharedState* shared = SharedCameraState();
+    shared->field_0x04 = 1;
+    shared->m_cameraMtx = &viewed->m_matrix;
+    viewed->m_viewport->SetCameraMtx(viewed->m_matrix);
+
+    pongCameraMgr_6280_g(this);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// grcViewport::SetCameraMtx  @ 0x821539F0 | size: 0x204
+// Takes a new camera matrix: stores it raw and with w forced to (0,0,0,1),
+// derives the view matrix (rigid inverse) and a copy with z negated, then lets
+// 0x82153070 rebuild the composites.
+// ─────────────────────────────────────────────────────────────────────────────
+void grcViewport::SetCameraMtx(const CamMatrix44& cameraMtx) {
+    m_cameraMtx = cameraMtx;
+
+    m_cameraMtx44.a = { cameraMtx.a.x, cameraMtx.a.y, cameraMtx.a.z, 0.0f };
+    m_cameraMtx44.b = { cameraMtx.b.x, cameraMtx.b.y, cameraMtx.b.z, 0.0f };
+    m_cameraMtx44.c = { cameraMtx.c.x, cameraMtx.c.y, cameraMtx.c.z, 0.0f };
+    m_cameraMtx44.d = { cameraMtx.d.x, cameraMtx.d.y, cameraMtx.d.z, 1.0f };
+
+    // The inverse fills only xyz of each row; w is never read.
+    CamMatrix44 view;
+    pongCreatureInst_50A0_g(&view, &cameraMtx);
+    m_viewMtx.a = { view.a.x, view.a.y, view.a.z, 0.0f };
+    m_viewMtx.b = { view.b.x, view.b.y, view.b.z, 0.0f };
+    m_viewMtx.c = { view.c.x, view.c.y, view.c.z, 0.0f };
+    m_viewMtx.d = { view.d.x, view.d.y, view.d.z, 1.0f };
+
+    m_viewMtxFlipZ.a = { m_viewMtx.a.x, m_viewMtx.a.y, -m_viewMtx.a.z, m_viewMtx.a.w };
+    m_viewMtxFlipZ.b = { m_viewMtx.b.x, m_viewMtx.b.y, -m_viewMtx.b.z, m_viewMtx.b.w };
+    m_viewMtxFlipZ.c = { m_viewMtx.c.x, m_viewMtx.c.y, -m_viewMtx.c.z, m_viewMtx.c.w };
+    m_viewMtxFlipZ.d = { m_viewMtx.d.x, m_viewMtx.d.y, -m_viewMtx.d.z, m_viewMtx.d.w };
+
+    game_3070(this);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CMtoCSAdapter::PublishCameraMatrix  @ 0x821722F8 | size: 0xDC
+// Writes a camera matrix into the camera machine's named values: the
+// translation goes to DesiredCameraPos and CameraPos, the basis rows to
+// CameraRight/Up/Forward.
+// ─────────────────────────────────────────────────────────────────────────────
+void CMtoCSAdapter::PublishCameraMatrix(const CamMatrix44& cameraMtx) {
+    rage::cmNamedValueSet* values = m_cmCamera->m_values;
+    *CamValueSlot(values, kCamValue_DesiredCameraPos) = cameraMtx.d;
+    *CamValueSlot(values, kCamValue_CameraRight)      = cameraMtx.a;
+    *CamValueSlot(values, kCamValue_CameraUp)         = cameraMtx.b;
+    *CamValueSlot(values, kCamValue_CameraForward)    = cameraMtx.c;
+    *CamValueSlot(values, kCamValue_CameraPos)        = cameraMtx.d;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// pongCineCamMgr::StepActiveGovernor  @ 0x82167558 | size: 0x150
+// Advances the governor m_mode selects. Mode 1 (governor A) also samples a
+// game-data vector for the shot conditions and re-derives the float at game
+// data +0x68D04 from condition 14. When the governor's camera machine steps
+// (0x82167EA8), the new node's settings are applied (0x82168CB0).
+// ─────────────────────────────────────────────────────────────────────────────
+void pongCineCamMgr::StepActiveGovernor() {
+    pongCamGovernor* governor;
+    if (m_mode == 1) {
+        float interval = m_governorA->m_shotKey.field_0x04;
+        g_cineSampleVecPrev = g_cineSampleVec;
+        void* gameData = lbl_8271A2EC;
+        g_cineSampleVec = FieldAt<CamVec4>(gameData, kGameData_Vec0E900);
+        g_cineSampleInterval = interval;
+
+        pg_7818(&m_governorA->m_shotKey);
+        pongCameraMgr_78D8_2h(&m_governorA->m_shotKey);
+
+        CamCondValue condition = { 6, 1.0f };
+        void* evaluator = FieldAt<void*>(gameData, kGameData_ShotEvaluator);
+        if (pongCameraMgr_7278_2h(evaluator, m_governorA->m_shotKey, 14, &condition, 1) &&
+            condition.value > 0.0f) {
+            FieldAt<float>(gameData, kGameData_Float68D04) = 0.8f / condition.value;
+        }
+        governor = m_governorA;
+    } else if (m_mode == 2 || m_mode == 3) {
+        pg_7818(&m_governorB->m_shotKey);
+        governor = m_governorB;
+    } else {
+        return;
+    }
+
+    if (pongCameraMgr_7EA8_g(governor->m_machine, governor, 1)) {
+        pongCameraMgr_8CB0_2hr(governor);
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2349,9 +2630,6 @@ extern const char kCamViewCS_DebugLabel[];    // lbl_820362F8 → returned by Ge
 // Zero-float constant used by OnReset (lfs f0 from .rdata).
 extern const float g_camViewCS_ResetFloat;    // lbl_8202D090 → 0.0f
 
-// Bound-camera position writer (pongCameraMgr helper at 0x821539F0).
-extern void pongCameraMgr_WriteBoundPosition(void* mgr, void* boundCamera);
-
 // Capsule-style FOV solver from the phBoundCapsule helper bank.
 // At 0x82228EA0 it takes (loopObj, extentY_in_f7, extentX_in_f6) and returns
 // the horizontal FOV in f1 plus propagates f6/f7 through to the caller.
@@ -2451,7 +2729,8 @@ void camViewCS::OnSourceChanged() {
  * +824..+836 with the active flag set at +864, before the publish helper runs.
  */
 void camViewCS::Update() {
-    pongCameraMgr_WriteBoundPosition(g_loopObject, this->m_activeSource);
+    // 0x8216CD98: the current viewport gets the viewed source's matrix.
+    static_cast<grcViewport*>(g_currentViewport)->SetCameraMtx(this->m_source->m_matrix);
 
     float extentX;
     float extentY;
