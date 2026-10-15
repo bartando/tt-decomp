@@ -429,7 +429,7 @@ float g_kPowerBlend = 0.5f;
 float g_kSwingRadiusConst = 1.0f;
 float g_kSwingScaleFactor = 1.0f;
 float g_kTicksPerSec = 60.0f;
-float g_kZero = 0.0f;
+const float g_kZero = 0.0f;  // @ 0x8202D110
 float g_ticksToSeconds = 1.0f / 60.0f;
 
 // ============================================================================

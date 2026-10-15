@@ -402,7 +402,7 @@ struct pongPlayerState : pongPlayer {
 // ── Global constants and singletons ──────────────────────────────────────
 extern const float g_recoveryTimerThreshold; // @ 0x8202D108
 extern const float g_swingPhaseThreshold;    // @ 0x8202D110
-extern const float g_kZero;                  // @ 0x8202D10C
+extern const float g_kZero;                  // @ 0x8202D110
 extern const float g_kSwingScaleFactor;      // @ 0x8204A3B8
 extern const vec3  g_hitVectorFlip;
 extern void*       g_geomSingleton;
