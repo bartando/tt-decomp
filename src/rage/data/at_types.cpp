@@ -28,47 +28,6 @@
 #include <cstdint>
 #include <cstring>
 
-namespace {
-
-uint32_t ComputeHashString(const char* text)
-{
-    if (text == nullptr) {
-        return 0;
-    }
-
-    uint32_t hash = 0;
-    while (*text != '\0') {
-        hash = (hash << 4) + static_cast<uint8_t>(*text++);
-
-        const uint32_t highBits = hash & 0xF0000000;
-        if (highBits != 0) {
-            hash ^= (highBits >> 24);
-            hash ^= highBits;
-        }
-    }
-
-    return hash;
-}
-
-bool StringsMatch(const char* left, const char* right)
-{
-    if (left == right) {
-        return true;
-    }
-
-    if (left == nullptr || right == nullptr) {
-        return false;
-    }
-
-    while (*left != '\0' && *left == *right) {
-        ++left;
-        ++right;
-    }
-
-    return *left == *right;
-}
-
-} // namespace
 
 // ─────────────────────────────────────────────────────────────────────────────
 // rage::xmlTree teardown. Callers know 0x821A8070 as atArray_Clear; it is the
@@ -276,6 +235,37 @@ void* atSingletonPool_AllocEntry(uint32_t /*unused*/)
     return &pool.data[index];
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// atHashMap<const char*, T>: string-keyed buckets of {key, value, next}.
+// ─────────────────────────────────────────────────────────────────────────────
+
+struct atHashMapEntry {
+    const char* key;
+    uint32_t value;             // +0x04, Find returns its address
+    atHashMapEntry* next;       // +0x08
+};
+
+struct atHashMapView {
+    atHashMapEntry** buckets;
+    uint16_t bucketCount;       // +0x04
+};
+
+// PJW hash over signed chars.
+// @ 0x8223A818
+uint32_t rage_atStringHash(const char* text)
+{
+    uint32_t hash = 0;
+    for (int32_t c = static_cast<signed char>(*text); c != 0;
+         c = static_cast<signed char>(*++text)) {
+        hash = (hash << 4) + static_cast<uint32_t>(c);
+        const uint32_t high = hash & 0xF0000000u;
+        if (high != 0) {
+            hash ^= (high >> 24) ^ high;
+        }
+    }
+    return hash;
+}
+
 // All symbols below use C linkage — C source files (src/rage/core/app_init.c,
 // src/rage/render_loop.c, src/xam/*) reach them through underscore-prefixed
 // symbol names. C++ callers just take the unmangled name.
@@ -288,35 +278,26 @@ extern "C" {
 //                    animation blend-clip caches (pcr_anim_blenders.cpp).
 // ─────────────────────────────────────────────────────────────────────────────
 void atHashMap_Clear(void* container) { (void)container; }
+// @ 0x8234C208
 void* atHashMap_Find(void* table, const void* key) {
-    if (table == nullptr) {
-        return nullptr;
-    }
-
-    const char* searchKey = static_cast<const char*>(key);
-    const uint16_t bucketCount = *reinterpret_cast<uint16_t*>(
-        static_cast<uint8_t*>(table) + 4);
+    auto* map = static_cast<atHashMapView*>(table);
+    const char* name = static_cast<const char*>(key);
+    const uint16_t bucketCount = map->bucketCount;
     if (bucketCount == 0) {
         return nullptr;
     }
-
-    void*** bucketArray = *reinterpret_cast<void****>(table);
-    if (bucketArray == nullptr) {
-        return nullptr;
-    }
-
-    const uint32_t bucketIndex = ComputeHashString(searchKey) % bucketCount;
-    void** entry = static_cast<void**>(bucketArray[bucketIndex]);
-
-    while (entry != nullptr) {
-        const char* entryKey = static_cast<const char*>(entry[0]);
-        if (StringsMatch(searchKey, entryKey)) {
-            return static_cast<uint8_t*>(static_cast<void*>(entry)) + 4;
+    for (atHashMapEntry* entry = map->buckets[rage_atStringHash(name) % bucketCount];
+         entry != nullptr; entry = entry->next) {
+        const char* a = name;
+        const char* b = entry->key;
+        while (*a != '\0' && *a == *b) {
+            ++a;
+            ++b;
         }
-
-        entry = static_cast<void**>(entry[2]);
+        if (*a == *b) {
+            return &entry->value;
+        }
     }
-
     return nullptr;
 }
 

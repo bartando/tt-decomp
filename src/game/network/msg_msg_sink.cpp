@@ -2154,6 +2154,7 @@ extern int32_t _crt_tls_fiber_setup();
 // (index != 0xFFFF), increments the reference count in the counter array
 // at +104, then calls vtable slot 6 to get the next slot index.
 // ─────────────────────────────────────────────────────────────────────────────
+// @ 0x8244D168
 void msgMsgSink_D168_sp(void* self, uint16_t slotIndex) {
     uint16_t index = slotIndex;
 
@@ -2162,11 +2163,11 @@ void msgMsgSink_D168_sp(void* self, uint16_t slotIndex) {
         uint32_t* counterArray = *(uint32_t**)((uint8_t*)self + 104);
         counterArray[index]++;
 
-        // Call vtable slot 6 to get next slot index
-        typedef uint16_t (*GetNextFn)(void*);
+        // Vtable slot 6 maps the current slot (r4) to the next one.
+        typedef uint16_t (*GetNextFn)(void*, uint16_t);
         void** vt = *(void***)self;
         GetNextFn getNext = (GetNextFn)vt[6];
-        index = getNext(self);
+        index = getNext(self, index);
     }
 }
 
@@ -2176,6 +2177,7 @@ void msgMsgSink_D168_sp(void* self, uint16_t slotIndex) {
 // (index != 0xFFFF), decrements the reference count in the counter array
 // at +104, then calls vtable slot 6 to get the next slot index.
 // ─────────────────────────────────────────────────────────────────────────────
+// @ 0x8244D1D8
 void msgMsgSink_D1D8_sp(void* self, uint16_t slotIndex) {
     uint16_t index = slotIndex;
 
@@ -2184,11 +2186,11 @@ void msgMsgSink_D1D8_sp(void* self, uint16_t slotIndex) {
         uint32_t* counterArray = *(uint32_t**)((uint8_t*)self + 104);
         counterArray[index]--;
 
-        // Call vtable slot 6 to get next slot index
-        typedef uint16_t (*GetNextFn)(void*);
+        // Vtable slot 6 maps the current slot (r4) to the next one.
+        typedef uint16_t (*GetNextFn)(void*, uint16_t);
         void** vt = *(void***)self;
         GetNextFn getNext = (GetNextFn)vt[6];
-        index = getNext(self);
+        index = getNext(self, index);
     }
 }
 

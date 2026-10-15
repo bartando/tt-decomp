@@ -272,24 +272,9 @@ extern "C" const char* rage_StringFindChar(const char* str, char c) {
     return std::strchr(str, c);
 }
 
-/**
- * rage_atStringCopy — Safe string copy with size limit
- *
- * Copies src to dest, ensuring null termination within maxSize bytes.
- * Equivalent to strncpy + forced null terminator.
- */
-extern "C" void rage_atStringCopy(const char* src, char* dest, int maxSize) {
-    if (!dest || maxSize <= 0) return;
-    if (!src) {
-        dest[0] = '\0';
-        return;
-    }
-    int i = 0;
-    for (; i < maxSize - 1 && src[i] != '\0'; i++) {
-        dest[i] = src[i];
-    }
-    dest[i] = '\0';
-}
+// rage_atStringCopy (0x82228990) is defined in pong_network_io.cpp. It is not
+// a strncpy: it looks the key up in the string table (0x82408F08) and writes
+// the entry as UTF-8.
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SECTION 4: Reference Counting & Singleton Management
@@ -1031,7 +1016,6 @@ extern "C" const FakeTypeInfo _ZTI8hsmState = { nullptr, "hsmState" };
 extern void atArray_Clear(void* arr);
 extern void audControl_Destructor(void* pControl);
 extern void hsmContext_SetNextState(void* ctx, int state);
-extern "C" void* atHashMap_Find(void* table, const char* key);
 extern void sysCallback_Invoke(void* callback, int code);
 
 extern "C" {
@@ -1045,10 +1029,6 @@ void _c_audControl_Destructor(void* o) { audControl_Destructor(o); }
 void _c_hsmContext_SetNextState(void* c, int s) __asm__("_hsmContext_SetNextState_2800");
 void _c_hsmContext_SetNextState(void* c, int s) { hsmContext_SetNextState(c, s); }
 
-void _c_atHashMap_Find(void* a, const void* b) __asm__("_atHashMap_Find");
-void _c_atHashMap_Find(void* a, const void* b) {
-    atHashMap_Find(a, static_cast<const char*>(b));
-}
 
 // _c_sysCallback_Invoke not needed — sysCallback_Invoke already has extern "C" linkage
 
