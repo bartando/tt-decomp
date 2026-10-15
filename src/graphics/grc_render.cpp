@@ -329,14 +329,14 @@ void grcDevice_beginScene(grcDeviceBeginScene* pDevice)
     rage::grcRenderTargetXenon* pRT =
         (rage::grcRenderTargetXenon*)pDevice->m_pRenderTarget;
     if (pRT != NULL) {
-        /* vtable[11]: set color-channel clear flag. */
-        pRT->SetColorChannelFlag(pDevice->m_bColorChannel);
-
-        /* vtable[12]: set depth-channel clear flag. */
-        pRT->SetDepthChannelFlag(pDevice->m_bDepthChannel);
-
-        /* vtable[8]: GetWidth (called for side-effect / render-target activation). */
-        pRT->GetWidth();
+        /* Slots 11 and 12 take the color/depth clear flags; slot 8 is GetWidth
+         * (result unused). */
+        void** vt = pRT->vtable;
+        ((void (*)(rage::grcRenderTargetXenon*, uint8_t))vt[11])(pRT, pDevice->m_bColorChannel);
+        vt = pRT->vtable;
+        ((void (*)(rage::grcRenderTargetXenon*, uint8_t))vt[12])(pRT, pDevice->m_bDepthChannel);
+        vt = pRT->vtable;
+        ((uint16_t (*)(rage::grcRenderTargetXenon*))vt[8])(pRT);
 
         /* Re-read gameLoop after the virtual dispatch. */
         pLoop = (uint8_t*)g_loop_obj_ptr;

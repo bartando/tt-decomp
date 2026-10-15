@@ -203,7 +203,6 @@ struct cmApproachNode : cmNodeBase {
     cmNodePort portA;         // +0x14  rate / approach speed
     cmNodePort portB;         // +0x1C  target value
     int32_t    m_nConnected;  // +0x24
-    int32_t    m_pad2;        // +0x28  align / purpose TBD
     cmDataObj* m_pResult;     // +0x28  current state buffer
     // NOTE: exact offset of m_pResult confirmed as +40 (0x28) from assembly:
     //   lwz r11, 40(r31)  → cmApproachOperator_vfn_10 @ 0x82278B90

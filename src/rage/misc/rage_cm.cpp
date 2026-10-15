@@ -107,6 +107,7 @@ void cmNode_SetFromPort_Dispatch(void* dst, const cmNodePort* port, int32_t dim)
  *
  * Returns dst.
  */
+// @ 0x821792D8
 float* cmNode_GetVector(float* dst, const cmNodePort* port) {
     switch (port->m_type) {
     case CM_PORT_DIRECT: {
@@ -139,6 +140,7 @@ float* cmNode_GetVector(float* dst, const cmNodePort* port) {
  * - If port.m_type == NODE   : calls upstream_node->GetFloat(&tmpBuf) via vcall slot 4
  * - Otherwise                : returns 0.0f  (g_cm_zeroFloat)
  */
+// @ 0x82179350
 float cmNode_GetFloat(const cmNodePort* port) {
     switch (port->m_type) {
     case CM_PORT_DIRECT:
@@ -864,43 +866,47 @@ static bool cmApproachOperator_VectorApproach(
     }
 }
 
+// rage::sysTimeManager (defined in match_data.cpp); Tick reads +8.
+struct cmTimeManagerView { void** vtable; uint32_t field_04; float frameSeconds; float framesPerSecond; };
+extern "C" cmTimeManagerView g_sysTimeManager;  // @ 0x825CAEB8
+
+// Vector step toward target: (current, target, rate, dt); the asm multiplies
+// rate * dt first, then runs the step cmApproachOperator_VectorApproach models.
+// @ 0x82277D38
+extern "C" void cmApproach_VectorStep(float* current, const float* target, float rate, float dt) {
+    cmApproachOperator_VectorApproach(current, target, rate * dt);
+}
+
 // cmApproachOperator::Tick @ 0x82278B90 (vfn_10)
-// Advances the approach by one frame step.
+// Moves the result (+0x28) toward portA (+0x14) at the rate from portB (+0x1C)
+// times the scaled frame time, without overshooting. The result's dim byte
+// selects the path: 2 = float, 4 = vector; anything else does nothing.
+// The asm doesn't null-check the result.
 void cmApproachOperator::Tick() {
-    void* resultPtr = m_pResult;
-    if (!resultPtr) return;
+    cmDataObj* result = m_pResult;
+    float dt = g_sysTimeManager.frameSeconds * g_cm_frameTime;
+    uint8_t dim = result->m_dim;
 
-    cmDataObj* result = reinterpret_cast<cmDataObj*>(resultPtr);
-    int32_t dim = result->m_dim;
-
-    float dt = g_cm_frameTime;
-
-    if (dim == CM_DIM_FLOAT) {
-        // Scalar approach
+    if (dim == 2) {
         float current = result->m_float;
-        float rate    = cmNode_GetFloat(&portA);
-        float target  = cmNode_GetFloat(&portB);
-        float step    = rate * dt;
-
+        float target  = cmNode_GetFloat(&portA);
+        float rate    = cmNode_GetFloat(&portB);
         if (current < target) {
-            current += step;
-            if (current > target) current = target;  // clamp overshoot
+            current = rate * dt + current;     // fmadds (fused)
+            if (current > target) current = target;
         } else if (current > target) {
-            current -= step;
-            if (current < target) current = target;  // clamp overshoot
+            current = current - rate * dt;     // fnmsubs (fused)
+            if (current < target) current = target;
         }
-        result->m_float = current;
-
-    } else if (dim == CM_DIM_INT32) {
-        // Vector (vec4) approach using the vector approach helper
-        float  target[4];
-        float* current = result->m_vec4;
-
-        cmNode_GetVector(target, &portB);
-        float rate = cmNode_GetFloat(&portA);
-        float step = rate * dt;
-
-        cmApproachOperator_VectorApproach(current, target, step);
+        m_pResult->m_float = current;
+    } else if (dim == 4) {
+        alignas(16) float current[4];
+        alignas(16) float target[4];
+        __builtin_memcpy(current, result->m_vec4, 16);
+        cmNode_GetVector(target, &portA);
+        float rate = cmNode_GetFloat(&portB);
+        cmApproach_VectorStep(current, target, rate, dt);
+        __builtin_memcpy(m_pResult->m_vec4, current, 16);
     }
 }
 

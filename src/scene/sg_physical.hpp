@@ -8,6 +8,7 @@
  */
 
 #include "sg_drawable.hpp"
+#include <stddef.h>
 
 // Forward declare — full definition in physics/ph_physics.hpp (rage namespace)
 namespace rage { struct phInst; }
@@ -15,6 +16,7 @@ using rage::phInst;
 
 // Forward declarations for physics types
 struct phBound;
+struct phUpdateObject;  // physics/ph_physics.hpp
 
 // ---------------------------------------------------------------------------
 // sgPhysicalObject  —  scene node with integrated physics simulation
@@ -33,7 +35,8 @@ struct phBound;
 //   +0x73  uint8_t   _pad73
 //   +0x74  void*     m_pPhysicsType     — physics type descriptor
 //   +0x78  uint32_t  m_nSecondaryData   — copied from phys type +4 on articulated creation
-//   +0x7C  phInst*   m_pPhysicsInstance — owning physics instance
+//   +0x7C  phUpdateObject* m_pDrawObject — built by AdvancedPhysics (0x8227F6A8 /
+//          0x8227F810); Transform reads its drawable/collider/transform source
 // ---------------------------------------------------------------------------
 // NOTE: fields +0x58, +0x5C and +0x6C are never read/written by any lifted
 // method we have; they sit between the sgRMDrawable base and the secondary
@@ -54,7 +57,7 @@ struct sgPhysicalObject : sgRMDrawable {
     uint8_t  _pad73;               // +0x73
     void*    m_pPhysicsType;       // +0x74  physics type descriptor
     uint32_t m_nSecondaryData;     // +0x78  secondary physics data
-    phInst*  m_pPhysicsInstance;   // +0x7C  owning physics instance
+    phUpdateObject* m_pDrawObject; // +0x7C  draw object (phUpdateObject layout)
 
     // slot 29 — Transform() / visibility update @ 0x823D9208 (size 0x130)
     //   1. Bail if no physics instance or no bound.
@@ -62,13 +65,21 @@ struct sgPhysicalObject : sgRMDrawable {
     //   3. Virtual visibility/culling check (phBound slot 9).
     //   4. If visible: store distance + flags, add to draw bucket.
     //   5. If invisible and not m_bIsHidden: call render-entry cleanup (slot 1).
-    virtual void Transform();
+    void Transform();
 
-    // slot 33 — PhysicsUpdate() @ 0x823D9368 (size 0x14)
-    //   Tail-calls phInst virtual slot 5 (Update).
-    virtual void PhysicsUpdate();
+    // slot 33 — @ 0x823D9368 (size 0x14)
+    //   Tail-calls the draw object's slot 5 (phUpdateObject::RenderShadow), f1 untouched.
+    void PhysicsUpdate(float shadowScale);
 
     // slot 39 — AdvancedPhysics() @ 0x823D98C0 (size 0x7C)
     //   Creates physics instance: articulated (ragdoll) or simple (rigid body).
-    virtual void AdvancedPhysics();
+    void AdvancedPhysics();
 };
+
+// Game layout (32-bit); the host build has 8-byte pointers.
+static_assert(sizeof(void*) != 4 || offsetof(sgNode, m_pFirstChild) == 0x0C, "sgNode layout");
+static_assert(sizeof(void*) != 4 || offsetof(sgRMDrawable, m_transform) == 0x10, "sgRMDrawable layout");
+static_assert(sizeof(void*) != 4 || offsetof(sgRMDrawable, m_pName) == 0x50, "sgRMDrawable layout");
+static_assert(sizeof(void*) != 4 || offsetof(sgPhysicalObject, m_pRenderEntryVtable) == 0x60, "sgPhysicalObject layout");
+static_assert(sizeof(void*) != 4 || offsetof(sgPhysicalObject, m_bIsHidden) == 0x70, "sgPhysicalObject layout");
+static_assert(sizeof(void*) != 4 || offsetof(sgPhysicalObject, m_pDrawObject) == 0x7C, "sgPhysicalObject layout");

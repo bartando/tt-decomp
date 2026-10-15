@@ -84,17 +84,14 @@ void sysMemSimpleAllocator::Unlock() {
 // Dispatches to Lock() or Unlock() via vtable.
 // ═══════════════════════════════════════════════════════════════════════
 void sysMemSimpleAllocator::SetLockState(bool lock) {
-    if (lock) {
-        Lock();
-    } else {
-        Unlock();
-    }
+    typedef void (*SlotFn)(sysMemSimpleAllocator*);
+    reinterpret_cast<SlotFn>(vtable[lock ? 8 : 9])(this);
 }
 
 // ═══════════════════════════════════════════════════════════════════════
 // slot 11: IsLocked  @ 0x821878B0  (8 bytes)
 // ═══════════════════════════════════════════════════════════════════════
-bool sysMemSimpleAllocator::IsLocked() {
+uint8_t sysMemSimpleAllocator::IsLocked() {
     return isLocked;
 }
 

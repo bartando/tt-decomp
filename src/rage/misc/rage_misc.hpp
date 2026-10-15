@@ -13,6 +13,7 @@
  *       from recomp/structured_pass5_final/.
  */
 #pragma once
+#include <stddef.h>
 #include <stdint.h>
 
 // ── Holder  [6 vtables — template/MI] ──────────────────────────
@@ -22,8 +23,8 @@ struct Holder {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x82121bf8
-    virtual void vfn_2();  // [2] @ 0x82121c08
+    void ScalarDtor(int flags); // [1] @ 0x82121bf8
+    void vfn_2();  // [2] @ 0x82121c08
 };
 
 namespace rage::atAny {
@@ -42,8 +43,8 @@ struct evtInstance {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x82221e90
-    virtual void vfn_3();  // [3] @ 0x82221e80
+    void vfn_2();  // [2] @ 0x82221e90
+    void vfn_3();  // [3] @ 0x82221e80
 };
 
 // ── rage::evtSet  [vtable @ 0x8204DA44] ──────────────────────────
@@ -51,7 +52,7 @@ struct evtSet {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~evtSet();                  // [0] @ 0x822207e8
+    ~evtSet();                  // [0] @ 0x822207e8
 };
 
 // ── rage::miniheapAllocator  [vtable @ 0x82074BCC] ──────────────────────────
@@ -60,10 +61,10 @@ struct miniheapAllocator {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void* Allocate(uint32_t size, uint32_t alignment); // [1] @ 0x823f89b8
-    virtual uint32_t GetUsedSize() const;  // [4] @ 0x823f8958
-    virtual uint32_t GetFreeSize() const;  // [5] @ 0x823f8970
-    virtual bool IsInRange(uint32_t address) const;  // [20] @ 0x823f8988
+    void* Allocate(uint32_t size, uint32_t alignment); // [1] @ 0x823f89b8
+    uint32_t GetUsedSize() const;  // [4] @ 0x823f8958
+    uint32_t GetFreeSize() const;  // [5] @ 0x823f8970
+    bool IsInRange(uint32_t address) const;  // [20] @ 0x823f8988
 };
 
 // ── rage::netConnectionManager  [vtable @ 0x820785BC] ──────────────────────────
@@ -71,7 +72,7 @@ struct netConnectionManager {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~netConnectionManager();                  // [0] @ 0x82413440
+    ~netConnectionManager();                  // [0] @ 0x82413440
 };
 
 } // namespace rage
@@ -91,7 +92,7 @@ struct sysMemAllocator {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~sysMemAllocator();                  // [0] @ 0x8212b098
+    ~sysMemAllocator();                  // [0] @ 0x8212b098
 };
 
 // ── rage::sysMemSimpleAllocator  [vtable @ 0x82038C4C] ──────────────────────────
@@ -103,51 +104,60 @@ struct sysMemSimpleAllocator {
 
     // ── field access clusters ──
     uint32_t     heapBase;       // +0x0004  base address of managed heap region
-    uint8_t     _pad0x001c[20];
+    uint8_t     _pad0x0008[0x14];
     uint32_t     field_0x001c;   // +0x001c  R:1 W:0  (internal bookkeeping)
-    uint8_t     _pad0x0044[36];
+    uint8_t     _pad0x0020[0x24];
     uint16_t     field_0x0044;   // +0x0044  R:1 W:0
+    uint8_t     _pad0x0046[6];
     uint32_t     heapSize;       // +0x004c  total size of heap region (heapBase + heapSize = end)
+    uint8_t     _pad0x0050[4];
     uint32_t     overflowHead;   // +0x0054  overflow free-list head (blocks > 15 size classes)
-    uint8_t     _pad0x0098[64];
+    uint32_t     buckets[16];    // +0x0058  free-list heads per size class
     uint32_t     largestAvailBlock; // +0x0098  largest available block size (returned by vfn_5)
     uint32_t     allocCount;     // +0x009c  running allocation counter (traps at maxAllocCount)
     uint32_t     maxAllocCount;  // +0x00a0  maximum allocation count before trap
-    uint8_t     _pad0x00b4[16];
-    uint32_t     snapshotIndex;  // +0x00b4  index into snapshot history array at +(snapshotIndex+41)*4
+    uint32_t     snapshots[4];   // +0x00a4  allocCount per TakeSnapshot
+    uint32_t     snapshotIndex;  // +0x00b4  next snapshots[] slot
+    uint8_t     _pad0x00b8;
     uint8_t      isLocked;       // +0x00b9  lock flag (vfn_8=Lock sets 1, vfn_9=Unlock sets 0)
     uint8_t      isLogging;      // +0x00ba  logging active flag (vfn_15/16 manage)
+    uint8_t     _pad0x00bb;
     uint32_t     logStream;      // +0x00bc  log file stream handle (opened by vfn_15, closed by vfn_16)
 
     // ── virtual methods ──
-    virtual ~sysMemSimpleAllocator();                  // [0] @ 0x82186c58
-    virtual void ScalarDtor(int flags);                // [1] @ 0x82186da0
-    virtual void Free(void* ptr);                      // [2] @ 0x82187178
-    virtual void* GetBucketHead(uint32_t sizeClass);   // [4] @ 0x82187840  returns bucket[sizeClass] or overflowHead
-    virtual uint32_t GetLargestAvailBlock();            // [5] @ 0x82187838  returns largestAvailBlock
-    virtual void Init();                               // [6] @ 0x82186df0  initializes allocator state
-    virtual void SetBreakAllocIndex(uint32_t index);   // [7] @ 0x82186d98  sets maxAllocCount (trap when reached)
-    virtual void Lock();                               // [8] @ 0x82187860  sets isLocked = 1
-    virtual void Unlock();                             // [9] @ 0x82187870  sets isLocked = 0
-    virtual void SetLockState(bool lock);              // [10] @ 0x82187880  dispatches to Lock/Unlock
-    virtual bool IsLocked();                           // [11] @ 0x821878b0  returns isLocked
-    virtual void TakeSnapshot();                       // [13] @ 0x821878b8  records allocCount at snapshotIndex
-    virtual void DumpLeaks(const char* name, const char* logPath); // [14] @ 0x821879b8  reports allocations since snapshot
-    virtual void BeginLogging(const char* path, bool countRef); // [15] @ 0x821878e0  opens log file stream
-    virtual void EndLogging();                         // [16] @ 0x82187958  closes log file stream
-    virtual void vfn_19();                             // [19] @ 0x82187588
-    virtual bool IsAddressOwned(void* addr);           // [20] @ 0x82187558  checks addr in [heapBase, heapBase+heapSize)
+    ~sysMemSimpleAllocator();                  // [0] @ 0x82186c58
+    void ScalarDtor(int flags);                // [1] @ 0x82186da0
+    void Free(void* ptr);                      // [2] @ 0x82187178
+    void* GetBucketHead(uint32_t sizeClass);   // [4] @ 0x82187840  returns bucket[sizeClass] or overflowHead
+    uint32_t GetLargestAvailBlock();            // [5] @ 0x82187838  returns largestAvailBlock
+    void Init();                               // [6] @ 0x82186df0  initializes allocator state
+    void SetBreakAllocIndex(uint32_t index);   // [7] @ 0x82186d98  sets maxAllocCount (trap when reached)
+    void Lock();                               // [8] @ 0x82187860  sets isLocked = 1
+    void Unlock();                             // [9] @ 0x82187870  sets isLocked = 0
+    void SetLockState(bool lock);              // [10] @ 0x82187880  dispatches to Lock/Unlock
+    uint8_t IsLocked();                        // [11] @ 0x821878b0  returns the isLocked byte as is
+    void TakeSnapshot();                       // [13] @ 0x821878b8  records allocCount at snapshotIndex
+    void DumpLeaks(const char* name, const char* logPath); // [14] @ 0x821879b8  reports allocations since snapshot
+    void BeginLogging(const char* path, bool countRef); // [15] @ 0x821878e0  opens log file stream
+    void EndLogging();                         // [16] @ 0x82187958  closes log file stream
+    void vfn_19();                             // [19] @ 0x82187588
+    bool IsAddressOwned(void* addr);           // [20] @ 0x82187558  checks addr in [heapBase, heapBase+heapSize)
 
     // ── non-virtual methods ──
     void* Allocate(uint32_t size);  // @ 0x82186E40  allocates from free-list buckets
 };
+
+static_assert(sizeof(void*) != 4 || offsetof(sysMemSimpleAllocator, heapSize) == 0x4C, "sysMemSimpleAllocator layout");
+static_assert(sizeof(void*) != 4 || offsetof(sysMemSimpleAllocator, largestAvailBlock) == 0x98, "sysMemSimpleAllocator layout");
+static_assert(sizeof(void*) != 4 || offsetof(sysMemSimpleAllocator, snapshotIndex) == 0xB4, "sysMemSimpleAllocator layout");
+static_assert(sizeof(void*) != 4 || offsetof(sysMemSimpleAllocator, logStream) == 0xBC, "sysMemSimpleAllocator layout");
 
 // ── rage::sysThreadPoolBase  [vtable @ 0x82069FA4] ──────────────────────────
 struct sysThreadPoolBase {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~sysThreadPoolBase();                  // [0] @ 0x82375510
+    ~sysThreadPoolBase();                  // [0] @ 0x82375510
 };
 
 // ── rage::sysThreadWorker  [vtable @ 0x82069FB0] ──────────────────────────
@@ -160,26 +170,26 @@ struct sysTimeManager {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~sysTimeManager();                  // [0] @ 0x82487468
-    virtual void vfn_12();  // [12] @ 0x82487338
-    virtual void vfn_13();  // [13] @ 0x82487368
-    virtual void vfn_14();  // [14] @ 0x82487388
-    virtual void vfn_15();  // [15] @ 0x824873a0
-    virtual void vfn_24();  // [24] @ 0x824872d8
-    virtual void vfn_25();  // [25] @ 0x824872b8
-    virtual void vfn_26();  // [26] @ 0x8248dfd8
-    virtual void vfn_37();  // [37] @ 0x8210cc58
-    virtual void vfn_38();  // [38] @ 0x82487540
-    virtual void vfn_39();  // [39] @ 0x824875a0
-    virtual void vfn_40();  // [40] @ 0x824875c0
-    virtual void vfn_41();  // [41] @ 0x824875f8
-    virtual void vfn_42();  // [42] @ 0x82487690
-    virtual void vfn_44();  // [44] @ 0x82487728
-    virtual void vfn_46();  // [46] @ 0x82487740
-    virtual void vfn_49();  // [49] @ 0x82487750
-    virtual void vfn_50();  // [50] @ 0x82488510
-    virtual void vfn_62();  // [62] @ 0x82487bf0
-    virtual void vfn_63();  // [63] @ 0x82487f88
+    ~sysTimeManager();                  // [0] @ 0x82487468
+    void vfn_12();  // [12] @ 0x82487338
+    void vfn_13();  // [13] @ 0x82487368
+    void vfn_14();  // [14] @ 0x82487388
+    void vfn_15();  // [15] @ 0x824873a0
+    void vfn_24();  // [24] @ 0x824872d8
+    void vfn_25();  // [25] @ 0x824872b8
+    void vfn_26();  // [26] @ 0x8248dfd8
+    void vfn_37();  // [37] @ 0x8210cc58
+    void vfn_38();  // [38] @ 0x82487540
+    void vfn_39();  // [39] @ 0x824875a0
+    void vfn_40();  // [40] @ 0x824875c0
+    void vfn_41();  // [41] @ 0x824875f8
+    void vfn_42();  // [42] @ 0x82487690
+    void vfn_44();  // [44] @ 0x82487728
+    void vfn_46();  // [46] @ 0x82487740
+    void vfn_49();  // [49] @ 0x82487750
+    void vfn_50();  // [50] @ 0x82488510
+    void vfn_62();  // [62] @ 0x82487bf0
+    void vfn_63();  // [63] @ 0x82487f88
 };
 
 } // namespace rage
@@ -191,8 +201,8 @@ struct exception {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~exception();                  // [0] @ 0x822def88
-    virtual void ScalarDtor(int flags); // [1] @ 0x823ed410
+    ~exception();                  // [0] @ 0x822def88
+    void ScalarDtor(int flags); // [1] @ 0x823ed410
 };
 
 } // namespace std
@@ -202,5 +212,5 @@ struct sysThreadPool {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~sysThreadPool();                  // [0] @ 0x823752a8
+    ~sysThreadPool();                  // [0] @ 0x823752a8
 };

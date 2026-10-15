@@ -23,7 +23,7 @@ struct xmlNode {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_20();  // [20] @ 0x821a9400
+    void vfn_20();  // [20] @ 0x821a9400
 };
 
 // ── rage::xmlNodeString  [vtable @ 0x8203ABEC] ──────────────────────────
@@ -31,14 +31,14 @@ struct xmlNodeString {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~xmlNodeString();                  // [0] @ 0x821aa0c0
-    virtual void vfn_12();  // [12] @ 0x821aa138
-    virtual void vfn_13();  // [13] @ 0x821aa148
-    virtual void vfn_15();  // [15] @ 0x821aa160
-    virtual void vfn_16();  // [16] @ 0x821aa230
-    virtual void vfn_17();  // [17] @ 0x821aa280
-    virtual void vfn_18();  // [18] @ 0x821aa298
-    virtual void vfn_20();  // [20] @ 0x821aa028
+    ~xmlNodeString();                  // [0] @ 0x821aa0c0
+    void vfn_12();  // [12] @ 0x821aa138
+    void vfn_13();  // [13] @ 0x821aa148
+    void vfn_15();  // [15] @ 0x821aa160
+    void vfn_16();  // [16] @ 0x821aa230
+    void vfn_17();  // [17] @ 0x821aa280
+    void vfn_18();  // [18] @ 0x821aa298
+    void vfn_20();  // [20] @ 0x821aa028
 };
 
 // ── rage::xmlNodeStruct  [vtable @ 0x820282EC] ──────────────────────────
@@ -46,18 +46,18 @@ struct xmlNodeStruct {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~xmlNodeStruct();                  // [0] @ 0x822145d0
-    virtual void ScalarDtor(int flags); // [1] @ 0x821a88d0
-    virtual void Initialize();  // [2] @ 0x821a8988
-    virtual void vfn_4();  // [4] @ 0x821a88e0
-    virtual void vfn_11();  // [11] @ 0x821a9020
-    virtual void vfn_12();  // [12] @ 0x821a9038
-    virtual void vfn_14();  // [14] @ 0x821a9f60
-    virtual void vfn_15();  // [15] @ 0x821a9148
-    virtual void vfn_19();  // [19] @ 0x821aa2b0
-    virtual bool IsType(uint32_t typeId);  // [20] @ 0x821a8898
-    virtual void RegisterFields();  // [21] — overridden by derived gd* classes
-    virtual const char* GetTypeName() const;  // [22] — overridden by derived gd* classes
+    ~xmlNodeStruct();                  // [0] @ 0x822145d0
+    void ScalarDtor(int flags); // [1] @ 0x821a88d0
+    void Initialize();  // [2] @ 0x821a8988
+    void vfn_4();  // [4] @ 0x821a88e0
+    void vfn_11();  // [11] @ 0x821a9020
+    void vfn_12();  // [12] @ 0x821a9038
+    void vfn_14();  // [14] @ 0x821a9f60
+    void vfn_15();  // [15] @ 0x821a9148
+    void vfn_19();  // [19] @ 0x821aa2b0
+    bool IsType(uint32_t typeId);  // [20] @ 0x821a8898
+    void RegisterFields();  // [21] — overridden by derived gd* classes
+    const char* GetTypeName() const;  // [22] — overridden by derived gd* classes
 };
 
 // ── rage::xmlNodeStruct::Type  [vtable @ 0x82027D6C] ──────────────────────────
@@ -72,8 +72,8 @@ struct xmlNodeStructBool {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual bool ParseValue(unsigned char* dest, const char* src);  // [1] @ 0x821a8a38
-    virtual void FormatValue(char* dest, const unsigned char* src); // [2] @ 0x821a8a80
+    bool ParseValue(unsigned char* dest, const char* src);  // [1] @ 0x821a8a38
+    void FormatValue(char* dest, const unsigned char* src); // [2] @ 0x821a8a80
 };
 
 // ── rage::xmlNodeStructChar  [vtable @ 0x8203AA24] ──────────────────────────
@@ -81,8 +81,8 @@ struct xmlNodeStructChar {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual bool ParseValue(unsigned char* dest, const char* src);  // [1] @ 0x821a8a98
-    virtual void FormatValue(char* dest, const unsigned char* src); // [2] @ 0x821a8aa8
+    bool ParseValue(unsigned char* dest, const char* src);  // [1] @ 0x821a8a98
+    void FormatValue(char* dest, const unsigned char* src); // [2] @ 0x821a8aa8
 };
 
 // ── rage::xmlNodeStructFloat  [vtable @ 0x8203AA74] ──────────────────────────
@@ -90,8 +90,8 @@ struct xmlNodeStructFloat {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x821a8bf8
-    virtual void vfn_2();  // [2] @ 0x821a8c38
+    void ScalarDtor(int flags); // [1] @ 0x821a8bf8
+    void vfn_2();  // [2] @ 0x821a8c38
 };
 
 // ── rage::xmlNodeStructInt  [vtable @ 0x8203AA60] ──────────────────────────
@@ -99,8 +99,8 @@ struct xmlNodeStructInt {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual bool ParseValue(int* dest, const char* src);   // [1] @ 0x821a8ba0
-    virtual void FormatValue(char* dest, const int* src);  // [2] @ 0x821a8be0
+    bool ParseValue(int* dest, const char* src);   // [1] @ 0x821a8ba0
+    void FormatValue(char* dest, const int* src);  // [2] @ 0x821a8be0
 };
 
 // ── rage::xmlNodeStructMatrix34  [vtable @ 0x8203AAC4] ──────────────────────────
@@ -108,8 +108,8 @@ struct xmlNodeStructMatrix34 {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x821a8e30
-    virtual void vfn_2();  // [2] @ 0x821a8eb0
+    void ScalarDtor(int flags); // [1] @ 0x821a8e30
+    void vfn_2();  // [2] @ 0x821a8eb0
 };
 
 // ── rage::xmlNodeStructShort  [vtable @ 0x8203AA4C] ──────────────────────────
@@ -117,8 +117,8 @@ struct xmlNodeStructShort {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual bool ParseValue(short* dest, const char* src);   // [1] @ 0x821a8b48
-    virtual void FormatValue(char* dest, const short* src);  // [2] @ 0x821a8b88
+    bool ParseValue(short* dest, const char* src);   // [1] @ 0x821a8b48
+    void FormatValue(char* dest, const short* src);  // [2] @ 0x821a8b88
 };
 
 // ── rage::xmlNodeStructString  [vtable @ 0x8203AA38] ──────────────────────────
@@ -126,8 +126,8 @@ struct xmlNodeStructString {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual bool ParseValue(const char** dest, const char* src);      // [1] @ 0x821a8ac0
-    virtual void FormatValue(char* dest, const char* const* src);     // [2] @ 0x821a8b10
+    bool ParseValue(const char** dest, const char* src);      // [1] @ 0x821a8ac0
+    void FormatValue(char* dest, const char* const* src);     // [2] @ 0x821a8b10
 };
 
 // ── rage::xmlNodeStructVector2  [vtable @ 0x8203AA88] ──────────────────────────
@@ -135,8 +135,8 @@ struct xmlNodeStructVector2 {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x821a8c70
-    virtual void vfn_2();  // [2] @ 0x821a8cb0
+    void ScalarDtor(int flags); // [1] @ 0x821a8c70
+    void vfn_2();  // [2] @ 0x821a8cb0
 };
 
 // ── rage::xmlNodeStructVector3  [vtable @ 0x8203AA9C] ──────────────────────────
@@ -144,8 +144,8 @@ struct xmlNodeStructVector3 {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x821a8cf8
-    virtual void vfn_2();  // [2] @ 0x821a8d38
+    void ScalarDtor(int flags); // [1] @ 0x821a8cf8
+    void vfn_2();  // [2] @ 0x821a8d38
 };
 
 // ── rage::xmlNodeStructVector4  [vtable @ 0x8203AAB0] ──────────────────────────
@@ -153,8 +153,8 @@ struct xmlNodeStructVector4 {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x821a8d88
-    virtual void vfn_2();  // [2] @ 0x821a8dd0
+    void ScalarDtor(int flags); // [1] @ 0x821a8d88
+    void vfn_2();  // [2] @ 0x821a8dd0
 };
 
 // ── rage::xmlTree  [vtable @ 0x8203A928] ──────────────────────────
@@ -162,17 +162,17 @@ struct xmlTree {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~xmlTree();                  // [0] @ 0x821a8020
-    virtual void ScalarDtor(int flags); // [1] @ 0x821a8180
-    virtual void vfn_2();  // [2] @ 0x821a82e8
-    virtual void vfn_3();  // [3] @ 0x821a83d8
-    virtual void vfn_4();  // [4] @ 0x821a8508
-    virtual void vfn_5();  // [5] @ 0x821a84a8
-    virtual void vfn_6();  // [6] @ 0x821a8450
-    virtual void vfn_7();  // [7] @ 0x821a83e0
-    virtual void vfn_9();  // [9] @ 0x821a8268
-    virtual void vfn_10();  // [10] @ 0x821a8360
-    virtual void vfn_11();  // [11] @ 0x821a8570
+    ~xmlTree();                  // [0] @ 0x821a8020
+    void ScalarDtor(int flags); // [1] @ 0x821a8180
+    void vfn_2();  // [2] @ 0x821a82e8
+    void vfn_3();  // [3] @ 0x821a83d8
+    void vfn_4();  // [4] @ 0x821a8508
+    void vfn_5();  // [5] @ 0x821a84a8
+    void vfn_6();  // [6] @ 0x821a8450
+    void vfn_7();  // [7] @ 0x821a83e0
+    void vfn_9();  // [9] @ 0x821a8268
+    void vfn_10();  // [10] @ 0x821a8360
+    void vfn_11();  // [11] @ 0x821a8570
 };
 
 } // namespace rage
@@ -182,7 +182,7 @@ struct xmlNodeStructAlignmentType {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_5();  // [5] @ 0x8240bca0
+    void vfn_5();  // [5] @ 0x8240bca0
 };
 
 // ── xmlNodeStructAnimHashEntry  [vtable @ 0x82027D80] ──────────────────────────
@@ -190,8 +190,8 @@ struct xmlNodeStructAnimHashEntry {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x820c8ac0
-    virtual void vfn_2();  // [2] @ 0x820c8b48
+    void ScalarDtor(int flags); // [1] @ 0x820c8ac0
+    void vfn_2();  // [2] @ 0x820c8b48
 };
 
 // ── xmlNodeStructAnimHashEntryArray  [vtable @ 0x82027D94] ──────────────────────────
@@ -199,7 +199,7 @@ struct xmlNodeStructAnimHashEntryArray {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x820c8b80
+    void ScalarDtor(int flags); // [1] @ 0x820c8b80
 };
 
 // ── xmlNodeStructArray  [2 vtables — template/MI] ──────────────────────────
@@ -207,8 +207,8 @@ struct xmlNodeStructArray {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x820de968
-    virtual void vfn_2();  // [2] @ 0x820dea18
+    void ScalarDtor(int flags); // [1] @ 0x820de968
+    void vfn_2();  // [2] @ 0x820dea18
 };
 
 // ── xmlNodeStructReverbMode  [vtable @ 0x8204E2E8] ──────────────────────────
@@ -216,7 +216,7 @@ struct xmlNodeStructReverbMode {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_5();  // [5] @ 0x82227d20
+    void vfn_5();  // [5] @ 0x82227d20
 };
 
 // ── xmlRoot  [vtable @ 0x8204E28C] ──────────────────────────
@@ -224,7 +224,7 @@ struct xmlRoot {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_12();  // [12] @ 0x82227ac0
-    virtual void vfn_13();  // [13] @ 0x82227ab0
-    virtual bool IsType(uint32_t typeId);  // [20] @ 0x82227b50
+    void vfn_12();  // [12] @ 0x82227ac0
+    void vfn_13();  // [13] @ 0x82227ab0
+    bool IsType(uint32_t typeId);  // [20] @ 0x82227b50
 };

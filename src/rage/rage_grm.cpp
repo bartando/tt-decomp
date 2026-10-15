@@ -6,7 +6,11 @@
 #include "animation/rage_anim.hpp"   // rage::datResource
 
 // Forward declarations for external functions
-extern "C" void fragDrawable_0AA0_2h(void* geom, void* drawable, uint32_t index, void* param);
+extern "C" void fragDrawable_0AA0_2h(void* state, void* geom, void* drawable, int index, void* param); // @ 0x820F0AA0
+namespace rage {
+extern uint32_t* g_iccProfilePtr;     // @ 0x825EB1D0  (defined in rage_core_utils.cpp)
+extern void*     g_currentGeometry;   // @ 0x82606350
+}
 
 // Helpers used by lifted dispatch methods (all raw recomp stubs).
 extern "C" void   rage_free_00C0(uint32_t ptr);              // @ 0x820C00C0
@@ -57,110 +61,67 @@ void spdApical::SetLodFadeEnd(float value) {
  * fragDrawable::ProcessGeometry
  * @ 0x820F1C00 | size: 0x17c
  *
- * Original symbol: fragDrawable_1C00_fw
- * Subsystem: RAGE Graphics / Fragment Drawable
+ * Original symbol: fragDrawable_1C00_fw. Only caller: 0x8225D9E4 (rmcDrawable).
+ * `this` looks like a grmModel (u16 shader indices at +0x0C, count at +0x16);
+ * geometryContainer holds the shader array pointer at +8.
  *
- * Iterates through drawable geometry and processes each one based on a filter criterion.
- * Calls virtual method slot 4 on each geometry object that matches the filter type.
- * 
- * Parameters:
- *   geometryContainer - Object containing geometry array at offset +8
- *   param1 - Parameter passed to geometry virtual method
- *   param2 - Parameter passed to geometry virtual method
- *   filterType - Type filter for geometry processing (extracted from flags bits 27-31)
- *   param3 - Additional parameter passed to geometry virtual method
+ * For each index i whose shader passes the filter, either hands it to
+ * 0x820F0AA0 (when the override at 0x825EB1D0 is set) or calls the shader's
+ * slot 4 with an "end of run" flag that is set when the next index uses a
+ * shader with a different id at +6. A forced shader (0x82606350) replaces the
+ * lookup; if its flag bit 0 is set its type counts as 0.
  */
 void fragDrawable::ProcessGeometry(void* geometryContainer, void* param1, void* param2,
                                    uint32_t filterType, void* param3) {
-    if (m_geometryCount <= 0) {
+    if (m_geometryCount == 0) {
         return;
     }
-    
-    // Global state pointers (SDA-relative globals)
-    extern uint32_t* g_iccProfilePtr;      // @ 0x825EB1D0 (r25 + -20016)
-    extern void* g_currentGeometry;        // @ 0x82606350 (r26 + 25424)
-    
-    uint32_t* statePtr = g_iccProfilePtr;
+
+    void* statePtr    = g_iccProfilePtr;
     void* currentGeom = g_currentGeometry;
-    
-    // Get geometry array from container
-    void** geometryArray = (void**)((uint8_t*)geometryContainer + 8);
-    
-    for (uint16_t i = 0; i < m_geometryCount; i++) {
-        void* geom = nullptr;
-        uint16_t flags = 0;
-        
-        // Determine geometry object and its flags
+
+    for (int i = 0; i < m_geometryCount; i++) {
+        void* geom;
+        uint32_t geomType;
         if (currentGeom != nullptr) {
             geom = currentGeom;
-            flags = *(uint16_t*)((uint8_t*)geom + 4);
-            
-            // Check if bit 0 is set (active flag)
-            bool isActive = (flags & 0x1) != 0;
-            if (!isActive) {
-                // Extract type from flags (bits 27-31 after rotation)
-                uint32_t geomType = (flags >> 5) & 0x1F;
-                
-                // Check if type matches filter
-                if (geomType != filterType) {
-                    continue;
-                }
-            }
+            uint16_t flags = *(uint16_t*)((uint8_t*)geom + 4);
+            geomType = (flags & 1) ? 0 : (flags >> 5) & 0x1F;
         } else {
-            // Load geometry from array using index
-            uint16_t geomIndex = m_pIndices[i];
-            geom = geometryArray[geomIndex];
-            flags = *(uint16_t*)((uint8_t*)geom + 4);
-            
-            // Extract type from flags
-            uint32_t geomType = (flags >> 5) & 0x1F;
-            
-            // Check if type matches filter
-            if (geomType != filterType) {
-                continue;
-            }
+            void** shaders = *(void***)((uint8_t*)geometryContainer + 8);
+            geom = shaders[m_pIndices[i]];
+            geomType = (*(uint16_t*)((uint8_t*)geom + 4) >> 5) & 0x1F;
         }
-        
-        // Fast path: if state pointer is set, call helper function
-        if (statePtr != nullptr) {
-            fragDrawable_0AA0_2h(geom, this, i, param3);
+        if ((int32_t)geomType != (int32_t)filterType) {
             continue;
         }
-        
-        // Determine if this is the last geometry in a sequence
-        bool isLast = false;
-        
-        if (currentGeom == nullptr) {
-            // Check if next geometry has same ID
-            if (i + 1 < m_geometryCount) {
-                uint16_t nextIndex = m_pIndices[i + 1];
-                void* nextGeom = geometryArray[nextIndex];
-                
-                uint16_t currentId = *(uint16_t*)((uint8_t*)geom + 6);
-                uint16_t nextId = *(uint16_t*)((uint8_t*)nextGeom + 6);
-                
-                isLast = (currentId != nextId);
-            } else {
-                isLast = true;
-            }
-        } else {
-            isLast = true;
+
+        if (statePtr != nullptr) {
+            fragDrawable_0AA0_2h(statePtr, geom, this, i, param3);
+            continue;
         }
-        
-        // Determine final isLast flag
-        bool finalIsLast = (i + 1 == m_geometryCount) || isLast;
-        
-        // Call virtual method at slot 4 (offset +16 in vtable)
-        void** vtable = *(void***)geom;
-        typedef void (*GeomProcessFn)(void* geom, void* drawable, uint32_t index,
-                                     void* param1, void* param2, void* param3,
-                                     bool isLast);
-        GeomProcessFn processFn = (GeomProcessFn)vtable[4];
-        processFn(geom, this, i, param1, param2, param3, finalIsLast);
-        
-        // Reload global state after virtual call
+
+        bool sameAsNext = true;
+        if (currentGeom == nullptr) {
+            if (i + 1 < m_geometryCount) {
+                void** shaders = *(void***)((uint8_t*)geometryContainer + 8);
+                void* nextGeom = shaders[m_pIndices[i + 1]];
+                sameAsNext = *(uint16_t*)((uint8_t*)geom + 6) ==
+                             *(uint16_t*)((uint8_t*)nextGeom + 6);
+            } else {
+                sameAsNext = false;
+            }
+        }
+        bool endOfRun = (i + 1 == m_geometryCount) || !sameAsNext;
+
+        typedef void (*GeomProcessFn)(void* geom, void* drawable, int index,
+                                      void* param1, void* param2, void* param3,
+                                      bool endOfRun);
+        GeomProcessFn processFn = (GeomProcessFn)(*(void***)geom)[4];
+        processFn(geom, this, i, param1, param2, param3, endOfRun);
+
         currentGeom = g_currentGeometry;
-        statePtr = g_iccProfilePtr;
+        statePtr    = g_iccProfilePtr;
     }
 }
 
@@ -173,13 +134,14 @@ void fragDrawable::ProcessGeometry(void* geometryContainer, void* param1, void* 
  * vtable (0x820276C4), then frees the object itself when bit 0 of flags
  * is set.  r3 comes back as `this`.
  * ═══════════════════════════════════════════════════════════════════════════ */
-void grmModel::ScalarDtor(int flags) {
+grmModel* grmModel::ScalarDtor(int flags) {
     vtable = reinterpret_cast<void**>(0x8202F3B4u);
     rage_free(m_pGeometry);
     vtable = reinterpret_cast<void**>(0x820276C4u);  // rage::datBase
     if (flags & 1) {
         rage_free(this);
     }
+    return this;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -189,21 +151,12 @@ void grmModel::ScalarDtor(int flags) {
  * Scalar-deleting destructor: runs the non-deleting destructor body
  * rage_0F38 @ 0x820F0F38, then frees the object when bit 0 of flags is set.
  * ═══════════════════════════════════════════════════════════════════════════ */
-void grmModelGeom::ScalarDtor(int flags) {
+grmModelGeom* grmModelGeom::ScalarDtor(int flags) {
     rage_0F38(this);
     if (flags & 1) {
         rage_free(this);
     }
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- * grmShaderGroup::~grmShaderGroup
- *
- * Host destructor: runs the guest's non-deleting destructor body,
- * net_2228_h @ 0x820F2228.  The slot-0 function is ScalarDtor below.
- * ═══════════════════════════════════════════════════════════════════════════ */
-grmShaderGroup::~grmShaderGroup() {
-    net_2228_h(this);
+    return this;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -214,21 +167,12 @@ grmShaderGroup::~grmShaderGroup() {
  * net_2228_h @ 0x820F2228, then frees the object when bit 0 of flags is
  * set.  r3 comes back as `this`.
  * ═══════════════════════════════════════════════════════════════════════════ */
-void grmShaderGroup::ScalarDtor(int flags) {
+grmShaderGroup* grmShaderGroup::ScalarDtor(int flags) {
     net_2228_h(this);
     if (flags & 1) {
         rage_free(this);
     }
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- * grmModelFactory::~grmModelFactory
- *
- * Host destructor: runs the guest's non-deleting destructor body at
- * 0x820F3CA0.  The slot-0 function is ScalarDtor below.
- * ═══════════════════════════════════════════════════════════════════════════ */
-grmModelFactory::~grmModelFactory() {
-    grmModelFactory_sm_DeclMap_dtor(this);
+    return this;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -239,11 +183,12 @@ grmModelFactory::~grmModelFactory() {
  * 0x820F3CA0, then frees the object when bit 0 of flags is set.  r3 comes
  * back as `this`.
  * ═══════════════════════════════════════════════════════════════════════════ */
-void grmModelFactory::ScalarDtor(int flags) {
+grmModelFactory* grmModelFactory::ScalarDtor(int flags) {
     grmModelFactory_sm_DeclMap_dtor(this);
     if (flags & 1) {
         rage_free(this);
     }
+    return this;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -289,27 +234,22 @@ void grmModelFactory::vfn_2(datResource& rsc, grmModel*& model) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * grmShaderFactory::~grmShaderFactory     [vtable slot 0]
+ * grmShaderFactory::ScalarDtor            [vtable slot 0]
  * @ 0x820F6E60 | size: 0x64 (100 bytes)
  *
- * Rebases the vtable to the grmShaderFactory slot (0x8202F808) — matches
- * -32253<<16 + -2040 in the original.  Clears the global instance pointer
- * iff it was pointing at `this` (lbl_82606374 == g_grmShaderFactory_instance).
- * Finally scalar-frees self on (r4 & 1); that leg is ScalarDeleteSelf below.
+ * Resets the vtable to grmShaderFactory's (0x8202F808), clears the global
+ * instance pointer (0x82606374) if it is this, frees this if bit 0 of
+ * flags is set, returns this.  Also slot 0 of grmShaderFactoryStandard.
  * ═══════════════════════════════════════════════════════════════════════════ */
-grmShaderFactory::~grmShaderFactory() {
+grmShaderFactory* grmShaderFactory::ScalarDtor(int flags) {
     vtable = reinterpret_cast<void**>(0x8202F808u);
     if (g_grmShaderFactory_instance == this) {
         g_grmShaderFactory_instance = nullptr;
     }
-}
-
-// The free leg of 0x820F6E60 (0x820F6E98..0x820F6EAC): free(this) when bit 0
-// of the delete flag is set.
-void grmShaderFactory::ScalarDeleteSelf(int deleteFlag) {
-    if (deleteFlag & 1) {
+    if (flags & 1) {
         rage_free(this);
     }
+    return this;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
