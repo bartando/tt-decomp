@@ -78,39 +78,9 @@ float fiAsciiTokenizer_2628_g(float a) {
 // rage::fiAsciiTokenizer — semantic lifts
 // ═════════════════════════════════════════════════════════════════════════════
 //
-// Virtual table layout derived from observed byte-offset dispatch in slot
-// bodies (slot N lives at vtable byte +4N):
-//
-//   slot  0 : ~fiAsciiTokenizer()                 (no-op, r3=0)
-//   slot  1 : GetToken(char* out, int outSize)    — raw token reader
-//   slot  2 : GetInt()                            — trampoline to slot 4
-//   slot  3 : (unused — not emitted)
-//   slot  4 : GetInt()  [real]                    — GetToken + strtol
-//   slot  5 : GetFloat()                          — GetToken + strtof
-//   slot  6 : GetVector4()                        — four GetFloat, staged
-//   slot  7 : GetVector3()                        — three GetFloat, staged
-//   slot  8 : GetVector4NoStage()                 — four GetFloat, direct
-//   slot  9 : GetVector3NoStage()                 — three GetFloat, direct
-//   slot 10 : GetVector2()                        — two GetFloat, direct
-//   slot 11 : SkipToken()                         — GetToken into 64-byte bit-bucket
-//   slot 12 : MatchIntField()                     — SkipToken + slot 4
-//   slot 13 : MatchFloatField()                   — SkipToken + slot 5
-//   slot 14 : MatchVector4Field(out)              — SkipToken + slot 6
-//   slot 15 : MatchVector3Field(out)              — SkipToken + slot 7
-//   slot 16 : MatchVector4NoStageField(out)       — SkipToken + slot 8
-//   slot 17 : MatchVector3NoStageField(out)       — SkipToken + slot 9
-//   slot 18 : MatchVector2Field(out)              — SkipToken + slot 10
-//   slot 19 : SkipWhitespaceThenInt()             — ph_58A8 + slot 4
-//   slot 20 : SkipWhitespaceThenFloat()           — ph_58A8 + slot 5
-//   slot 21 : SkipWhitespaceThenVector4(out)      — ph_58A8 + slot 6
-//   slot 22 : SkipWhitespaceThenVector3(out)      — ph_58A8 + slot 7
-//   slot 23 : SkipWhitespaceThenVector4NoStage(out) — ph_58A8 + slot 8
-//   slot 24 : SkipWhitespaceThenVector3NoStage(out) — ph_58A8 + slot 9
-//   slot 25 : SkipWhitespaceThenVector2(out)      — ph_58A8 + slot 10
-//   slot 26 : WriteBlockOpen()                    — emit '\t'*depth + '{' + CRLF, depth++
-//   slot 30 : SetIndentDepth(int delta)           — +=delta to m_indentDepth (+0xA0)
-//   slot 36 : (tail target of slot 37, takes 1 arg)
-//   slot 37 : CloseAndFlush()                     — tail-calls slot 36 with arg=0
+// Vtable 0x8202777C; the slot order is the class declaration's. Slots 12..18
+// read the field-name token without checking it; slots 19..25 read it through
+// ph_58A8, which compares it with the expected name (result unused).
 //
 // Instance layout (non-exhaustive):
 //   +0x00  vtable*
@@ -127,16 +97,17 @@ float fiAsciiTokenizer_2628_g(float a) {
 namespace rage {
 
 extern "C" {
-    // Leading-whitespace skip primitive used by the "SkipWhitespaceThen*"
-    // slot family. Defined in src/game/pong_render.cpp (ph_58A8 @ 0x822E58A8).
-    void ph_58A8(void* tokenizer);
+    // Reads one token and compares it with `name` (the result is dropped).
+    // @ 0x822E58A8
+    void ph_58A8(void* tokenizer, const char* name);
 
     // strtol-equivalent integer parser. FLIRT-matched to `atol` family.
     // @ 0x82432120 (12 bytes). Returns signed int.
     int _xe_strcpyn_10(const char* src);
 
-    // strtof-equivalent float parser. @ 0x82432B80 (8 bytes, jump thunk).
-    float jumptable_2B80(const char* src);
+    // strtod(src, NULL): `li r4,0; b 0x82432A80`. Returns a double; GetFloat
+    // rounds it (frsp). @ 0x82432B80
+    double jumptable_2B80(const char* src);
 
     // Single-byte writer for the structured-output path. Reads a FILE* from
     // this->[+0x0C] and writes r4 (byte value). @ 0x822E51F0 (136 bytes).
@@ -148,49 +119,63 @@ extern "C" {
 // constant here because the build may patch it.
 extern "C" const float lbl_8202D110;
 
+// Virtual slots in the order of the game's vtable (0x8202777C, 40 slots). No
+// C++ destructor: one would take two Itanium slots and shift every other slot.
+// Slots not lifted yet are pure, so the vtable references no undefined symbols.
+// The Match*/Check* families take the field name in r4 and the output in r5.
 class fiAsciiTokenizer {
 public:
-    virtual ~fiAsciiTokenizer();
-    virtual int   GetToken(char* out, int outSize);                  // slot 1
-    virtual int   GetIntTrampoline();                                // slot 2
-    virtual void  vfn_3();                                           // slot 3 (unused)
-    virtual int   GetInt();                                          // slot 4
-    virtual float GetFloat();                                        // slot 5
-    virtual void  GetVector4(float outV4[4]);                        // slot 6
-    virtual void  GetVector3(float outV3[3]);                        // slot 7
-    virtual void  GetVector4NoStage(float outV4[4]);                 // slot 8
-    virtual void  GetVector3NoStage(float outV3[3]);                 // slot 9
-    virtual void  GetVector2(float outV2[2]);                        // slot 10
-    virtual void  SkipToken();                                       // slot 11
-    virtual int   MatchIntField();                                   // slot 12
-    virtual float MatchFloatField();                                 // slot 13
-    virtual void  MatchVector4Field(float outV4[4]);                 // slot 14
-    virtual void  MatchVector3Field(float outV3[3]);                 // slot 15
-    virtual void  MatchVector4NoStageField(float outV4[4]);          // slot 16
-    virtual void  MatchVector3NoStageField(float outV3[3]);          // slot 17
-    virtual void  MatchVector2Field(float outV2[2]);                 // slot 18
-    virtual int   SkipWhitespaceThenInt();                           // slot 19
-    virtual float SkipWhitespaceThenFloat();                         // slot 20
-    virtual void  SkipWhitespaceThenVector4(float outV4[4]);         // slot 21
-    virtual void  SkipWhitespaceThenVector3(float outV3[3]);         // slot 22
-    virtual void  SkipWhitespaceThenVector4NoStage(float outV4[4]);  // slot 23
-    virtual void  SkipWhitespaceThenVector3NoStage(float outV3[3]);  // slot 24
-    virtual void  SkipWhitespaceThenVector2(float outV2[2]);         // slot 25
-    virtual void  WriteBlockOpen();                                  // slot 26
-    virtual void  SetIndentDepth(int delta);                         // slot 30
-    virtual void  CloseAndFlush(const char* closingStr);             // slot 37
+    virtual int   vfn_0();                                              // 0  @ 0x8210CAF8
+    virtual int   GetToken(char* out, int outSize) = 0;                 // 1  @ 0x822E5550
+    virtual int   GetIntTrampoline();                                   // 2  @ 0x822E5E78
+    virtual int   GetIntTrampoline2();                                  // 3  (same body)
+    virtual int   GetInt();                                             // 4
+    virtual float GetFloat();                                           // 5
+    virtual void  GetVector4(float outV4[4]);                           // 6
+    virtual void  GetVector3(float outV3[3]);                           // 7
+    virtual void  GetVector4NoStage(float outV4[4]);                    // 8
+    virtual void  GetVector3NoStage(float outV3[3]);                    // 9
+    virtual void  GetVector2(float outV2[2]);                           // 10
+    virtual void  SkipToken();                                          // 11
+    virtual int   MatchIntField(const char* name);                      // 12
+    virtual float MatchFloatField(const char* name);                    // 13
+    virtual void  MatchVector4Field(const char* name, float outV4[4]);  // 14
+    virtual void  MatchVector3Field(const char* name, float outV3[3]);  // 15
+    virtual void  MatchVector4NoStageField(const char* name, float outV4[4]); // 16
+    virtual void  MatchVector3NoStageField(const char* name, float outV3[3]); // 17
+    virtual void  MatchVector2Field(const char* name, float outV2[2]);  // 18
+    virtual int   CheckIntField(const char* name);                      // 19
+    virtual float CheckFloatField(const char* name);                    // 20
+    virtual void  CheckVector4Field(const char* name, float outV4[4]);  // 21
+    virtual void  CheckVector3Field(const char* name, float outV3[3]);  // 22
+    virtual void  CheckVector4NoStageField(const char* name, float outV4[4]); // 23
+    virtual void  CheckVector3NoStageField(const char* name, float outV3[3]); // 24
+    virtual void  CheckVector2Field(const char* name, float outV2[2]);  // 25
+    virtual void  WriteBlockOpen();                                     // 26
+    virtual void  vfn_27() = 0;                                         // 27 @ 0x822E6828
+    virtual void  vfn_28() = 0;                                         // 28 @ 0x822E68A8
+    virtual void  vfn_29() = 0;                                         // 29 @ 0x822E6928
+    virtual void  SetIndentDepth(int delta);                            // 30
+    virtual void  vfn_31() = 0;                                         // 31 @ 0x822E6C58
+    virtual void  vfn_32() = 0;                                         // 32 @ 0x822E6BC0
+    virtual void  vfn_33() = 0;                                         // 33 @ 0x822E6B30
+    virtual void  vfn_34() = 0;                                         // 34 @ 0x822E6AB8
+    virtual void  vfn_35() = 0;                                         // 35 @ 0x822E6A40
+    virtual bool  WriteStringWithPadding(const char* str, int padCount) = 0; // 36 @ 0x822E6998
+    virtual bool  CloseAndFlush(const char* closingStr);                // 37
+    virtual void  vfn_38() = 0;                                         // 38 @ 0x822E6A40
+    virtual void  vfn_39() = 0;                                         // 39 @ 0x822E6A40
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// fiAsciiTokenizer::~fiAsciiTokenizer()   — vtable slot 0
+// fiAsciiTokenizer::vfn_0()               — vtable slot 0
 // @ 0x8210CAF8 | size: 0x8
 //
-// Emitted as a one-instruction body (`li r3,0; blr`). The base destructor
-// in this family is a no-op that simply zeroes r3. True teardown lives in
-// slot 1 of the scalar-deleting dtor pair.
+// `li r3,0; blr`, a body the linker shares with other classes. It can't be
+// a scalar deleting destructor (those return this).
 // ─────────────────────────────────────────────────────────────────────────────
-fiAsciiTokenizer::~fiAsciiTokenizer() {
-    // intentionally empty — base destructor returns 0 in r3.
+int fiAsciiTokenizer::vfn_0() {
+    return 0;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -201,6 +186,11 @@ fiAsciiTokenizer::~fiAsciiTokenizer() {
 // is a convenience entry where no leading-whitespace skip is required.
 // ─────────────────────────────────────────────────────────────────────────────
 int fiAsciiTokenizer::GetIntTrampoline() {
+    return this->GetInt();
+}
+
+// Slot 3 is the same function as slot 2 (0x822E5E78).
+int fiAsciiTokenizer::GetIntTrampoline2() {
     return this->GetInt();
 }
 
@@ -248,10 +238,10 @@ float fiAsciiTokenizer::GetFloat() {
     }
     char first = buf[0];
     if (first == '-' || first == '.') {
-        return jumptable_2B80(buf);
+        return static_cast<float>(jumptable_2B80(buf));
     }
     if (first >= '0' && first <= '9') {
-        return jumptable_2B80(buf);
+        return static_cast<float>(jumptable_2B80(buf));
     }
     return lbl_8202D110;
 }
@@ -353,7 +343,7 @@ void fiAsciiTokenizer::SkipToken() {
 // Consume the field-name token, then invoke slot 4 (GetInt). Used by
 // parStream to read a "name value" pair where the name is discarded.
 // ─────────────────────────────────────────────────────────────────────────────
-int fiAsciiTokenizer::MatchIntField() {
+int fiAsciiTokenizer::MatchIntField(const char* /*name*/) {
     char scratch[64];
     scratch[0] = '\0';
     (void)this->GetToken(scratch, static_cast<int>(sizeof(scratch)));
@@ -366,7 +356,7 @@ int fiAsciiTokenizer::MatchIntField() {
 //
 // Mirror of MatchIntField — consume field name, then slot 5 (GetFloat).
 // ─────────────────────────────────────────────────────────────────────────────
-float fiAsciiTokenizer::MatchFloatField() {
+float fiAsciiTokenizer::MatchFloatField(const char* /*name*/) {
     char scratch[64];
     scratch[0] = '\0';
     (void)this->GetToken(scratch, static_cast<int>(sizeof(scratch)));
@@ -377,10 +367,10 @@ float fiAsciiTokenizer::MatchFloatField() {
 // fiAsciiTokenizer::MatchVector2Field()   — vtable slot 18
 // @ 0x822E6360 | size: 0x6C
 //
-// Consume the field-name token, then call slot 10 (GetVector2) forwarding
-// the caller's out-buffer as r4. This is the parStream "name v2" pair.
+// Consume the field-name token, then call slot 10 (GetVector2) on the
+// caller's out-buffer (r5). This is the parStream "name v2" pair.
 // ─────────────────────────────────────────────────────────────────────────────
-void fiAsciiTokenizer::MatchVector2Field(float outV2[2]) {
+void fiAsciiTokenizer::MatchVector2Field(const char* /*name*/, float outV2[2]) {
     char scratch[64];
     scratch[0] = '\0';
     (void)this->GetToken(scratch, static_cast<int>(sizeof(scratch)));
@@ -388,27 +378,57 @@ void fiAsciiTokenizer::MatchVector2Field(float outV2[2]) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// fiAsciiTokenizer::SkipWhitespaceThenInt()   — vtable slot 19
+// fiAsciiTokenizer::CheckIntField()       — vtable slot 19
 // @ 0x822E6590 | size: 0x40
 //
-// Skip leading whitespace via ph_58A8 (shared fi-layer primitive), then
-// dispatch to slot 4 (GetInt). Entry point used when the caller knows a
-// leading separator may or may not be present.
+// Reads the field-name token through ph_58A8 (checked against `name`), then
+// slot 4 (GetInt).
 // ─────────────────────────────────────────────────────────────────────────────
-int fiAsciiTokenizer::SkipWhitespaceThenInt() {
-    ph_58A8(this);
+int fiAsciiTokenizer::CheckIntField(const char* name) {
+    ph_58A8(this, name);
     return this->GetInt();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// fiAsciiTokenizer::SkipWhitespaceThenFloat() — vtable slot 20
+// fiAsciiTokenizer::CheckFloatField()     — vtable slot 20
 // @ 0x822E65D0 | size: 0x40
 //
-// Skip leading whitespace then slot 5 (GetFloat).
+// ph_58A8 (checked field name), then slot 5 (GetFloat).
 // ─────────────────────────────────────────────────────────────────────────────
-float fiAsciiTokenizer::SkipWhitespaceThenFloat() {
-    ph_58A8(this);
+float fiAsciiTokenizer::CheckFloatField(const char* name) {
+    ph_58A8(this, name);
     return this->GetFloat();
+}
+
+// Slots 21..25: ph_58A8 (checked field name), then slots 6..10.
+// @ 0x822E6750
+void fiAsciiTokenizer::CheckVector4Field(const char* name, float outV4[4]) {
+    ph_58A8(this, name);
+    this->GetVector4(outV4);
+}
+
+// @ 0x822E6700
+void fiAsciiTokenizer::CheckVector3Field(const char* name, float outV3[3]) {
+    ph_58A8(this, name);
+    this->GetVector3(outV3);
+}
+
+// @ 0x822E66B0
+void fiAsciiTokenizer::CheckVector4NoStageField(const char* name, float outV4[4]) {
+    ph_58A8(this, name);
+    this->GetVector4NoStage(outV4);
+}
+
+// @ 0x822E6660
+void fiAsciiTokenizer::CheckVector3NoStageField(const char* name, float outV3[3]) {
+    ph_58A8(this, name);
+    this->GetVector3NoStage(outV3);
+}
+
+// @ 0x822E6610
+void fiAsciiTokenizer::CheckVector2Field(const char* name, float outV2[2]) {
+    ph_58A8(this, name);
+    this->GetVector2(outV2);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -426,18 +446,16 @@ float fiAsciiTokenizer::SkipWhitespaceThenFloat() {
 void fiAsciiTokenizer::WriteBlockOpen() {
     uint8_t* self = reinterpret_cast<uint8_t*>(this);
     int32_t*  pDepth = reinterpret_cast<int32_t*>(self + 0xA0);
-    void*     stream = *reinterpret_cast<void**>(self + 0x0C);
+    void**    pStream = reinterpret_cast<void**>(self + 0x0C);
 
-    // Emit one tab per indent level.
-    for (int32_t n = *pDepth; n > 0; --n) {
-        fiAsciiTokenizer_51F0(stream, '\t');
+    // The asm counts down to exactly 0; a negative depth wraps around.
+    for (int32_t n = *pDepth; n != 0; --n) {
+        fiAsciiTokenizer_51F0(*pStream, '\t');
     }
-    // Block-open glyph + CRLF.
-    fiAsciiTokenizer_51F0(stream, '{');
-    fiAsciiTokenizer_51F0(stream, '\r');
-    fiAsciiTokenizer_51F0(stream, '\n');
+    fiAsciiTokenizer_51F0(*pStream, '{');
+    fiAsciiTokenizer_51F0(*pStream, '\r');
+    fiAsciiTokenizer_51F0(*pStream, '\n');
 
-    // Nest one level deeper for subsequent writes.
     *pDepth = *pDepth + 1;
 }
 
@@ -469,21 +487,13 @@ void fiAsciiTokenizer::SetIndentDepth(int delta) {
 // "close current element" idiom. CloseAndFlush itself takes the string as
 // its caller-supplied argument.
 // ─────────────────────────────────────────────────────────────────────────────
-void fiAsciiTokenizer::CloseAndFlush(const char* closingStr) {
-    using Slot36Fn = bool (*)(fiAsciiTokenizer*, const char*, int);
-    void** vt = *reinterpret_cast<void***>(this);
-    Slot36Fn writeWithPadding = reinterpret_cast<Slot36Fn>(vt[36]);
-    (void)writeWithPadding(this, closingStr, 0);
+bool fiAsciiTokenizer::CloseAndFlush(const char* closingStr) {
+    return this->WriteStringWithPadding(closingStr, 0);
 }
 
 } // namespace rage
 
-// Note: slot 3 body is not emitted in the binary — the vtable entry points
-//   at a pure-virtual handler. No lift required.
-// Note: slots 14–17, 21–25, 27–29, 31–35 follow the same vector/whitespace
-//   dispatch templates documented above; they can be batched in a follow-up.
-//   Slot 36 is WriteStringWithPadding @ 0x822E6998 (see CloseAndFlush note
-//   for the resolved signature).
+// Note: slot 36 is WriteStringWithPadding @ 0x822E6998 (see CloseAndFlush).
 // Note: fiAsciiTokenizer_2628_g @ 0x82432628 (0x24C bytes) is the FP
 //   formatter state machine — classifies NaN/inf/whole/small/general and
 //   dispatches to the matching %g-variant. Migration from stubs.cpp is
@@ -504,7 +514,7 @@ namespace rage {
 // Consume the field-name token via GetToken, then forward the output buffer
 // to GetVector4 (slot 6). Used by parStream for "name x y z w" quads.
 // ─────────────────────────────────────────────────────────────────────────────
-void fiAsciiTokenizer::MatchVector4Field(float outV4[4]) {
+void fiAsciiTokenizer::MatchVector4Field(const char* /*name*/, float outV4[4]) {
     char scratch[64];
     scratch[0] = '\0';
     (void)this->GetToken(scratch, static_cast<int>(sizeof(scratch)));
@@ -518,7 +528,7 @@ void fiAsciiTokenizer::MatchVector4Field(float outV4[4]) {
 // Consume the field-name token, then forward the output buffer to
 // GetVector3 (slot 7). Used by parStream for "name x y z" triples.
 // ─────────────────────────────────────────────────────────────────────────────
-void fiAsciiTokenizer::MatchVector3Field(float outV3[3]) {
+void fiAsciiTokenizer::MatchVector3Field(const char* /*name*/, float outV3[3]) {
     char scratch[64];
     scratch[0] = '\0';
     (void)this->GetToken(scratch, static_cast<int>(sizeof(scratch)));
@@ -532,7 +542,7 @@ void fiAsciiTokenizer::MatchVector3Field(float outV3[3]) {
 // Consume the field-name token, then call GetVector4NoStage (slot 8).
 // Writes each component directly to the output as it is parsed.
 // ─────────────────────────────────────────────────────────────────────────────
-void fiAsciiTokenizer::MatchVector4NoStageField(float outV4[4]) {
+void fiAsciiTokenizer::MatchVector4NoStageField(const char* /*name*/, float outV4[4]) {
     char scratch[64];
     scratch[0] = '\0';
     (void)this->GetToken(scratch, static_cast<int>(sizeof(scratch)));
@@ -546,7 +556,7 @@ void fiAsciiTokenizer::MatchVector4NoStageField(float outV4[4]) {
 // Consume the field-name token, then call GetVector3NoStage (slot 9).
 // Writes each component directly to the output as it is parsed.
 // ─────────────────────────────────────────────────────────────────────────────
-void fiAsciiTokenizer::MatchVector3NoStageField(float outV3[3]) {
+void fiAsciiTokenizer::MatchVector3NoStageField(const char* /*name*/, float outV3[3]) {
     char scratch[64];
     scratch[0] = '\0';
     (void)this->GetToken(scratch, static_cast<int>(sizeof(scratch)));
