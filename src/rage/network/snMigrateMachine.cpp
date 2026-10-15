@@ -21,7 +21,8 @@ namespace rage {
 class SinglesNetworkClient;
 
 // External HSM utility functions
-extern void hsmState_AttachChild(void* parent, void* childState);                     // @ 0x823EF850 — AttachChildState
+class hsmStateBase;
+extern void hsmState_AttachChild(hsmStateBase* parent, hsmStateBase* childState);    // @ 0x823EF850 — AttachChildState
 extern void snSession_AssociateConnections(void* context, void* session, void* connectionList); // @ 0x823ED988 — AssociateConnection
 extern void snSession_ProcessPendingConnections(void* context, void* session, void* connectionList); // @ 0x823EDA90 — ProcessPendingConnections
 
@@ -141,9 +142,10 @@ void snAcquiringHost_OnExit_Thunk(void* thisPtr) {
  *   - this+0x53C (snMigratingAsGuest)
  */
 void MigrateMachine_OnEnter(void* thisPtr) {
+    hsmStateBase* parent = static_cast<hsmStateBase*>(thisPtr);
     char* self = static_cast<char*>(thisPtr);
-    hsmState_AttachChild(thisPtr, self + 0x54);   // m_acquiringHost
-    hsmState_AttachChild(thisPtr, self + 0x53C);  // m_migratingAsGuest
+    hsmState_AttachChild(parent, reinterpret_cast<hsmStateBase*>(self + 0x54));  // m_acquiringHost
+    hsmState_AttachChild(parent, reinterpret_cast<hsmStateBase*>(self + 0x53C));  // m_migratingAsGuest
 }
 
 /**
@@ -154,9 +156,10 @@ void MigrateMachine_OnEnter(void* thisPtr) {
  *   - this+0x4B8 (snNotifyingGuests)
  */
 void AcquiringHost_OnEnterAttach(void* thisPtr) {
+    hsmStateBase* parent = static_cast<hsmStateBase*>(thisPtr);
     char* self = static_cast<char*>(thisPtr);
-    hsmState_AttachChild(thisPtr, self + 0x4A0);  // m_migrating
-    hsmState_AttachChild(thisPtr, self + 0x4B8);  // m_notifyingGuests
+    hsmState_AttachChild(parent, reinterpret_cast<hsmStateBase*>(self + 0x4A0));  // m_migrating
+    hsmState_AttachChild(parent, reinterpret_cast<hsmStateBase*>(self + 0x4B8));  // m_notifyingGuests
 }
 
 /**
@@ -167,9 +170,10 @@ void AcquiringHost_OnEnterAttach(void* thisPtr) {
  *   - this+0x4C (snMigrating)
  */
 void MigratingAsGuest_OnEnterAttach(void* thisPtr) {
+    hsmStateBase* parent = static_cast<hsmStateBase*>(thisPtr);
     char* self = static_cast<char*>(thisPtr);
-    hsmState_AttachChild(thisPtr, self + 0x18);  // m_waitingForMigrateMsg
-    hsmState_AttachChild(thisPtr, self + 0x4C);  // m_migrating
+    hsmState_AttachChild(parent, reinterpret_cast<hsmStateBase*>(self + 0x18));  // m_waitingForMigrateMsg
+    hsmState_AttachChild(parent, reinterpret_cast<hsmStateBase*>(self + 0x4C));  // m_migrating
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
