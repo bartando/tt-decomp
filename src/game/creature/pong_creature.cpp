@@ -1829,6 +1829,325 @@ void pongCreatureInst::Detach() {  // D470_p33
     pongCreatureInst_Cleanup(this);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// pongCreatureInst — rage::fragInst attach, fragment cache and world bound
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// pongCreatureInst derives from rage::fragInst (vtable 0x82032D2C), which
+// derives from rage::phInst: the base destructor at 0x8211D470 (lifted above
+// as Detach) restores the fragInst vtable and then runs phInst's (0x822C8FD0).
+// The slots below work on fragInst members. The flat field_0x.. list in
+// pong_creature.hpp also holds rage::fragType members (the XML tuning readers
+// at 0x82118E70..0x82119180 and fragType's constructor at 0x8211BB30 write
+// +0x20..+0x1BF), so these methods read the object through
+// pongCreatureInstLayout, which only holds members these functions and
+// fragInst's resource constructor (0x8211D3B8) prove.
+
+struct fragType;  // rage::fragType (vtable 0x82032CA4), opaque here
+
+// Chained hash map from a 32-bit key to a 16-bit use count. The fragment
+// cache pool keeps one (pool+0x1C) counting the cached instances per fragInst
+// cache key: ph_A808 (0x8212A808) inserts the key or bumps its count when it
+// sets up an entry.
+struct CacheKeyCount {
+    uint32_t key;    // +0x00
+    uint16_t count;  // +0x04
+    uint16_t _pad06;
+};
+
+struct CacheKeyNode {
+    CacheKeyCount entry;  // +0x00
+    CacheKeyNode* next;   // +0x08  next node in the same bucket
+};
+
+struct CacheKeyMap {
+    uint32_t       bucketCount;  // +0x00  power of two
+    uint32_t       nodeCount;    // +0x04
+    CacheKeyNode** buckets;      // +0x08
+    CacheKeyNode*  freeNodes;    // +0x0C  ph_A808 takes new nodes from here
+
+    CacheKeyNode* Find(const CacheKeyCount& probe) const;
+};
+
+// Pool of fragment cache entries at g_creatureManager+0x2F0. Acquire
+// (0x821263B8) takes a free entry while used < capacity, otherwise it steals
+// one whose instance's world bound sphere (inst+0x70 / +0x80) lies outside
+// the six view planes at g_creatureManager+0x1D0.
+struct fragCachePool {
+    uint8_t      _pad00[0x1C];  // capacity +0x00, used +0x04, free list +0x0C
+    CacheKeyMap* keyCounts;     // +0x1C
+};
+
+// Callback object (rage::Functor1 layout, assumed): the caller loads the
+// thunk from +0x0C and passes the callback itself plus one argument.
+struct fragInstCallback {
+    uint8_t _pad00[0x0C];  // callee + member-function pointer
+    void  (*thunk)(const fragInstCallback* self, void* managerHandle);  // +0x0C
+};
+
+// The object behind g_creatureManager (0x826063B8), reduced to what these
+// methods touch. Its fragInst callbacks sit 0x10 apart from +0x32C: attach,
+// detach (DetachFromScene), bound moved, create (+0x35C: fragInst's resource
+// constructor passes the instance and keeps the result at inst+0xC0) and
+// destroy (+0x36C: fragInst's destructor at 0x8211D470).
+struct fragInstManager {
+    uint8_t          _pad000[0x2F0];
+    fragCachePool*   cachePool;     // +0x2F0
+    uint8_t          _pad2F4[0x38];
+    fragInstCallback onAttach;      // +0x32C
+    fragInstCallback onDetach;      // +0x33C
+    fragInstCallback onBoundMoved;  // +0x34C
+};
+
+// The parts of rage::phArchetype / rage::phBound read below. phBound's
+// SetCentroidOffset (0x8228D178) stores the vector at +0x30; +0x08 is the
+// radius of the bounding sphere around that centroid.
+struct phBoundView {
+    uint8_t _pad00[0x08];
+    float   radiusAroundCentroid;  // +0x08
+    uint8_t _pad0C[0x24];
+    float   centroidOffset[4];     // +0x30  w unused
+};
+
+struct phArchetypeView {
+    uint8_t      _pad00[0x0C];
+    phBoundView* bound;  // +0x0C
+};
+
+struct pongCreatureInstLayout;
+
+// Object at fragInst+0x94: supplies the instance's fragType when set, and
+// lists the attached instances that point at it (linked through +0x58/+0x5C).
+struct fragTypeHolder {
+    uint8_t                 _pad00[0x18];
+    fragType*               type;            // +0x18
+    uint8_t                 _pad1C[0x20];
+    pongCreatureInstLayout* instancesHead;   // +0x3C
+    pongCreatureInstLayout* instancesTail;   // +0x40
+    uint32_t                instanceCount;   // +0x44
+};
+
+static const uint32_t FRAG_INST_FLAG_ATTACHED = 0x1;  // set by AttachToScene, cleared by DetachFromScene
+
+// pongCreatureInst as laid out in the binary (rage::phInst, then rage::fragInst,
+// then pongCreatureInst's own members), reduced to what these methods use.
+struct pongCreatureInstLayout {
+    void**                  vtable;            // +0x00
+    phArchetypeView*        archetype;         // +0x04  rage::phInst; released by ~phInst (0x822C8FD0)
+    uint8_t                 _pad08[0x08];      // +0x08  phInst level index (u16)
+    float                   matrix[4][4];      // +0x10  world matrix, translation in row 3 (+0x40)
+    uint32_t                flags;             // +0x50  FRAG_INST_FLAG_*
+    fragCacheEntry*         cacheEntry;        // +0x54  set when ph_A700 (0x8212A700) binds an entry
+    pongCreatureInstLayout* prevInHolder;      // +0x58
+    pongCreatureInstLayout* nextInHolder;      // +0x5C
+    uint8_t                 _pad60[0x10];
+    float                   worldBoundCenter[4];  // +0x70  w lane is not meaningful
+    float                   worldBoundRadius;  // +0x80
+    uint8_t                 _pad84[0x0C];
+    fragType*               type;              // +0x90  used when typeHolder is null
+    fragTypeHolder*         typeHolder;        // +0x94
+    uint32_t                cacheKey;          // +0x98  counted in fragCachePool::keyCounts, 0 = none
+    uint8_t                 _pad9C[0x24];
+    void*                   managerHandle;     // +0xC0  returned by the manager's create callback
+    uint8_t                 _padC4[0x60];
+    void*                   bounds;            // +0x124  atArray of 0x100-byte phBound objects
+    uint16_t                boundCount;        // +0x128
+    uint16_t                boundCapacity;     // +0x12A
+
+    // Inlined wherever fragInst needs its type (also ph_A700, ph_A808, 0x8211FA00)
+    fragType* ResolvedType() const { return typeHolder ? typeHolder->type : type; }
+};
+
+extern void* g_creatureManager;  // @ 0x826063B8 — see fragInstManager
+
+// @ 0x821263B8 (pongCreatureInst_63B8) — takes an entry from the pool, or null
+extern fragCacheEntry* fragCachePool_Acquire(fragCachePool* pool);
+// @ 0x8212A700 (ph_A700) — binds the entry to the instance (entry+0x1B4 = inst,
+// inst+0x54 = entry). With a type, the last three go to ph_A808, which sets
+// bit `index` of the entry's bitset at +0x1CC when markIndex is set; without
+// one, arg5 and index are only stored at entry+0x1B8 / +0x1BC.
+extern void fragCacheEntry_Init(fragCacheEntry* entry, fragTypeHolder* typeHolder, fragType* type,
+                                const float* matrix, pongCreatureInst* inst, void* arg5,
+                                uint16_t index, bool markIndex);
+
+static fragInstManager* FragInstManager() {
+    return static_cast<fragInstManager*>(g_creatureManager);
+}
+
+static pongCreatureInstLayout* Layout(pongCreatureInst* inst) {
+    return reinterpret_cast<pongCreatureInstLayout*>(inst);
+}
+
+// Bob Jenkins' 32-bit integer hash, inlined at both users of the key map
+static uint32_t HashCacheKey(uint32_t key) {
+    uint32_t hash = key;
+    hash += hash << 12;
+    hash ^= hash >> 22;
+    hash += hash << 4;
+    hash ^= hash >> 9;
+    hash += hash << 10;
+    hash ^= hash >> 2;
+    hash += hash << 7;
+    hash ^= hash >> 12;
+    return hash;
+}
+
+/**
+ * CacheKeyMap::Find @ 0x82121660 | size: 0xB0  (was pongCreatureInst_1660_w)
+ *
+ * Returns the node holding probe.key, or null. Only the key is compared; the
+ * count in the probe is ignored. A hash of 0 is bumped to 1 before masking.
+ */
+CacheKeyNode* CacheKeyMap::Find(const CacheKeyCount& probe) const {
+    uint32_t hash = HashCacheKey(probe.key);
+    if (hash == 0)
+        hash = 1;
+
+    for (CacheKeyNode* node = buckets[hash & (bucketCount - 1)]; node != nullptr; node = node->next) {
+        if (node->entry.key == probe.key)
+            return node;
+    }
+    return nullptr;
+}
+
+/**
+ * pongCreatureInst::ScalarDeletingDtor @ 0x820C8EE0 | size: 0x9C  [vtable slot 0]
+ *
+ * Destroys the embedded bound array, runs fragInst's destructor and frees
+ * the object when bit 0 of flags is set. Returns this, like every MSVC
+ * deleting destructor.
+ */
+void* pongCreatureInst::ScalarDeletingDtor(int flags) {
+    pongCreatureInstLayout* self = Layout(this);
+
+    // atArray destructor: delete[] the bounds when the array owns its storage.
+    // MSVC keeps a 16-byte cookie starting with the element count in front of
+    // the array; with elements left, the first one's vector deleting destructor
+    // (flags 3) destroys them all and frees the block.
+    if (self->boundCapacity != 0 && self->bounds != nullptr) {
+        int32_t* cookie = (int32_t*)((char*)self->bounds - 16);
+        if (*cookie != 0)
+            VCALL(self->bounds, 0, void(*)(void*, int))(self->bounds, 3);
+        else
+            rage_free(cookie);
+    }
+
+    Detach();  // 0x8211D470: ~fragInst
+
+    if (flags & 1)
+        rage_free(this);
+    return this;
+}
+
+/**
+ * pongCreatureInst::AttachToScene @ 0x8211D0E0 | size: 0x13C  [vtable slot 41]
+ *
+ * Marks the instance attached and tells the manager (callback +0x32C). With
+ * rejectIfKeyCached it first refuses (returns false) when the instance's
+ * cache key is already counted in the fragment cache pool, i.e. another
+ * cached instance uses it. An instance with a type gets vtable slot 48; one
+ * with a type holder is pushed onto the front of the holder's instance list.
+ */
+bool pongCreatureInst::AttachToScene(bool rejectIfKeyCached) {
+    fragInstManager*        manager = FragInstManager();
+    pongCreatureInstLayout* self    = Layout(this);
+
+    if (rejectIfKeyCached && self->cacheKey != 0) {
+        CacheKeyCount probe;
+        probe.key   = self->cacheKey;
+        probe.count = 0;  // _pad06 stays unset, as in the original
+        if (manager->cachePool->keyCounts->Find(probe) != nullptr)
+            return false;
+    }
+
+    self->flags |= FRAG_INST_FLAG_ATTACHED;
+    manager->onAttach.thunk(&manager->onAttach, self->managerHandle);
+
+    if (self->ResolvedType() != nullptr)
+        InitializeTransform();  // vtable slot 48
+
+    fragTypeHolder* holder = self->typeHolder;
+    if (holder == nullptr)
+        return true;
+
+    // Insert in front of the current head (written as a general insert-before)
+    pongCreatureInstLayout* head = holder->instancesHead;
+    if (head != nullptr) {
+        pongCreatureInstLayout* prev = head->prevInHolder;
+        self->prevInHolder = prev;
+        if (prev != nullptr)
+            prev->nextInHolder = self;
+        else
+            holder->instancesHead = self;
+        head->prevInHolder = self;
+        self->nextInHolder = head;
+    } else {
+        holder->instancesHead = self;
+        holder->instancesTail = self;
+        self->nextInHolder = nullptr;
+        self->prevInHolder = nullptr;
+    }
+    holder->instanceCount++;
+    return true;
+}
+
+/**
+ * pongCreatureInst::AcquireCacheEntry @ 0x8211EFC0 | size: 0xA0  [vtable slot 43]
+ *
+ * Takes a fragment cache entry from the pool and binds it to this instance.
+ * When the pool has none to give, calls vtable slot 57 and returns null.
+ */
+fragCacheEntry* pongCreatureInst::AcquireCacheEntry() {
+    pongCreatureInstLayout* self = Layout(this);
+
+    fragCacheEntry* entry = fragCachePool_Acquire(FragInstManager()->cachePool);
+    if (entry == nullptr) {
+        // Slot 57 is probably 0x8211FA00 (no direct callers), which logs "Fragment
+        // cache entry could not be allocated for instance of type '%s' at <%f %f %f>"
+        VCALL(this, 57, void(*)(pongCreatureInst*))(this);
+        return nullptr;
+    }
+
+    void* arg5 = GetPhysicsAllocator();  // vtable slot 53
+    fragCacheEntry_Init(entry, self->typeHolder, self->type, &self->matrix[0][0], this, arg5, 0xFF, false);
+    return entry;
+}
+
+/**
+ * pongCreatureInst::UpdateWorldBound @ 0x82121530 | size: 0x12C  [vtable slot 46]
+ *
+ * For a cached instance with a type: rebuilds the world bounding sphere the
+ * cache pool culls against (bound centroid moved by the world matrix, bound
+ * radius), tells the manager (callback +0x34C), then runs vtable slot 47.
+ */
+void pongCreatureInst::UpdateWorldBound() {
+    pongCreatureInstLayout* self = Layout(this);
+
+    if (self->cacheEntry == nullptr || self->ResolvedType() == nullptr)
+        return;
+
+    const phBoundView* bound = self->archetype->bound;
+    const float (*m)[4] = self->matrix;
+
+    // The original transposes the matrix and takes three 4-wide dot products
+    // with (centroid.xyz, w): the mask at 0x82619BE0 keeps xyz and the
+    // constant at 0x82619BD0 supplies w, assumed 1.0 since row 3 (the
+    // translation) has to count. Unverified: the .data bytes aren't in the repo.
+    const float cx = bound->centroidOffset[0];
+    const float cy = bound->centroidOffset[1];
+    const float cz = bound->centroidOffset[2];
+
+    self->worldBoundRadius = bound->radiusAroundCentroid;
+    for (int axis = 0; axis < 3; ++axis)
+        self->worldBoundCenter[axis] = cx * m[0][axis] + cy * m[1][axis] + cz * m[2][axis] + m[3][axis];
+    self->worldBoundCenter[3] = cx;  // leftover lane of the final vector merge
+
+    fragInstManager* manager = FragInstManager();
+    manager->onBoundMoved.thunk(&manager->onBoundMoved, self->managerHandle);
+
+    SyncBoneMatrices();  // vtable slot 47
+}
+
 /**
  * pongCreature::Relocate @ 0x820C8858 | size: 0x7C
  *
