@@ -16,6 +16,9 @@
 // @ 0x825C2D74 (.data)
 extern "C" uint32_t g_eventHash_BallBounce = 0x825C2D74u;
 
+// @ 0x825C4940 (.data) — set by BallShot_Launch, read by fxBallTrail::AddSample
+extern "C" float g_ballTrailHitValue = 0.0f;
+
 // @ 0x825C4954 (.data)
 extern "C" uint32_t g_eventHash_BallHit = 0x825C4954u;
 
@@ -70,6 +73,9 @@ TT_DATA_ALIAS("g_phShadowState", "lbl_826063C8");
 
 // @ 0x82606570 (.data)
 extern "C" void* g_activeBallNode = nullptr;
+
+// @ 0x82606580 (.data) — cleared by BallShot_Launch before it solves a shot
+extern "C" int32_t g_shotSolveState = 0;
 
 // @ 0x826065E4 (.data)
 extern "C" void* g_pPhysicsLevel = nullptr;
