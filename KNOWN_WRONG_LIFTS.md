@@ -9,7 +9,7 @@ Many structs (likely hundreds; `rage_misc.hpp`, `pong_render.hpp`, `char_view.hp
 `cm_operators.hpp`, `rage_grm.hpp`, …) declare a `void** vtable` / `m_vtable` field AND C++
 `virtual` methods. The compiler then adds its own hidden vptr in front, so every field sits
 one pointer late (4 bytes on the game's 32-bit layout). Found by lift-check on `grmModel`
-(+0xC read as +0x10) and `hsmStateBase`/`hsmState` (fixed). Fix per class: drop one of the
+(+0xC read as +0x10), `hsmStateBase`/`hsmState` and `pongPlayer` (all three fixed). Fix per class: drop one of the
 two (keep C++ virtuals only where nothing needs the vtable field by name, otherwise make the
 methods non-virtual), then re-verify its lifts.
 
@@ -51,8 +51,7 @@ methods non-virtual), then re-verify its lifts.
 - `rage_free` (0x820C00C0) is declared `extern "C"` in some files and with C++ linkage in others.
 - `FinalizeServeSetup` (0x8219F9C0) and `ResetSwingTrackingState` (0x8219FA40) are
   `shotTarget` methods still declared on `pongPlayer`; callers go through a cast.
-- `pongPlayer::CheckHandednessDifference` (0x821E04B0) really takes a pad record and a
-  button id and tests one of the button's bits.
+
 - `pongPlayer::IsSwingApexReached` / `pongPlayerState::IsSwingApexReached` are another
   duplicate pair at 0x820CDA58, unchecked.
 - `pcr_anim_blenders.cpp` declares `pongPlayer_DE98_g` with C++ linkage; it's defined `extern "C"`.
@@ -96,10 +95,11 @@ methods non-virtual), then re-verify its lifts.
 - 0x820F0E78, 0x820F0EE8 (grm ScalarDtors) and 0x8222CFA8 (`fiAsciiTokenizer_SetString`)
   return `this` in r3; the lifts return void (`rage_par.cpp` declares SetString void).
 - `grmModelGeom::GetGeometryEntry` reads `this[1]`; probably off by the vtable-member bug.
+- `pongPlayer`'s C++ virtuals don't number like the game's vtable (the Itanium destructor
+  takes two slots; slots 3–6 and 8 aren't declared), so any virtual call on it through C++
+  is suspect; the serve code calls slot 9 through a helper for that reason.
 - `globals.c`: `g_msgSinkTemplate` is at 0x8261A0C0, not 0x8241A0C0.
-- `pongPlayer_TossServeBall` (0x821934A0): the impulse's w lane (`_pad`) should be 0. The asm's
-  1/t comes from the (1, 1, 1, 0) constant at 0x825CB7C0; the lift computes
-  `(hit.w - pos.w) / t * mass`. Found by `tools/lift-check` (`lift-check pong_player_toss_serve_ball`).
+
 
 ## The recomp is not ground truth
 

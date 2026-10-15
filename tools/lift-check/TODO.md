@@ -24,3 +24,10 @@ Reported by the agents using it. Each was worked around in a spec; fix in the to
 - `stub(args=...)` compares stack pointers raw instead of as `<stack>` and doesn't switch off
   pointee comparison (workaround: `deref={"rN": 0}`).
 - Helpers in `specs/` (e.g. `_rage_rsc.py`) start with `_`; anything globbing specs must skip them.
+- The marker scan gives a section banner's address to the next code line when that line has
+  a trailing `// @` comment.
+- `stub()` clobbers r5–r12; leaf callees the original keeps registers across need `run()`.
+- No way to ignore an address in the memory diff; the stack fill is set after `inputs()`.
+- Clang contracts multiply-adds into FMA where the asm rounds separately (Serve needs FTOL
+  1e-5). Compiling lifts with `-ffp-contract=off` should fix it.
+- No transparent `run()` for helpers the original inlines (`specs/player_common.py` subclasses it).
