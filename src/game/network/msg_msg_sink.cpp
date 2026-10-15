@@ -48,7 +48,7 @@ extern void RtlLeaveCriticalSection(void*);
 
 // External dependencies
 extern void rage_free(void* ptr);
-extern void msgMsgSink_A970_2h(void*);
+extern void* msgMsgSink_A970_2h(void* self, void* rttiArg, void* bucket, uint16_t hdr16, void* callback);
 extern void* msgMsgSink_F518_wrh(uint32_t);
 extern void msgMsgSink_E860_g(void*, uint32_t, uint32_t, uint32_t);
 
@@ -152,10 +152,9 @@ msgMsgSink::~msgMsgSink()
  *   5. Zeros fields at +68, +72, +76, +80, +84, +88, +92, +96
  *   6. Zeros 22 uint32 array starting at +112
  */
-void msgMsgSink::InitializeExtended() {
-    // Call base initialization
-    extern void msgMsgSink_A970_2h(void*);
-    msgMsgSink_A970_2h(this);
+// @ 0x8245C078
+msgMsgSink* msgMsgSink::InitializeExtended(void* rttiArg, void* bucket, uint16_t hdr16, void* callback) {
+    msgMsgSink_A970_2h(this, rttiArg, bucket, hdr16, callback);
     
     // Set vtables
     *(void**)((char*)this + 0) = kVtable_54E8;    // Primary vtable (0x820054E8)
@@ -177,6 +176,7 @@ void msgMsgSink::InitializeExtended() {
     for (int i = 0; i < 22; i++) {
         array[i] = 0;
     }
+    return this;
 }
 
 /**

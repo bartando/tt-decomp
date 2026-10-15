@@ -869,35 +869,26 @@ void msgMsgSink_6220_w(void* self, uint32_t flag = 0)
 extern "C" void msgMsgSink_6220_w_c(void* self) { msgMsgSink_6220_w(self, 0); }
 
 
+extern "C" uint32_t xe_GetCurrentThreadId();  // @ 0x82566B78 (KTHREAD+0x14C via r13+0x100)
+
 /**
  * msgMsgSink_84C0_gen @ 0x824484C0 | size: 0x94
  *
- * TLS-fiber helper wrapping an atomic compare-exchange on the sink's
- * slot-table at +20. Returns -30009<<16 | 18 when the swap collapses the
- * slot (value == -1), otherwise 0. The original spins on lwarx/stwcx.
+ * Fails with 0x8AC70012 when called on the thread whose id is at +0x14 (the
+ * one that owns the engine's callback), else returns 0. The asm swaps -1 into
+ * a stack copy of the current id with lwarx/stwcx. when it matches; only
+ * the copy is touched.
  */
+// @ 0x824484C0
 int32_t msgMsgSink_84C0_gen(void* self)
 {
-    uint8_t* s = static_cast<uint8_t*>(self);
-    uint32_t expected = *reinterpret_cast<uint32_t*>(s + 20);
-
-    // Atomic CAS: set slot to -1 if matches expected, else keep current.
-    uint32_t* slot = reinterpret_cast<uint32_t*>(
-        /* spill location emulated by the recomp */ s + 20);
-    uint32_t prev;
-    do {
-        prev = __atomic_load_n(slot, __ATOMIC_ACQUIRE);
-        if (prev != expected) {
-            __atomic_store_n(slot, prev, __ATOMIC_RELEASE);
-            break;
-        }
-    } while (!__atomic_compare_exchange_n(slot, &prev, 0xFFFFFFFFu,
-                                          false, __ATOMIC_ACQ_REL,
-                                          __ATOMIC_ACQUIRE));
-
-    uint32_t after = *slot;
-    if (static_cast<int32_t>(after) == -1) {
-        return static_cast<int32_t>((static_cast<uint32_t>(-30009) << 16) | 18u);
+    uint32_t owner = *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(self) + 0x14);
+    uint32_t current = xe_GetCurrentThreadId();
+    if (current == owner) {
+        current = 0xFFFFFFFFu;
+    }
+    if (current == 0xFFFFFFFFu) {
+        return static_cast<int32_t>(0x8AC70012u);
     }
     return 0;
 }
@@ -907,11 +898,12 @@ int32_t msgMsgSink_84C0_gen(void* self)
  * msgMsgSink_A970_2h @ 0x8244A970 | size: 0xbc
  *
  * Constructor-like initializer. Wires up head vtable, clears circular list
- * links at +4/+8, stores incoming parameters, and calls the scalar-deleting
- * dtor on (r5 + 4) via its vtable slot 0.
+ * links at +4/+8, stores incoming parameters, then calls slot 0 of the
+ * object at bucket+4 with this+0xC. Returns this.
  */
-void msgMsgSink_A970_2h(void* self, void* rttiArg, void* bucket,
-                        uint16_t hdr16, void* callback)
+// @ 0x8244A970
+void* msgMsgSink_A970_2h(void* self, void* rttiArg, void* bucket,
+                         uint16_t hdr16, void* callback)
 {
     uint8_t* s = static_cast<uint8_t*>(self);
     void* vt_head = reinterpret_cast<void*>(uintptr_t(0x82003e24u));  // +15908
@@ -938,13 +930,12 @@ void msgMsgSink_A970_2h(void* self, void* rttiArg, void* bucket,
     *reinterpret_cast<uint32_t*>(s + 60) = 0;
     *reinterpret_cast<uint32_t*>(s + 64) = 0;
 
-    // Scalar-deleting dtor on (bucket+4)
-    if (bucket) {
-        void* arg3 = static_cast<uint8_t*>(bucket) + 4;
-        void** vt = *reinterpret_cast<void***>(arg3);
-        using Fn = void(*)(void*);
-        reinterpret_cast<Fn>(vt[0])(arg3);
-    }
+    // Registers the +0xC sub-object with the owner at bucket+4 (its slot 0).
+    void* owner = static_cast<uint8_t*>(bucket) + 4;
+    void** vt = *reinterpret_cast<void***>(owner);
+    using Fn = void(*)(void*, void*);
+    reinterpret_cast<Fn>(vt[0])(owner, s + 12);
+    return self;
 }
 
 

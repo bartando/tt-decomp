@@ -421,7 +421,7 @@ struct msgMsgSink {
     void ForwardFinalizeMessage();  // [148] @ 0x824508a8
     
     // ── non-virtual methods (implemented) ──
-    void InitializeExtended();  // @ 0x8245C078
+    msgMsgSink* InitializeExtended(void* rttiArg, void* bucket, uint16_t hdr16, void* callback);  // @ 0x8245C078
     void ProcessMessageWithIndex(uint32_t param1, uint16_t msgIndex, uint32_t param2);  // @ 0x8244E978
     void DispatchVirtualMethod();  // @ 0x824542D0 [related to vtable slot 12]
     uint16_t GetNestedValue(void* dataPtr);  // @ 0x8244F490
