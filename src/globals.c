@@ -905,6 +905,9 @@ TT_DATA_ALIAS("g_kGeomOffset", "g_pInputArrayTable");                         /*
 TT_DATA_ALIAS("g_pMatchState", "g_pCamShotMgr");                              /* 0x8271A318 */
 TT_DATA_ALIAS("g_pMatchConfig", "g_pCameraSharedState");                      /* 0x8271A32C */
 TT_DATA_ALIAS("g_pPlayerSlotLookup", "g_pCameraSharedState");
+TT_DATA_ALIAS("g_phActiveCameraPtr", "g_loop_obj_ptr");                        /* 0x825EAB30 */
+TT_DATA_ALIAS("g_phGlobalStatePtr", "g_rendererState");                        /* 0x8260641C */
+TT_DATA_ALIAS("g_phBoundTaperedCapsuleUpdateImpl", "g_display_obj_ptr");       /* 0x826066E4 */
 TT_DATA_ALIAS("g_shotType3_825C8038", "g_aiTypeId_3");  /* 0x825C8038 */
 TT_DATA_ALIAS("g_attrHash_SwingType1", "g_aiTypeId_3");
 TT_DATA_ALIAS("g_character_type_id_3", "g_aiTypeId_3");

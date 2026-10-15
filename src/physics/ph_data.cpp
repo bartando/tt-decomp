@@ -57,6 +57,9 @@ extern "C" void* g_animState = nullptr;
 
 // @ 0x826064E0 (.data)
 extern "C" uint8_t g_physicsDisabled = 0x0u;
+TT_DATA_ALIAS("g_phDisabled", "g_physicsDisabled");
+TT_DATA_ALIAS("g_phDisableFlag", "g_physicsDisabled");
+TT_DATA_ALIAS("g_phBoundInitialized", "g_physicsDisabled");
 
 // @ 0x826066E4 (.data)
 extern "C" void* g_phMaterialAllocator = nullptr;

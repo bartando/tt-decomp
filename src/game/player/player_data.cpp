@@ -121,6 +121,7 @@ extern "C" alignas(16) uint8_t g_mirrorBuffer[32] = {};
 // @ 0x82606740 (.data)
 extern "C" alignas(16) float g_identityVector[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 TT_DATA_ALIAS("g_identityVec", "g_identityVector");
+TT_DATA_ALIAS("g_phBoundAABBTemplate", "g_identityVector");
 
 // @ 0x82607210 (.data) — a 16-byte object in the image (zero); room for host pointer widths
 extern "C" alignas(16) uint8_t g_kCourtBoxOuterMin[32] = {};

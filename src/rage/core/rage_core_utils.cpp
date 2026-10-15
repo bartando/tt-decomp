@@ -903,8 +903,8 @@ void netSystem_Shutdown(void) {}
 
 extern "C" void sysMemAllocator_InitThreadHeap(void) {
     extern void* g_pAllocatorBase;
-    extern char g_mainThreadXtfStorage[256];
-    extern uint32_t g_allocInitFlag;
+    extern char g_mainThreadXtfStorage[256];  // @ 0x8271B114
+    extern uint32_t g_allocInitFlag;  // @ 0x8271B1D8
     extern void xe_alloc_thread_ctx_6CA8(void* ctx, uint32_t heapSize, uint32_t flags);
     extern void xe_get_thread_ctx_36E8(void);
 

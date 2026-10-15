@@ -167,6 +167,7 @@ set(SOURCES
     src/game/player/player_data.cpp
     src/graphics/grc_data.cpp
     src/physics/ph_data.cpp
+    src/physics/ld_ph_data.cpp
     src/rage/animation/anim_data.cpp
     src/rage/audio/aud_data.cpp
     src/rage/network/sn_data.cpp
