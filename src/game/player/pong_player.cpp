@@ -12,6 +12,8 @@
 #include "pong_player.hpp"
 #include <cstring>   // memset
 #include <cmath>     // fabsf
+#include <cfloat>    // FLT_MAX
+#include <cstddef>   // offsetof
 
 // rage memory — declare only what we need to avoid memset redecl conflict
 extern void rage_free(void* ptr);
@@ -444,8 +446,8 @@ void pongPlayer::GetSwingTargetVector(vec3* out, pongPlayer* state) const {
  *
  * All five conditions must hold simultaneously:
  *   1. Swing phase is NOT blocked (IsSwingPhaseBlocked == false)
- *   2. Swing timer is NOT running: timing state exists AND
- *      currentTime >= targetTime (NaN treated as expired — see header note)
+ *   2. Swing timer is NOT running: no timing state, or
+ *      currentTime >= targetTime (a NaN timer counts as running)
  *   3. NOT in recovery (IsRecovering == false)
  *   4. Secondary creature state is NOT active (IsCreatureState2Active == false)
  *   5. Primary creature state is NOT in "ready" state (IsCreatureStateReady == false)
@@ -467,10 +469,10 @@ bool pongPlayer::CanAcceptSwingInput() const
     // Gate 2: timing state — timer must be expired (currentTime >= targetTime).
     // An absent timing state is treated as expired (timer never started).
     if (m_pTimingState) {
-        // `!(currentTime < targetTime)` is used instead of `currentTime >= targetTime`
-        // so that NaN inputs (uninitialised timer) return true (expired), matching
-        // the PPC `blt/bns` idiom — see header notes.
-        bool timerRunning = !(m_pTimingState->m_currentTime < m_pTimingState->m_targetTime);
+        // IsSwingTimerActive (0x820CD550) inlined: the asm computes
+        // (currentTime >= targetTime, ordered) and negates it with cntlzw, so a
+        // NaN timer counts as running.
+        bool timerRunning = !(m_pTimingState->m_currentTime >= m_pTimingState->m_targetTime);
         if (timerRunning)
             return false;
     }
@@ -6769,3 +6771,642 @@ void game_D468(void* player, vec3* targetPos) {
     (void)player; (void)targetPos;
 }
 
+
+
+// ===========================================================================
+// SECTION 60 — Serve: EnterServeMode, SetupServe, StartServe, Serve
+// ===========================================================================
+//
+// The serve sequence, named after its "pongPlayer::Serve() %s"-style debug
+// strings: EnterServeMode puts the ball in the server's hand, SetupServe resets
+// the serve's shot record, StartServe hands the creature's swing animation two
+// callbacks, and Serve (one of those callbacks) tosses the ball so that it
+// reaches the hit point exactly on the animation's hit frame.
+//
+// The header's pongPlayer is no help here: its fields below +0x100 are really
+// pongCreature's (the 0x820Cxxxx functions it was built from take a
+// pongCreature: 0x820C69A0 is called from pongCreature_vfn_7 with this-0x10),
+// and the +0x1C4 it calls m_pOpponent is this player's own pongCreature
+// (StartServe calls the pongCreature function 0x820C7248 on it; Serve reads
+// its swing animation through it). So these functions read pongPlayer through
+// pongPlayerServeLayout, which holds only offsets their own asm proves.
+// Offsets in comments are the game's 32-bit ones.
+
+// 16-byte AltiVec matrix, rows a, b, c and the translation d (rage::Matrix34).
+struct pongMatrix34 {
+    vec3 a, b, c, d;
+};
+
+// ── Physics ────────────────────────────────────────────────────────────────
+// Shapes match rage::phSimulator / phLevelNew / phInst; the method names are
+// what the calls do here, not proven names.
+
+struct phBallArchetypeView {
+    void** vtable;  // +0x00
+
+    // Slot 15, called by Serve with 1.0f on the ball's archetype right before
+    // the toss (probably a gravity or damping factor; unproven).
+    void vfn_15(float value) {
+        reinterpret_cast<void (*)(phBallArchetypeView*, float)>(vtable[15])(this, value);
+    }
+};
+
+struct phInstView {
+    void**           vtable;      // +0x00
+    phBallArchetypeView* archetype;   // +0x04
+    uint16_t         levelIndex;  // +0x08  slot in the physics level
+    uint8_t          _pad0A[0x06];
+    pongMatrix34     matrix;      // +0x10  world matrix
+    uint8_t          _pad50[0x50];
+    vec3             vecA0;       // +0xA0  moved into +0xB0 when the ball is placed in hand
+    vec3             vecB0;       // +0xB0
+
+    // Slot 3 gets the old matrix just before PlaceBallInHand overwrites it.
+    void vfn_3(pongMatrix34* currentMatrix) {
+        reinterpret_cast<void (*)(phInstView*, pongMatrix34*)>(vtable[3])(this, currentMatrix);
+    }
+};
+
+// What the physics level hands back for the ball while it is active (a
+// rage::phCollider in RAGE terms).
+struct pongBallBody {
+    void**      vtable;    // +0x00
+    uint8_t     _pad04[0x0C];
+    phInstView* inst;      // +0x10
+    uint8_t     _pad14[0x50];
+    float       mass;      // +0x64  inferred: launch velocity * this = the impulse applied
+    uint8_t     _pad68[0x68];
+    vec3        position;  // +0xD0  the impulse point; z is the distance from the net
+
+    // Slot 1. Called after the ball is teleported into the hand and right
+    // before the toss impulse (probably clears its motion). Taken to have no
+    // arguments: r4/r5 hold unrelated leftovers at both call sites.
+    void vfn_1() {
+        reinterpret_cast<void (*)(pongBallBody*)>(vtable[1])(this);
+    }
+};
+
+struct phLevelView {
+    void**   vtable;        // +0x00
+    uint8_t  _pad04[0x18];
+    uint8_t* objectStates;  // +0x1C  one byte per level index; low 3 bits 0 = active
+
+    bool IsActive(uint16_t index) const { return (objectStates[index] & 7) == 0; }
+
+    // Slot 4: the body of an active object, or null.
+    pongBallBody* GetActiveBody(uint16_t index) {
+        return reinterpret_cast<pongBallBody* (*)(phLevelView*, uint16_t)>(vtable[4])(this, index);
+    }
+
+    // Slot 11: called right after an instance's matrix was overwritten by hand.
+    void UpdateObjectLocation(uint16_t index) {
+        reinterpret_cast<void (*)(phLevelView*, uint16_t)>(vtable[11])(this, index);
+    }
+};
+
+struct phSimulatorView {
+    void*        vtable;  // +0x00
+    phLevelView* level;   // +0x04
+};
+
+extern phSimulatorView* g_pPhysicsSim;    // @ 0x825F5BD0
+extern phLevelView*     g_pPhysicsLevel;  // @ 0x826065E4  same +0x1C state bytes as g_pPhysicsSim->level
+
+// @ 0x822C4980 — activates the object at levelIndex and returns its body
+// (rage::phSimulator::ActivateObject in shape). pong_ball.cpp stubs a
+// void-returning (void*, unsigned short, ...) overload of this symbol.
+extern pongBallBody* pongBallInstance_4980_g(phSimulatorView* sim, uint16_t levelIndex,
+                                             int a, int b, int c, int d);
+// @ 0x822CCBB8 — applies an impulse to a body at a point (component 0).
+extern void phSimulator_CBB8_g(pongBallBody* body, const vec3* impulse, const vec3* point,
+                               int component);
+
+extern float g_identityVector[4];  // @ 0x82606740  (named in ph_physics.cpp)
+extern float g_ballGravity;        // @ 0x825CBCE4  -9.8f in the image (.data, so tunable)
+
+// ── Creature side ──────────────────────────────────────────────────────────
+
+struct pongAnimClipView {
+    uint8_t _pad00[0x1C];
+    int32_t hitFrame;  // +0x1C  inferred: Serve times the toss to land on this frame (30 fps)
+};
+
+// The creature's swing animation state; the header calls it pongRecoveryState.
+// game_CD20 (0x820DCD20) clears the same fields.
+struct pongSwingAnimView {
+    uint8_t           _pad00[0x24];
+    pongAnimClipView* clip;       // +0x24
+    uint8_t           _pad28[0x08];
+    float             startTime;  // +0x30  match-clock time the clip started
+};
+
+// The object at pongCreature+0xBC that the 0x820CD550..0x820CD6B8 predicates
+// take (the header's pongPlayerState).
+struct pongServeBlenderView {
+    uint8_t            _pad00[0x80];
+    pongSwingAnimView* swingAnim;  // +0x80  header: m_pRecoveryState
+};
+
+struct pongCreatureServeView {
+    uint8_t               _pad00[0xBC];
+    pongServeBlenderView* blender;  // +0xBC
+};
+
+// The 16-byte callback StartServe gives the creature; 0x820C7248 copies the two
+// of them into the swing animation at +0x50 and +0x60. game_3860 builds one of
+// the same shape (rage::datCallback-like: target, function, data, kind).
+typedef void (*pongCallbackFn)();
+struct pongCallback {
+    void*          target;    // +0x00
+    pongCallbackFn function;  // +0x04
+    void*          data;      // +0x08
+    int32_t        kind;      // +0x0C  1: function(target); 4: function(target, int* answer)
+};
+
+// @ 0x820DD1C0 — world position of the swing animation's hit point.
+extern void game_D1C0(vec3* outPos, pongSwingAnimView* swingAnim);
+// @ 0x820CE090 — a bone matrix from the creature's skeleton (bone id at +0x1C
+// of the blender), translation pushed a little along the bone's motion.
+extern void game_E090(pongServeBlenderView* blender, pongMatrix34* outMatrix);
+// @ 0x820C7248 — lifted above as pongPlayer::SetupRecoverySlots, but that lift
+// doesn't match the asm: `this` is a pongCreature and the two arguments are
+// pongCallbacks, stored unconditionally before game_D060 runs.
+extern void pongPlayer_7248_g(pongCreatureServeView* creature, const pongCallback* serveCallback,
+                              const pongCallback* queryCallback);
+
+// ── Player side ────────────────────────────────────────────────────────────
+
+// rtti shotTarget (vtable 0x8203A824, stored by pongPlayer's fixup at
+// 0x82198D88); lives at pongPlayer+0x1EC.
+struct shotTargetLayout {
+    void**      vtable;  // +0x00
+    uint8_t     _pad04[0x28];
+    pongPlayer* owner;   // +0x2C  also read by 0x8219F9C0
+};
+
+// rtti aiPlayer (vtable 0x8203A83C, stored by 0x821A5FC8); pongPlayer+0x1F0.
+struct aiPlayerServeView {
+    struct Sub34 {
+        uint8_t _pad00[0x04];
+        float   value4;  // +0x04
+    };
+    uint8_t _pad00[0x34];
+    Sub34*  sub34;       // +0x34
+};
+
+// pongPlayer+0x17F0; only the byte SetupServe clears is known.
+struct pongPlayerSub17F0 {
+    uint8_t _pad00[0x22];
+    uint8_t flag22;  // +0x22
+};
+
+// pongPlayer+0x185C, read by pg_9A70 (0x82199A70): returns 5, or 9 when
+// flag4 is set (posting message 0x101A), or 3 when flag6 is set.
+struct pongServeTypeFlags {
+    uint8_t _pad00[0x04];
+    uint8_t flag4;  // +0x04
+    uint8_t _pad05;
+    uint8_t flag6;  // +0x06
+    uint8_t _pad07;
+};
+
+struct pongPlayerServeLayout {
+    void**                 vtable;          // +0x000
+    uint8_t                _pad004[0x1BC];
+    phInstView*            ballInst;        // +0x1C0  the ball's instance, from **0x8271A2F4
+    pongCreatureServeView* creature;        // +0x1C4  header: m_pOpponent
+    float                  serveBounceZ;    // +0x1C8  inferred: the serve's bounce depth on the server's half
+    int32_t                moveMode;        // +0x1CC  "Move mode is %d." (vfn_2); set by 0x82195C00
+    int32_t                playerIndex;     // +0x1D0  header: m_inputSlotIdx
+    uint8_t                _pad1D4[0x18];
+    shotTargetLayout*      shotTarget;      // +0x1EC
+    aiPlayerServeView*     ai;              // +0x1F0  header: m_pActionState
+    uint8_t                _pad1F4[0x15F4];
+    float                  field_17E8;      // +0x17E8  FLT_MAX when StartServe sees io_Input_poll_9D68
+    int32_t                field_17EC;      // +0x17EC  2 then; io_8A48 answers whether it's nonzero
+    pongPlayerSub17F0*     sub17F0;         // +0x17F0
+    uint8_t                _pad17F4[0x68];
+    pongServeTypeFlags     serveTypeFlags;  // +0x185C
+    uint8_t                _pad1864[0x56];
+    uint8_t                field_18BA;      // +0x18BA  cleared by Serve
+    uint8_t                _pad18BB[0x0D];
+    uint8_t                field_18C8;      // +0x18C8  set by StartServe and SetupServe
+    uint8_t                _pad18C9[0x27];
+    float                  serveHitDelay;   // +0x18F0  seconds from the toss to the hit frame
+    float                  serveStartTime;  // +0x18F4  match clock when Serve ran
+};
+
+static pongPlayerServeLayout* ServeLayout(pongPlayer* player) {
+    return reinterpret_cast<pongPlayerServeLayout*>(player);
+}
+
+// One 416-byte entry of the per-player table at 0x8261A3D0 (g_ballSplashArray
+// above), indexed by pongPlayer+0x1D0. The record at +0x30 is the one
+// 0x821D6100 and 0x8219F9C0's 0x821D5F70 take.
+struct pongShotRecord {
+    uint8_t  _pad00[0x20];
+    vec3     targetPos;    // +0x20  world point the shot aims at (Serve mirrors its z)
+    uint8_t  _pad30[0x10];
+    vec3     vec40;        // +0x40  zeroed by SetupServe unless shotType is 3
+    uint8_t  _pad50[0x4C];
+    int32_t  shotType;     // +0x9C  pg_9A70's 5, 9 or 3
+    uint8_t  _padA0[0x26];
+    uint16_t flagsC6;      // +0xC6  SetupServe sets the high byte to 0x10
+    uint8_t  _padC8[0x38];
+    float    aimNorm[2];   // +0x100 aim on the table, each in [-1, 1]; [1] follows depth
+};
+
+struct pongPlayerShotEntry {
+    uint8_t        _pad00[0x04];
+    uint8_t        flag04;  // +0x04  cleared by StartServe and SetupServe
+    uint8_t        flag05;  // +0x05  likewise
+    uint8_t        _pad06[0x2A];
+    pongShotRecord shot;    // +0x30
+    uint8_t        _pad138[0x68];
+};
+static_assert(sizeof(pongPlayerShotEntry) == 0x1A0, "pongPlayerShotEntry is 416 bytes");
+static_assert(offsetof(pongPlayerShotEntry, shot) + offsetof(pongShotRecord, aimNorm) == 0x130,
+              "aimNorm sits at entry+0x130");
+
+static pongPlayerShotEntry* PlayerShotEntries() {
+    return reinterpret_cast<pongPlayerShotEntry*>(g_ballSplashArray);
+}
+
+// The match-settings singleton the file reaches as g_pInputArrayTable
+// (0x825EAB28; also g_pInputObj / g_pButtonStateTable above).
+struct pongMatchSettingsView {
+    uint8_t _pad00[0x38];
+    int32_t playerMode[2];   // +0x38  per player; picks EnterServeMode's path
+    uint8_t sideFlipped[2];  // +0x40  per player; mirrors serve depth and aim (cf. SetServeSideFlip)
+    uint8_t _pad42[0x5A];
+    float   field_9C[2];     // +0x9C  per player; SetupServe feeds it to 0x821D6100
+};
+static_assert(offsetof(pongMatchSettingsView, field_9C) == 0x9C, "settings +0x9C");
+
+static pongMatchSettingsView* MatchSettings() {
+    return reinterpret_cast<pongMatchSettingsView*>(g_pInputArrayTable);
+}
+
+// What 0x8271A304 points at (declared above as g_pGlobalClock, but xe_9DC8
+// fills it with the table's dimensions in metres).
+struct pongTableDims {
+    uint8_t _pad00[0x10];
+    float   width;    // +0x10  1.5224
+    float   height;   // +0x14  0.7628
+    float   length;   // +0x18  2.7439
+    uint8_t _pad1C[0x08];
+    float   field24;  // +0x24  0.325
+    float   field28;  // +0x28  0.481
+};
+
+static const pongTableDims* TableDims() {
+    return static_cast<const pongTableDims*>(g_pGlobalClock);
+}
+
+extern "C" void* g_pongMatchTiming;  // @ 0x8271A2E8  (named in pong_lerp_queue.cpp)
+struct pongMatchClockView {
+    uint8_t _pad00[0x30];
+    float   now;  // +0x30  match clock, seconds
+};
+
+static float MatchClockNow() {
+    return static_cast<const pongMatchClockView*>(g_pongMatchTiming)->now;
+}
+
+// What g_game_state_ptr (0x8271A2F8) points at, as far as EnterServeMode reads it.
+struct pongGameStateServeView {
+    struct Sub14 {
+        uint8_t _pad00[0x25A8];
+        int32_t field_25A8;  // +0x25A8  game_3860 is only called while this is positive
+    };
+    uint8_t _pad00[0x14];
+    Sub14*  sub14;           // +0x14   game_3860 logs into this object too
+};
+
+extern void* g_game_state_ptr;       // @ 0x8271A2F8
+extern void* g_networkTimingObject;  // @ 0x8271A328
+
+// @ 0x82391480 — cached timestamp text for log lines.
+extern const char* util_1480(void* clock, int slot);
+// @ 0x821D3860 — records a named transition on the game state object.
+extern void game_3860(void* gameState, int kind, const char* name);
+// @ 0x8225E6E0 — posts a game message (same declaration as message.cpp;
+// PostPageGroupMessage above gives it a fifth argument it doesn't take).
+extern void PostGameMessage(uint32_t messageId, uint32_t flags, uint32_t param1, uint32_t param2);
+// @ 0x82198A48 — StartServe's query callback: *answer = io_Input_poll_9D68 && +0x17EC != 0.
+extern void io_8A48(pongPlayer* player, int32_t* answer);
+// @ 0x82199A70 — picks the serve's shot type from the flags (see pongServeTypeFlags).
+extern int32_t pg_9A70(pongServeTypeFlags* flags, int32_t playerIndex);
+// @ 0x821D6100 — lifted above as pongPlayer::ComputeShotSpeedForType, but its
+// `this` is the shot record (it reads shotType at +0x9C and writes +0x94).
+extern void pongPlayer_6100_g(pongShotRecord* shot, float input);
+
+// Flags argument of PostGameMessage: one bit per player.
+static uint32_t PlayerMessageBit(int32_t playerIndex) {
+    return playerIndex != 0 ? 2u : 1u;
+}
+
+
+/**
+ * pongPlayer_GetServeBallBody  (pongPlayer_25C8_g @ 0x821925C8 | size: 0x9C)
+ *
+ * Returns the ball's physics body: the level's body for it while it is active,
+ * otherwise whatever activating it returns. Called by Serve and 0x8218D818.
+ */
+pongBallBody* pongPlayer_GetServeBallBody(pongPlayer* player)
+{
+    pongPlayerServeLayout* self = ServeLayout(player);
+    phLevelView* level = g_pPhysicsSim->level;
+    uint16_t ballIndex = self->ballInst->levelIndex;
+
+    if (level->IsActive(ballIndex)) {
+        pongBallBody* body = level->GetActiveBody(ballIndex);
+        if (body)
+            return body;
+    }
+    return pongBallInstance_4980_g(g_pPhysicsSim, self->ballInst->levelIndex, 0, 0, 0, 0);
+}
+
+
+/**
+ * pongPlayer_PlaceBallInHand  (pongPlayer_EAA8_g @ 0x8218EAA8 | size: 0x100)
+ *
+ * Teleports the ball's instance onto a bone of the player's creature (the
+ * serving hand, going by the callers EnterServeMode and Serve), shifts the
+ * instance's +0xA0 vector into +0xB0 and resets +0xA0, lets the body run its
+ * slot 1, and tells the physics level the object moved.
+ */
+void pongPlayer_PlaceBallInHand(pongPlayer* player, pongBallBody* ball)
+{
+    pongPlayerServeLayout* self = ServeLayout(player);
+
+    pongMatrix34 holdMatrix;
+    game_E090(self->creature->blender, &holdMatrix);
+
+    phInstView* inst = self->ballInst;
+    inst->vfn_3(&inst->matrix);
+
+    inst = self->ballInst;
+    inst->matrix = holdMatrix;
+    inst->vecB0 = inst->vecA0;
+    memcpy(&inst->vecA0, g_identityVector, sizeof(inst->vecA0));
+
+    if (ball)
+        ball->vfn_1();
+
+    g_pPhysicsLevel->UpdateObjectLocation(self->ballInst->levelIndex);
+}
+
+
+/**
+ * pongPlayer_TossServeBall  (game_34A0 @ 0x821934A0 | size: 0x114)
+ *
+ * The serve toss: launches the ball so it reaches the swing animation's hit
+ * point after flightTime seconds. Solves the ballistic arc for the velocity,
+ *   v = (hitPoint - position) / t,   v.y -= (gravity / 2) * t,
+ * turns it into an impulse with the body's mass and applies it at the ball.
+ */
+void pongPlayer_TossServeBall(pongPlayer* player, pongBallBody* ball, float flightTime)
+{
+    pongPlayerServeLayout* self = ServeLayout(player);
+    const float halfGravity = g_ballGravity * 0.5f;  // 0.5f @ 0x8202D10C
+
+    vec3 hitPoint;
+    game_D1C0(&hitPoint, self->creature->blender->swingAnim);
+
+    // The asm takes 1/t with vrefp plus one Newton-Raphson step (the 1.0
+    // vector at 0x825CB7C0), and runs every vector step on the w lane too.
+    float invTime = 1.0f / flightTime;
+    vec3 velocity;
+    velocity.x = (hitPoint.x - ball->position.x) * invTime;
+    velocity.y = (hitPoint.y - ball->position.y) * invTime;
+    velocity.z = (hitPoint.z - ball->position.z) * invTime;
+    velocity._pad = (hitPoint._pad - ball->position._pad) * invTime;
+    velocity.y = velocity.y - halfGravity * flightTime;
+
+    const float mass = ball->mass;
+    vec3 impulse;
+    impulse.x = velocity.x * mass;
+    impulse.y = velocity.y * mass;
+    impulse.z = velocity.z * mass;
+    impulse._pad = velocity._pad * mass;
+
+    ball->vfn_1();
+    phSimulator_CBB8_g(ball, &impulse, &ball->position, 0);
+}
+
+
+/**
+ * shotTarget_AdjustAimDepthForBall  (pongPlayer_FBD8_w @ 0x8219FBD8 | size: 0x100)
+ *
+ * A shotTarget method, not pongPlayer's: Serve calls it on pongPlayer+0x1EC
+ * and it reaches the player through shotTarget+0x2C. Also called by 0x8219EF38.
+ *
+ * When the ball is more than (table length - 0.1) from the net and the aim's
+ * world depth is short of that overshoot, moves the normalized aim depth by the
+ * difference, scaled to the table, and clamps it to [-1, 1].
+ */
+void shotTarget_AdjustAimDepthForBall(shotTargetLayout* target, const pongBallBody* ball)
+{
+    const float kMargin = 0.1f;  // @ 0x8202CFE8
+    const pongTableDims* table = TableDims();
+
+    float ballDepth = fabsf(ball->position.z);
+    if (ballDepth <= table->length - kMargin)
+        return;
+
+    float overshoot = ballDepth - table->length + kMargin;
+    int32_t playerIndex = ServeLayout(target->owner)->playerIndex;
+    pongShotRecord& shot = PlayerShotEntries()[playerIndex].shot;
+
+    vec3 targetPos = shot.targetPos;  // 16-byte copy to the stack in the asm
+    if (fabsf(targetPos.z) >= overshoot)
+        return;
+
+    if (MatchSettings()->sideFlipped[playerIndex])
+        overshoot = -overshoot;
+
+    float depthRange = (table->field28 + table->field24) * (table->length * 0.5f);
+    float aimDepth = (overshoot - targetPos.z) / depthRange * 2.0f + shot.aimNorm[1];  // 2.0f @ 0x8202D184
+
+    // fsel clamp. The lower test is against -1.0f (0x825C5938); the doubles it
+    // selects (0x82079D10, 0x82079B08) aren't in the excavated constants and
+    // are taken to be -1.0 and 1.0.
+    if (aimDepth < -1.0f)
+        aimDepth = -1.0f;
+    if (aimDepth >= 1.0f)
+        aimDepth = 1.0f;
+
+    // The asm writes both halves back with one 8-byte store; [0] keeps its value.
+    shot.aimNorm[1] = aimDepth;
+}
+
+
+/**
+ * pongPlayer_Serve  @ 0x82193298 | size: 0x204
+ *
+ * Runs as the serve callback StartServe gives the creature's swing animation.
+ * Puts the ball in hand, works out how long until the animation's hit frame,
+ * sets move mode 4, picks the serve's bounce depth on the server's half, and
+ * tosses the ball so it arrives at the hit point on that frame.
+ */
+void pongPlayer_Serve(pongPlayer* player)
+{
+    pongPlayerServeLayout* self = ServeLayout(player);
+    nop_8240E6D0("pongPlayer::Serve() %s", util_1480(g_networkTimingObject, 0));
+
+    pongBallBody* ball = pongPlayer_GetServeBallBody(player);
+    pongPlayer_PlaceBallInHand(player, ball);
+
+    // Seconds until the swing animation reaches its hit frame (30 fps clips).
+    const pongSwingAnimView* swing = self->creature->blender->swingAnim;
+    float hitTime = swing->startTime + (float)swing->clip->hitFrame * (1.0f / 30.0f);  // @ 0x82079BB8
+    float hitDelay = hitTime - MatchClockNow();
+    self->serveHitDelay = hitDelay;
+    self->serveStartTime = MatchClockNow();
+
+    pongPlayer_5C00_g(player, 4);  // move mode 4
+
+    // Bounce depth on the server's half: the aim point mirrored over the net,
+    // pushed out to a quarter of the table if it is nearer the net than that,
+    // and pulled in halfway towards the ball if it is behind the ball.
+    vec3 targetPos = PlayerShotEntries()[self->playerIndex].shot.targetPos;
+    float bounceZ = -targetPos.z;
+    self->serveBounceZ = bounceZ;
+
+    const pongTableDims* table = TableDims();
+    float halfLength = table->length * 0.5f;     // 0.5f @ 0x8202D10C
+    float quarterLength = halfLength * 0.5f;
+    uint8_t sideFlipped = MatchSettings()->sideFlipped[self->playerIndex];
+
+    if (fabsf(bounceZ) < quarterLength) {
+        if (!sideFlipped)
+            quarterLength = halfLength * -0.5f;  // -0.5f @ 0x82079BF8
+        self->serveBounceZ = quarterLength;
+    } else {
+        float ballDepth = fabsf(ball->position.z);
+        if (fabsf(bounceZ) > ballDepth) {
+            float sum = quarterLength + ballDepth;
+            self->serveBounceZ = sideFlipped ? sum * 0.5f : sum * -0.5f;
+        }
+    }
+
+    ball->inst->archetype->vfn_15(1.0f);  // 1.0f @ 0x8202D108
+    pongPlayer_TossServeBall(player, ball, hitDelay);
+
+    PostGameMessage(0x820, PlayerMessageBit(self->playerIndex), 0, 0);
+    shotTarget_AdjustAimDepthForBall(self->shotTarget, ball);
+    self->field_18BA = 0;
+}
+
+
+/**
+ * pongPlayer_StartServe  @ 0x82193190 | size: 0x104
+ *
+ * Gives the creature two callbacks for its swing animation (via 0x820C7248):
+ * pongPlayer_Serve, and the query io_8A48. Then posts message 0x380B and
+ * clears the player's two serve bytes in the shot table.
+ */
+void pongPlayer_StartServe(pongPlayer* player)
+{
+    pongPlayerServeLayout* self = ServeLayout(player);
+    nop_8240E6D0("pongPlayer::StartServe() %s", util_1480(g_networkTimingObject, 0));
+
+    if (io_Input_poll_9D68(g_pInputArrayTable) != 0) {
+        self->field_17E8 = FLT_MAX;  // @ 0x82079AD8
+        self->field_17EC = 2;
+    }
+
+    pongCallback serveCallback = {
+        player, reinterpret_cast<pongCallbackFn>(&pongPlayer_Serve), nullptr, 1 };
+    pongCallback queryCallback = {
+        player, reinterpret_cast<pongCallbackFn>(&io_8A48), nullptr, 4 };
+    pongPlayer_7248_g(self->creature, &serveCallback, &queryCallback);
+
+    self->field_18C8 = 1;
+    PostGameMessage(0x380B, PlayerMessageBit(self->playerIndex) | 0x40, 0, 0);
+
+    PlayerShotEntries()[self->playerIndex].flag04 = 0;
+    PlayerShotEntries()[self->playerIndex].flag05 = 0;
+}
+
+
+/**
+ * pongPlayer_SetupServe  @ 0x82192F00 | size: 0x108  (called by 0x82192D88)
+ *
+ * Resets the serve's shot record: finalizes the shot target, lets slot 9
+ * (OnButtonReleased) run, picks the shot type (5, since the two flags it
+ * reads are cleared first), and recomputes the record's +0x94 from the
+ * player's settings value.
+ */
+void pongPlayer_SetupServe(pongPlayer* player)
+{
+    pongPlayerServeLayout* self = ServeLayout(player);
+    nop_8240E6D0("pongPlayer::SetupServe %s", util_1480(g_networkTimingObject, 0));
+
+    pongShotRecord& shot = PlayerShotEntries()[self->playerIndex].shot;
+    if (shot.shotType != 3)
+        memset(&shot.vec40, 0, sizeof(shot.vec40));
+
+    // 0x8219F9C0 is lifted above as pongPlayer::FinalizeServeSetup, but its
+    // `this` is the shotTarget (it finds the player at +0x2C).
+    reinterpret_cast<pongPlayer*>(self->shotTarget)->FinalizeServeSetup();
+
+    self->sub17F0->flag22 = 0;
+    player->OnButtonReleased();  // vtable slot 9 (0x821935B8)
+
+    self->serveTypeFlags.flag4 = 0;
+    self->serveTypeFlags.flag6 = 0;
+    shot.shotType = pg_9A70(&self->serveTypeFlags, self->playerIndex);
+    pongPlayer_6100_g(&shot, MatchSettings()->field_9C[self->playerIndex]);
+
+    shot.flagsC6 = (uint16_t)((shot.flagsC6 & 0x00FF) | 0x1000);
+    self->field_18C8 = 1;
+
+    PlayerShotEntries()[self->playerIndex].flag05 = 0;
+    PlayerShotEntries()[self->playerIndex].flag04 = 0;
+}
+
+
+/**
+ * pongPlayer_EnterServeMode  @ 0x82192668 | size: 0x1B0
+ * (called by 0x82196348 and, through message.cpp's declaration, 0x823B8808)
+ *
+ * Makes sure the ball is active, then either puts it in the server's hand
+ * right away (player mode 2, or mode 1 unless pongPlayer_CheckServeInput says
+ * otherwise) or only switches to move mode 2. That switch is skipped when the
+ * aiPlayer's +0x34 value is not positive and the move mode is already 2 or 4.
+ */
+void pongPlayer_EnterServeMode(void* playerPtr)
+{
+    pongPlayer* player = static_cast<pongPlayer*>(playerPtr);
+    pongPlayerServeLayout* self = ServeLayout(player);
+
+    // pongPlayer_GetServeBallBody inlined, with a log before the activation.
+    uint16_t ballIndex = self->ballInst->levelIndex;
+    pongBallBody* ball = nullptr;
+    if (g_pPhysicsSim->level->IsActive(ballIndex))
+        ball = g_pPhysicsSim->level->GetActiveBody(ballIndex);
+    if (!ball) {
+        const pongGameStateServeView* gameState =
+            static_cast<const pongGameStateServeView*>(g_game_state_ptr);
+        if (gameState->sub14->field_25A8 > 0)
+            game_3860(g_game_state_ptr, 1, "pongPlayer::EnterServeMode");
+        ball = pongBallInstance_4980_g(g_pPhysicsSim, self->ballInst->levelIndex, 0, 0, 0, 0);
+    }
+
+    int32_t mode = MatchSettings()->playerMode[self->playerIndex];
+    if ((mode == 1 && !pongPlayer_CheckServeInput(player)) || mode == 2) {
+        pongPlayer_PlaceBallInHand(player, ball);
+        pongPlayer_5C00_g(player, 2);  // move mode 2
+        return;
+    }
+
+    if (mode != 0 && !pongPlayer_CheckServeInput(player))
+        return;
+
+    if (self->ai->sub34->value4 <= 0.0f && (self->moveMode == 2 || self->moveMode == 4))
+        return;
+
+    pongPlayer_5C00_g(player, 2);  // move mode 2
+}
