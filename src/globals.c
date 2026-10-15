@@ -40,7 +40,6 @@ extern uint32_t lbl_825CAF88;     /* 4 bytes .data — resource/string field typ
 extern uint32_t lbl_825C93D0;     /* 8 bytes .data — cameraProperty2 / sgNode_typeId alias */
 extern uint8_t  lbl_8261A0C0[16]; /* default viewport rect / scene reset matrix */
 extern uint8_t  lbl_82619BE0[16]; /* SIMD comparison mask */
-extern float    lbl_825C5938[4];  /* 16 bytes .data — input scale / msgSink init */
 extern uint8_t  lbl_825CB800[64]; /* identity matrix ref */
 extern uint32_t lbl_8260641C;     /* SDA+25628 — renderer state ptr slot */
 extern uint8_t  lbl_82607C40[65616]; /* SDA+31808 — TemplateRegistry backing */
@@ -686,7 +685,6 @@ float g_hudRenderParam = 0.0f;            // @ 0x82140110
 // Player adjustment / input / timing constants
 float       g_kAdjustmentScale     = 0.0f;  // @ 0x82079BAC
 const float g_kAdjustmentThreshold = 0.0f;  // @ 0x8202D110
-const float g_kInputScale          = 0.0f;  // @ 0x825C5938
 const float g_kInputThresholdHigh  = 0.0f;  // @ 0x8202D110
 const float g_kMaxAdjustment       = 0.0f;  // @ 0x82079CD8
 const float g_kQuantScale1         = 0.0f;  // @ 0x82079FFC
@@ -711,7 +709,6 @@ void* g_matrixFieldType   = NULL;          // @ 0x825CAFA4
 
 // Message sink
 uint32_t      g_msgSinkBitfield      = 0;        // @ 0x825B0C30
-const float   g_msgSinkInitFloat     = 0.0f;     // @ 0x825C5938
 const uint32_t g_msgSinkTemplate[4]  = {0};      // @ 0x8241A0C0
 
 // Network globals
