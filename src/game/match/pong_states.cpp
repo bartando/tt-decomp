@@ -131,7 +131,7 @@ extern uint8_t g_creditsRollVisible;   // @ 0x8260660E
 creditsData::~creditsData() {
     // If we allocated an entry array, free it
     if (m_entryCount != 0) {
-        rage_free(m_pEntries);
+        rage_free(m_pArray);
     }
     // Let the singleton base do its teardown
     rage::ReleaseSingleton(this);
@@ -580,7 +580,7 @@ void pongCreditsState::Init() {
 
     // Register context with credits-roll manager (slot 23 on ctx)
     if (ctx != nullptr) {
-        ctx->RegisterWithCreditsRoll();   // vtable slot 23
+        ((void (*)(pongCreditsContext*))ctx->vtable[23])(ctx);  // RegisterWithCreditsRoll
     }
 }
 
@@ -1322,7 +1322,7 @@ void pongDialogState::Init() {
 
     // Register the context (calls slot 23 → allocates page group)
     if (m_pContext != nullptr) {
-        m_pContext->Register();
+        ((void (*)(pongDialogContext*))m_pContext->vtable[23])(m_pContext);  // Register
     }
 }
 

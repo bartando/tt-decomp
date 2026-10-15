@@ -10,6 +10,12 @@
  *       Cross-ref recomp/structured_pass5_final/ for each method.
  */
 #pragma once
+
+// Every struct here carries the game's vtable as an explicit `vtable` member
+// and lists its slots as plain (non-virtual) methods: C++ virtuals would add a
+// hidden vptr (in front of `vtable` where both exist) and number slots their
+// own way (two for a virtual destructor, none for undeclared ones). Call a
+// slot through `vtable[n]`.
 #include <stdint.h>
 
 // charViewCharData and charViewData moved to include/game/char_view.hpp
@@ -27,21 +33,25 @@ class pongCreditsContext;
 // slot 21 = RegisterFields, slot 22 = GetKey).
 // ─────────────────────────────────────────────────────────────────────────────
 struct creditsData {
-    // +0x00 vtable pointer (implicit)
-    // +0x04..+0x1F  base class (atSingleton) data
-    void*       m_pNodeList;       // +0x0C  linked list of raw entry nodes
-    void*       m_pEntries;        // +0x20  loaded entry array (after RegisterFields)
-    void*       m_strName;         // +0x1C  (offset approx — serialised string)
-    void*       m_pActiveEntries;  // +0x20  built by BuildActiveList (slot 3)
-    uint16_t    m_activeCount;     // +0x26  number of active entries
-    uint16_t    m_entryCount;      // +0x26  raw node count (same region, see dtor)
-    void*       m_pArray;          // +0x20  final array ptr (slot 3 result)
+    void**      vtable;            // +0x00
+    uint8_t     _pad04[8];         // +0x04..+0x0B
+    void*       m_pNodeList;       // +0x0C  linked list of raw entry nodes (BuildActiveList 0x8240C1A0)
+    uint8_t     _pad10[8];         // +0x10..+0x17
+    void*       m_pEntries;        // +0x18  registered array field (RegisterFields 0x8240C148)
+    void*       m_strName;         // +0x1C  registered string field (0x8240C160)
+    // atArray built by BuildActiveList (slot 3): data, count, capacity.
+    union {
+        void*   m_pActiveEntries;  // +0x20
+        void*   m_pArray;          // +0x20
+    };
+    uint16_t    m_activeCount;     // +0x24
+    uint16_t    m_entryCount;      // +0x26  capacity; the dtor frees +0x20 when it's non-zero
 
-    virtual ~creditsData();                        // [0]  @ 0x8240C0B8
-    virtual void BuildActiveList();                // [3]  @ 0x8240C188
-    virtual bool IsSupported(uint32_t assetId) const; // [20] @ 0x8240C070
-    virtual void RegisterFields();                 // [21] @ 0x8240C120
-    virtual const char* GetKey() const;            // [22] @ 0x8231F358
+    ~creditsData();                        // [0]  @ 0x8240C0B8
+    void BuildActiveList();                // [3]  @ 0x8240C188
+    bool IsSupported(uint32_t assetId) const; // [20] @ 0x8240C070
+    void RegisterFields();                 // [21] @ 0x8240C120
+    const char* GetKey() const;            // [22] @ 0x8231F358
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -52,8 +62,8 @@ struct creditsData {
 // are floats/values registered with RegisterFields().
 // ─────────────────────────────────────────────────────────────────────────────
 struct creditsSettings {
-    // +0x00 vtable pointer (implicit)
-    // +0x04..+0x0F  base class data
+    void**  vtable;           // +0x00
+    uint8_t _pad04[12];       // +0x04..+0x0F  base class data
     float   m_scrollSpeed;    // +0x10  pixels/sec scroll rate
     float   m_fadeInTime;     // +0x14
     float   m_fadeOutTime;    // +0x18
@@ -63,8 +73,8 @@ struct creditsSettings {
     float   m_pageSpacing;    // +0x28
     float   m_colour;         // +0x2C  (or colour struct, registered separately)
 
-    virtual bool IsSupported(uint32_t assetId) const; // [20] @ 0x8240C2C0
-    virtual void RegisterFields();                     // [21] @ 0x8240C308
+    bool IsSupported(uint32_t assetId) const; // [20] @ 0x8240C2C0
+    void RegisterFields();                     // [21] @ 0x8240C308
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -78,17 +88,17 @@ struct creditsSettings {
 //   +0x1C  m_bActive           (byte — whether the credits are currently active)
 // ─────────────────────────────────────────────────────────────────────────────
 struct pongCreditsContext {
-    // (primary vtable implicit)
-    uint8_t         _pad_primary[20];       // +0x04..+0x13  base class data
+    void**          vtable;                 // +0x00
+    uint8_t         _pad_primary[16];       // +0x04..+0x13  base class data
     void*           _secondary_vtable;      // +0x14  MI secondary vtable @ 0x8205EE6C
     pongPageGroup*  m_pPageGroup;           // +0x18  UI page group (null until Init)
     uint8_t         m_bActive;              // +0x1C  credits currently showing
 
-    virtual ~pongCreditsContext(); // [0]  @ 0x82309C38
-    virtual bool CanTransition();          // [11] @ 0x82309D38
-    virtual void OnEnterCredits();         // [16] @ 0x82309E18
-    virtual void OnExitCredits();          // [18] @ 0x82309F38
-    virtual void RegisterWithCreditsRoll();// [23] @ 0x82309CA0 (thunk)
+    ~pongCreditsContext(); // [0]  @ 0x82309C38
+    bool CanTransition();          // [11] @ 0x82309D38
+    void OnEnterCredits();         // [16] @ 0x82309E18
+    void OnExitCredits();          // [18] @ 0x82309F38
+    void RegisterWithCreditsRoll();// [23] @ 0x82309CA0 (thunk)
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -104,23 +114,23 @@ struct pongAttractState {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void Reset();  // [7] @ 0x823057e8
-    virtual void Shutdown();  // [8] @ 0x82306ea8
-    virtual void OnEnter();  // [11] @ 0x823058e0
-    virtual void OnExit();  // [12] @ 0x823059a8
-    virtual void GetName();  // [13] @ 0x82305a60
-    virtual void ProcessInput();  // [14] @ 0x82305800
+    void Reset();  // [7] @ 0x823057e8
+    void Shutdown();  // [8] @ 0x82306ea8
+    void OnEnter();  // [11] @ 0x823058e0
+    void OnExit();  // [12] @ 0x823059a8
+    void GetName();  // [13] @ 0x82305a60
+    void ProcessInput();  // [14] @ 0x82305800
 };
 
 struct pongCreditsState : public pongAttractState {
     void*               m_pHSMContext;   // +0x04  rage::hsmContext for transitions
     pongCreditsContext* m_pContext;      // +0x08  the live credits context
 
-    virtual ~pongCreditsState(); // [0]  @ 0x8230A000
-    virtual void OnEnter(int prevStateIdx);             // [11] @ 0x8230A150
-    virtual void OnExit(int nextStateIdx);              // [12] @ 0x8230A268
-    virtual void* GetContext();                         // [13] @ 0x82309C28
-    virtual void Init();                                // [14] @ 0x8230A068
+    ~pongCreditsState(); // [0]  @ 0x8230A000
+    void OnEnter(int prevStateIdx);             // [11] @ 0x8230A150
+    void OnExit(int nextStateIdx);              // [12] @ 0x8230A268
+    void* GetContext();                         // [13] @ 0x82309C28
+    void Init();                                // [14] @ 0x8230A068
 };
 // Helper shared by pongCreditsContext::CanTransition and pongCreditsState::OnEnter
 // Sets the page group's visible state and clears the context's m_bActive flag.
@@ -133,11 +143,11 @@ struct hsmState {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~hsmState();                  // [0] @ 0x823b3d30
-    virtual void vfn_2();  // [2] @ 0x823ed280
-    virtual void Start();  // [3] @ 0x823ed290
-    virtual void Stop();  // [4] @ 0x823e8d58
-    virtual void OnExit();  // [12] @ 0x823ed3a0
+    ~hsmState();                  // [0] @ 0x823b3d30
+    void vfn_2();  // [2] @ 0x823ed280
+    void Start();  // [3] @ 0x823ed290
+    void Stop();  // [4] @ 0x823e8d58
+    void OnExit();  // [12] @ 0x823ed3a0
 
     // Non-virtual methods
     void GetFullStatePath(char* buf, unsigned int bufSize) const;
@@ -149,9 +159,9 @@ struct pongAttractContext {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongAttractContext();                  // [0] @ 0x823055a0
-    virtual void OnEnterCredits();  // [16] @ 0x82305600
-    virtual void OnExitCredits();  // [18] @ 0x82305790
+    ~pongAttractContext();                  // [0] @ 0x823055a0
+    void OnEnterCredits();  // [16] @ 0x82305600
+    void OnExitCredits();  // [18] @ 0x82305790
 };
 
 // ── pongAttractState  [vtable @ 0x8205E0AC] ──────────────────────────
@@ -162,8 +172,8 @@ struct pongBootState {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x822c1220
-    virtual void GetName();  // [13] @ 0x822c1210
+    void OnEnter();  // [11] @ 0x822c1220
+    void GetName();  // [13] @ 0x822c1210
 };
 
 // pongCharViewContext and pongCharViewState moved to include/game/char_view.hpp
@@ -184,17 +194,17 @@ struct pongBootState {
 //   +0x20  m_bSkipClose      — byte, if set suppresses Close on exit
 // ─────────────────────────────────────────────────────────────────────────────
 struct pongDialogContext {
-    // +0x00: primary vtable (implicit)
+    void**      vtable;                 // +0x00
     uint8_t     _pad_primary[16];       // +0x04..+0x13  base class data
     void*       _secondary_vtable;      // +0x14  MI secondary vtable
     void*       m_pPageGroup;           // +0x18  dialog page group (null until Register)
     int32_t     m_nextStateIdx;         // +0x1C  state to transition to (-1 init)
     uint8_t     m_bSkipClose;           // +0x20  suppress Close on exit
 
-    virtual ~pongDialogContext(); // [0]  @ 0x8230C7A0
-    virtual void Update();              // [16] @ 0x8230C8A8  — checks dialog ready, transitions
-    virtual void OnExit();              // [18] @ 0x8230C918  — closes dialog page group
-    virtual void Register();            // [23] @ 0x8230C808  — allocates page group, registers
+    ~pongDialogContext(); // [0]  @ 0x8230C7A0
+    void Update();              // [16] @ 0x8230C8A8  — checks dialog ready, transitions
+    void OnExit();              // [18] @ 0x8230C918  — closes dialog page group
+    void Register();            // [23] @ 0x8230C808  — allocates page group, registers
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -212,13 +222,13 @@ struct pongDialogState : public pongAttractState {
     uint8_t             m_savedOverlay;  // +0x08  saved overlay state
     pongDialogContext*  m_pContext;      // +0x0C  the live dialog context
 
-    virtual ~pongDialogState();   // [0]  @ 0x8230CC20
-    virtual void ProcessInput();         // [7]  @ 0x8230CC88  — forwards to context slot 4
-    virtual void Teardown();             // [8]  @ 0x8230CD60  — destroys context
-    virtual void OnEnter(int prevStateIdx);  // [11] @ 0x8230CDD0
-    virtual void OnExit(int nextStateIdx);   // [12] @ 0x8230CED0
-    virtual void* GetContext();              // [13] @ 0x8230C790
-    virtual void Init();                     // [14] @ 0x8230CCA0
+    ~pongDialogState();   // [0]  @ 0x8230CC20
+    void ProcessInput();         // [7]  @ 0x8230CC88  — forwards to context slot 4
+    void Teardown();             // [8]  @ 0x8230CD60  — destroys context
+    void OnEnter(int prevStateIdx);  // [11] @ 0x8230CDD0
+    void OnExit(int nextStateIdx);   // [12] @ 0x8230CED0
+    void* GetContext();              // [13] @ 0x8230C790
+    void Init();                     // [14] @ 0x8230CCA0
 };
 
 // ── pongFrontendContext  [2 vtables — template/MI] ──────────────────────────
@@ -226,12 +236,12 @@ struct pongFrontendContext {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongFrontendContext();                  // [0] @ 0x8230d110
-    virtual void OnEnter();  // [11] @ 0x8230d198
-    virtual void OnExit();  // [12] @ 0x8230d958
-    virtual void ProcessInput();  // [14] @ 0x8230da70
-    virtual void HandleMessage();  // [17] @ 0x8230eae8
-    virtual void OnExitCredits();  // [18] @ 0x8230ec00
+    ~pongFrontendContext();                  // [0] @ 0x8230d110
+    void OnEnter();  // [11] @ 0x8230d198
+    void OnExit();  // [12] @ 0x8230d958
+    void ProcessInput();  // [14] @ 0x8230da70
+    void HandleMessage();  // [17] @ 0x8230eae8
+    void OnExitCredits();  // [18] @ 0x8230ec00
 };
 
 // ── pongFrontendLive  [vtable @ 0x8205DEB4] ──────────────────────────
@@ -246,10 +256,10 @@ struct pongFrontendState {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x82310750
-    virtual void OnExit();  // [12] @ 0x82310b20
-    virtual void GetName();  // [13] @ 0x82310ea8
-    virtual void ProcessInput();  // [14] @ 0x823106e0
+    void OnEnter();  // [11] @ 0x82310750
+    void OnExit();  // [12] @ 0x82310b20
+    void GetName();  // [13] @ 0x82310ea8
+    void ProcessInput();  // [14] @ 0x823106e0
 
     // ── non-virtual methods (from debug strings) ──
     void WaitForCharLoadToEnd();
@@ -260,11 +270,11 @@ struct pongLeaderboardContext {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongLeaderboardContext();                  // [0] @ 0x82322ec8
-    virtual void OnEnter();  // [11] @ 0x82323020
-    virtual void OnEnterCredits();  // [16] @ 0x82323050
-    virtual void OnExitCredits();  // [18] @ 0x82323138
-    virtual void vfn_23();  // [23] @ 0x82322f30
+    ~pongLeaderboardContext();                  // [0] @ 0x82322ec8
+    void OnEnter();  // [11] @ 0x82323020
+    void OnEnterCredits();  // [16] @ 0x82323050
+    void OnExitCredits();  // [18] @ 0x82323138
+    void vfn_23();  // [23] @ 0x82322f30
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -281,16 +291,16 @@ struct pongLeaderboardContext {
 //   +0x18  m_bInputDetected — byte flag, set when any controller input seen
 // ─────────────────────────────────────────────────────────────────────────────
 struct pongLegalsContext {
-    // +0x00: vtable (implicit)
-    uint32_t    m_baseData[4];          // +0x04..+0x13  base class data (zeroed)
+    void**      vtable;                 // +0x00
+    uint32_t    m_baseData[3];          // +0x04..+0x0F  base class data (zeroed)
     void*       m_field10;              // +0x10  base class data (zeroed)
     void*       m_pPageGroup;           // +0x14  UI page group (null until Init)
     uint8_t     m_bInputDetected;       // +0x18  input detected → ready to advance
 
-    virtual ~pongLegalsContext(); // [0]  @ 0x82310ED0
-    virtual bool CanTransition();       // [12] @ 0x82310F60  — destroys page group, returns true
-    virtual void Update();              // [16] @ 0x82310FB8  — polls input, transitions when ready
-    virtual void OnExit();              // [18] @ 0x82311070  — forwards Close to page group
+    ~pongLegalsContext(); // [0]  @ 0x82310ED0
+    bool CanTransition();       // [12] @ 0x82310F60  — destroys page group, returns true
+    void Update();              // [16] @ 0x82310FB8  — polls input, transitions when ready
+    void OnExit();              // [18] @ 0x82311070  — forwards Close to page group
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -306,10 +316,10 @@ struct pongLegalsState : public pongAttractState {
     void*               m_pHSMContext;  // +0x04  rage::hsmContext
     pongLegalsContext*  m_pContext;     // +0x08  the live legals context
 
-    virtual void OnEnter(int prevStateIdx);  // [11] @ 0x82311280
-    virtual void OnExit(int nextStateIdx);   // [12] @ 0x82311368
-    virtual void* GetContext();              // [13] @ 0x82310EC0
-    virtual void Init();                     // [14] @ 0x823111A8
+    void OnEnter(int prevStateIdx);  // [11] @ 0x82311280
+    void OnExit(int nextStateIdx);   // [12] @ 0x82311368
+    void* GetContext();              // [13] @ 0x82310EC0
+    void Init();                     // [14] @ 0x823111A8
 };
 
 // ── pongLoadingContext  [vtable @ 0x8205E8BC] ──────────────────────────
@@ -317,18 +327,18 @@ struct pongLoadingContext {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void OnEnter();  // [11] @ 0x823078a8
-    virtual void OnEnterCredits();  // [16] @ 0x82307a18
-    virtual void OnExitCredits();  // [18] @ 0x82307b00
-    virtual void vfn_23();  // [23] @ 0x823078e0
-    virtual void vfn_24();  // [24] @ 0x82307980
-    virtual void vfn_25();  // [25] @ 0x823079c8
-    virtual void vfn_26();  // [26] @ 0x823079d8
-    virtual void vfn_27();  // [27] @ 0x82307a00
-    virtual void vfn_28();  // [28] @ 0x82307b28
-    virtual void vfn_29();  // [29] @ 0x82307d30
-    virtual void vfn_30();  // [30] @ 0x82307f48
-    virtual void vfn_31();  // [31] @ 0x82308008
+    void OnEnter();  // [11] @ 0x823078a8
+    void OnEnterCredits();  // [16] @ 0x82307a18
+    void OnExitCredits();  // [18] @ 0x82307b00
+    void vfn_23();  // [23] @ 0x823078e0
+    void vfn_24();  // [24] @ 0x82307980
+    void vfn_25();  // [25] @ 0x823079c8
+    void vfn_26();  // [26] @ 0x823079d8
+    void vfn_27();  // [27] @ 0x82307a00
+    void vfn_28();  // [28] @ 0x82307b28
+    void vfn_29();  // [29] @ 0x82307d30
+    void vfn_30();  // [30] @ 0x82307f48
+    void vfn_31();  // [31] @ 0x82308008
 };
 
 // ── pongLoadingState  [vtable @ 0x8205E874] ──────────────────────────
@@ -336,12 +346,12 @@ struct pongLoadingState {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void Reset();  // [7] @ 0x82308440
-    virtual void Shutdown();  // [8] @ 0x823085a8
-    virtual void OnEnter();  // [11] @ 0x82308660
-    virtual void OnExit();  // [12] @ 0x823087d8
-    virtual void GetName();  // [13] @ 0x82308938
-    virtual void ProcessInput();  // [14] @ 0x82308498
+    void Reset();  // [7] @ 0x82308440
+    void Shutdown();  // [8] @ 0x823085a8
+    void OnEnter();  // [11] @ 0x82308660
+    void OnExit();  // [12] @ 0x823087d8
+    void GetName();  // [13] @ 0x82308938
+    void ProcessInput();  // [14] @ 0x82308498
 };
 
 // ── pongLogosContext  [vtable @ 0x8205E564] ──────────────────────────
@@ -358,9 +368,9 @@ struct pongLogosContext {
     uint8_t     m_bActive;        // +0x1C  active flag
 
     // ── virtual methods ──
-    virtual uint32_t GetType();     // [14] @ 0x82306d48 - returns 1
-    virtual void Update();          // [16] @ 0x82306d58 - checks completion, transitions
-    virtual void Render();          // [18] @ 0x82306da8 - renders logos
+    uint32_t GetType();     // [14] @ 0x82306d48 - returns 1
+    void Update();          // [16] @ 0x82306d58 - checks completion, transitions
+    void Render();          // [18] @ 0x82306da8 - renders logos
 };
 
 // ── pongLogosState  [vtable @ 0x8205E51C] ──────────────────────────
@@ -372,10 +382,10 @@ struct pongLogosState {
     void*       m_pLogosContext;  // +0x08  pongLogosContext* allocated in Init
 
     // ── virtual methods ──
-    virtual void OnEnter(uint32_t prevStateIdx);  // [11] @ 0x82306f18
-    virtual void OnExit(uint32_t nextStateIdx);   // [12] @ 0x82306fd8
-    virtual const char* GetName();                 // [13] @ 0x82306d38 - returns "pongLogosState"
-    virtual void Init();                           // [14] @ 0x82306db8 - allocates context
+    void OnEnter(uint32_t prevStateIdx);  // [11] @ 0x82306f18
+    void OnExit(uint32_t nextStateIdx);   // [12] @ 0x82306fd8
+    const char* GetName();                 // [13] @ 0x82306d38 - returns "pongLogosState"
+    void Init();                           // [14] @ 0x82306db8 - allocates context
 };
 
 // ── pongPauseContext  [2 vtables — template/MI] ──────────────────────────
@@ -383,11 +393,11 @@ struct pongPauseContext {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongPauseContext();                  // [0] @ 0x82308a08
-    virtual void OnEnter();  // [11] @ 0x82308a70
-    virtual void OnEnterCredits();  // [16] @ 0x82308b68
-    virtual void OnExitCredits();  // [18] @ 0x82308d20
-    virtual void vfn_23();  // [23] @ 0x82308ad0
+    ~pongPauseContext();                  // [0] @ 0x82308a08
+    void OnEnter();  // [11] @ 0x82308a70
+    void OnEnterCredits();  // [16] @ 0x82308b68
+    void OnExitCredits();  // [18] @ 0x82308d20
+    void vfn_23();  // [23] @ 0x82308ad0
 };
 
 // ── pongPauseState  [vtable @ 0x8205EA6C] ──────────────────────────
@@ -395,11 +405,11 @@ struct pongPauseState {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongPauseState();                  // [0] @ 0x82308fe8
-    virtual void OnEnter();  // [11] @ 0x82309108
-    virtual void OnExit();  // [12] @ 0x82309250
-    virtual void GetName();  // [13] @ 0x823089f8
-    virtual void ProcessInput();  // [14] @ 0x82309050
+    ~pongPauseState();                  // [0] @ 0x82308fe8
+    void OnEnter();  // [11] @ 0x82309108
+    void OnExit();  // [12] @ 0x82309250
+    void GetName();  // [13] @ 0x823089f8
+    void ProcessInput();  // [14] @ 0x82309050
 };
 
 // ── pongStatsContext  [2 vtables — template/MI] ──────────────────────────
@@ -407,10 +417,10 @@ struct pongStatsContext {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongStatsContext();                  // [0] @ 0x82322530
-    virtual void OnEnter();  // [11] @ 0x82322598
-    virtual void OnEnterCredits();  // [16] @ 0x82322c10
-    virtual void OnExitCredits();  // [18] @ 0x82322e28
+    ~pongStatsContext();                  // [0] @ 0x82322530
+    void OnEnter();  // [11] @ 0x82322598
+    void OnEnterCredits();  // [16] @ 0x82322c10
+    void OnExitCredits();  // [18] @ 0x82322e28
 };
 
 // ── pongTrainingLoadingContext  [vtable @ 0x8205E944] ──────────────────────────
@@ -418,9 +428,9 @@ struct pongTrainingLoadingContext {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_23();  // [23] @ 0x82308350
-    virtual void vfn_28();  // [28] @ 0x823080d0
-    virtual void vfn_29();  // [29] @ 0x823081e8
+    void vfn_23();  // [23] @ 0x82308350
+    void vfn_28();  // [28] @ 0x823080d0
+    void vfn_29();  // [29] @ 0x823081e8
 };
 
 // ── pongTrainingUIContext  [2 vtables — template/MI] ──────────────────────────
@@ -428,12 +438,12 @@ struct pongTrainingUIContext {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongTrainingUIContext();                  // [0] @ 0x82307080
-    virtual void OnEnter();  // [11] @ 0x82307120
-    virtual void OnExit();  // [12] @ 0x82307180
-    virtual void OnEnterCredits();  // [16] @ 0x823071b8
-    virtual void OnExitCredits();  // [18] @ 0x823072e0
-    virtual void vfn_23();  // [23] @ 0x82307420
+    ~pongTrainingUIContext();                  // [0] @ 0x82307080
+    void OnEnter();  // [11] @ 0x82307120
+    void OnExit();  // [12] @ 0x82307180
+    void OnEnterCredits();  // [16] @ 0x823071b8
+    void OnExitCredits();  // [18] @ 0x823072e0
+    void vfn_23();  // [23] @ 0x82307420
 };
 
 // ── pongTrainingUIState  [vtable @ 0x8205E68C] ──────────────────────────
@@ -441,11 +451,11 @@ struct pongTrainingUIState {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongTrainingUIState();                  // [0] @ 0x82307520
-    virtual void Shutdown();  // [8] @ 0x823075a8
-    virtual void OnExit();  // [12] @ 0x82307728
-    virtual void GetName();  // [13] @ 0x82307070
-    virtual void ProcessInput();  // [14] @ 0x823077e0
+    ~pongTrainingUIState();                  // [0] @ 0x82307520
+    void Shutdown();  // [8] @ 0x823075a8
+    void OnExit();  // [12] @ 0x82307728
+    void GetName();  // [13] @ 0x82307070
+    void ProcessInput();  // [14] @ 0x823077e0
 };
 
 // ── rlConcreteStatsView  [2 vtables — template/MI] ──────────────────────────
@@ -453,7 +463,7 @@ struct rlConcreteStatsView {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~rlConcreteStatsView();                  // [0] @ 0x82336fb0
+    ~rlConcreteStatsView();                  // [0] @ 0x82336fb0
 };
 
 // ── frontendData  [vtable @ 0x820763D4] ──────────────────────────
@@ -468,8 +478,8 @@ struct frontendData {
     // ... additional fields at +0x10, +0x14 (registered in RegisterFields)
     
     // ── virtual methods ──
-    virtual bool IsSupported(uint32_t assetId) const;  // [20] @ 0x8240BBF0
-    virtual void RegisterFields();                      // [21] @ 0x8240BC38
+    bool IsSupported(uint32_t assetId) const;  // [20] @ 0x8240BBF0
+    void RegisterFields();                      // [21] @ 0x8240BC38
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -480,15 +490,17 @@ struct frontendData {
 // slot 21 = RegisterFields, slot 22 = GetKey).
 // ─────────────────────────────────────────────────────────────────────────────
 struct dialogData {
+    void**      vtable;            // +0x00
+    uint8_t     _pad04[12];        // +0x04..+0x0F
     // +0x00 vtable pointer (implicit)
     // +0x04..+0x0F  base class (atSingleton) data
     int32_t     m_dialogType;      // +0x10  dialog type ID (validated 0-209)
     int32_t     m_buttonCount;     // +0x14  number of buttons (validated >= 1)
 
-    virtual void Validate();                           // [2]  @ 0x8240AF20
-    virtual bool IsSupported(uint32_t assetId) const;  // [20] @ 0x8240AE68
-    virtual void RegisterFields();                     // [21] @ 0x8240AEB0
-    virtual const char* GetKey() const;                // [22] @ 0x822EC760
+    void Validate();                           // [2]  @ 0x8240AF20
+    bool IsSupported(uint32_t assetId) const;  // [20] @ 0x8240AE68
+    void RegisterFields();                     // [21] @ 0x8240AEB0
+    const char* GetKey() const;                // [22] @ 0x822EC760
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
