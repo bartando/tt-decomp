@@ -92,39 +92,34 @@ extern const char* g_stateName_charView;    // @ 0x8205EF5C
  * 
  * Returns the UI context object by forwarding to the screen object's vtable.
  */
+// @ 0x823057E8
 void* pongAttractState::GetContext() {
-    if (!m_pScreenObject) {
-        return nullptr;
-    }
-    
-    // Forward to screen object's GetContext method (vtable slot 4)
-    typedef void* (*GetContextFunc)(void*);
+    // Tail call of the context object's slot 4 with a 0 argument; no null check.
+    typedef void* (*GetContextFunc)(void*, int);
     void** vtable = *(void***)m_pScreenObject;
-    GetContextFunc getContext = (GetContextFunc)vtable[4];
-    return getContext(m_pScreenObject);
+    return ((GetContextFunc)vtable[4])(m_pScreenObject, 0);
 }
 
 /**
  * pongAttractState::OnExit @ 0x82306EA8 | size: 0x6C
- * 
- * Called when leaving this state - cleans up the UI screen object.
+ *
+ * Called when leaving this state - releases and deletes the context object.
  */
+// @ 0x82306EA8
 void pongAttractState::OnExit() {
     if (!m_pScreenObject) {
         return;
     }
-    
-    // Call Release/Cleanup on screen object (vtable slot 5)
-    void** vtable = *(void***)m_pScreenObject;
+
     typedef void (*ReleaseFunc)(void*);
-    ReleaseFunc release = (ReleaseFunc)vtable[5];
-    release(m_pScreenObject);
-    
-    // Call destructor with delete flag (vtable slot 0)
-    typedef void (*DestructorFunc)(void*, bool);
-    DestructorFunc dtor = (DestructorFunc)vtable[0];
-    dtor(m_pScreenObject, true);
-    
+    ((ReleaseFunc)(*(void***)m_pScreenObject)[5])(m_pScreenObject);
+
+    // The release can clear the pointer, so it's reloaded.
+    if (m_pScreenObject) {
+        typedef void (*DestructorFunc)(void*, int);
+        ((DestructorFunc)(*(void***)m_pScreenObject)[0])(m_pScreenObject, 1);
+    }
+
     m_pScreenObject = nullptr;
 }
 
@@ -312,7 +307,7 @@ charViewData::~charViewData() {
     }
     
     // Call base class destructor
-    rage::ReleaseSingleton(this);
+    rage::ReleaseSingleton(reinterpret_cast<rage::atSingleton*>(this));
 }
 
 /**
