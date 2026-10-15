@@ -29,29 +29,34 @@ slot 1..25 one off; header fixed, drill subclasses other than Movement not re-ve
 - ~240 data symbols stay undefined because their declared address is missing or wrong
   (0x8204A5F8 is a string, not a tuning table; 0x82079ADC isn't FLT_MAX; 0x82077054 is a
   vtable). Each needs a manual check against the asm.
-- Duplicate definitions will become link errors once nothing is undefined:
-  `msgMsgSink_D168_sp`/`D1D8_sp` (`pong_network_io.cpp` + `msg_msg_sink.cpp`), `atArray_Clear`,
-  `atHashMap_Find`, `rage_atStringCopy`, the `charViewCS` vtable (`char_view.cpp` +
-  `pong_camera.cpp`), `ph_Atan2`/`ph_Normalize`.
+- Duplicate definitions will become link errors once nothing is undefined: the `charViewCS`
+  vtable (`char_view.cpp` + `pong_camera.cpp`).
+- `rage_atStringCopy` (0x82228990) forwards to the unlifted `CopyNetworkString`; the real
+  function looks a key up in the string table (0x82408F08) and writes the entry as UTF-8.
 - Placeholder bodies that callers rely on (not bridged): `at_types.cpp` `atSingleton_*`,
-  `datArray_Grow`, `datResource_Load`, `atArray_Clear`; `fiAsciiTokenizer.cpp`
-  `Destroy`/`ReadBool`/`ReadToken`; `kernel_shims.c` `ke_*Object*`; `hsm.cpp`
-  `hsmContext_Init*`, `gmLogic_StepFrame`, `SetTrainingState`, `hsmEvent_Init`;
-  `par_xml_types.cpp` `xml*`, `RegisterSerializationField`; `rage_core_utils.cpp` `rage_C1A8`,
-  `RtlEnterCriticalSection_D6F0_fw`, `rage::g_capsuleVolK*`/`g_ph*` (guessed values),
-  `atSingletonPool_AllocEntry` (always 64 bytes); `netStream_ReadS16`, `pongPlayer_0270_g`.
+  `datResource_Load` (912 bytes, a dozen callees), `atHashMap_Clear` (empty);
+  `fiAsciiTokenizer.cpp` `ReadBool`/`ReadToken`; `kernel_shims.c` `ke_*Object*`; `hsm.cpp`
+  `hsmContext_Init*` (`hsmContext_Init` reads the time base, so lift-check can't compare it),
+  `SetTrainingState` (0x821EE9F8 runs per player, not as one state set); `par_xml_types.cpp`
+  `xml*` (the originals are virtual calls on a tokenizer); `rage_core_utils.cpp`
+  `RtlEnterCriticalSection_D6F0_fw`, `rage::g_capsuleVolK*`/`g_ph*` (guessed values).
+- `RegisterSerializationField` (0x821A8F58, ~860 call sites) reads through `g_sda_base`; nothing
+  sets that yet, so it crashes at runtime until something does.
 - Signatures that really conflict across files: `_locale_register`/`XMemFree` 0x820C02D0 (four
   spellings); `msg_msg_sink.cpp` declares 3E68/3EA8, D168/D1D8, 6220, 5098, A970, E860, EC28,
   DC40, 7970, `game_8CF8_h`, `RtlEnterCriticalSection_A158_h` two ways each;
   `atSingleton_89F8_2hr` (pointer as u32); inside `ph_physics.cpp` `grc_2CC8`, `ph_1B78`,
-  `phJoint3Dof_0170_g`, `ph_TokenizerReadInt`; `pongMover_Reset`, `pongPlayer_B208_g`,
+  `phJoint3Dof_0170_g` (declared with count and constructor swapped; every call passes ptr,
+  stride, count, ctor; 17 undefined references), `ph_TokenizerReadInt`; `pongMover_Reset`, `pongPlayer_B208_g`,
   `pongBallInstance_4980_g`, `pg_E6E0`, `LocomotionStateAnim_ApplyAnimData`,
   `ReleaseSingleton`, `rage_strDuplicate`, `rage_7630`, `util_1568`, `xe_GetLoadContext`.
 - The `pg_6F48`/`6C40`/`6F10`/`B850`/`C3B8` group are Xbox thread/event wrappers (ResumeThread,
   SetEvent, CloseHandle, SuspendThread, WaitForSingleObject); they need a per-thread
   last-error and a kernel layer the port doesn't have.
 - Bridges that forward to ported bodies, not lifts: `rage_free` → `free()`, `xe_EC88` → host
-  malloc, `util_PackColorRGBA`.
+  malloc, `util_PackColorRGBA`, `fiAsciiTokenizer_Destroy` → host `free()` (0x82433310 is the
+  CRT's free; unverifiable). Verified forwards: `hsmEvent_Init` → `snEvent_Construct`,
+  `netStream_ReadS16` → `datBitBuffer` `ReadSigned<s16>`.
 
 ## Wrong lifts
 
@@ -167,6 +172,14 @@ slot 1..25 one off; header fixed, drill subclasses other than Movement not re-ve
 - `rage_grm.cpp` declares `rage_free_00C0(uint32_t)` (truncates host pointers).
 - `msg_msg_sink.cpp` 8B78/8B90 drop the slot argument in r4.
 - `globals.c`: `g_msgSinkTemplate` is at 0x8261A0C0, not 0x8241A0C0.
+- `ph_ctor_0460_Destructor` stores vtable 0x820014C8; the asm stores 0x82059FA8.
+- `ph_TokenizerReadInt`/`ReadFloat` (0x82430E88/E90) are CRT math wrappers taking a double in f1.
+- `math_Sqrt`, `Acos`, `Asin`, `Atan2`, `Sin` are labelled with mid-function addresses
+  (0x8240D888…).
+- `render_loop.c` `gameLoop_StepFrame` passes `g_pGmLogic`; it should pass the game loop.
+- `msg_msg_sink.cpp` thunks 0x8244EFE8/0x824514E8 drop r4 on the way into `rage_C1A8`.
+- `gd_data.cpp` lifts 0x821A8F58 wrong as `RegisterSerializedField`; delete it
+  (`RegisterSerializationField` in `par_xml_types.cpp` is the verified one).
 - `globals.c` defines 0x82619BE0 as all-ones; `pong_creature.cpp` says it keeps xyz only. A
   static initializer sets it, so unverified.
 - 0x8271A2F8 +0x10/+0x14 are two `gdBallPredictData*`, swapped per shot by 0x82282A50.
