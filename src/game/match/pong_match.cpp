@@ -1010,105 +1010,122 @@ void gmLogicSinglesMatch_vfn_20(void* self) { // @ 0x82106788
 
 // ─────────────────────────────────────────────────────────────────────────────
 // gmLogicSinglesMatch::stateReplay::onEnterState  @ 0x8210AFD0 | size: 0x168
-// Anchored by the log string "gmLogicSinglesMatch::stateReplay::onEnterState".
 //
-// Enters replay mode. Steps:
-//   1. Chain to stateServeBounce_vfn_11 (base onEnter).
-//   2. Post global message 2128 (MSG_ENTER_REPLAY) to world channel 64.
-//   3. Peek flag at [match-context + 29] — if set, hot-path:
-//        a. Pull replay-buffer pointer from the global match context;
-//        b. If flags A/B at fixed bit-offsets are both clear, look up and
-//           activate the "replay player" actor (via game_76A8);
-//        c. If flag C is set, copy a pointer (+272 in match) into the
-//           replay slot and invoke util_CE00 (replay prep / playback init);
-//        d. If flag D is set, mark replay session "active" (write 1 into
-//           replay+36084);
-//        e. Set the HSM "is-replay-running" byte in the match struct (+37)
-//           and the state-local "entered" byte (this+16).
-//      Cold path: clear (this+16) and call stateReplay_B320 (replay fail-
-//      over / bail-out which drops state to stateServeBounce).
-//
-// In addition to +16, zeroes three status bytes at this+17/18/19 (replay
-// timers / scrub flags) and sets the class-wide "replay active" flag at
-// the singleton (lbl_82104650 + 26224 <- 0).
+// Runs the base OnEnter (0x82106A60, with 0), posts message 0x850, clears the
+// state's bytes at +0x11..+0x13 and the byte at 0x82606670, and logs
+// "gmLogicSinglesMatch::stateReplay::onEnterState" through game_3860.
+// Without a replay (match context +0x1D clear) it clears +0x10 and calls
+// 0x8210B320. Otherwise it hands the replay's last entry to 0x821676A8 (unless
+// the replay's byte +0x68CFB is set), copies a word from 0x8271A324+0x110 into
+// the replay when +0x68CFC is set, runs 0x821CCE00 on the replay, sets
+// +0x68CF4 when +0x68CF9 is set, and finally sets +0x10 and context +0x25.
 // ─────────────────────────────────────────────────────────────────────────────
-extern "C" {
-    void stateServeBounce_vfn_11_base(void* self);      // 0x82106A60
-    void ReplayActor_Activate(void* actor, void* slot); // game_76A8 @ 0x821676A8
-    void ReplayInit_CE00(void* replaySlot);             // util_CE00 @ 0x821CCE00
-    void stateReplay_B320_fallback(void* self);         // @ 0x8210B320
-    void game_3860_unknown(void);                       // @ 0x821D3860
 
-    // Matchcontext / replay globals (reconstructed from the lis/addi pairs)
-    extern void* g_pActiveMatchContext;  // derived from r27 (-23812), +29 = flag
-    extern char  g_ReplayActive;         // r10 (-32160) + 26224
-    extern void* g_pReplayStateData;     // r28 (-23828) — base of replay slot
-    extern void* g_pHsmContextCurrent;   // -23772
+struct stateReplayView {
+    uint8_t _pad00[0x10];
+    uint8_t m_hasReplay;  // +0x10
+    uint8_t field_11;     // +0x11
+    uint8_t field_12;     // +0x12
+    uint8_t field_13;     // +0x13
+};
+
+struct singlesMatchContextView {   // *(0x8271A2FC)
+    uint8_t _pad00[0x1D];
+    uint8_t m_replayAvailable;     // +0x1D
+    uint8_t _pad1E[7];
+    uint8_t m_replayRunning;       // +0x25
+};
+
+struct replayEntry {               // 16 bytes
+    uint8_t bytes[16];
+};
+
+struct replayEntryList {
+    replayEntry* m_entries;        // +0x00
+    uint16_t     m_count;          // +0x04
+};
+
+struct replayDataView {            // *(0x8271A2EC)
+    uint8_t          _pad00000[0x68CF4];
+    int32_t          field_68CF4;  // +0x68CF4  set to 1 when +0x68CF9 is set
+    uint8_t          _pad68CF8[1];
+    uint8_t          field_68CF9;  // +0x68CF9
+    uint8_t          _pad68CFA[1];
+    uint8_t          field_68CFB;  // +0x68CFB  skips the entry hand-off
+    uint8_t          field_68CFC;  // +0x68CFC  copy 0x8271A324+0x110 into +0x68D00
+    uint8_t          _pad68CFD[1];
+    uint8_t          field_68CFE;  // +0x68CFE  use entry 0 - 1 instead of the last one
+    uint8_t          _pad68CFF[1];
+    void*            field_68D00;  // +0x68D00
+    uint8_t          _pad68D04[0xC];
+    replayEntryList* m_entryList;  // +0x68D10
+};
+
+struct lbl_8260641CView {          // *(0x8260641C)
+    uint8_t _pad00[0x2C];
+    void*   field_2C;              // +0x2C  first argument to 0x821676A8
+};
+
+struct lbl_8271A324View {          // *(0x8271A324)
+    uint8_t _pad000[0x110];
+    void*   field_110;             // +0x110
+};
+
+extern "C" {
+    void stateServeBounce_OnEnter(void* self, int param);  // @ 0x82106A60
+    void stateReplay_B320_fallback(void* self);            // @ 0x8210B320
 }
+extern singlesMatchContextView* g_pActiveMatchContext;  // @ 0x8271A2FC
+extern replayDataView*          g_pReplayStateData;     // @ 0x8271A2EC
+extern lbl_8271A324View*        lbl_8271A324;           // @ 0x8271A324
+extern lbl_8260641CView*        lbl_8260641C;           // @ 0x8260641C
+extern uint8_t                  g_ReplayActive;         // @ 0x82606670 (the earlier lift's name; unproven)
+extern void* g_game_state_ptr;                          // @ 0x8271A2F8
+void game_3860(void* gameState, int kind, const char* name);  // @ 0x821D3860, lifted below
+extern void game_76A8(void* owner, replayEntry* entry);       // @ 0x821676A8
+extern void util_CE00(replayDataView* replay);                // @ 0x821CCE00
 
 void gmLogicSinglesMatch_stateReplay_OnEnter(void* self) { // @ 0x8210AFD0
-    stateServeBounce_vfn_11_base(self);
+    stateReplayView* state = static_cast<stateReplayView*>(self);
 
-    // Broadcast: "replay entered" to world (group mask 64).
-    PostGlobalMessage(2128, 64, 0, nullptr);
+    stateServeBounce_OnEnter(self, 0);
+    PostGlobalMessage(0x850, 0x40, 0, nullptr);
 
-    void* matchCtx = g_pActiveMatchContext;
-    uint8_t flagEntry = *((uint8_t*)matchCtx + 29);
-
-    // Local status bytes on this state
-    *((uint8_t*)self + 17) = 0;
-    *((uint8_t*)self + 18) = 0;
-    *((uint8_t*)self + 19) = 0;
-
-    // Class-wide flag: "replay active" pushed to false before re-arming
+    uint8_t replayAvailable = g_pActiveMatchContext->m_replayAvailable;
+    state->field_11 = 0;
+    state->field_12 = 0;
+    state->field_13 = 0;
     g_ReplayActive = 0;
-    game_3860_unknown();
+    game_3860(g_game_state_ptr, 1, "gmLogicSinglesMatch::stateReplay::onEnterState");
 
-    if (flagEntry == 0) {
-        // Cold path — no replay buffer ready; bail to service fallback.
-        *((uint8_t*)self + 16) = 0;
+    if (replayAvailable == 0) {
+        state->m_hasReplay = 0;
         stateReplay_B320_fallback(self);
         return;
     }
 
-    // Hot path — replay buffer ready.
-    char* replaySlot = (char*)g_pReplayStateData;
-
-    // Probe flags A (byte +36091) and B (byte +36094) in the replay slot.
-    if (replaySlot[36091] == 0) {
-        if (replaySlot[36094] == 0) {
-            void* actorPtr = *(void**)(replaySlot + 36112);
-            if (actorPtr != nullptr) {
-                uint16_t actorIndex = *(uint16_t*)((char*)actorPtr + 4);
-                // (actorIndex*16) walk into a per-actor table reachable via
-                // g_replayActorBase -> slot +44 -> table[0] + (idx<<4) - 16
-                void* table   = /* g_replayActorBase->slot44 */
-                    *(void**)(*(char**)(*(char**)((char*)&g_ReplayActive + 25628)) + 44);
-                void* dataSlot = (char*)(*(void**)((char*)table + 0))
-                                 + ((uint32_t)actorIndex << 4) - 16;
-                ReplayActor_Activate(actorPtr, dataSlot);
-            }
+    replayDataView* replay = g_pReplayStateData;
+    if (replay->field_68CFB == 0) {
+        uint16_t count = 0;
+        if (replay->field_68CFE == 0 && replay->m_entryList != nullptr) {
+            count = replay->m_entryList->m_count;
         }
-        replaySlot = (char*)g_pReplayStateData;
+        game_76A8(lbl_8260641C->field_2C, replay->m_entryList->m_entries + count - 1);
+        replay = g_pReplayStateData;
     }
 
-    // Flag C — replay owns a match-side pointer; copy HSM context+272 in.
-    if (replaySlot[36092] != 0) {
-        void* hsmCtx = g_pHsmContextCurrent;
-        *(void**)(replaySlot + 36096) = *(void**)((char*)hsmCtx + 272);
+    if (replay->field_68CFC != 0) {
+        replay->field_68D00 = lbl_8271A324->field_110;
     }
 
-    // Final init
-    ReplayInit_CE00(replaySlot);
+    util_CE00(replay);
 
-    // Flag D — arm replay "active" byte
-    if (replaySlot[36089] != 0) {
-        *(uint32_t*)(replaySlot + 36084) = 1;
+    if (replay->field_68CF9 != 0) {
+        replay->field_68CF4 = 1;
     }
 
-    // Mark both local and match-wide "replay running" flags
-    *((uint8_t*)self + 16) = 1;
-    *((uint8_t*)matchCtx + 37) = 1;
+    state->m_hasReplay = 1;
+    g_pActiveMatchContext->m_replayRunning = 1;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1359,6 +1376,342 @@ void gmLogicSwingPractice::stateAim::OnEnter() {
         gmLogicChild* child = logic->m_children[logic->m_activeChild];
         VirtualSlot<void (*)(gmLogicChild*, int)>(child, 9)(child, 1);
     }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// gmPracticeTarget — the swing-practice target
+//
+// Bases rage::datBase (+0x00) and pongRenderable (+0x04); see pong_match.hpp.
+// ═════════════════════════════════════════════════════════════════════════════
+
+extern void* g_gmPracticeTarget_vtable[];             // @ 0x82032414
+extern void* g_gmPracticeTarget_pongRenderable_vtable[];  // @ 0x82032428
+extern void* g_pongRenderable_vtable[];               // @ 0x82032404
+
+// The allocator sequence the 360 build inlines for `new`: 0x820C0038 makes sure
+// the thread's allocator table exists, then the current allocator's slot 1
+// (Allocate(size, align)) is called.
+extern "C" void sysMemAllocator_InitMainThread();     // @ 0x820C0038
+namespace rage { void* rage_alloc_aligned(unsigned long size, unsigned long alignment); }
+// The matching inlined `delete`: pointers inside a resource are left alone,
+// anything else goes back through the current allocator's slot 2.
+namespace rage { uint8_t FindSingleton(void* ptr); }  // @ 0x820F90D0
+extern "C" void sysMemAllocator_Free(void* ptr);
+extern "C" void* xe_EC88(uint32_t size);              // @ 0x820DEC88, operator new
+
+static void* AllocateAligned(uint32_t size, uint32_t alignment) {
+    sysMemAllocator_InitMainThread();
+    return rage::rage_alloc_aligned(size, alignment);
+}
+
+// @ 0x82112CC0 (rage_2CC0) — gmPracticeTarget's destructor body: restores both
+// vtables, deletes the sets, zeroes the set count, frees the word array and
+// the six Fx strings/colours, then stores datBase's vtable 0x820176C4.
+extern void gmPracticeTarget_Destruct(gmPracticeTarget* target);
+// @ 0x821132B0 (pongDrillCounterSpin_32B0_p46) — fills the table at 0x82617C90
+// with points scaled by the table size (0x8271A304 +0x10/+0x18). Takes no
+// arguments; the constructor still has `this` in r3 when it calls it.
+extern void gmPracticeTarget_LayOutTableGrid();
+
+/**
+ * gmPracticeTargetFx::Construct @ 0x82113D10 | size: 0xE4
+ *
+ * No texture, height offset 0.001, and two zeroed 16-byte colours.
+ */
+gmPracticeTargetFx* gmPracticeTargetFx::Construct() {
+    const float zero = 0.0f;  // @ 0x8202D110
+    m_heightOffset = 0.001f;  // @ 0x8202D168
+    m_textureName = nullptr;
+
+    float* color = static_cast<float*>(AllocateAligned(16, 16));
+    if (color != nullptr) {
+        color[0] = zero;
+        color[1] = zero;
+        color[2] = zero;
+        color[3] = zero;
+    } else {
+        color = nullptr;
+    }
+    m_color = color;
+
+    float* altColor = static_cast<float*>(AllocateAligned(16, 16));
+    if (altColor != nullptr) {
+        altColor[0] = zero;
+        altColor[1] = zero;
+        altColor[2] = zero;
+        altColor[3] = zero;
+        m_altColor = altColor;
+        return this;
+    }
+    m_altColor = nullptr;
+    return this;
+}
+
+/**
+ * gmPracticeTarget::Construct @ 0x82112B58 | size: 0x114
+ *
+ * Runs pongRenderable's part (vtable 0x82032404, then gmPracticeTarget's
+ * 0x82032428), sets the flags, constructs both Fx members, puts the target at
+ * the origin, allocates its word array and lays out the table grid.
+ */
+gmPracticeTarget* gmPracticeTarget::Construct() {
+    const float zero = 0.0f;  // @ 0x8202D110
+    const float one = 1.0f;   // @ 0x8202D108
+
+    m_renderable.field_08 = zero;
+    m_renderable.field_0C = 0;
+    m_renderable.vtable = g_pongRenderable_vtable;
+    m_renderable.field_10 = -1;
+    vtable = g_gmPracticeTarget_vtable;
+    field_16 = 0;
+    field_1C = 0;
+    m_renderable.vtable = g_gmPracticeTarget_pongRenderable_vtable;
+    m_visible = 1;
+    m_drawEnabled = 1;
+    field_17 = 1;
+    field_20 = 0;
+    m_fx.Construct();
+    m_fx2.Construct();
+
+    m_spinAngle = zero;
+    field_44 = 0;
+    m_sets = nullptr;
+    m_position[0] = zero;
+    m_position[1] = zero;
+    m_position[2] = zero;
+    m_position[3] = one;
+
+    // 0x14 bytes on the 360.
+    gmPracticeTargetWordArray* wordArray = static_cast<gmPracticeTargetWordArray*>(
+        AllocateAligned(sizeof(gmPracticeTargetWordArray), 16));
+    if (wordArray != nullptr) {
+        wordArray->m_data = nullptr;
+        wordArray->m_count = 0;
+        wordArray->m_capacity = 0;
+        wordArray->field_0C = 0;
+        wordArray->m_flags &= 0x3F;
+    } else {
+        wordArray = nullptr;
+    }
+    m_wordArray = wordArray;
+
+    gmPracticeTarget_LayOutTableGrid();
+    return this;
+}
+
+/**
+ * gmPracticeTarget::ScalarDeletingDtor  [slot 0] @ 0x82112C70 | size: 0x50
+ *
+ * Runs the destructor body, then frees the object when bit 0 of flags is set.
+ */
+gmPracticeTarget* gmPracticeTarget::ScalarDeletingDtor(uint32_t flags) {
+    gmPracticeTarget_Destruct(this);
+    if (flags & 1) {
+        rage_free(this);
+    }
+    return this;
+}
+
+// rage::fiAssetManager (rage::ASSET): a stack of 128-byte folder names at
+// +0x180 with its depth at +0x600. The callers pop a folder inline.
+struct fiAssetManagerView {
+    uint8_t _pad000[0x600];
+    int32_t m_folderDepth;  // +0x600
+};
+extern fiAssetManagerView g_fiAssetManager;  // @ 0x825D0080
+struct fiStream;
+// @ 0x822E2E60 — pushes a folder ("$/..." is taken as is).
+extern void fiAssetManager_PushFolder(fiAssetManagerView* assets, const char* path);
+// @ 0x822E3040 — opens name.ext in the current folder; the loaders pass 0, 1.
+extern fiStream* fiAssetManager_Open(fiAssetManagerView* assets, const char* name, const char* ext,
+                                     int arg3, int arg4);
+// @ 0x822E3B38
+extern void fiStream_Close(fiStream* stream);
+
+// rage::fiTokenizer as the loaders build it on the stack (vtable 0x8205A594).
+struct fiTokenizerView {
+    void**      vtable;        // +0x00
+    const char* m_name;        // +0x04  the file's name
+    int32_t     field_08;      // +0x08  1
+    fiStream*   m_stream;      // +0x0C
+    int32_t     field_10;      // +0x10  0x20
+    int32_t     field_14;      // +0x14  2
+    int32_t     field_18;      // +0x18  0
+    char        m_buffer[0x80];// +0x1C  first byte cleared
+    int32_t     field_9C;      // +0x9C  0
+    int32_t     field_A0;      // +0xA0  0
+};
+extern void* g_fiTokenizer_vtable[];  // @ 0x8205A594
+// @ 0x822E5908 — reads a token; true when it equals `token`, otherwise puts it back.
+extern bool fiTokenizer_CheckToken(fiTokenizerView* tokenizer, const char* token, bool consume);
+// @ 0x822E5E88
+extern int32_t fiTokenizer_GetInt(fiTokenizerView* tokenizer);
+// @ 0x822E5F08
+extern float fiTokenizer_GetFloat(fiTokenizerView* tokenizer);
+
+// The tokenizer constructor every loader inlines.
+static void fiTokenizer_Init(fiTokenizerView* tokenizer, const char* name, fiStream* stream) {
+    tokenizer->field_A0 = 0;
+    tokenizer->vtable = g_fiTokenizer_vtable;
+    tokenizer->field_08 = 1;
+    tokenizer->m_name = name;
+    tokenizer->m_stream = stream;
+    tokenizer->field_10 = 0x20;
+    tokenizer->field_18 = 0;
+    tokenizer->m_buffer[0] = 0;
+    tokenizer->field_9C = 0;
+    tokenizer->field_14 = 2;
+}
+
+// Slot 1 of the tokenizer: reads the next token into buffer (at most size bytes).
+static void fiTokenizer_GetToken(fiTokenizerView* tokenizer, char* buffer, int size) {
+    VirtualSlot<void (*)(fiTokenizerView*, char*, int)>(tokenizer, 1)(tokenizer, buffer, size);
+}
+
+// @ 0x82113DF8 (atSingleton_3DF8_h) — reads TextureName, Color, AltColor and
+// HeightOffset, each only if its token is next.
+extern void gmPracticeTargetFx_Load(gmPracticeTargetFx* fx, fiTokenizerView* tokenizer);
+// @ 0x82113F20 (pongNetMessageHolder_3F20_w) — reads "NumTargets" and that many
+// 0x44-byte targets (nine ints, then two groups of four floats).
+extern void gmPracticeTargetSet_Load(gmPracticeTargetSet* set, fiTokenizerView* tokenizer);
+// @ 0x821B2A58 (pg_2A58_g) — allocates `capacity` words; count = capacity.
+extern void gmPracticeTargetWordArray_Init(gmPracticeTargetWordArray* array, int32_t capacity,
+                                           bool flag6, bool flag7);
+
+extern int32_t  g_practiceTargetNumSets;       // @ 0x826063AC (lbl_826063AC)
+extern uint32_t g_practiceTargetDefaultColor;  // @ 0x825CA198, 0xAARRGGBB
+extern uint32_t g_practiceTargetHitColor;      // @ 0x825CA19C, 0xAARRGGBB
+
+// Reads four floats (R, G, B, A in 0..1) and packs them as 0xAARRGGBB; each
+// channel is the low byte of the float times 255 truncated to an int.
+static uint32_t ReadColor(fiTokenizerView* tokenizer) {
+    const float scale = 255.0f;  // @ 0x82079BE0
+    float r = fiTokenizer_GetFloat(tokenizer);
+    float g = fiTokenizer_GetFloat(tokenizer);
+    float b = fiTokenizer_GetFloat(tokenizer);
+    float a = fiTokenizer_GetFloat(tokenizer);
+    uint32_t alpha = static_cast<uint8_t>(static_cast<int32_t>(a * scale));
+    uint32_t red = static_cast<uint8_t>(static_cast<int32_t>(r * scale));
+    uint32_t green = static_cast<uint8_t>(static_cast<int32_t>(g * scale));
+    uint32_t blue = static_cast<uint8_t>(static_cast<int32_t>(b * scale));
+    return (alpha << 24) | (red << 16) | (green << 8) | blue;
+}
+
+// Opens name.fx and loads one Fx from it.
+static void LoadFx(gmPracticeTargetFx* fx, const char* name) {
+    fiStream* stream = fiAssetManager_Open(&g_fiAssetManager, name, "fx", 0, 1);
+    if (stream == nullptr) {
+        return;
+    }
+    fiTokenizerView tokenizer;
+    fiTokenizer_Init(&tokenizer, name, stream);
+    gmPracticeTargetFx_Load(fx, &tokenizer);
+    fiStream_Close(stream);
+}
+
+/**
+ * gmPracticeTarget::LoadData  [slot 1] @ 0x82112DF8 | size: 0x4B4
+ *
+ * From "$/fx": fx_target.fx into m_fx, fx_target2.fx into m_fx2, then
+ * practice_targets.fx:
+ *     NumSets n                      (also kept in g_practiceTargetNumSets)
+ *     TargetDefaultColor r g b a     (0..1, packed into g_practiceTargetDefaultColor)
+ *     TargetHitColor r g b a
+ *     Set <token> NumTargets ... <token>   (n times)
+ * The word array is sized for the largest set. Ends by popping "$/fx",
+ * pushing "$/fx/tex" and popping it again.
+ */
+void gmPracticeTarget::LoadData() {
+    fiAssetManager_PushFolder(&g_fiAssetManager, "$/fx");
+
+    LoadFx(&m_fx, "fx_target");
+    LoadFx(&m_fx2, "fx_target2");
+
+    int32_t maxTargets = 0;
+    fiStream* stream = fiAssetManager_Open(&g_fiAssetManager, "practice_targets", "fx", 0, 1);
+    if (stream != nullptr) {
+        fiTokenizerView tokenizer;
+        fiTokenizer_Init(&tokenizer, "practice_targets", stream);
+
+        if (fiTokenizer_CheckToken(&tokenizer, "NumSets", true)) {
+            int32_t numSets = fiTokenizer_GetInt(&tokenizer);
+            g_practiceTargetNumSets = numSets;
+
+            // new gmPracticeTargetSet[numSets]; 0xFFFFFFFF bytes when the size overflows.
+            const uint32_t header = offsetof(gmPracticeTargetSetBlock, m_sets);
+            uint32_t count = static_cast<uint32_t>(numSets);
+            uint32_t bytes = 0xFFFFFFFFu;
+            if (count <= (0xFFFFFFFFu - header) / sizeof(gmPracticeTargetSet)) {
+                bytes = header + count * static_cast<uint32_t>(sizeof(gmPracticeTargetSet));
+            }
+            gmPracticeTargetSetBlock* block = static_cast<gmPracticeTargetSetBlock*>(xe_EC88(bytes));
+            gmPracticeTargetSet* sets;
+            if (block != nullptr) {
+                block->m_count = numSets;
+                gmPracticeTargetSet* set = block->m_sets;
+                for (int32_t i = numSets - 1; i >= 0; --i) {
+                    set->m_numTargets = 0;
+                    set->m_targets = nullptr;
+                    ++set;
+                }
+                sets = block->m_sets;
+            } else {
+                sets = nullptr;
+            }
+            m_sets = sets;
+
+            if (fiTokenizer_CheckToken(&tokenizer, "TargetDefaultColor", true)) {
+                g_practiceTargetDefaultColor = ReadColor(&tokenizer);
+            }
+            if (fiTokenizer_CheckToken(&tokenizer, "TargetHitColor", true)) {
+                g_practiceTargetHitColor = ReadColor(&tokenizer);
+            }
+
+            for (int32_t i = 0; i < g_practiceTargetNumSets; ++i) {
+                if (!fiTokenizer_CheckToken(&tokenizer, "Set", true)) {
+                    continue;
+                }
+                char token[0x40];
+                token[0] = 0;
+                fiTokenizer_GetToken(&tokenizer, token, 0x40);
+                gmPracticeTargetSet_Load(&m_sets[i], &tokenizer);
+                token[0] = 0;
+                fiTokenizer_GetToken(&tokenizer, token, 0x40);
+                if (maxTargets < m_sets[i].m_numTargets) {
+                    maxTargets = m_sets[i].m_numTargets;
+                }
+            }
+        }
+        fiStream_Close(stream);
+    }
+
+    gmPracticeTargetWordArray_Init(m_wordArray, maxTargets, false, true);
+
+    g_fiAssetManager.m_folderDepth--;
+    fiAssetManager_PushFolder(&g_fiAssetManager, "$/fx/tex");
+    g_fiAssetManager.m_folderDepth--;
+}
+
+struct pongDrawBucket;
+extern pongDrawBucket* g_drawBucket;  // @ 0x826064F4
+void pongDrawBucket_AddEntry(pongDrawBucket* bucket, void* renderable, uint32_t bucketMask);  // @ 0x822278D8
+
+/**
+ * gmPracticeTarget::AddToDrawBucket  [slot 2] @ 0x82113448 | size: 0x48
+ *
+ * While both draw flags are set, resets the renderable's two per-draw fields
+ * and adds it to layer 2 (mask 4) of the draw bucket.
+ */
+void gmPracticeTarget::AddToDrawBucket() {
+    if (m_visible == 0) {
+        return;
+    }
+    if (m_drawEnabled == 0) {
+        return;
+    }
+    m_renderable.field_08 = 0.0f;  // @ 0x8202D110
+    m_renderable.field_0C = 0;
+    pongDrawBucket_AddEntry(g_drawBucket, &m_renderable, 4);
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

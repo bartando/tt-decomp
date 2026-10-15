@@ -1045,12 +1045,21 @@ struct gmPracticeTargetFx {
     float  m_heightOffset;  // +0x04  "HeightOffset", 0.001 by default
     float* m_color;         // +0x08  "Color", 4 floats, zeroed by the constructor
     float* m_altColor;      // +0x0C  "AltColor", 4 floats, zeroed by the constructor
+
+    gmPracticeTargetFx* Construct();  // @ 0x82113D10 (cmOperatorCtor_3D10_w)
 };
 
 // One "Set" block of "$/fx/practice_targets", read by 0x82113F20; 8 bytes.
 struct gmPracticeTargetSet {
     int32_t m_numTargets;   // +0x00  "NumTargets"
     void*   m_targets;      // +0x04  m_numTargets entries of 0x44 bytes
+};
+
+// new gmPracticeTargetSet[NumSets]: the count is stored in front of the array
+// (at -4 on the 360; on the host the array starts at its own alignment).
+struct gmPracticeTargetSetBlock {
+    int32_t             m_count;
+    gmPracticeTargetSet m_sets[1];
 };
 
 // The 0x14-byte word array the target allocates at +0x18: data, count and
@@ -1084,11 +1093,16 @@ struct gmPracticeTarget {
     gmPracticeTargetFx         m_fx;          // +0x24  "fx_target"
     gmPracticeTargetFx         m_fx2;         // +0x34  "fx_target2"
     uint32_t                   field_44;      // +0x44  0
-    gmPracticeTargetSet*       m_sets;        // +0x48  new[NumSets] (count cookie at -4)
+    gmPracticeTargetSet*       m_sets;        // +0x48  new[NumSets], see gmPracticeTargetSetBlock
     uint32_t                   field_4C;      // +0x4C
     float                      m_position[4]; // +0x50  (0, 0, 0, 1)
     float                      m_spinAngle;   // +0x60  advanced 2*pi per second, wrapped to [-pi, pi]
     uint8_t                    m_spinStopped; // +0x64  while set, gmLogicSwingPractice::Update leaves m_spinAngle alone
+
+    gmPracticeTarget* Construct();                         // @ 0x82112B58 (cmOperatorCtor_2B58_w)
+    gmPracticeTarget* ScalarDeletingDtor(uint32_t flags);  // [0] @ 0x82112C70
+    void LoadData();                                       // [1] @ 0x82112DF8
+    void AddToDrawBucket();                                // [2] @ 0x82113448
 };
 
 // ── powerZoneAttr  [vtable @ 0x82049A44] ──────────────────────────
