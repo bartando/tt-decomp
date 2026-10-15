@@ -20,15 +20,14 @@
 // in per-subsystem headers as they land.
 // ============================================================================
 
-/* .rdata (RTTI vtables) — typed as opaque bytes in C. Real class decls
- * live in C++ headers and are imported via extern "C" when this file is
- * finally converted to .cpp — permanent shape until that conversion. */
-extern const uint8_t lbl_8203A910[12];   /* FloatAverager vtbl #1 */
-extern const uint8_t lbl_8203A91C[12];   /* FloatAverager vtbl #2 */
-extern const uint8_t lbl_82070D78[12];   /* FloatAverager vtbl #3 */
-extern const uint8_t lbl_8207166C[12];   /* FloatAverager vtbl #4 */
-extern const uint8_t lbl_820533CC[16];   /* cmRefreshableCtor vtbl */
-extern const uint8_t lbl_82033094[72];   /* rage::fragDrawable vtbl */
+/* .rdata vtables: null-filled, sized to the original's slots up to its
+ * trailing null (the next word is the following vtable's RTTI locator). */
+void* const lbl_8203A910[2] = {0};    // @ 0x8203A910  FloatAverager
+void* const lbl_8203A91C[2] = {0};    // @ 0x8203A91C  FloatAverager
+void* const lbl_82070D78[2] = {0};    // @ 0x82070D78  FloatAverager
+void* const lbl_8207166C[2] = {0};    // @ 0x8207166C  FloatAverager
+void* const lbl_820533CC[3] = {0};    // @ 0x820533CC  cmRefreshableCtor
+void* const lbl_82033094[18] = {0};   // @ 0x82033094  rage::fragDrawable
 
 /* .rdata scalar/float constants */
 extern const float lbl_8202D110;  /* 4-byte float constant (heavily reused) */
@@ -603,7 +602,7 @@ uint32_t g_character_type_id_3    = 0;     // @ 0x825C8038
 // Network: cmRefreshableCtor vtable (RTTI, 20 vtables / virtual base MI).
 // Typed as const uint8_t* while this file stays in C; the C++ typed form
 // lives alongside cmRefreshableCtor once that class header lands.
-const uint8_t* g_cmRefreshableCtorVtable = lbl_820533CC;  // @ 0x820533CC
+const uint8_t* g_cmRefreshableCtorVtable = (const uint8_t*)lbl_820533CC;  // @ 0x820533CC
 
 // Player contact zone constants
 const float g_contactZoneMinA = 0.0f;
@@ -653,14 +652,14 @@ const float g_floatZero      = 0.0f;       // @ 0x8202D110
 // FloatAverager vtables (network classes) — RTTI: FloatAverager (4 vtables, MI).
 // Opaque-byte pointer retained because this file is C; typed C++ decl lands
 // with the FloatAverager class header.
-const uint8_t* g_FloatAverager_vtable_1 = lbl_8203A910;   // @ 0x8203A910
-const uint8_t* g_FloatAverager_vtable_2 = lbl_8203A91C;   // @ 0x8203A91C
-const uint8_t* g_FloatAverager_vtable_3 = lbl_82070D78;   // @ 0x82070D78
-const uint8_t* g_FloatAverager_vtable_4 = lbl_8207166C;   // @ 0x8207166C
+const uint8_t* g_FloatAverager_vtable_1 = (const uint8_t*)lbl_8203A910;   // @ 0x8203A910
+const uint8_t* g_FloatAverager_vtable_2 = (const uint8_t*)lbl_8203A91C;   // @ 0x8203A91C
+const uint8_t* g_FloatAverager_vtable_3 = (const uint8_t*)lbl_82070D78;   // @ 0x82070D78
+const uint8_t* g_FloatAverager_vtable_4 = (const uint8_t*)lbl_8207166C;   // @ 0x8207166C
 
 // Physics: rage::fragDrawable vtable.
 // Opaque bytes while this stays in C — see FloatAverager note above.
-const uint8_t* g_fragDrawableVtable = lbl_82033094;       // @ 0x82033094
+const uint8_t* g_fragDrawableVtable = (const uint8_t*)lbl_82033094;       // @ 0x82033094
 
 // Frame sync object
 void* g_frameSyncObj = NULL;               // @ 0x825F64F4
