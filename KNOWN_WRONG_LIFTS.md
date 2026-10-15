@@ -37,6 +37,13 @@ before relying on any of these; fix and delete the entry when done.
 - 0x82228EA0 reads gameLoop+0x204, which `game_loop_types.h` calls a target FPS; the result is
   an aspect ratio, so one of the two labels is wrong.
 - 0x82606750 has four names across the codebase (`lbl_82606750` among them).
+- `snJoinMachine.cpp` (not built) calls `rage::hsmState_AttachChild` as
+  `snHsmState_AttachChild(void*, void*)`; the real one takes `(hsmStateBase*, hsmStateBase*)`.
+- `char_view.hpp`: `pongAttractState::OnEnter` (0x82305800) sits in slot 14 but overrides
+  `hsmState::OnEnter`, which is slot 5.
+- `rage_grm.hpp` still names `grmShader` slot 0 `IsOfType` (asm: scalar deleting destructor)
+  and slot 6 `IsOfTypeExt` (asm: stores `this` as the active shader, returns 1).
+- `rage_free` (0x820C00C0) is declared `extern "C"` in some files and with C++ linkage in others.
 - `globals.c`: `g_msgSinkTemplate` is at 0x8261A0C0, not 0x8241A0C0.
 
 ## The recomp is not ground truth
