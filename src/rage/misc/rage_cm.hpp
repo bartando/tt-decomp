@@ -17,6 +17,10 @@
 #include <stdint.h>
 #include "rage_cm_types.hpp"
 
+// Every class below carries the game's vtable as an explicit `vtable` member
+// at +0x00; its slots are listed by number but declared non-virtual (a C++
+// virtual would add a hidden vptr and shift every field).
+
 namespace rage {
 
 
@@ -28,7 +32,7 @@ struct cmAbsAngleDiff {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227bf68
+    void vfn_4();  // [4] @ 0x8227bf68
 };
 
 // ── rage::cmAction  [vtable @ 0x82052224] ──────────────────────────
@@ -41,9 +45,9 @@ struct cmActionFactory {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmActionFactory();                  // [0] @ 0x82261308
-    virtual void ScalarDtor(int flags); // [1] @ 0x822776c8
-    virtual void vfn_3();  // [3] @ 0x82277728
+    ~cmActionFactory();                  // [0] @ 0x82261308
+    void ScalarDtor(int flags); // [1] @ 0x822776c8
+    void vfn_3();  // [3] @ 0x82277728
 };
 
 // ── rage::cmAdd — defined in rage_cm_types.hpp
@@ -53,7 +57,7 @@ struct cmAlarmTimer {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_16();  // [16] @ 0x82262ae0
+    void vfn_16();  // [16] @ 0x82262ae0
 };
 
 // ── rage::cmAnd  [vtable @ 0x820547D4] ──────────────────────────
@@ -61,8 +65,8 @@ struct cmAnd {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x8227ca88
-    virtual void vfn_5();  // [5] @ 0x8227caf0
+    void vfn_3();  // [3] @ 0x8227ca88
+    void vfn_5();  // [5] @ 0x8227caf0
 };
 
 // ── rage::cmAngle  [vtable @ 0x820551CC] ──────────────────────────
@@ -70,7 +74,7 @@ struct cmAngle {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227a0e0
+    void vfn_4();  // [4] @ 0x8227a0e0
 };
 
 // ── rage::cmAngleDiff  [vtable @ 0x820541A4] ──────────────────────────
@@ -78,7 +82,7 @@ struct cmAngleDiff {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227bff8
+    void vfn_4();  // [4] @ 0x8227bff8
 };
 
 // ── rage::cmAngleLerp  [vtable @ 0x82054044] ──────────────────────────
@@ -86,8 +90,8 @@ struct cmAngleLerp {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227bc50
-    virtual void vfn_16();  // [16] @ 0x82262620
+    void vfn_4();  // [4] @ 0x8227bc50
+    void vfn_16();  // [16] @ 0x82262620
 };
 
 // ── rage::cmAngleLinearApproach  [vtable @ 0x82054A3C] ──────────────────────────
@@ -95,7 +99,7 @@ struct cmAngleLinearApproach {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x82278f10
+    void vfn_10();  // [10] @ 0x82278f10
 };
 
 // ── rage::cmAnglePowerApproach  [vtable @ 0x82054A94] ──────────────────────────
@@ -103,7 +107,7 @@ struct cmAnglePowerApproach {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x82278e58
+    void vfn_10();  // [10] @ 0x82278e58
 };
 
 // ── rage::cmAnimBoneOrientation  [vtable @ 0x8203837C] ──────────────────────────
@@ -111,7 +115,7 @@ struct cmAnimBoneOrientation {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x821853d8
+    void vfn_2();  // [2] @ 0x821853d8
 };
 
 // ── rage::cmAnimBonePosition  [vtable @ 0x82038324] ──────────────────────────
@@ -119,9 +123,9 @@ struct cmAnimBonePosition {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x82185320
-    virtual void vfn_16();  // [16] @ 0x82184d18
-    virtual void vfn_18();  // [18] @ 0x82185ea8
+    void vfn_2();  // [2] @ 0x82185320
+    void vfn_16();  // [16] @ 0x82184d18
+    void vfn_18();  // [18] @ 0x82185ea8
 };
 
 // ── rage::cmAnimCamFStop  [vtable @ 0x82038274] ──────────────────────────
@@ -129,7 +133,7 @@ struct cmAnimCamFStop {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x82185218
+    void vfn_4();  // [4] @ 0x82185218
 };
 
 // ── rage::cmAnimCamFov  [vtable @ 0x8203821C] ──────────────────────────
@@ -137,8 +141,8 @@ struct cmAnimCamFov {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x82185140
-    virtual void vfn_16();  // [16] @ 0x82184c98
+    void vfn_4();  // [4] @ 0x82185140
+    void vfn_16();  // [16] @ 0x82184c98
 };
 
 // ── rage::cmAnimCamOrientation  [vtable @ 0x820381C4] ──────────────────────────
@@ -146,7 +150,7 @@ struct cmAnimCamOrientation {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x82185058
+    void vfn_2();  // [2] @ 0x82185058
 };
 
 // ── rage::cmAnimCamPosition  [vtable @ 0x8203816C] ──────────────────────────
@@ -154,19 +158,19 @@ struct cmAnimCamPosition {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmAnimCamPosition();                  // [0] @ 0x8227cba0
-    virtual void vfn_2();  // [2] @ 0x82184fb0
-    virtual void vfn_3();  // [3] @ 0x82184978
-    virtual void vfn_4();  // [4] @ 0x82184550
-    virtual void vfn_6();  // [6] @ 0x82270f40
-    virtual void vfn_7();  // [7] @ 0x82270f58
-    virtual void vfn_8();  // [8] @ 0x82270ec0
-    virtual void vfn_11();  // [11] @ 0x82270f88
-    virtual void vfn_12();  // [12] @ 0x82183bf0
-    virtual void vfn_13();  // [13] @ 0x82270fb8
-    virtual void vfn_15();  // [15] @ 0x82270b70
-    virtual void vfn_16();  // [16] @ 0x82184c50
-    virtual void vfn_18();  // [18] @ 0x82185e68
+    ~cmAnimCamPosition();                  // [0] @ 0x8227cba0
+    void vfn_2();  // [2] @ 0x82184fb0
+    void vfn_3();  // [3] @ 0x82184978
+    void vfn_4();  // [4] @ 0x82184550
+    void vfn_6();  // [6] @ 0x82270f40
+    void vfn_7();  // [7] @ 0x82270f58
+    void vfn_8();  // [8] @ 0x82270ec0
+    void vfn_11();  // [11] @ 0x82270f88
+    void vfn_12();  // [12] @ 0x82183bf0
+    void vfn_13();  // [13] @ 0x82270fb8
+    void vfn_15();  // [15] @ 0x82270b70
+    void vfn_16();  // [16] @ 0x82184c50
+    void vfn_18();  // [18] @ 0x82185e68
 };
 
 // ── rage::cmAnimDuration  [vtable @ 0x820382CC] ──────────────────────────
@@ -174,9 +178,9 @@ struct cmAnimDuration {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x821852c8
-    virtual void vfn_16();  // [16] @ 0x82184cd8
-    virtual void vfn_18();  // [18] @ 0x82184b58
+    void vfn_4();  // [4] @ 0x821852c8
+    void vfn_16();  // [16] @ 0x82184cd8
+    void vfn_18();  // [18] @ 0x82184b58
 };
 
 // ── rage::cmApproach2  [vtable @ 0x82056A5C] ──────────────────────────
@@ -184,13 +188,13 @@ struct cmApproach2 {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmApproach2();                  // [0] @ 0x822792d8
-    virtual void vfn_2();  // [2] @ 0x82279568
-    virtual void vfn_4();  // [4] @ 0x82279608
-    virtual void vfn_6();  // [6] @ 0x822793c8
-    virtual void vfn_9();  // [9] @ 0x82279418
-    virtual void vfn_10();  // [10] @ 0x82279428
-    virtual void vfn_17();  // [17] @ 0x82279348
+    ~cmApproach2();                  // [0] @ 0x822792d8
+    void vfn_2();  // [2] @ 0x82279568
+    void vfn_4();  // [4] @ 0x82279608
+    void vfn_6();  // [6] @ 0x822793c8
+    void vfn_9();  // [9] @ 0x82279418
+    void vfn_10();  // [10] @ 0x82279428
+    void vfn_17();  // [17] @ 0x82279348
 };
 
 // ── rage::cmApproachOperator — defined in rage_cm_types.hpp
@@ -204,8 +208,8 @@ struct cmBlock {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmBlock();                  // [0] @ 0x82277190
-    virtual void vfn_3();  // [3] @ 0x82277280
+    ~cmBlock();                  // [0] @ 0x82277190
+    void vfn_3();  // [3] @ 0x82277280
 };
 
 // ── rage::cmBlockBank  [vtable @ 0x820567C0] ──────────────────────────
@@ -213,7 +217,7 @@ struct cmBlockBank {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmBlockBank();                  // [0] @ 0x82277548
+    ~cmBlockBank();                  // [0] @ 0x82277548
 };
 
 // ── rage::cmCachedOperator  [vtable @ 0x8205627C] ──────────────────────────
@@ -221,11 +225,11 @@ struct cmCachedOperator {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmCachedOperator();                  // [0] @ 0x82271778
-    virtual void ScalarDtor(int flags); // [1] @ 0x82271898
-    virtual void vfn_2();  // [2] @ 0x822718a8
-    virtual void vfn_3();  // [3] @ 0x82271890
-    virtual void vfn_4();  // [4] @ 0x822718a0
+    ~cmCachedOperator();                  // [0] @ 0x82271778
+    void ScalarDtor(int flags); // [1] @ 0x82271898
+    void vfn_2();  // [2] @ 0x822718a8
+    void vfn_3();  // [3] @ 0x82271890
+    void vfn_4();  // [4] @ 0x822718a0
 };
 
 // ── rage::cmCapture  [vtable @ 0x820569AC] ──────────────────────────
@@ -233,14 +237,14 @@ struct cmCapture {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x822789c8
-    virtual void vfn_2();  // [2] @ 0x82278928
-    virtual void vfn_3();  // [3] @ 0x82278978
-    virtual void vfn_4();  // [4] @ 0x822788d8
-    virtual void vfn_6();  // [6] @ 0x82278880
-    virtual void vfn_9();  // [9] @ 0x822788c8
-    virtual void vfn_16();  // [16] @ 0x822779c8
-    virtual void vfn_17();  // [17] @ 0x822787f8
+    void ScalarDtor(int flags); // [1] @ 0x822789c8
+    void vfn_2();  // [2] @ 0x82278928
+    void vfn_3();  // [3] @ 0x82278978
+    void vfn_4();  // [4] @ 0x822788d8
+    void vfn_6();  // [6] @ 0x82278880
+    void vfn_9();  // [9] @ 0x822788c8
+    void vfn_16();  // [16] @ 0x822779c8
+    void vfn_17();  // [17] @ 0x822787f8
 };
 
 // ── rage::cmChanged  [vtable @ 0x820567F4] ──────────────────────────
@@ -248,10 +252,10 @@ struct cmChanged {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_6();  // [6] @ 0x82278018
-    virtual void vfn_10();  // [10] @ 0x82277ef0
-    virtual void vfn_16();  // [16] @ 0x822778b8
-    virtual void vfn_17();  // [17] @ 0x82278168
+    void vfn_6();  // [6] @ 0x82278018
+    void vfn_10();  // [10] @ 0x82277ef0
+    void vfn_16();  // [16] @ 0x822778b8
+    void vfn_17();  // [17] @ 0x82278168
 };
 
 // ── rage::cmClamp — defined in rage_cm_types.hpp
@@ -261,7 +265,7 @@ struct cmClampRange {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227c0a8
+    void vfn_4();  // [4] @ 0x8227c0a8
 };
 
 // ── rage::cmCompMult  [vtable @ 0x8205527C] ──────────────────────────
@@ -269,7 +273,7 @@ struct cmCompMult {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x8227a140
+    void vfn_2();  // [2] @ 0x8227a140
 };
 
 // ── rage::cmCompiledMachineBank  [vtable @ 0x82037DBC] ──────────────────────────
@@ -277,8 +281,8 @@ struct cmCompiledMachineBank {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmCompiledMachineBank();                  // [0] @ 0x8217f208
-    virtual void ScalarDtor(int flags); // [1] @ 0x8217f270
+    ~cmCompiledMachineBank();                  // [0] @ 0x8217f208
+    void ScalarDtor(int flags); // [1] @ 0x8217f270
 };
 
 // ── rage::cmControlRef  [vtable @ 0x82056B8C] ──────────────────────────
@@ -286,11 +290,11 @@ struct cmControlRef {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x8227cd68
-    virtual void vfn_2();  // [2] @ 0x8227cd08
-    virtual void vfn_3();  // [3] @ 0x8227cca8
-    virtual void vfn_4();  // [4] @ 0x8227cc48
-    virtual void vfn_5();  // [5] @ 0x8227cbe8
+    void ScalarDtor(int flags); // [1] @ 0x8227cd68
+    void vfn_2();  // [2] @ 0x8227cd08
+    void vfn_3();  // [3] @ 0x8227cca8
+    void vfn_4();  // [4] @ 0x8227cc48
+    void vfn_5();  // [5] @ 0x8227cbe8
 
     // ── non-virtual methods ──
     void GetBool(uint8_t* out);
@@ -303,8 +307,8 @@ struct cmCross {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x8227a068
-    virtual void vfn_16();  // [16] @ 0x82262f98
+    void vfn_2();  // [2] @ 0x8227a068
+    void vfn_16();  // [16] @ 0x82262f98
 };
 
 // ── rage::cmDepthProbe  [vtable @ 0x82052CF4] ──────────────────────────
@@ -312,8 +316,8 @@ struct cmDepthProbe {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x822799a0
-    virtual void vfn_16();  // [16] @ 0x82262298
+    void vfn_4();  // [4] @ 0x822799a0
+    void vfn_16();  // [16] @ 0x82262298
 };
 
 // ── rage::cmDevArg  [vtable @ 0x82054CA4] ──────────────────────────
@@ -321,7 +325,7 @@ struct cmDevArg {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x8227ace8
+    void vfn_3();  // [3] @ 0x8227ace8
 };
 
 // ── rage::cmDiffTuningSet  [2 vtables — template/MI] ──────────────────────────
@@ -329,9 +333,9 @@ struct cmDiffTuningSet {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmDiffTuningSet();                  // [0] @ 0x821792d0
-    virtual void ScalarDtor(int flags); // [1] @ 0x821792b8
-    virtual void vfn_2();  // [2] @ 0x821792b0
+    ~cmDiffTuningSet();                  // [0] @ 0x821792d0
+    void ScalarDtor(int flags); // [1] @ 0x821792b8
+    void vfn_2();  // [2] @ 0x821792b0
 };
 
 // ── rage::cmDifferential — defined in rage_cm_types.hpp
@@ -341,9 +345,9 @@ struct cmDifferentiate {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_6();  // [6] @ 0x82278220
-    virtual void vfn_9();  // [9] @ 0x82278270
-    virtual void vfn_10();  // [10] @ 0x822782d0
+    void vfn_6();  // [6] @ 0x82278220
+    void vfn_9();  // [9] @ 0x82278270
+    void vfn_10();  // [10] @ 0x822782d0
 };
 
 // ── rage::cmDist  [vtable @ 0x82055384] ──────────────────────────
@@ -351,7 +355,7 @@ struct cmDist {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227a330
+    void vfn_4();  // [4] @ 0x8227a330
 };
 
 // ── rage::cmDist2  [vtable @ 0x82055434] ──────────────────────────
@@ -359,7 +363,7 @@ struct cmDist2 {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227a488
+    void vfn_4();  // [4] @ 0x8227a488
 };
 
 // ── rage::cmDivide  [vtable @ 0x82053B74] ──────────────────────────
@@ -367,8 +371,8 @@ struct cmDivide {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227b398
-    virtual void vfn_5();  // [5] @ 0x8227b348
+    void vfn_4();  // [4] @ 0x8227b398
+    void vfn_5();  // [5] @ 0x8227b348
 };
 
 // ── rage::cmDot  [vtable @ 0x820550C4] ──────────────────────────
@@ -376,8 +380,8 @@ struct cmDot {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x82279f80
-    virtual void vfn_16();  // [16] @ 0x82263018
+    void vfn_4();  // [4] @ 0x82279f80
+    void vfn_16();  // [16] @ 0x82263018
 };
 
 // ── rage::cmDrawVec  [vtable @ 0x82054C4C] ──────────────────────────
@@ -385,7 +389,7 @@ struct cmDrawVec {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_16();  // [16] @ 0x82262da0
+    void vfn_16();  // [16] @ 0x82262da0
 };
 
 // ── rage::cmEquals  [vtable @ 0x8205461C] ──────────────────────────
@@ -393,8 +397,8 @@ struct cmEquals {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x8227c6d0
-    virtual void vfn_16();  // [16] @ 0x822626f8
+    void vfn_3();  // [3] @ 0x8227c6d0
+    void vfn_16();  // [16] @ 0x822626f8
 };
 
 // ── rage::cmExpandPauseApproach  [vtable @ 0x82054B9C] ──────────────────────────
@@ -402,7 +406,7 @@ struct cmExpandPauseApproach {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x822791c8
+    void vfn_10();  // [10] @ 0x822791c8
 };
 
 // ── rage::cmFOV  [vtable @ 0x8205435C] ──────────────────────────
@@ -410,7 +414,7 @@ struct cmFOV {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227c2a0
+    void vfn_4();  // [4] @ 0x8227c2a0
 };
 
 // ── rage::cmFlatDist  [vtable @ 0x820553DC] ──────────────────────────
@@ -418,7 +422,7 @@ struct cmFlatDist {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227a400
+    void vfn_4();  // [4] @ 0x8227a400
 };
 
 // ── rage::cmFlatDist2  [vtable @ 0x8205548C] ──────────────────────────
@@ -426,7 +430,7 @@ struct cmFlatDist2 {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227a508
+    void vfn_4();  // [4] @ 0x8227a508
 };
 
 // ── rage::cmFlatDot  [vtable @ 0x8205511C] ──────────────────────────
@@ -434,7 +438,7 @@ struct cmFlatDot {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x82279ff0
+    void vfn_4();  // [4] @ 0x82279ff0
 };
 
 // ── rage::cmFlatten  [vtable @ 0x82055644] ──────────────────────────
@@ -442,7 +446,7 @@ struct cmFlatten {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x8227a758
+    void vfn_2();  // [2] @ 0x8227a758
 };
 
 // ── rage::cmGNoise  [vtable @ 0x8205456C] ──────────────────────────
@@ -450,7 +454,7 @@ struct cmGNoise {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227c5f0
+    void vfn_4();  // [4] @ 0x8227c5f0
 };
 
 // ── rage::cmGang  [vtable @ 0x82056338] ──────────────────────────
@@ -463,7 +467,7 @@ struct cmGraph {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_16();  // [16] @ 0x82262d10
+    void vfn_16();  // [16] @ 0x82262d10
 };
 
 // ── rage::cmGreaterThan  [vtable @ 0x82054674] ──────────────────────────
@@ -471,8 +475,8 @@ struct cmGreaterThan {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x8227c830
-    virtual void vfn_16();  // [16] @ 0x822627b8
+    void vfn_3();  // [3] @ 0x8227c830
+    void vfn_16();  // [16] @ 0x822627b8
 };
 
 // ── rage::cmHitProbe  [vtable @ 0x82052BEC] ──────────────────────────
@@ -480,8 +484,8 @@ struct cmHitProbe {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x82279878
-    virtual void vfn_16();  // [16] @ 0x82262278
+    void vfn_3();  // [3] @ 0x82279878
+    void vfn_16();  // [16] @ 0x82262278
 };
 
 // ── rage::cmIf  [vtable @ 0x82054CFC] ──────────────────────────
@@ -489,12 +493,12 @@ struct cmIf {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x8227ae80
-    virtual void vfn_2();  // [2] @ 0x8227acf8
-    virtual void vfn_3();  // [3] @ 0x8227ae28
-    virtual void vfn_4();  // [4] @ 0x8227ad78
-    virtual void vfn_5();  // [5] @ 0x8227add0
-    virtual void vfn_16();  // [16] @ 0x82262dd8
+    void ScalarDtor(int flags); // [1] @ 0x8227ae80
+    void vfn_2();  // [2] @ 0x8227acf8
+    void vfn_3();  // [3] @ 0x8227ae28
+    void vfn_4();  // [4] @ 0x8227ad78
+    void vfn_5();  // [5] @ 0x8227add0
+    void vfn_16();  // [16] @ 0x82262dd8
 };
 
 // ── rage::cmInfo  [vtable @ 0x82054BF4] ──────────────────────────
@@ -502,7 +506,7 @@ struct cmInfo {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x8227abb8
+    void vfn_3();  // [3] @ 0x8227abb8
 };
 
 // ── rage::cmIntegrate — defined in rage_cm_types.hpp
@@ -514,7 +518,7 @@ struct cmInverse {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227b6d8
+    void vfn_4();  // [4] @ 0x8227b6d8
 };
 
 // ── rage::cmIsValid  [vtable @ 0x82054E04] ──────────────────────────
@@ -528,10 +532,10 @@ struct cmLerp {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x8227bb48
-    virtual void vfn_4();  // [4] @ 0x8227ba78
-    virtual void vfn_5();  // [5] @ 0x8227b988
-    virtual void vfn_16();  // [16] @ 0x82262578
+    void vfn_2();  // [2] @ 0x8227bb48
+    void vfn_4();  // [4] @ 0x8227ba78
+    void vfn_5();  // [5] @ 0x8227b988
+    void vfn_16();  // [16] @ 0x82262578
 };
 
 // ── rage::cmLessThan  [vtable @ 0x820546CC] ──────────────────────────
@@ -539,7 +543,7 @@ struct cmLessThan {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x8227c8d0
+    void vfn_3();  // [3] @ 0x8227c8d0
 };
 
 // ── rage::cmLocalRestart  [vtable @ 0x82054D54] ──────────────────────────
@@ -547,7 +551,7 @@ struct cmLocalRestart {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x8227aed8
+    void vfn_3();  // [3] @ 0x8227aed8
 };
 
 // ── rage::cmLookAtAngles  [vtable @ 0x8205574C] ──────────────────────────
@@ -555,7 +559,7 @@ struct cmLookAtAngles {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x8227aa40
+    void vfn_2();  // [2] @ 0x8227aa40
 };
 
 // ── rage::cmMachine  [vtable @ 0x82056304] ──────────────────────────
@@ -563,7 +567,7 @@ struct cmMachine {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmMachine();                  // [0] @ 0x82272728
+    ~cmMachine();                  // [0] @ 0x82272728
 };
 
 // ── rage::cmMachineBank  [vtable @ 0x8205636C] ──────────────────────────
@@ -576,7 +580,7 @@ struct cmMag {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227a240
+    void vfn_4();  // [4] @ 0x8227a240
 };
 
 // ── rage::cmMag2  [vtable @ 0x8205532C] ──────────────────────────
@@ -584,7 +588,7 @@ struct cmMag2 {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227a2e0
+    void vfn_4();  // [4] @ 0x8227a2e0
 };
 
 // ── rage::cmMaterialProbe  [vtable @ 0x82052D4C] ──────────────────────────
@@ -592,7 +596,7 @@ struct cmMaterialProbe {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x82279a08
+    void vfn_3();  // [3] @ 0x82279a08
 };
 
 // ── rage::cmMax  [vtable @ 0x82053F3C] ──────────────────────────
@@ -600,8 +604,8 @@ struct cmMax {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227b838
-    virtual void vfn_5();  // [5] @ 0x8227b898
+    void vfn_4();  // [4] @ 0x8227b838
+    void vfn_5();  // [5] @ 0x8227b898
 };
 
 // ── rage::cmMaxPauseApproach  [vtable @ 0x82054B44] ──────────────────────────
@@ -609,7 +613,7 @@ struct cmMaxPauseApproach {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x822790d0
+    void vfn_10();  // [10] @ 0x822790d0
 };
 
 // ── rage::cmMemory — defined in rage_cm_types.hpp
@@ -619,15 +623,15 @@ struct cmMetafileTuningSet {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmMetafileTuningSet();                  // [0] @ 0x821792c8
-    virtual void ScalarDtor(int flags); // [1] @ 0x82276090
-    virtual void vfn_3();  // [3] @ 0x82276c20
-    virtual void vfn_4();  // [4] @ 0x82275770
-    virtual void vfn_5();  // [5] @ 0x82275800
-    virtual void vfn_6();  // [6] @ 0x82275890
-    virtual void vfn_7();  // [7] @ 0x82275920
-    virtual void vfn_8();  // [8] @ 0x822759b0
-    virtual void vfn_10();  // [10] @ 0x82276a78
+    ~cmMetafileTuningSet();                  // [0] @ 0x821792c8
+    void ScalarDtor(int flags); // [1] @ 0x82276090
+    void vfn_3();  // [3] @ 0x82276c20
+    void vfn_4();  // [4] @ 0x82275770
+    void vfn_5();  // [5] @ 0x82275800
+    void vfn_6();  // [6] @ 0x82275890
+    void vfn_7();  // [7] @ 0x82275920
+    void vfn_8();  // [8] @ 0x822759b0
+    void vfn_10();  // [10] @ 0x82276a78
 };
 
 // ── rage::cmMin  [vtable @ 0x82053F94] ──────────────────────────
@@ -635,8 +639,8 @@ struct cmMin {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227b8e0
-    virtual void vfn_5();  // [5] @ 0x8227b940
+    void vfn_4();  // [4] @ 0x8227b8e0
+    void vfn_5();  // [5] @ 0x8227b940
 };
 
 // ── rage::cmMinPauseApproach  [vtable @ 0x82054AEC] ──────────────────────────
@@ -644,9 +648,9 @@ struct cmMinPauseApproach {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_6();  // [6] @ 0x822791b8
-    virtual void vfn_10();  // [10] @ 0x82278fe8
-    virtual void vfn_16();  // [16] @ 0x82262b98
+    void vfn_6();  // [6] @ 0x822791b8
+    void vfn_10();  // [10] @ 0x82278fe8
+    void vfn_16();  // [16] @ 0x82262b98
 };
 
 // ── rage::cmModulo  [vtable @ 0x82053BCC] ──────────────────────────
@@ -654,8 +658,8 @@ struct cmModulo {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227b448
-    virtual void vfn_5();  // [5] @ 0x8227b3f0
+    void vfn_4();  // [4] @ 0x8227b448
+    void vfn_5();  // [5] @ 0x8227b3f0
 };
 
 // ── rage::cmMotorPlant  [vtable @ 0x82056AB4] ──────────────────────────
@@ -663,9 +667,9 @@ struct cmMotorPlant {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmMotorPlant();                  // [0] @ 0x82279d40
-    virtual void ScalarDtor(int flags); // [1] @ 0x82279db0
-    virtual void vfn_3();  // [3] @ 0x82279d98
+    ~cmMotorPlant();                  // [0] @ 0x82279d40
+    void ScalarDtor(int flags); // [1] @ 0x82279db0
+    void vfn_3();  // [3] @ 0x82279d98
 };
 
 // ── rage::cmMultiply  [vtable @ 0x82053B1C] ──────────────────────────
@@ -673,9 +677,9 @@ struct cmMultiply {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227b2f0
-    virtual void vfn_5();  // [5] @ 0x8227b2b8
-    virtual void vfn_16();  // [16] @ 0x822624f8
+    void vfn_4();  // [4] @ 0x8227b2f0
+    void vfn_5();  // [5] @ 0x8227b2b8
+    void vfn_16();  // [16] @ 0x822624f8
 };
 
 // ── rage::cmNamedValueSet  [vtable @ 0x820373AC] ──────────────────────────
@@ -683,15 +687,15 @@ struct cmNamedValueSet {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmNamedValueSet();                  // [0] @ 0x82175d20
-    virtual void ScalarDtor(int flags); // [1] @ 0x82275a40
-    virtual void vfn_3();  // [3] @ 0x82275a50
-    virtual void vfn_4();  // [4] @ 0x82275ae0
-    virtual void vfn_5();  // [5] @ 0x82275b30
-    virtual void vfn_6();  // [6] @ 0x82275b80
-    virtual void vfn_7();  // [7] @ 0x82275bd0
-    virtual void vfn_8(uint32_t param1, uint32_t param2);  // [8] @ 0x82275c20
-    virtual void vfn_9();  // [9] @ 0x82275c68
+    ~cmNamedValueSet();                  // [0] @ 0x82175d20
+    void ScalarDtor(int flags); // [1] @ 0x82275a40
+    void vfn_3();  // [3] @ 0x82275a50
+    void vfn_4();  // [4] @ 0x82275ae0
+    void vfn_5();  // [5] @ 0x82275b30
+    void vfn_6();  // [6] @ 0x82275b80
+    void vfn_7();  // [7] @ 0x82275bd0
+    void vfn_8(uint32_t param1, uint32_t param2);  // [8] @ 0x82275c20
+    void vfn_9();  // [9] @ 0x82275c68
 };
 
 // ── rage::cmNegate — defined in rage_cm_types.hpp
@@ -701,7 +705,7 @@ struct cmNoise {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227c3b8
+    void vfn_4();  // [4] @ 0x8227c3b8
 };
 
 // ── rage::cmNormal  [vtable @ 0x82055224] ──────────────────────────
@@ -709,7 +713,7 @@ struct cmNormal {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x8227a1a8
+    void vfn_2();  // [2] @ 0x8227a1a8
 };
 
 // ── rage::cmNormalProbe  [vtable @ 0x82052C9C] ──────────────────────────
@@ -730,16 +734,16 @@ struct cmNormalizedTimer {
     cmDataObj*  m_pCurrentValue;  // +0x1C — current timer value buffer
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x82271340
-    virtual void vfn_2();  // [2] @ 0x822712a0
-    virtual void vfn_3();  // [3] @ 0x822712f0
-    virtual void vfn_4();  // [4] @ 0x82271250
-    virtual void vfn_6();  // [6] @ 0x822785e0
-    virtual void vfn_9();  // [9] @ 0x822711c8
-    virtual void vfn_10();  // [10] @ 0x82278630
+    void ScalarDtor(int flags); // [1] @ 0x82271340
+    void vfn_2();  // [2] @ 0x822712a0
+    void vfn_3();  // [3] @ 0x822712f0
+    void vfn_4();  // [4] @ 0x82271250
+    void vfn_6();  // [6] @ 0x822785e0
+    void vfn_9();  // [9] @ 0x822711c8
+    void vfn_10();  // [10] @ 0x82278630
     void SetValue();  // [14] @ 0x82271218
-    virtual void vfn_16();  // [16] @ 0x822623f8
-    virtual void vfn_17();  // [17] @ 0x822710b0
+    void vfn_16();  // [16] @ 0x822623f8
+    void vfn_17();  // [17] @ 0x822710b0
 };
 
 // ── rage::cmNot  [vtable @ 0x8205482C] ──────────────────────────
@@ -747,9 +751,9 @@ struct cmNot {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x8227cb28
-    virtual void vfn_5();  // [5] @ 0x8227cb68
-    virtual void vfn_16();  // [16] @ 0x82277948
+    void vfn_3();  // [3] @ 0x8227cb28
+    void vfn_5();  // [5] @ 0x8227cb68
+    void vfn_16();  // [16] @ 0x82277948
 };
 
 // ── rage::cmOperator  [vtable @ 0x82056224] ──────────────────────────
@@ -762,7 +766,7 @@ struct cmOperatorSet {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmOperatorSet();                  // [0] @ 0x82263098
+    ~cmOperatorSet();                  // [0] @ 0x82263098
 };
 
 // ── rage::cmOr  [vtable @ 0x82054724] ──────────────────────────
@@ -770,9 +774,9 @@ struct cmOr {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x8227c970
-    virtual void vfn_5();  // [5] @ 0x8227c9d8
-    virtual void vfn_16();  // [16] @ 0x82262820
+    void vfn_3();  // [3] @ 0x8227c970
+    void vfn_5();  // [5] @ 0x8227c9d8
+    void vfn_16();  // [16] @ 0x82262820
 };
 
 // ── rage::cmPassThrough  [vtable @ 0x82052F04] ──────────────────────────
@@ -780,12 +784,12 @@ struct cmPassThrough {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x8227acb0
-    virtual void vfn_2();  // [2] @ 0x8227ac70
-    virtual void vfn_3();  // [3] @ 0x8227ac38
-    virtual void vfn_4();  // [4] @ 0x8227ac00
-    virtual void vfn_5();  // [5] @ 0x8227abc8
-    virtual void vfn_16();  // [16] @ 0x82262c10
+    void ScalarDtor(int flags); // [1] @ 0x8227acb0
+    void vfn_2();  // [2] @ 0x8227ac70
+    void vfn_3();  // [3] @ 0x8227ac38
+    void vfn_4();  // [4] @ 0x8227ac00
+    void vfn_5();  // [5] @ 0x8227abc8
+    void vfn_16();  // [16] @ 0x82262c10
 };
 
 // ── rage::cmPositionProbe  [vtable @ 0x82052C44] ──────────────────────────
@@ -793,8 +797,8 @@ struct cmPositionProbe {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x822798e0
-    virtual void vfn_16();  // [16] @ 0x82262288
+    void vfn_2();  // [2] @ 0x822798e0
+    void vfn_16();  // [16] @ 0x82262288
 };
 
 // ── rage::cmPow  [vtable @ 0x8205440C] ──────────────────────────
@@ -802,7 +806,7 @@ struct cmPow {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227c358
+    void vfn_4();  // [4] @ 0x8227c358
 };
 
 // ── rage::cmPowerApproach  [vtable @ 0x820549E4] ──────────────────────────
@@ -810,15 +814,15 @@ struct cmPowerApproach {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmPowerApproach();                  // [0] @ 0x8226cc20
-    virtual void vfn_2();  // [2] @ 0x82278d20
-    virtual void vfn_4();  // [4] @ 0x82278cd0
-    virtual void vfn_6();  // [6] @ 0x82278ae0
-    virtual void vfn_9();  // [9] @ 0x82278b40
-    virtual void vfn_10();  // [10] @ 0x82278d70
-    virtual void vfn_14();  // [14] @ 0x82278c98
-    virtual void vfn_16();  // [16] @ 0x82262b20
-    virtual void vfn_17();  // [17] @ 0x82278a18
+    ~cmPowerApproach();                  // [0] @ 0x8226cc20
+    void vfn_2();  // [2] @ 0x82278d20
+    void vfn_4();  // [4] @ 0x82278cd0
+    void vfn_6();  // [6] @ 0x82278ae0
+    void vfn_9();  // [9] @ 0x82278b40
+    void vfn_10();  // [10] @ 0x82278d70
+    void vfn_14();  // [14] @ 0x82278c98
+    void vfn_16();  // [16] @ 0x82262b20
+    void vfn_17();  // [17] @ 0x82278a18
 };
 
 // ── rage::cmPrint  [vtable @ 0x82052F5C] ──────────────────────────
@@ -836,7 +840,7 @@ struct cmRange {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227bd30
+    void vfn_4();  // [4] @ 0x8227bd30
 };
 
 // ── rage::cmReporter  [vtable @ 0x8205640C] ──────────────────────────
@@ -844,9 +848,9 @@ struct cmReporter {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmReporter();                  // [0] @ 0x82273990
-    virtual void ScalarDtor(int flags); // [1] @ 0x82273a08
-    virtual void vfn_2();  // [2] @ 0x82273e68
+    ~cmReporter();                  // [0] @ 0x82273990
+    void ScalarDtor(int flags); // [1] @ 0x82273a08
+    void vfn_2();  // [2] @ 0x82273e68
 };
 
 // ── rage::cmResettableTimer  [vtable @ 0x82056954] ──────────────────────────
@@ -854,9 +858,9 @@ struct cmResettableTimer {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_6();  // [6] @ 0x822786f8
-    virtual void vfn_10();  // [10] @ 0x82278730
-    virtual void vfn_16();  // [16] @ 0x82277988
+    void vfn_6();  // [6] @ 0x822786f8
+    void vfn_10();  // [10] @ 0x82278730
+    void vfn_16();  // [16] @ 0x82277988
 };
 
 // ── rage::cmRotateX  [vtable @ 0x820554E4] ──────────────────────────
@@ -864,8 +868,8 @@ struct cmRotateX {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x8227a588
-    virtual void vfn_16();  // [16] @ 0x82263058
+    void vfn_2();  // [2] @ 0x8227a588
+    void vfn_16();  // [16] @ 0x82263058
 };
 
 // ── rage::cmRotateY  [vtable @ 0x8205553C] ──────────────────────────
@@ -873,7 +877,7 @@ struct cmRotateY {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x8227a5e8
+    void vfn_2();  // [2] @ 0x8227a5e8
 };
 
 // ── rage::cmRotateZ  [vtable @ 0x82055594] ──────────────────────────
@@ -881,7 +885,7 @@ struct cmRotateZ {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x8227a648
+    void vfn_2();  // [2] @ 0x8227a648
 };
 
 // ── rage::cmSPrint  [vtable @ 0x82052FB4] ──────────────────────────
@@ -917,9 +921,9 @@ struct cmSampleCamMachineBank {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmSampleCamMachineBank();                  // [0] @ 0x8216dcb8
-    virtual void ScalarDtor(int flags); // [1] @ 0x82184a50
-    virtual void vfn_3();  // [3] @ 0x82273788
+    ~cmSampleCamMachineBank();                  // [0] @ 0x8216dcb8
+    void ScalarDtor(int flags); // [1] @ 0x82184a50
+    void vfn_3();  // [3] @ 0x82273788
 };
 
 // ── rage::cmSampleCamMotorPlant  [vtable @ 0x82037DE4] ──────────────────────────
@@ -927,13 +931,13 @@ struct cmSampleCamMotorPlant {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmSampleCamMotorPlant();                  // [0] @ 0x82182d50
-    virtual void ScalarDtor(int flags); // [1] @ 0x82182f70
-    virtual void vfn_2();  // [2] @ 0x82182de8
-    virtual void vfn_3();  // [3] @ 0x82182ea8
-    virtual void vfn_4();  // [4] @ 0x82183430
-    virtual void vfn_5();  // [5] @ 0x821835a0
-    virtual void vfn_6();  // [6] @ 0x821839d8
+    ~cmSampleCamMotorPlant();                  // [0] @ 0x82182d50
+    void ScalarDtor(int flags); // [1] @ 0x82182f70
+    void vfn_2();  // [2] @ 0x82182de8
+    void vfn_3();  // [3] @ 0x82182ea8
+    void vfn_4();  // [4] @ 0x82183430
+    void vfn_5();  // [5] @ 0x821835a0
+    void vfn_6();  // [6] @ 0x821839d8
 };
 
 // ── rage::cmScale  [vtable @ 0x820555EC] ──────────────────────────
@@ -941,7 +945,7 @@ struct cmScale {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x8227a6e0
+    void vfn_2();  // [2] @ 0x8227a6e0
 };
 
 // ── rage::cmScreenToWorld  [vtable @ 0x820556F4] ──────────────────────────
@@ -949,7 +953,7 @@ struct cmScreenToWorld {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x8227a8e0
+    void vfn_2();  // [2] @ 0x8227a8e0
 };
 
 // ── rage::cmSelectPointerFromArray  [vtable @ 0x82054DAC] ──────────────────────────
@@ -957,8 +961,8 @@ struct cmSelectPointerFromArray {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x8227b028
-    virtual void vfn_16();  // [16] @ 0x82262ed8
+    void ScalarDtor(int flags); // [1] @ 0x8227b028
+    void vfn_16();  // [16] @ 0x82262ed8
 };
 
 // ── rage::cmSign  [vtable @ 0x82053EE4] ──────────────────────────
@@ -966,8 +970,8 @@ struct cmSign {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227b7d8
-    virtual void vfn_5();  // [5] @ 0x8227b790
+    void vfn_4();  // [4] @ 0x8227b7d8
+    void vfn_5();  // [5] @ 0x8227b790
 };
 
 // ── rage::cmSimple  [vtable @ 0x820562D0] ──────────────────────────
@@ -975,14 +979,14 @@ struct cmSimple {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmSimple();                  // [0] @ 0x82273578
-    virtual void vfn_3();  // [3] @ 0x822731d8
-    virtual void vfn_4();  // [4] @ 0x822772a0
-    virtual void vfn_5();  // [5] @ 0x82273238
-    virtual void vfn_6();  // [6] @ 0x822732d8
-    virtual void vfn_7();  // [7] @ 0x82273350
-    virtual void vfn_9();  // [9] @ 0x822733a8
-    virtual void vfn_10();  // [10] @ 0x82273448
+    ~cmSimple();                  // [0] @ 0x82273578
+    void vfn_3();  // [3] @ 0x822731d8
+    void vfn_4();  // [4] @ 0x822772a0
+    void vfn_5();  // [5] @ 0x82273238
+    void vfn_6();  // [6] @ 0x822732d8
+    void vfn_7();  // [7] @ 0x82273350
+    void vfn_9();  // [9] @ 0x822733a8
+    void vfn_10();  // [10] @ 0x82273448
 };
 
 // ── rage::cmSimpleAction  [vtable @ 0x8205226C] ──────────────────────────
@@ -990,9 +994,9 @@ struct cmSimpleAction {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x822612a8
-    virtual void vfn_5();  // [5] @ 0x822612f0
-    virtual void vfn_6();  // [6] @ 0x82261290
+    void vfn_3();  // [3] @ 0x822612a8
+    void vfn_5();  // [5] @ 0x822612f0
+    void vfn_6();  // [6] @ 0x82261290
 };
 
 // ── rage::cmSine — defined in rage_cm_types.hpp
@@ -1002,7 +1006,7 @@ struct cmSlowIn {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227c150
+    void vfn_4();  // [4] @ 0x8227c150
 };
 
 // ── rage::cmSlowInOut  [vtable @ 0x82054304] ──────────────────────────
@@ -1010,7 +1014,7 @@ struct cmSlowInOut {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227c248
+    void vfn_4();  // [4] @ 0x8227c248
 };
 
 // ── rage::cmSlowOut  [vtable @ 0x820542AC] ──────────────────────────
@@ -1018,7 +1022,7 @@ struct cmSlowOut {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227c1a8
+    void vfn_4();  // [4] @ 0x8227c1a8
 };
 
 // ── rage::cmSphericalNoise  [vtable @ 0x82054514] ──────────────────────────
@@ -1026,7 +1030,7 @@ struct cmSphericalNoise {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x8227c4f8
+    void vfn_2();  // [2] @ 0x8227c4f8
 };
 
 // ── rage::cmSqrt  [vtable @ 0x820543B4] ──────────────────────────
@@ -1034,7 +1038,7 @@ struct cmSqrt {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227c318
+    void vfn_4();  // [4] @ 0x8227c318
 };
 
 // ── rage::cmSubtract — defined in rage_cm_types.hpp
@@ -1044,7 +1048,7 @@ struct cmTangent {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x8227b638
+    void vfn_4();  // [4] @ 0x8227b638
 };
 
 // ── rage::cmTunable  [vtable @ 0x82056B34] ──────────────────────────
@@ -1052,10 +1056,10 @@ struct cmTunable {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void ScalarDtor(int flags); // [1] @ 0x8227afd8
-    virtual void vfn_2();  // [2] @ 0x8227aee8
-    virtual void vfn_3();  // [3] @ 0x8227af38
-    virtual void vfn_4();  // [4] @ 0x8227af88
+    void ScalarDtor(int flags); // [1] @ 0x8227afd8
+    void vfn_2();  // [2] @ 0x8227aee8
+    void vfn_3();  // [3] @ 0x8227af38
+    void vfn_4();  // [4] @ 0x8227af88
 };
 
 // ── rage::cmTuningSet  [vtable @ 0x82056758] ──────────────────────────
@@ -1063,7 +1067,7 @@ struct cmTuningSet {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmTuningSet();                  // [0] @ 0x82276030
+    ~cmTuningSet();                  // [0] @ 0x82276030
 };
 
 // ── rage::cmTurnsOff  [vtable @ 0x820568A4] ──────────────────────────
@@ -1071,7 +1075,7 @@ struct cmTurnsOff {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x822780e0
+    void vfn_10();  // [10] @ 0x822780e0
 };
 
 // ── rage::cmTurnsOn  [vtable @ 0x8205684C] ──────────────────────────
@@ -1079,7 +1083,7 @@ struct cmTurnsOn {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_10();  // [10] @ 0x82278068
+    void vfn_10();  // [10] @ 0x82278068
 };
 
 // ── rage::cmUnwarpedAlarmTimer  [vtable @ 0x82052EAC] ──────────────────────────
@@ -1097,7 +1101,7 @@ struct cmValueSet {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cmValueSet();                  // [0] @ 0x82275458
+    ~cmValueSet();                  // [0] @ 0x82275458
 };
 
 // ── rage::cmVector  [vtable @ 0x82056ADC] ──────────────────────────
@@ -1105,8 +1109,8 @@ struct cmVector {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x82279e50
-    virtual void vfn_16();  // [16] @ 0x82279dc8
+    void vfn_2();  // [2] @ 0x82279e50
+    void vfn_16();  // [16] @ 0x82279dc8
 };
 
 // ── rage::cmVectorGNoise  [vtable @ 0x820545C4] ──────────────────────────
@@ -1114,7 +1118,7 @@ struct cmVectorGNoise {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x8227c638
+    void vfn_2();  // [2] @ 0x8227c638
 };
 
 // ── rage::cmVectorNoise  [vtable @ 0x820544BC] ──────────────────────────
@@ -1122,7 +1126,7 @@ struct cmVectorNoise {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x8227c418
+    void vfn_2();  // [2] @ 0x8227c418
 };
 
 // ── rage::cmVectorToBearing  [vtable @ 0x82054E5C] ──────────────────────────
@@ -1130,8 +1134,8 @@ struct cmVectorToBearing {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x82279e08
-    virtual void vfn_16();  // [16] @ 0x82262fd8
+    void vfn_4();  // [4] @ 0x82279e08
+    void vfn_16();  // [16] @ 0x82262fd8
 };
 
 // ── rage::cmVizVectorBlue  [vtable @ 0x8205506C] ──────────────────────────
@@ -1144,7 +1148,7 @@ struct cmVizVectorRed {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_16();  // [16] @ 0x82262f58
+    void vfn_16();  // [16] @ 0x82262f58
 };
 
 // ── rage::cmVizVectorSpline  [vtable @ 0x820557A4] ──────────────────────────
@@ -1152,7 +1156,7 @@ struct cmVizVectorSpline {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_18();  // [18] @ 0x82270bd0
+    void vfn_18();  // [18] @ 0x82270bd0
 };
 
 // ── rage::cmVizVectorWhite  [vtable @ 0x82055014] ──────────────────────────
@@ -1165,8 +1169,8 @@ struct cmWorldToScreen {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x8227a7a8
-    virtual void vfn_18();  // [18] @ 0x82270b90
+    void vfn_2();  // [2] @ 0x8227a7a8
+    void vfn_18();  // [18] @ 0x82270b90
 };
 
 // ── rage::cmX  [vtable @ 0x82054EB4] ──────────────────────────
@@ -1174,7 +1178,7 @@ struct cmX {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x82279ec0
+    void vfn_4();  // [4] @ 0x82279ec0
 };
 
 // ── rage::cmXor  [vtable @ 0x8205477C] ──────────────────────────
@@ -1182,8 +1186,8 @@ struct cmXor {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_3();  // [3] @ 0x8227ca10
-    virtual void vfn_16();  // [16] @ 0x822628a0
+    void vfn_3();  // [3] @ 0x8227ca10
+    void vfn_16();  // [16] @ 0x822628a0
 };
 
 // ── rage::cmY  [vtable @ 0x82054F0C] ──────────────────────────
@@ -1191,7 +1195,7 @@ struct cmY {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x82279f00
+    void vfn_4();  // [4] @ 0x82279f00
 };
 
 // ── rage::cmZ  [vtable @ 0x82054F64] ──────────────────────────
@@ -1199,7 +1203,7 @@ struct cmZ {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x82279f40
+    void vfn_4();  // [4] @ 0x82279f40
 };
 
 } // namespace rage
