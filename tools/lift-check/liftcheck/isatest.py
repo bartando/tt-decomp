@@ -20,7 +20,7 @@ from unicorn import UcError
 from .build import llvm_bin
 from .machine import Machine, d2bits
 
-DEFAULT_TESTS = Path("~/PhpstormProjects/ttrecomp/third_party/rexglue-sdk/tests/ppc/asm")
+DEFAULT_TESTS = Path("~/PhpstormProjects/ttrecomp/third_party/rexglue-sdk/tests/ppc/asm").expanduser()
 
 # binutils VMX128 table: mnemonic -> (opcode, xop, xop mask, operands)
 _X128 = 0x3D0

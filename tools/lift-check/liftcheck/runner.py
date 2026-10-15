@@ -78,7 +78,7 @@ class Checker:
         self.addr = self.spec.ADDRESS
         self.ftol = opts.ftol if opts.ftol is not None else getattr(self.spec, "FTOL", 0.0)
         self.trials = opts.trials if opts.trials is not None else getattr(self.spec, "TRIALS", 200)
-        image_path = os.environ.get("TT_IMAGE", DEFAULT_IMAGE)
+        image_path = os.path.expanduser(os.environ.get("TT_IMAGE", DEFAULT_IMAGE))
         if not Path(image_path).exists():
             raise SystemExit(f"lift-check: game image not found at {image_path} (set TT_IMAGE)")
         self.image = Path(image_path).read_bytes()
