@@ -381,8 +381,8 @@ struct msgMsgSink {
     void SendEvent();  // [52] @ 0x8244db58
     void* GetSessionPointer();  // [54] @ 0x8244ef38
     void ForwardProcessMessage();  // [55] @ 0x8244f8a8
-    void vfn_56();  // [56] @ 0x82456e38
-    void vfn_57();  // [57] @ 0x82456eb0
+    uint32_t vfn_56(void* param);  // [56] @ 0x82456e38 — SetMessageBuffer under the lock, then notify +0x188/+0x18C
+    int32_t vfn_57(void* param);   // [57] @ 0x82456eb0 — the same around slot 35
     void DispatchDefaultHandler();  // [59] @ 0x821efd10
     void vfn_60();  // [60] @ 0x824564c0
     void vfn_61();  // [61] @ 0x82457130
