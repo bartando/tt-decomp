@@ -128,6 +128,32 @@ bool datBitBuffer_ReadS16(void* bb, int16_t* out) {
     return true;
 }
 
+// @ 0x82260E18 — datBitBuffer::ReadSigned<s32> (SinglesNetworkClient_0E18_g)
+// A sign bit, then bits - 1 bits of magnitude, negated if the sign was set.
+bool datBitBuffer_ReadS32(void* bb, int32_t* out, int32_t bits) {
+    uint32_t sign;
+    if (!datBitBuffer_ReadU32(bb, &sign, 1)) {
+        return false;
+    }
+    if (!datBitBuffer_ReadU32(bb, reinterpret_cast<uint32_t*>(out), bits - 1)) {
+        return false;
+    }
+    if (sign != 0) {
+        *out = static_cast<int32_t>(0u - static_cast<uint32_t>(*out));
+    }
+    return true;
+}
+
+// @ 0x823CEA98 — a network timestamp, a signed 32-bit count and a float
+// (SinglesNetworkClient_EA98_g). Note the stream is the second argument.
+void netTimestamp_Deserialise(void* timestamp, void* bb) {
+    uint8_t* ts = static_cast<uint8_t*>(timestamp);
+    datBitBuffer_ReadS32(bb, reinterpret_cast<int32_t*>(ts), 32);
+    uint32_t bits;
+    datBitBuffer_ReadU32(bb, &bits, 32);
+    __builtin_memcpy(ts + 4, &bits, sizeof bits);
+}
+
 // @ 0x82260CE8 — datBitBuffer::Grow (SinglesNetworkClient_0CE8_g)
 // Makes room for `bits` bits: false if that is past m_maxBits. A buffer
 // whose block is shared (refcount > 1) is copied even when it is big enough.
@@ -353,4 +379,10 @@ void netStream_WriteS16(void* bb, int16_t value, int bits) {
 
 void netStream_WriteBool(void* bb, uint8_t value) {
     datBitBuffer_WriteFieldBool(bb, value);
+}
+
+// pong_network.cpp's name for the timestamp read (MatchTimeSyncMessage and
+// two other deserialisers call 0x823CEA98 with the destination first).
+void netStream_ReadU64(void* timestamp, void* bb) {
+    netTimestamp_Deserialise(timestamp, bb);
 }
