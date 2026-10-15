@@ -1062,3 +1062,167 @@ void crAnimDofQuaternion::EvaluateChannels(void* animContext, float time, float*
 }
 
 } // namespace rage
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Resource placement (rsc constructors) for creature animation data
+//
+// Filed under crAnimDofFloat_* by the symbol map, but none of these touch
+// crAnimDofFloat: they relocate the pointers of data loaded from a resource
+// image (see datResource in rage_anim.hpp).
+// ═════════════════════════════════════════════════════════════════════════════
+
+extern void* g_pcrAnimObserverHash_vtable[];  // @ 0x820283C4
+extern void* g_pcrAnimObserver_vtable[];      // @ 0x820283B8
+extern void* g_xmlTree_vtable[];              // @ 0x8203A928  rage::xmlTree
+
+namespace rage {
+
+// @ 0x82387530 — relocates a map key's string; null-safe on both the key slot
+// and the string.
+void PlaceMapKeyString(datResource& rsc, const char** key);
+
+// @ 0x820CF728 — relocates the pointer, then runs pcrAnimObserved's rsc
+// constructor (0x820CF598) on the object it points to.
+void PlaceAnimObservedPtr(datResource& rsc, ::pcrAnimObserved*& observed);
+
+// @ 0x820CFB88 — relocates the pointer, then resets the node it points to:
+// xmlRoot vtable, and the words at +0x04/+0x08/+0x0C (tree links) zeroed.
+void PlaceXmlRootPtr(datResource& rsc, ::xmlRoot*& root);
+
+// @ 0x820CF0F0 — re-parents every observed object in m_observed under m_root,
+// in key order (qsort with a strcmp comparator, 0x820CF0B8).
+void pcrAnimObserverHash_BuildTree(pcrAnimObserverHash* hash);
+
+namespace {
+
+// Body of the atMap rsc constructor the three map placers below are compiled
+// from. Relocates the bucket array, each bucket's head, and every entry's
+// next link, key and data.
+//
+// Before each key and data call the binary tests the (constant) placement
+// function's address against null; that test is always true and dropped here.
+template <typename Data, typename PlaceData>
+atHashMap<const char*, Data>* PlaceStringKeyedMap(atHashMap<const char*, Data>* map,
+                                                  datResource& rsc, PlaceData placeData) {
+    rsc.PointerFixup(map->m_buckets);
+
+    for (uint32_t slot = 0; slot < map->m_numSlots; ++slot) {
+        rsc.PointerFixup(map->m_buckets[slot]);
+
+        for (auto* entry = map->m_buckets[slot]; entry; entry = entry->next) {
+            rsc.PointerFixup(entry->next);
+            PlaceMapKeyString(rsc, &entry->key);   // 0x82387530
+            placeData(rsc, entry->data);
+        }
+    }
+
+    return map;
+}
+
+} // namespace
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PlaceFaceAnimItemMap()
+// @ 0x820C2A58 | size: 0x144   (symbol map: crAnimDofFloat_2A58_h)
+//
+// rsc constructor of pcrFaceAnimBlender's name -> face anim item maps; its rsc
+// constructor (0x820C0CA0) runs it on the maps at +0xA0, +0xA8 and +0xB0.
+// Each item is placed with PlaceFaceAnimItem.
+// ─────────────────────────────────────────────────────────────────────────────
+pcrFaceAnimItemMap* PlaceFaceAnimItemMap(pcrFaceAnimItemMap* map, datResource& rsc,
+                                         pcrFaceAnimItemMap::PlaceKeyFn /*placeKey*/,
+                                         pcrFaceAnimItemMap::PlaceDataFn /*placeData*/) {
+    return PlaceStringKeyedMap(map, rsc, PlaceFaceAnimItem);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PlaceFaceAnimItem()
+// @ 0x820C2BA0 | size: 0xAC   (symbol map: crAnimDofFloat_2BA0_2h)
+//
+// Relocates a pointer to a face anim item, then the item's own two pointers.
+// Data placer of PlaceFaceAnimItemMap; pcrFaceAnimBlender's rsc constructor
+// also calls it for every element of its 17 item arrays.
+// ─────────────────────────────────────────────────────────────────────────────
+void PlaceFaceAnimItem(datResource& rsc, pcrFaceAnimItem*& item) {
+    rsc.PointerFixup(item);
+    if (!item)
+        return;
+
+    rsc.PointerFixup(item->m_name);
+    rsc.PointerFixup(item->m_ptr1C);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PlaceCreatureTypeMap()
+// @ 0x820C3700 | size: 0x16C   (symbol map: crAnimDofFloat_3700_fw)
+//
+// rsc constructor of the name map at pongCreatureType+0x0C (its only caller is
+// pongCreatureType's rsc constructor, 0x820C30F8). The data are plain
+// pointers: the placer it was given (0x820C3870, a bare pointer fixup) is
+// inlined.
+// ─────────────────────────────────────────────────────────────────────────────
+pongCreatureTypeMap* PlaceCreatureTypeMap(pongCreatureTypeMap* map, datResource& rsc,
+                                          pongCreatureTypeMap::PlaceKeyFn /*placeKey*/,
+                                          pongCreatureTypeMap::PlaceDataFn /*placeData*/) {
+    return PlaceStringKeyedMap(map, rsc, [](datResource& r, void*& data) { r.PointerFixup(data); });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PlaceObservedMap()
+// @ 0x820CFA40 | size: 0x144   (symbol map: crAnimDofFloat_FA40_2h)
+//
+// rsc constructor of pcrAnimObserverHash::m_observed. Each observed object is
+// relocated and rsc-constructed by PlaceAnimObservedPtr (0x820CF728).
+// ─────────────────────────────────────────────────────────────────────────────
+pcrAnimObservedMap* PlaceObservedMap(pcrAnimObservedMap* map, datResource& rsc,
+                                     pcrAnimObservedMap::PlaceKeyFn /*placeKey*/,
+                                     pcrAnimObservedMap::PlaceDataFn /*placeData*/) {
+    return PlaceStringKeyedMap(map, rsc, PlaceAnimObservedPtr);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PlaceAnimObserverHash()  — pcrAnimObserverHash rsc constructor
+// @ 0x820CF778 | size: 0xCC   (symbol map: crAnimDofFloat_F778)
+//
+// Relocates the loaded fields, starts m_tree empty, then rebuilds the tree of
+// observed objects under m_root.
+// ─────────────────────────────────────────────────────────────────────────────
+pcrAnimObserverHash* PlaceAnimObserverHash(pcrAnimObserverHash* hash, datResource& rsc) {
+    hash->vtable = g_pcrAnimObserverHash_vtable;
+    rsc.PointerFixup(hash->m_owned04);
+    PlaceObservedMap(&hash->m_observed, rsc, PlaceMapKeyString, PlaceAnimObservedPtr);
+
+    hash->m_tree.vtable = g_xmlTree_vtable;
+    hash->m_tree.root   = nullptr;
+    hash->m_tree.unk18  = 0;
+    hash->m_tree.unk1C  = 0;
+    hash->m_tree.unk1E  = 0;
+
+    PlaceXmlRootPtr(rsc, hash->m_root);
+    pcrAnimObserverHash_BuildTree(hash);
+    return hash;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PlaceAnimObserver()  — pcrAnimObserver rsc constructor
+// @ 0x820CF848 | size: 0x104   (symbol map: crAnimDofFloat_F848_fw)
+//
+// Relocates the observer's fields and rsc-constructs each of its hashes.
+// Called from 0x820C84B8 on a relocated pcrAnimObserver pointer.
+// ─────────────────────────────────────────────────────────────────────────────
+pcrAnimObserver* PlaceAnimObserver(pcrAnimObserver* observer, datResource& rsc) {
+    observer->vtable = g_pcrAnimObserver_vtable;
+    rsc.PointerFixup(observer->m_hashes);
+    rsc.PointerFixup(observer->m_ptr08);
+
+    for (int i = 0; i < observer->m_hashCount; ++i) {
+        pcrAnimObserverHash*& hash = observer->m_hashes[i];
+        rsc.PointerFixup(hash);
+        if (hash)
+            PlaceAnimObserverHash(hash, rsc);
+    }
+
+    return observer;
+}
+
+} // namespace rage

@@ -642,3 +642,120 @@ struct crIKSpine {
 };
 
 } // namespace rage
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Resource placement (rsc constructors) for creature animation data
+//
+// The symbol map files these functions under crAnimDofFloat_*; they don't
+// touch crAnimDofFloat. They relocate the pointers of data loaded from a
+// resource image and are lifted in rage_anim.cpp.
+// ═════════════════════════════════════════════════════════════════════════════
+
+struct pcrAnimObserved;   // game/creature/pong_creature.hpp  [vtable @ 0x82028354]
+struct xmlRoot;           // rage/data/rage_xml.hpp           [vtable @ 0x8204E28C]
+
+namespace rage {
+
+// Relocation state passed to every rsc constructor. Pointers in a loaded image
+// still hold the addresses they were saved with. The image is cut into chunks
+// of m_chunkSize bytes that may each load anywhere, so a pointer moves by the
+// delta of the chunk it points into.
+struct datResource {
+    uint8_t   _unk00[4];          // +0x00  not used by the fixups
+    uintptr_t m_savedBase;        // +0x04  address the image's pointers were saved against
+    intptr_t  m_chunkDelta[17];   // +0x08  per chunk: loaded address - saved address (17 fit before +0x4C)
+    uint32_t  m_chunkSize;        // +0x4C  bytes per chunk
+
+    // Inlined by the compiler at every pointer an rsc constructor relocates.
+    template <typename T>
+    void PointerFixup(T*& ptr) const {
+        if (!ptr)
+            return;
+        const uintptr_t saved = reinterpret_cast<uintptr_t>(ptr);
+        const uintptr_t chunk = (saved - m_savedBase) / m_chunkSize;  // divwu; traps if m_chunkSize == 0
+        ptr = reinterpret_cast<T*>(saved + m_chunkDelta[chunk]);
+    }
+};
+
+// Hash map with chained buckets (RAGE's atMap layout; the repo's helpers call
+// it atHashMap: atHashMap_Find, atHashMap_Clear @ 0x8234C0E0).
+template <typename Key, typename Data>
+struct atHashMap {
+    struct Entry {
+        Key    key;    // +0x00
+        Data   data;   // +0x04
+        Entry* next;   // +0x08  next entry in the same bucket
+    };
+
+    // Placement callbacks an rsc constructor receives for keys and data.
+    using PlaceKeyFn  = void (*)(datResource& rsc, Key* key);
+    using PlaceDataFn = void (*)(datResource& rsc, Data& data);
+
+    Entry**  m_buckets;    // +0x00  m_numSlots chains
+    uint16_t m_numSlots;   // +0x04
+    uint16_t m_unk06;      // +0x06  zeroed with m_numSlots by atHashMap_Clear; likely the entry count
+};
+
+// Element of pcrFaceAnimBlender's three name maps (+0xA0/+0xA8/+0xB0) and of
+// its 17 arrays at +0x5C. Name invented; the real class is unknown.
+struct pcrFaceAnimItem {
+    uint8_t     _unk00[0x18];  // +0x00  not touched by placement
+    const char* m_name;        // +0x18  strlen'd and sent over the network by 0x820C27B8
+    void*       m_ptr1C;       // +0x1C  pointee unknown (the blender reads a float at its +0x0C)
+};
+
+// pcrAnimObserverHash and pcrAnimObserver aren't RAGE classes (their RTTI has
+// no rage:: prefix). game/creature/pong_creature.hpp declares both in the
+// global namespace without fields; these copies only hold the fields their
+// rsc constructors touch, and sit in rage:: so the two don't clash. Merge them
+// into that header once it gets real layouts.
+
+// [vtable @ 0x820283C4]  base: rage::datBase
+struct pcrAnimObserverHash {
+    void** vtable;                                          // +0x00
+    void*  m_owned04;                                       // +0x04  heap block freed by the dtor (0x820CF038)
+    atHashMap<const char*, ::pcrAnimObserved*> m_observed;  // +0x08  name -> observed
+
+    // +0x10  embedded rage::xmlTree, default-constructed rather than loaded
+    struct {
+        void**    vtable;   // +0x10  rage::xmlTree vtable (0x8203A928)
+        ::xmlRoot* root;    // +0x14  set to m_root by pcrAnimObserverHash_BuildTree (0x820CF0F0)
+        uint32_t  unk18;    // +0x18
+        uint16_t  unk1C;    // +0x1C
+        uint16_t  unk1E;    // +0x1E
+    } m_tree;
+
+    ::xmlRoot* m_root;      // +0x20  root node the observed objects hang under
+};
+
+// [vtable @ 0x820283B8]  base: rage::datBase
+struct pcrAnimObserver {
+    void**                vtable;          // +0x00
+    uint8_t               _unk04[4];       // +0x04  not touched by placement
+    void*                 m_ptr08;         // +0x08  relocated; pointee unknown
+    pcrAnimObserverHash** m_hashes;        // +0x0C  array of m_hashCount
+    uint16_t              m_hashCount;     // +0x10
+    uint16_t              m_hashCapacity;  // +0x12  dtor (0x820CF3A8) frees m_hashes when nonzero
+};
+
+using pcrFaceAnimItemMap   = atHashMap<const char*, pcrFaceAnimItem*>;
+using pcrAnimObservedMap   = atHashMap<const char*, ::pcrAnimObserved*>;
+using pongCreatureTypeMap  = atHashMap<const char*, void*>;   // pointee type unknown
+
+// The three map placers are one atMap rsc constructor compiled per caller.
+// Callers pass the key/data placement functions, but each compiled copy
+// ignores those arguments and calls its fixed pair directly.
+pcrFaceAnimItemMap* PlaceFaceAnimItemMap(pcrFaceAnimItemMap* map, datResource& rsc,
+                                         pcrFaceAnimItemMap::PlaceKeyFn,
+                                         pcrFaceAnimItemMap::PlaceDataFn);       // @ 0x820C2A58
+void PlaceFaceAnimItem(datResource& rsc, pcrFaceAnimItem*& item);                 // @ 0x820C2BA0
+pongCreatureTypeMap* PlaceCreatureTypeMap(pongCreatureTypeMap* map, datResource& rsc,
+                                          pongCreatureTypeMap::PlaceKeyFn,
+                                          pongCreatureTypeMap::PlaceDataFn);     // @ 0x820C3700
+pcrAnimObservedMap* PlaceObservedMap(pcrAnimObservedMap* map, datResource& rsc,
+                                     pcrAnimObservedMap::PlaceKeyFn,
+                                     pcrAnimObservedMap::PlaceDataFn);           // @ 0x820CFA40
+pcrAnimObserverHash* PlaceAnimObserverHash(pcrAnimObserverHash* hash, datResource& rsc);  // @ 0x820CF778
+pcrAnimObserver* PlaceAnimObserver(pcrAnimObserver* observer, datResource& rsc);          // @ 0x820CF848
+
+} // namespace rage
