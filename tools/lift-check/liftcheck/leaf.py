@@ -1,11 +1,11 @@
-"""Which volatile registers a leaf function can write.
+"""Which volatile registers a function (and what it calls) can write.
 
 MSVC's link-time code generation lets a caller keep values in volatile registers
 across a call to a leaf it knows leaves them alone (r8 across pg_C2A0_g, f1 and r7
 across io_Input_poll_9D68, r3 = this after a reset). A stub standing in for such a
 callee must leave them alone too, so the dispatcher only clobbers what the
-original callee could write. Over-approximates: any field that may be a
-destination counts.
+original callee could write, through every direct call it makes. Over-approximates:
+any field that may be a destination counts; a call through a register gives up.
 """
 from __future__ import annotations
 
@@ -20,11 +20,12 @@ _OP31_NO_GPR = {0, 32, 4, 54, 86, 246, 278, 470, 982, 598, 854, 1014,      # cmp
 _OP31_FP = {535, 567, 599, 631}                    # lfsx lfsux lfdx lfdux: write FRT
 
 
-def written(words: list[int], lo: int, hi: int) -> tuple[set[int], set[int]] | None:
-    """(GPRs, FPRs) the code in [lo, hi) may write, or None if it isn't a leaf (calls,
-    branches out of its range, jumps through CTR)."""
+def written(words: list[int], lo: int, hi: int) -> tuple[set[int], set[int], set[int]] | None:
+    """(GPRs, FPRs, callees) the code in [lo, hi) may write and call directly, or None if
+    it calls through a register (bctrl, a tail call through CTR) or traps to the OS."""
     gprs: set[int] = set()
     fprs: set[int] = set()
+    calls: set[int] = set()
     data: set[int] = set()
     for k, w in enumerate(words):
         pc = lo + 4 * k
@@ -33,21 +34,17 @@ def written(words: list[int], lo: int, hi: int) -> tuple[set[int], set[int]] | N
         op = w >> 26
         rt, ra = (w >> 21) & 31, (w >> 16) & 31
         if op == 18:
-            if w & 1:
-                return None
             li = w & 0x03FFFFFC
             li = li - 0x04000000 if li & 0x02000000 else li
-            dest = li if w & 2 else pc + li
-            if not lo <= dest < hi:
-                return None             # a tail call
+            dest = (li if w & 2 else pc + li) & 0xFFFFFFFF
+            if w & 1 or not lo <= dest < hi:
+                calls.add(dest)         # a call or a tail call
         elif op == 16:
-            if w & 1:
-                return None
             bd = w & 0xFFFC
             bd = bd - 0x10000 if bd & 0x8000 else bd
-            dest = bd if w & 2 else pc + bd
-            if not lo <= dest < hi:
-                return None
+            dest = (bd if w & 2 else pc + bd) & 0xFFFFFFFF
+            if w & 1 or not lo <= dest < hi:
+                calls.add(dest)
         elif op == 19:
             xo = (w >> 1) & 0x3FF
             if xo in (16, 528) and w & 1:
@@ -101,7 +98,7 @@ def written(words: list[int], lo: int, hi: int) -> tuple[set[int], set[int]] | N
         else:
             gprs.update((rt, ra))
             fprs.add(rt)
-    return gprs, fprs
+    return gprs, fprs, calls
 
 
 def _jump_table(words, k, lo) -> int | None:

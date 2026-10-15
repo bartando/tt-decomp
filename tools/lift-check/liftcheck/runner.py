@@ -128,6 +128,7 @@ class Checker:
         self.policies: dict = {}
         self.fake_policies: dict = {}
         self._canon: dict[int, int] = {}
+        self.helpers = self.syms.helper_ranges()
         self._leaf: dict[int, tuple | None] = {}
         for key, pol in getattr(self.spec, "CALLS", {}).items():
             if isinstance(key, int):
@@ -163,19 +164,34 @@ class Checker:
             self._canon[target] = a
         return a
 
-    def leaf_writes(self, target: int) -> tuple | None:
-        """(GPRs, FPRs) the original callee can write, if it's a leaf (see leaf.py)."""
-        if target not in self._leaf:
-            from .leaf import written
-            r = self.syms.func_range(target)
-            res = None
-            if r is not None and r[1] - r[0] <= 0x4000:
-                lo, hi = r
-                data = self.image[lo - IMAGE_BASE: hi - IMAGE_BASE]
-                res = written([int.from_bytes(data[k:k + 4], "big") for k in range(0, len(data), 4)],
-                              lo, hi)
-            self._leaf[target] = res
-        return self._leaf[target]
+    def leaf_writes(self, target: int, depth: int = 0) -> tuple | None:
+        """(GPRs, FPRs) the original callee can write, following its direct calls (see
+        leaf.py); None if it calls through a register or the chain is too deep."""
+        if target in self._leaf:
+            return self._leaf[target]
+        from .leaf import written
+        self._leaf[target] = None                       # recursion guard
+        r = self.syms.func_range(target)
+        res = None
+        if r is not None and r[1] - r[0] <= 0x4000 and depth < 8:
+            lo, hi = r
+            data = self.image[lo - IMAGE_BASE: hi - IMAGE_BASE]
+            w = written([int.from_bytes(data[k:k + 4], "big") for k in range(0, len(data), 4)], lo, hi)
+            if w is not None:
+                gprs, fprs, calls = set(w[0]), set(w[1]), w[2]
+                for c in calls:
+                    if any(hlo <= c < hhi for hlo, hhi in self.helpers):
+                        gprs |= {11, 12}        # __savegprlr & co: scratch plus non-volatiles
+                        continue
+                    sub = self.leaf_writes(self.canonical(c), depth + 1)
+                    if sub is None:
+                        break
+                    gprs |= sub[0]
+                    fprs |= sub[1]
+                else:
+                    res = (gprs, fprs)
+        self._leaf[target] = res
+        return res
 
     # ── one side ────────────────────────────────────────────────────────────
     def _policy(self, target: int, trial: Trial) -> Policy:

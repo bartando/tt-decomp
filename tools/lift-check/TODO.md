@@ -4,5 +4,5 @@ Reported by the agents using it. Each was worked around in a spec; fix in the to
 
 - Varargs aren't compared unless named in `args=` (the count isn't known; the format
   string itself compares as text).
-- Non-leaf callees that keep registers (LTCG through a call chain) still need
-  `preserves=` or `run()`.
+- Callees whose call chain goes through a register (vtables, function pointers) are
+  clobbered in full; where LTCG keeps registers across one, `preserves=` or `run()`.

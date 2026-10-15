@@ -101,8 +101,9 @@ all fail (about 40 s).
   - memcpy, memmove, memset, strlen and strcmp are Python models and stay out of the call
     trace (MSVC and clang inline different copies); their effects are in the memory diff.
   - After a stub or model returns, the volatile registers are clobbered with random values,
-    except, when the original callee is a leaf (no calls, no branches out), those it never
-    writes: MSVC's link-time codegen keeps values in them across such calls. A stub with
+    except those the original callee never writes, through all its direct calls (when
+    nothing in the chain calls through a register; about 40% of the game's functions):
+    MSVC's link-time codegen keeps values in them across such calls. A stub with
     the default return also keeps r3/f1 then. A call to a one-branch thunk (`b X`) is
     recorded, matched and handled as a call to X.
 - `EXTERNS`, `FTOL` (relative float tolerance, default 0), `TRIALS`, `RET` (`"r3"`, `"f1"`,
