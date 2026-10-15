@@ -20,6 +20,8 @@ TT_DATA_ALIAS("g_kFloatConst_5C5938", "g_charViewCS_scale");
 TT_DATA_ALIAS("g_kPositiveSideSign", "g_charViewCS_scale");
 TT_DATA_ALIAS("lbl_825C5938", "g_charViewCS_scale");
 TT_DATA_ALIAS("g_kInputScale", "g_charViewCS_scale");
+TT_DATA_ALIAS("g_kSwingDisplay2", "g_charViewCS_scale");
+TT_DATA_ALIAS("g_float_value_22840", "g_charViewCS_scale");
 TT_DATA_ALIAS("g_msgSinkInitFloat", "g_charViewCS_scale");
 TT_DATA_ALIAS("g_defaultTimeout", "g_charViewCS_scale");
 TT_DATA_ALIAS("g_fDefaultTimer", "g_charViewCS_scale");

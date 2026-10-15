@@ -158,6 +158,7 @@ set(SOURCES
     # Definitions the link was missing: data from the image, small lifts,
     # and bridges between spellings of one symbol
     src/game/ball/ball_data.cpp
+    src/game/ld_game_data.cpp
     src/game/camera/camera_data.cpp
     src/game/camera/ld_cam_data.cpp
     src/game/char_view/char_view_data.cpp

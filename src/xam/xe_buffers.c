@@ -270,8 +270,8 @@ extern void xe_A750(uint32_t size, uint32_t alignment);  /* @ 0x821AA750 */
  * addresses. Rename once the owning class / global lands — these live
  * partway into larger symbols so their permanent names depend on the
  * class of the owning object, not on anything we can infer here. */
-extern uint32_t audVoice_vtable_word;  /* @ 0x82163570 (audVoiceSfx_PlayByEntry+0xD8) */
-extern uint32_t g_swfCMD_globalState;  /* @ 0x824063F4 (swfCMD_6290_p46+0x164) */
+extern uint32_t audVoice_vtable_word;  /* @ 0x82035570 (rage::audControlMgr vtable; the asm stores its address) */
+extern uint32_t g_swfCMD_globalState;  /* @ 0x82606414 */
 
 void InitAudioControlManager(void* structure, uint8_t enableFlag) {
     uint32_t* words = (uint32_t*)structure;
@@ -301,7 +301,7 @@ extern void pg_D678_gen(void* structure, int32_t value1, void* ptr, int32_t valu
 /* Pointer word living inside atSingleton_2940_p39+0x28 — holds the active
  * atSingleton instance. Permanent name awaits the atSingleton_2940_p39
  * lift; until then this anchor name captures the access pattern. */
-extern uint32_t* g_atSingleton_2940_ptr;  /* @ 0x82412968 */
+extern uint32_t* g_atSingleton_2940_ptr;  /* @ 0x8271A2E8 */
 
 void UpdateParamOffsetState(void* structure, int32_t param) {
     /* Calculate offset: (param + 0x20000 - 23877) * 4 */
@@ -405,8 +405,8 @@ void* AllocateVtableTrackedStruct32(void) {
          * The lbl_ anchor names are the stable shape until the owning
          * class header lands; they point partway into a larger symbol
          * so there is no better name derivable from static data alone. */
-        extern uint32_t lbl_82020120_vtable_word;  /* @ 0x82020154 (lbl_82020120+0x34) */
-        extern uint32_t lbl_820201D8_vtable_word;  /* @ 0x820201DC (lbl_820201D8+0x04) */
+        extern uint32_t lbl_82020120_vtable_word;  /* @ 0x82030154 (gmLogicNode vtable; the asm stores its address) */
+        extern uint32_t lbl_820201D8_vtable_word;  /* @ 0x820301DC (gmLogicNode's second vtable; the asm stores its address) */
 
         /* Initialize structure fields */
         words[0] = lbl_82020120_vtable_word;  /* vtable pointer @ +0x00 */
@@ -556,7 +556,7 @@ void* xe_D6F8(void) {
         bytes[0x10101] = 0;  /* +100,257 */
         
         /* Check global flag to determine initialization */
-        extern uint32_t* g_system_flags;  /* @ 0x821DA170 */
+        extern uint32_t g_system_flags[];  /* @ 0x825CA0F0 (the "nomotionblur" option record; [1] = its value) */
         uint32_t flagValue = g_system_flags[1];
         
         if (flagValue != 0) {
@@ -586,7 +586,7 @@ void* xe_D6F8(void) {
 // xe_0780()  @ 0x820F0780 | size: 0x108
 // Allocates buffer for 56-byte elements with complex initialization
 // ─────────────────────────────────────────────────────────────────────────────
-extern float g_float_values[3];  /* @ 0x8202D1A8, 0x8202D1A0, 0x8202D238 */
+extern float g_float_values[3];  /* @ 0x8202D110, 0x8202D108, 0x8202D168 (three separate constants) */
 
 void xe_0780(XeBuffer* buffer, uint16_t capacity) {
     void* data = NULL;
@@ -754,7 +754,7 @@ void xe_5A70(XeBuffer* buffer, uint16_t newCapacity) {
 // xe_5BE8()  @ 0x82115BE8 | size: 0xD0
 // Allocates and initializes a 56-byte hitTipData object with nested structure
 // ─────────────────────────────────────────────────────────────────────────────
-extern float g_float_value_22840;  /* @ offset 22840 from base */
+extern float g_float_value_22840;  /* @ 0x825C5938  -1.0f */
 
 void* xe_5BE8(void) {
     void* obj = xe_alloc_aligned(56, 16);

@@ -21,12 +21,14 @@ extern "C" alignas(16) const float g_kBoundsUpper32[2] = {1.25f, 2.00501254e-05f
 
 // @ 0x8202D108 (.rdata)
 extern "C" const float g_kFloatConst_D108 = 1.0f;
+TT_DATA_ALIAS("g_kDefaultServeSpeed", "g_kFloatConst_D108");
 
 // @ 0x8202D10C (.rdata)
 extern "C" const float g_kFloatConst_D10C = 0.5f;
 
 // @ 0x8202D110 (.rdata)
 extern "C" const float g_kFloatConst_D110 = 0.0f;
+TT_DATA_ALIAS("g_kZeroFloat", "g_kFloatConst_D110");
 
 // @ 0x8202D118 (.rdata)
 extern "C" alignas(16) const float g_kPercentScale[3] = {100.0f, 0.0f, 1.0f};
@@ -42,6 +44,7 @@ extern "C" const float g_kSwingDisplay1 = 3.40282347e+38f;
 
 // @ 0x82079B00 (.rdata)
 extern "C" const double g_kDoubleConst_79B00 = 0.0;
+TT_DATA_ALIAS("g_kCourtNegMax", "g_kDoubleConst_79B00");
 
 // @ 0x82079B08 (.rdata)
 extern "C" const double g_kDoubleConst_79B08 = 1.0;
@@ -57,6 +60,8 @@ extern "C" const float g_kFloatConst_79BAC = 0.0174532924f;
 
 // @ 0x82079BB8 (.rdata)
 extern "C" const float g_kFloatConst_79BB8 = 0.0333333351f;
+TT_DATA_ALIAS("g_kFrameScale", "g_kFloatConst_79BB8");
+TT_DATA_ALIAS("g_kSwingProgressScale", "g_kFloatConst_79BB8");
 
 // @ 0x82079C04 (.rdata)
 extern "C" const float g_kFloatConst_79C04 = -1000.0f;
@@ -117,6 +122,7 @@ extern "C" uint8_t lbl_8260642F = 0x0u;
 
 // @ 0x82606720 (.data)
 extern "C" alignas(16) uint8_t g_mirrorBuffer[32] = {};
+TT_DATA_ALIAS("g_swingTrajectoryGlobal", "g_mirrorBuffer");
 
 // @ 0x82606740 (.data)
 extern "C" alignas(16) float g_identityVector[4] = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -141,6 +147,7 @@ TT_DATA_ALIAS("g_playerDataArray2", "g_ballSplashArray");
 
 // @ 0x8271A304 (.data)
 extern "C" void* g_pGlobalClock = nullptr;
+TT_DATA_ALIAS("g_pCourtGeomSingleton", "g_pGlobalClock");
 
 // @ 0x8271A31C (.data)
 extern "C" void* g_pPlayerRecords = nullptr;

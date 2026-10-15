@@ -48,6 +48,7 @@ extern "C" uint32_t g_phCollisionFlags = 0xFFFFFFFFu;
 
 // @ 0x825C8080 (.data)
 extern "C" float g_phCapsuleShapeK = 0.25f;
+TT_DATA_ALIAS("g_kContactScale2", "g_phCapsuleShapeK");
 
 // @ 0x825E7890 (.data)
 extern "C" uint32_t g_mmioStoredValue = 0x0u;

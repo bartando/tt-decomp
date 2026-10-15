@@ -37,6 +37,7 @@ TT_DATA_ALIAS("g_pAudSystemContext", "g_audCtrlMgrControlPrimary");
 
 // @ 0x82606414 (.data)
 extern "C" void* g_audCtrlMgrControlListHead = nullptr;
+TT_DATA_ALIAS("g_swfCMD_globalState", "g_audCtrlMgrControlListHead");
 
 // @ 0x82606418 (.data)
 extern "C" uint8_t g_audMasterMuteFlag = 0x0u;

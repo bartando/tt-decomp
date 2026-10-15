@@ -161,14 +161,14 @@ extern bool  pongPlayer_99B0_g(float* valuePtr, float startVal, float ratio, flo
 extern float pongPlayer_0508_g(void* obj, int channel, float inputVal);                  // @ 0x821E0508
 
 // ── External globals for batch 10 implementations ────────────────────────
-extern void*       g_pCourtGeomSingleton;     // @ 0x8251A304 — court geometry singleton
+extern void*       g_pCourtGeomSingleton;     // @ 0x8271A304 — court geometry singleton
 extern float       g_kCourtHeightOffset;      // @ 0x825C8078 — court height offset constant
 extern const float g_kFloatConst_D168;        // @ 0x8202D168 — grid reset float constant
 extern float       g_swingSlotGridDefault;    // @ 0x825CAF7C — writable grid default
 extern const float g_kPositiveSideSign;       // @ 0x825C5938 — positive court side sign
 extern const float g_kTransitionStep;         // @ 0x825CAEC0 — transition blend step size
 extern const float g_kSwingTargetConst;       // @ 0x825C80FC — swing target input constant
-extern void*       g_pPlayerSlotLookup;       // @ 0x8251A32C — player slot lookup global
+extern void*       g_pPlayerSlotLookup;       // @ 0x8271A32C — player slot lookup global
 
 // Forward declarations for functions implemented at end of file
 void pongPlayer_E640_g(void* gridSubObj);  // ClearSwingSlotGrid @ 0x8219E640
@@ -2246,7 +2246,7 @@ void pongPlayer::InitMovementAndContact() {  // pongPlayer_5D50_g @ 0x82195D50
 
     // Set up contact zone with scale constants
     extern const float g_kContactScale1;  // @ 0x825C8A50
-    extern const float g_kContactScale2;  // @ 0x82028080
+    extern const float g_kContactScale2;  // @ 0x825C8080
     void* shotState = m_pShotState;  // +496
     pongPlayer_SetupShotTarget(shotState, g_kContactScale1, g_kContactScale2);
 }
@@ -2295,7 +2295,7 @@ void pongPlayer::NotifySlotChangeAndSync(void* slotsBase, uint32_t slotIndex,
     uint8_t* base = reinterpret_cast<uint8_t*>(slotsBase);
 
     // Look up speed value from table indexed by columnIndex
-    extern float g_kSlotSpeedLookup[];  // @ 0x825C76CC
+    extern float g_kSlotSpeedLookup[];  // @ 0x825C76DC
     float speedVal = g_kSlotSpeedLookup[columnIndex];
 
     // Store speed at slot offset (+61 base, *4 stride)
@@ -2356,7 +2356,7 @@ void pongPlayer::UpdateServeSpeed() {  // pongPlayer_CD48_g @ 0x8218CD48
     uint8_t configHandedness = configBytes[6];
 
     if (configHandedness == 0) {
-        extern const float g_kDefaultServeSpeed;
+        extern const float g_kDefaultServeSpeed;  // @ 0x8202D108
         *reinterpret_cast<float*>(creatureBytes + 208) = g_kDefaultServeSpeed;
         return;
     }
@@ -2444,9 +2444,9 @@ void pongPlayer::InitializeReplaySnapshot(void* outSnapshot) {
 void pongPlayer::ClampMovementToCourtBounds(float* delta) {
     // pongPlayer_D558_wrh @ 0x8219D558
     // Constants: g_kFloatConst_D110=g_kFloatConst_D110 @ 0x8202D110
-    extern const double g_kCourtMaxDelta;  // @ 0x82079D78
-    extern const double g_kCourtNegMax;    // @ 0x82079B80
-    extern const float g_kCourtMinDelta;   // @ 0x82079D68
+    extern const double g_kCourtMaxDelta;  // @ 0x82079CF8  5.0
+    extern const double g_kCourtNegMax;    // @ 0x82079B00  0.0
+    extern const float g_kCourtMinDelta;   // @ 0x82079CE8  -5.0f
 
     float maxDelta = static_cast<float>(g_kCourtMaxDelta);
     float negMax   = static_cast<float>(g_kCourtNegMax);
@@ -2588,7 +2588,7 @@ bool pongPlayer::IsLocomotionReady() const {  // pongPlayer_2578_g @ 0x82192578
 // pongPlayer_3628_g (SetServeSideFlip) — implemented at end of file
 extern void* game_C690(pongPlayer* player);
 extern void pongMover_Reset(void* mover, void* position);
-extern uint32_t g_kGeomOffset;  // global loaded via lis+lwz
+extern uint32_t g_kGeomOffset;  // @ 0x825EAB28  a pointer in the asm (lwz, then added to the slot index)
 
 void pongPlayer::ResetServePosition() {  // pongPlayer_36D8_g @ 0x821936D8
     uint32_t fieldOffset = static_cast<uint32_t>(this->m_inputSlotIdx);
@@ -2906,7 +2906,7 @@ void pongPlayer::SyncFieldWithCallback(void* target, void* source) {  // pongPla
  * Called from ResetShotTrackingState and the main shot processing loop.
  */
 void pongPlayer::ResetShotSyncFields(void* shotState, uint8_t clearNetFlags) {  // pongPlayer_9310_g @ 0x82199310
-    extern const float g_kZeroFloat;  // @ 0x82079D10 (0.0f)
+    extern const float g_kZeroFloat;  // @ 0x8202D110 (0.0f)
 
     float zero = g_kZeroFloat;
 
@@ -2995,7 +2995,7 @@ void pongPlayer::ClearSwingTrajectoryData(void* trajectoryBlock) {  // pongPlaye
     memset(base + 16, 0, 16);
 
     // Zero global trajectory vector
-    extern uint8_t g_swingTrajectoryGlobal[];  // @ 0x825C6720
+    extern uint8_t g_swingTrajectoryGlobal[];  // @ 0x82606720
     memset(g_swingTrajectoryGlobal, 0, 16);
 
     // Clear byte flags at +0 and +1
@@ -3448,7 +3448,7 @@ uint8_t pongPlayer_0C58_g() {  // @ 0x821A0C58
 extern void pongPlayer_76E8_g(void* swingDisplay);   // @ 0x821A76E8
 extern const float g_kSwingDisplay0;                 // @ 0x82079AD4 [.rdata]
 extern const float g_kSwingDisplay1;                 // @ 0x82079AD8 [.rdata]
-extern const float g_kSwingDisplay2;                 // @ 0x82085938 [.rdata]
+extern const float g_kSwingDisplay2;                 // @ 0x825C5938 [.data]  -1.0f
 
 void pongPlayer::ResetSwingDisplayValues() {  // pongPlayer_7038 @ 0x821A7038
     uint8_t* base = reinterpret_cast<uint8_t*>(this);
@@ -3474,7 +3474,7 @@ void pongPlayer::ResetSwingDisplayValues() {  // pongPlayer_7038 @ 0x821A7038
  *   - Otherwise returns: (float)(frameCount @ sub+32) * g_kFrameScale
  *                         / (totalDuration @ sub->inner+12)
  */
-extern const float g_kFrameScale;    // @ 0x82079BC8 [.rdata]
+extern const float g_kFrameScale;    // @ 0x82079BB8 [.rdata]  1/30
 
 float pongPlayer_D238_g(void* self) {  // @ 0x820DD238
     uint8_t* base = reinterpret_cast<uint8_t*>(self);
@@ -5518,8 +5518,8 @@ extern "C" bool pongPlayer_7890_g(pongPlayer* self) {
         // parent-frame-index lives at +20 on the inner anim state.
         int32_t frameIndex = *reinterpret_cast<int32_t*>(
             reinterpret_cast<uint8_t*>(parentAnim) + 20);
-        // scale constant @ 0x825E9BB8 (float) in the per-player input table.
-        extern const float g_kSwingProgressScale;  // @ 0x825E9BB8
+        // scale constant: 1/30, the frame duration.
+        extern const float g_kSwingProgressScale;  // @ 0x82079BB8
         float frac = (static_cast<float>(frameIndex) * g_kSwingProgressScale)
                    / parentDuration;
         threshold = frac;

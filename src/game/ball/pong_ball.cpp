@@ -2020,7 +2020,7 @@ extern "C" {
 
 // Global static byte written/read by PostLoadProperties / LoadProperties.
 // lis -32160 / +25741 → 0x8203E48D (.data byte, size 1) — a 'debug enabled' flag.
-extern "C" uint8_t g_pongBallHitDataEnableFlag;                        // @ 0x8203E48D
+extern "C" uint8_t g_pongBallHitDataEnableFlag;                        // @ 0x8260648D
 
 namespace {
 constexpr uint16_t kHitDataFlag_Enabled     = 0x1000;  // bit set when debug flag is on
@@ -2206,9 +2206,9 @@ void pongBallHitData::PostLoadProperties() {
 }
 
 // File-scope extern decls (C linkage prohibited inside function bodies)
-extern "C" uint32_t g_pongBallHitData_hashA;   // @ 0x8202861C
-extern "C" uint32_t g_pongBallHitData_hashB;   // @ 0x8203F03C
-extern "C" uint32_t g_pongBallHitData_hashC;   // @ 0x8203F038
+extern "C" uint32_t g_pongBallHitData_hashA;   // @ 0x825C761C
+extern "C" uint32_t g_pongBallHitData_hashB;   // @ 0x825C803C
+extern "C" uint32_t g_pongBallHitData_hashC;   // @ 0x825C8038
 
 // ── pongBallHitData::IsApplicable [vfn_20] @ 0x821D65C0 ──────────────────────
 // Matches the passed attribute hash against three known property hashes.

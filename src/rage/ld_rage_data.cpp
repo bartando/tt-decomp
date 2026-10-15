@@ -130,3 +130,4 @@ extern "C" alignas(16) uint32_t g_grmShaderFx_variantTable[2] = {};
 
 // @ 0x825EBC40 (.data) — runtime-initialised
 extern "C" void* g_pGrcTextureCache = nullptr;
+TT_DATA_ALIAS("lbl_825EBC40", "g_pGrcTextureCache");
