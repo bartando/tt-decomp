@@ -1149,11 +1149,13 @@ void netStream_ReadBlock(void* client, void* dst, short bitCount)
     // Fixed-size block reader; backing impl lives in pong_network.cpp.
 }
 
-/** netStream_ReadS16 — reads a signed 16-bit value (util_7970 @ 0x820D7970). */
-void netStream_ReadS16(void* client, void* dst, int bitCount)
+// pong_network.cpp's spelling of datBitBuffer::ReadSigned<s16> (0x820D7970,
+// lifted in dat_bit_buffer.cpp). The original reads 15 bits whatever r5 says.
+bool datBitBuffer_ReadS16(void* bb, int16_t* out);
+uint8_t netStream_ReadS16(void* client, void* dst, int bitCount)
 {
-    (void)client; (void)dst; (void)bitCount;
-    // Backing impl in pong_network.cpp.
+    (void)bitCount;
+    return datBitBuffer_ReadS16(client, static_cast<int16_t*>(dst));
 }
 
 /**

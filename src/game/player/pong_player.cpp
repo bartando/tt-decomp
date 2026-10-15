@@ -5264,10 +5264,32 @@ extern "C" float pongPlayer_94F8_wrh();
 // address so future work can resolve the Hex-Rays pseudocode.
 ////////////////////////////////////////////////////////////////////////////////
 
-// pongPlayer_0270_g @ 0x821E0270 | size: 0x240
-// Resolves a court-space point for a target by blending endpoint vectors
-// against a per-player factor. Stub pending dedicated lift pass.
-extern "C" int pongPlayer_0270_g(void* /*self*/) { return 0; }
+// Mirrors a position id through flags at +4..+7. Ids 0x22..0x29 and
+// 0x2A..0x31 are two rings of eight; per ring, one flag maps slot i to
+// (4 - i) & 7 and the next to (8 - i) & 7, the second applied after the first.
+// @ 0x821E0270
+extern "C" int pongPlayer_0270_g(const void* self, int id)
+{
+    static const uint8_t kMirrorA[8] = {4, 3, 2, 1, 0, 7, 6, 5};
+    static const uint8_t kMirrorB[8] = {0, 7, 6, 5, 4, 3, 2, 1};
+    const uint8_t* flags = static_cast<const uint8_t*>(self) + 4;
+    int base;
+    if (id >= 0x22 && id <= 0x29) {
+        base = 0x22;
+    } else if (id >= 0x2A && id <= 0x31) {
+        base = 0x2A;
+        flags += 2;
+    } else {
+        return id;
+    }
+    if (flags[0] != 0) {
+        id = base + kMirrorA[id - base];
+    }
+    if (flags[1] != 0) {
+        id = base + kMirrorB[id - base];
+    }
+    return id;
+}
 
 // pongPlayer_1460_g @ 0x821A1460 | size: 0x13F8 (5112 bytes)
 // Massive composite — one of the core per-frame player processors.
