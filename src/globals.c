@@ -847,6 +847,10 @@ void* g_vtable_pong_char_view_context_2  = NULL;
 void* g_vtable_pong_char_view_context_3  = NULL;
 void* g_vtable_pong_char_view_state      = NULL;
 
+// Camera (both set at runtime: pongCameraMgr slots 23/24 store 0x8271A318)
+void* g_pCamShotMgr = NULL;          // @ 0x8271A318  atSingleton<camShotMgr> instance
+void* g_pCameraSharedState = NULL;   // @ 0x8271A32C  camera state gameplay reads (+0x06 CameraHasSides)
+
 // Drills
 void* g_pPracticeTarget = NULL;  // @ 0x826063A8  runtime-initialised (0x821020D8 stores it)
 void* g_pTrainingHud    = NULL;  // @ 0x82606614  runtime-initialised
@@ -898,6 +902,9 @@ TT_DATA_ALIAS("g_debugDrawTypes", "g_ui_object_types");
 TT_DATA_ALIAS("g_debugDrawPriority", "g_ui_object_flags");
 TT_DATA_ALIAS("g_inputScoreByPlayer", "g_pInputScoreTable");                  /* 0x825EAB40 */
 TT_DATA_ALIAS("g_kGeomOffset", "g_pInputArrayTable");                         /* 0x825EAB28 */
+TT_DATA_ALIAS("g_pMatchState", "g_pCamShotMgr");                              /* 0x8271A318 */
+TT_DATA_ALIAS("g_pMatchConfig", "g_pCameraSharedState");                      /* 0x8271A32C */
+TT_DATA_ALIAS("g_pPlayerSlotLookup", "g_pCameraSharedState");
 TT_DATA_ALIAS("g_shotType3_825C8038", "g_aiTypeId_3");  /* 0x825C8038 */
 TT_DATA_ALIAS("g_attrHash_SwingType1", "g_aiTypeId_3");
 TT_DATA_ALIAS("g_character_type_id_3", "g_aiTypeId_3");
