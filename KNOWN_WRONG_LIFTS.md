@@ -19,8 +19,9 @@ methods non-virtual), then re-verify its lifts.
 ## Systemic: C++ virtual slot numbers don't match the game's vtables
 
 Headers declare virtuals with gaps (Itanium's two destructor slots, undeclared slots), so a
-C++ virtual call lands in the wrong slot. Found in `pongPlayer` (slot 9 called as 5) and
-`pongCreatureInst` (slots 47/48/53/10 called as 26/27/28/8). Lifted code calls through
+C++ virtual call lands in the wrong slot. Found in `pongPlayer` (slot 9 called as 5),
+`pongCreatureInst` (slots 47/48/53/10 called as 26/27/28/8) and `pongTrainingDrill` (every
+slot 1..25 one off; header fixed, drill subclasses other than Movement not re-verified). Lifted code calls through
 `VCALL` with the game's slot number where verified; other virtual calls are suspect.
 
 ## Wrong lifts
@@ -113,6 +114,18 @@ C++ virtual call lands in the wrong slot. Found in `pongPlayer` (slot 9 called a
 - `ph_update_object.cpp` marks `g_phFrameIndex` at 0x825C4898; the asm reads 0x826065DC.
 - `include/globals.h:119` still mentions `RestorePoseFromRollback` (now `SavePoseSnapshot`).
 - 0x820C6378 (`pongCreature` slot 6) still has a TODO body.
+- `pong_strings.hpp`: `g_str_pongDrill_tooManySuccesses` is at 0x82031970, not 0x82033970.
+- `globals.c`: `g_fPrngNormalize` is 1/0xFFFFFFFF, should be 2^-23; `g_prngState` is a scalar
+  used as an array of 2; 0x825C5938 is defined as 0.0 under two names but is -1.0 (drills'
+  "no time limit"). `g_pPracticeTarget`, `g_pTrainingHud`, `g_gdDrillMovementData_classId`
+  have no definitions.
+- `network.cpp`: 0x822FA818/0x822FA878/0x822FA8F0 are hudTrainingHUD setters ("completed",
+  "time_low", "arrow_direction"), not SinglesNetworkClient; 0x822FA8F0 has two names.
+- `ph_physics`: 0x82431910 `RoundToNearestInt` is floor; 0x824321F0 is ceil.
+- `pong_player_swing.cpp`: 0x821C9CD0 "GetCreatureBoneMatrix" returns one side's play-area
+  bounds (leaf, keeps r3).
+- `pong_match.hpp`: gmPracticeTarget +0x17 (`field_17`) is a keep-on-table clamp flag.
+- `pong_states.cpp` puts string-address `// @` markers on `rage_debugLog` calls.
 - `globals.c`: `g_msgSinkTemplate` is at 0x8261A0C0, not 0x8241A0C0.
 
 

@@ -38,3 +38,7 @@ Reported by the agents using it. Each was worked around in a spec; fix in the to
 - A name marked with two addresses fails to build.
 - Values set by static initializers are zero in the boot image (e.g. 0x82619BD0/BE0).
 - Running a callee that calls further functions compares their stack-pointer args raw.
+- 64-bit integer ops: `mulld` followed by a plain `add` runs the add as 32-bit, so the carry
+  into the upper half is wrong (drill RNG 0x82113BA8 / `OnRallyEnd` 0x8210D660 uncheckable).
+- Strings shorter than 2 or longer than ~63 bytes compare as raw pointers; varargs aren't
+  compared; a `// @` marker on the second line of a multi-line declaration is missed.
