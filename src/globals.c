@@ -549,7 +549,7 @@ const float g_animBlendWeight = 0.0f;      // @ 0x8202D110
 
 // Ball / swing attribute hashes
 void* g_attrHash_HitZone = &g_attrHash_HitZone;  // @ 0x825C761C  type token, see g_aiTypeId_3
-const float g_alphaMultiplier  = 0.0f;     // @ 0x82079BE0
+const float g_alphaMultiplier  = 255.0f;     // @ 0x82079BE0
 
 // CRT atexit guards
 int32_t g_atexit_guard_0 = 0;              // @ 0x82733048
@@ -559,7 +559,7 @@ int32_t g_atexit_guard_1 = 0;              // @ 0x8273304C
 void* g_binkVideoPlayer = NULL;            // @ 0x825EB988
 
 // Camera system
-float    g_cameraAdjustment  = 0.0f;       // @ 0x8202CFF4
+float    g_cameraAdjustment  = 1.25f;       // @ 0x8202CFF4
 uint8_t  g_cameraFlagA       = 0;
 uint8_t  g_cameraFlagB       = 0;
 uint8_t  g_cameraFlag_7532   = 0;
@@ -624,10 +624,10 @@ const char* g_error_unhandled_event   = "";
 void* g_eventTypeTable = NULL;             // @ 0x82017888
 
 // Float constants (network / physics)
-const float g_floatConstant1 = 0.0f;       // @ 0x82079AD4
+const float g_floatConstant1 = -3.40282347e+38f;       // @ 0x82079AD4
 const float g_floatConstant2 = 0.0f;       // @ 0x8202D110
 const float g_floatConstant3 = 0.0f;       // @ 0x8202D110
-const float g_floatConstant4 = 0.0f;       // @ 0x825C7600
+const float g_floatConstant4 = -11.85f;       // @ 0x825C7600
 const float g_floatEpsilon   = 0.0f;       // @ 0x8202D110
 const float g_floatNegOne    = 0.0f;       // @ 0x8202D110
 const float g_floatOne       = 0.0f;       // @ 0x8202D110
@@ -672,13 +672,13 @@ void* g_hudFlashBase   = NULL;            // @ 0x82606454
 float g_hudRenderParam = 0.0f;            // @ 0x82140110
 
 // Player adjustment / input / timing constants
-float       g_kAdjustmentScale     = 0.0f;  // @ 0x82079BAC
+float       g_kAdjustmentScale     = 0.0174532924f;  // @ 0x82079BAC
 const float g_kAdjustmentThreshold = 0.0f;  // @ 0x8202D110
 const float g_kInputThresholdHigh  = 0.0f;  // @ 0x8202D110
-const float g_kMaxAdjustment       = 0.0f;  // @ 0x82079CD8
-const float g_kQuantScale1         = 0.0f;  // @ 0x82079FFC
-const float g_kQuantScale2         = 0.0f;  // @ 0x82079FF8
-const float g_kSpecialThreshold    = 0.0f;  // @ 0x825C8A50
+const float g_kMaxAdjustment       = 0.45f;  // @ 0x82079CD8
+const float g_kQuantScale1         = 0.0322580636f;  // @ 0x82079FFC
+const float g_kQuantScale2         = 0.161290318f;  // @ 0x82079FF8
+const float g_kSpecialThreshold    = 10.0f;  // @ 0x825C8A50
 float       g_kTimingConstant      = 0.9f;  // @ 0x825C4930 (image: 0.9)
 const float g_kZeroThreshold       = 1.0f;  // @ 0x8202D108
 
@@ -687,8 +687,8 @@ void* g_localUserPtr = NULL;
 
 // Locomotion / creature animation
 void*       g_locomotionAnimInstance = NULL;  // @ 0x8271A378
-const float g_lookAtMultiplier       = 0.0f;  // @ 0x8202D184
-const float g_lookAtRefAngle         = 0.0f;  // @ 0x8202D10C
+const float g_lookAtMultiplier       = 2.0f;  // @ 0x8202D184
+const float g_lookAtRefAngle         = 0.5f;  // @ 0x8202D10C
 
 // Match result / player select tables
 void* g_matchResultTable  = NULL;          // @ 0x82027884
