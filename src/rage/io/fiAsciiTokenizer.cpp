@@ -20,7 +20,10 @@
  * This file intentionally keeps the surface minimal and self-contained.
  */
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 extern "C" {
 
@@ -35,14 +38,10 @@ void fiAsciiTokenizer_InitializeTokenizer(void* tokenizer) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Source-buffer attachment + drive loop
+// Drive loop
+// (fiAsciiTokenizer_SetString @ 0x8222CFA8 is std::string::assign; it lives
+// with the STLport containers at the end of this file.)
 // ─────────────────────────────────────────────────────────────────────────────
-void fiAsciiTokenizer_SetString(void* tokenizer,
-                                const char* begin,
-                                const char* end) {
-    (void)tokenizer; (void)begin; (void)end;
-}
-
 void fiAsciiTokenizer_Process(void* tokenizer, int mode) {
     (void)tokenizer; (void)mode;
 }
@@ -563,12 +562,17 @@ void fiAsciiTokenizer::MatchVector3NoStageField(float outV3[3]) {
 extern "C" {
 
 // Forward declarations for shared helpers
-void fiAsciiTokenizer_1F08_g(const char* errorMsg);
-[[noreturn]] void fiAsciiTokenizer_FB40_g(int exitCode);
-void* xe_EC88(uint32_t size);
+void fiAsciiTokenizer_1F08_g(const char* errorMsg);     // @ 0x82431F08 — CRT puts-style message writer
+[[noreturn]] void fiAsciiTokenizer_FB40_g(int exitCode); // @ 0x8242FB40 — CRT exit()
+void* xe_EC88(uint32_t size);                            // @ 0x820DEC88 — operator new
 
 // .rdata string at 0x8202E2B8 — "out of memory"
 static const char* const g_pOutOfMemoryStr = "out of memory";
+
+// The three allocators below are STLport allocator<T>::allocate(n, hint):
+// r3 is the allocator (the container's _M_end_of_storage proxy), r4 the
+// element count and r5 the hint, which none of them read. Earlier lifts took
+// the count as the first argument; the asm reads it from r4.
 
 // ─────────────────────────────────────────────────────────────────────────────
 // fiAsciiTokenizer_D588_g @ 0x8222D588 | size: 0x60
@@ -577,7 +581,7 @@ static const char* const g_pOutOfMemoryStr = "out of memory";
 // Returns nullptr if size is zero. The overflow check against 0xFFFFFFFF
 // is dead code in 32-bit context (always passes).
 // ─────────────────────────────────────────────────────────────────────────────
-void* fiAsciiTokenizer_D588_g(uint32_t size) {
+void* fiAsciiTokenizer_D588_g(void* /*allocator*/, uint32_t size, const void* /*hint*/) {
     if (size == 0) {
         return nullptr;
     }
@@ -591,7 +595,7 @@ void* fiAsciiTokenizer_D588_g(uint32_t size) {
 // with "out of memory" if count exceeds 0x3FFFFFFF (~1 billion entries).
 // Returns nullptr if count is zero.
 // ─────────────────────────────────────────────────────────────────────────────
-void* fiAsciiTokenizer_76D8_g(uint32_t count) {
+void* fiAsciiTokenizer_76D8_g(void* /*allocator*/, uint32_t count, const void* /*hint*/) {
     if (count > 0x3FFFFFFFu) {
         fiAsciiTokenizer_1F08_g(g_pOutOfMemoryStr);
         fiAsciiTokenizer_FB40_g(1);
@@ -609,7 +613,7 @@ void* fiAsciiTokenizer_76D8_g(uint32_t count) {
 // with "out of memory" if count exceeds 0x0FFFFFFF (~268 million entries).
 // Returns nullptr if count is zero.
 // ─────────────────────────────────────────────────────────────────────────────
-void* fiAsciiTokenizer_8598_g(uint32_t count) {
+void* fiAsciiTokenizer_8598_g(void* /*allocator*/, uint32_t count, const void* /*hint*/) {
     if (count > 0x0FFFFFFFu) {
         fiAsciiTokenizer_1F08_g(g_pOutOfMemoryStr);
         fiAsciiTokenizer_FB40_g(1);
@@ -635,11 +639,19 @@ void* fiAsciiTokenizer_8598_g(uint32_t count) {
 //   r3 = this (12-byte array struct)
 //   r4 = capacity (number of uint32_t slots)
 //   r5 = pointer to fill value (single uint32_t read repeatedly)
+//
+// The struct is STLport's std::vector<T> for a 4-byte T (_M_start, _M_finish,
+// _M_end_of_storage); this function is its vector(n, value) constructor. See
+// the STLport section at the end of the file for operator= and the grow path.
 // ─────────────────────────────────────────────────────────────────────────────
 struct DynArrayU32 {
     uint32_t* m_pBegin;
     uint32_t* m_pEnd;
-    uint32_t* m_pCapacityEnd;
+    uint32_t* m_pCapacityEnd;    // also the allocator proxy passed to allocate()
+
+    DynArrayU32& operator=(const DynArrayU32& other);                  // @ 0x8222D150
+    void InsertOverflow(uint32_t* pos, const uint32_t& value,
+                        uint32_t fillCount, bool atEnd);               // @ 0x8222D278
 };
 
 void fiAsciiTokenizer_CC50_g(DynArrayU32* arr, uint32_t capacity,
@@ -672,3 +684,444 @@ void fiAsciiTokenizer_CC50_g(DynArrayU32* arr, uint32_t capacity,
 }
 
 } // extern "C"
+
+// ═════════════════════════════════════════════════════════════════════════════
+// STLport containers filed as fiAsciiTokenizer_* (0x8222CD98 – 0x8222D958)
+//
+// The symbol map files this run under fiAsciiTokenizer, but nothing in it
+// touches a tokenizer: no vtable stores, no RTTI, no tokenizer fields. It is
+// STLport std::string and std::vector<T> code (5.0-era string layout, which
+// tests the inline buffer through _M_end_of_storage):
+//   - length errors print "basic_string" (0x8204EC4C) and abort();
+//   - bad_alloc prints "out of memory" and exit(1)s;
+//   - allocate() is called on &_M_end_of_storage (the allocator proxy) with a
+//     null hint, and the grow/fill helpers have STLport's exact shapes.
+// One owner is rage::mfRegisteredPlayback (ctor 0x8222B1E8, vtable 0x8204EC44):
+// a std::string at +0x134, a std::vector<Matrix34> at +0x120 and a vector of
+// pointers at +0x2C.
+//
+// STLport's _M_construct_null compiles to nothing in this build, so no
+// function here writes a terminator; erase() still moves the byte after
+// _M_finish along with the tail.
+// ═════════════════════════════════════════════════════════════════════════════
+
+// .rdata string at 0x8204EC4C — STLport's length_error message for strings
+static const char* const g_pBasicStringStr = "basic_string";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// StlString — STLport std::basic_string<char> with the short-string buffer
+//
+//   +0x00  union { char* m_dynamicBuf; char m_staticBuf[16]; }
+//   +0x10  char* m_finish
+//   +0x14  char* m_endOfStorage — also the allocator proxy. Equals
+//          m_staticBuf + 16 while the text lives in m_staticBuf; that test is
+//          how every function here tells the two storage modes apart.
+// rage_par.cpp (parPackedStringValue32) reads the same layout.
+// ─────────────────────────────────────────────────────────────────────────────
+struct StlString {
+    static constexpr uint32_t kStaticBufSize = 16;
+    static constexpr uint32_t kMaxSize = 0xFFFFFFFEu;   // max_size(): size_t(-1) - 1
+
+    union {
+        char* m_dynamicBuf;
+        char  m_staticBuf[kStaticBufSize];
+    };
+    char* m_finish;
+    char* m_endOfStorage;
+
+    bool UsingStaticBuf() const { return m_endOfStorage == m_staticBuf + kStaticBufSize; }
+    char* Start() { return UsingStaticBuf() ? m_staticBuf : m_dynamicBuf; }
+
+    void AllocateBlock(uint32_t n);                              // @ 0x8222CEB8
+    void RangeInitialize(const char* first, const char* last);   // @ 0x8222D480
+    StlString& Append(const char* first, const char* last);      // @ 0x8222D5E8
+};
+
+// rage::Matrix34: four 16-byte rows a, b, c, d (a Vector3 each, padded to 16).
+// The mfRegisteredPlayback ctor resets each element of its vector to identity:
+// 1.0 at a.x, b.y, c.z and d cleared with one vector store. Elements are only
+// ever copied whole here (four lvx128/stvx pairs).
+struct alignas(16) Matrix34 {
+    float a[4];
+    float b[4];
+    float c[4];
+    float d[4];
+};
+static_assert(sizeof(Matrix34) == 64, "Matrix34 is 64 bytes on the 360");
+
+// STLport std::vector<Matrix34>: same three-pointer layout as DynArrayU32.
+struct DynArrayMatrix34 {
+    Matrix34* m_pBegin;
+    Matrix34* m_pEnd;
+    Matrix34* m_pCapacityEnd;    // also the allocator proxy
+
+    void Resize(uint32_t newSize, const Matrix34& fill);                 // @ 0x8222CD98
+    void InsertOverflow(Matrix34* pos, const Matrix34& value,
+                        uint32_t fillCount, bool atEnd);                 // @ 0x8222D958
+};
+
+extern "C" {
+
+[[noreturn]] void fiAsciiTokenizer_31F0_g();   // @ 0x824331F0 — CRT abort()
+void rage_free_00C0(void* ptr);                // @ 0x820C00C0 — operator delete
+
+// @ 0x8222DD78 — uninitialized_copy for chars: memcpy when first != last,
+// returns dest + (last - first).
+char* game_DD78_h(const char* first, const char* last, char* dest);
+
+// @ 0x8222DDD0 — uninitialized_copy for Matrix34: copy-constructs each element
+// (placement new, null-checked) and returns the end of the copy. Callers also
+// pass a type-dispatch tag pointer in r6 that it never reads.
+Matrix34* fiAsciiTokenizer_DDD0_w(const Matrix34* first, const Matrix34* last, Matrix34* dest);
+
+// @ 0x8222DAF0 — vector<Matrix34>::_M_fill_insert_aux: inserts `count` copies
+// of *value at pos when the capacity already fits. Not lifted yet; callers
+// also pass a type-dispatch tag pointer in r7.
+void fiAsciiTokenizer_DAF0_2h(DynArrayMatrix34* vec, Matrix34* pos, uint32_t count,
+                              const Matrix34* value);
+
+} // extern "C"
+
+// ─────────────────────────────────────────────────────────────────────────────
+// StlString::AllocateBlock()   — _String_base::_M_allocate_block(n)
+// @ 0x8222CEB8 | size: 0x88   (symbol map: fiAsciiTokenizer_CEB8_g)
+//
+// Sets up empty storage for at least n chars: the inline buffer when n fits
+// in 16, otherwise a heap block of exactly n. The heap path also checks
+// n <= max_size() + 1 (0xFFFFFFFF, always true) and n > 0 (always true past
+// the first test) and raises length_error otherwise.
+// ─────────────────────────────────────────────────────────────────────────────
+void StlString::AllocateBlock(uint32_t n) {
+    if (n <= kStaticBufSize) {
+        m_finish       = m_staticBuf;
+        m_endOfStorage = m_staticBuf + kStaticBufSize;
+        return;
+    }
+
+    if (n != 0) {
+        char* block = static_cast<char*>(fiAsciiTokenizer_D588_g(&m_endOfStorage, n, nullptr));
+        m_dynamicBuf   = block;
+        m_finish       = block;
+        m_endOfStorage = block + n;
+    } else {
+        fiAsciiTokenizer_1F08_g(g_pBasicStringStr);   // _M_throw_length_error
+        fiAsciiTokenizer_31F0_g();
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// StlString::RangeInitialize()   — basic_string::_M_range_initialize(f, l)
+// @ 0x8222D480 | size: 0x104   (symbol map: fiAsciiTokenizer_D480_w)
+//
+// Constructor body for a [first, last) range: reserves size + 1, copies the
+// chars and sets m_finish. Called by the const char* constructor (0x8222CF40)
+// and by util_B8F8.
+// ─────────────────────────────────────────────────────────────────────────────
+void StlString::RangeInitialize(const char* first, const char* last) {
+    const uint32_t n = static_cast<uint32_t>(last - first);
+    AllocateBlock(n + 1);
+
+    if (UsingStaticBuf()) {
+        // _M_copyT
+        if (n != 0) {
+            std::memcpy(Start(), first, n);
+        }
+        m_finish = Start() + n;
+    } else {
+        // uninitialized_copy
+        char* finish = Start();
+        if (last != first) {
+            std::memcpy(finish, first, n);
+            finish += n;
+        }
+        m_finish = finish;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// StlString::Append()   — basic_string::_M_appendT(first, last)
+// @ 0x8222D5E8 | size: 0x1FC   (symbol map: fiAsciiTokenizer_D5E8_g)
+//
+// Appends [first, last). When it doesn't fit, grows to
+// size + max(size, n) + 1, copies old text and new chars into the new block
+// and frees the old heap block (never the inline buffer). When it fits, it
+// copies first[1..n) past m_finish before writing first[0] onto m_finish,
+// STLport's order for keeping the terminator slot valid.
+// ─────────────────────────────────────────────────────────────────────────────
+StlString& StlString::Append(const char* first, const char* last) {
+    if (first == last) {
+        return *this;
+    }
+
+    const uint32_t oldSize = static_cast<uint32_t>(m_finish - Start());
+    const uint32_t n       = static_cast<uint32_t>(last - first);
+    if (n > kMaxSize || oldSize > kMaxSize - n) {
+        fiAsciiTokenizer_1F08_g(g_pBasicStringStr);   // _M_throw_length_error
+        fiAsciiTokenizer_31F0_g();
+    }
+
+    const uint32_t capacity = static_cast<uint32_t>(m_endOfStorage - Start()) - 1;
+    if (oldSize + n > capacity) {
+        const uint32_t newCapacity = oldSize + std::max(oldSize, n) + 1;
+        char* newStart  = static_cast<char*>(fiAsciiTokenizer_D588_g(&m_endOfStorage, newCapacity, nullptr));
+        char* newFinish = game_DD78_h(Start(), m_finish, newStart);
+        std::memcpy(newFinish, first, n);
+        newFinish += n;
+
+        // _M_deallocate_block
+        if (!UsingStaticBuf() && m_dynamicBuf != nullptr) {
+            rage_free_00C0(m_dynamicBuf);
+        }
+
+        m_dynamicBuf   = newStart;
+        m_finish       = newFinish;
+        m_endOfStorage = newStart + newCapacity;
+    } else {
+        // The binary tests UsingStaticBuf() here and runs _M_copyT or
+        // uninitialized_copy; both arms are "memcpy unless empty".
+        const char* rest = first + 1;
+        if (last != rest) {
+            std::memcpy(m_finish + 1, rest, static_cast<uint32_t>(last - rest));
+        }
+        *m_finish = *first;
+        m_finish += n;
+    }
+
+    return *this;
+}
+
+extern "C" {
+
+// ─────────────────────────────────────────────────────────────────────────────
+// fiAsciiTokenizer_SetString()   — basic_string::_M_assign(first, last)
+// @ 0x8222CFA8 | size: 0x1A4   (symbol map: fiAsciiTokenizer_CFA8_w)
+//
+// Replaces the string's text with [first, last). When the new text is no
+// longer than the old, it is copied over the front and the rest erased;
+// otherwise the first size() chars are overwritten and the remainder
+// appended. Called by parMemberString vfn 7 (rage_par.cpp keeps this name
+// and a void return) and atSingleton_FBB0_h. The binary returns `string`.
+// ─────────────────────────────────────────────────────────────────────────────
+void fiAsciiTokenizer_SetString(void* string, const char* first, const char* last) {
+    StlString* str = static_cast<StlString*>(string);
+
+    const uint32_t n    = static_cast<uint32_t>(last - first);
+    const uint32_t size = static_cast<uint32_t>(str->m_finish - str->Start());
+
+    if (n <= size) {
+        if (n != 0) {
+            std::memcpy(str->Start(), first, n);
+        }
+
+        // erase(begin() + n, end()). The move takes (end - last) + 1 bytes,
+        // the +1 being the terminator slot; with last == end that is 1.
+        char* eraseFirst = str->Start() + n;
+        char* eraseLast  = str->m_finish;
+        if (eraseFirst != eraseLast) {
+            const uint32_t moveBytes = static_cast<uint32_t>(str->m_finish - eraseLast) + 1;
+            if (moveBytes != 0) {
+                std::memmove(eraseFirst, eraseLast, moveBytes);
+            }
+            str->m_finish = eraseFirst + (str->m_finish - eraseLast);
+        }
+    } else {
+        if (size != 0) {
+            std::memcpy(str->Start(), first, size);
+        }
+        str->Append(first + (str->m_finish - str->Start()), last);
+    }
+}
+
+} // extern "C"
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DynArrayU32::operator=()   — vector<T>::operator=(const vector&)
+// @ 0x8222D150 | size: 0x128   (symbol map: fiAsciiTokenizer_2150)
+//
+// Copy-assigns another 4-byte-element vector: reallocates to exactly
+// other.size() when it exceeds the capacity, otherwise copies in place and
+// copy-constructs any extra tail past m_pEnd. Callers: xe_C3F0 and
+// LocomotionStateMf_C9E8_w. The element type is folded across 4-byte T
+// (pointers at mfRegisteredPlayback+0x2C); uint32_t stands in.
+// ─────────────────────────────────────────────────────────────────────────────
+DynArrayU32& DynArrayU32::operator=(const DynArrayU32& other) {
+    if (&other == this) {
+        return *this;
+    }
+
+    const uint32_t* srcBegin = other.m_pBegin;
+    const uint32_t* srcEnd   = other.m_pEnd;
+    const uint32_t otherSize = static_cast<uint32_t>(srcEnd - srcBegin);
+
+    if (otherSize > static_cast<uint32_t>(m_pCapacityEnd - m_pBegin)) {
+        // _M_allocate_and_copy, then _M_clear
+        uint32_t* block = static_cast<uint32_t*>(fiAsciiTokenizer_76D8_g(&m_pCapacityEnd, otherSize, nullptr));
+        if (srcEnd != srcBegin) {
+            std::memcpy(block, srcBegin, (srcEnd - srcBegin) * sizeof(uint32_t));
+        }
+        if (m_pBegin != nullptr) {
+            rage_free_00C0(m_pBegin);
+        }
+        m_pBegin       = block;
+        m_pCapacityEnd = block + otherSize;
+    } else if (static_cast<uint32_t>(m_pEnd - m_pBegin) >= otherSize) {
+        if (srcEnd != srcBegin) {
+            std::memmove(m_pBegin, srcBegin, (srcEnd - srcBegin) * sizeof(uint32_t));
+        }
+    } else {
+        // Assign over the live elements, then copy-construct the rest at m_pEnd.
+        const uint32_t size = static_cast<uint32_t>(m_pEnd - m_pBegin);
+        if (size != 0) {
+            std::memmove(m_pBegin, srcBegin, size * sizeof(uint32_t));
+        }
+        const uint32_t* tail = other.m_pBegin + (m_pEnd - m_pBegin);
+        if (other.m_pEnd != tail) {
+            std::memcpy(m_pEnd, tail, (other.m_pEnd - tail) * sizeof(uint32_t));
+        }
+    }
+
+    m_pEnd = m_pBegin + otherSize;
+    return *this;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DynArrayU32::InsertOverflow()   — vector<T>::_M_insert_overflow (trivial T)
+// @ 0x8222D278 | size: 0x120   (symbol map: fiAsciiTokenizer_D278_g)
+//
+// Grow path of insert(pos, fillCount, value): allocates
+// size + max(size, fillCount) elements, copies [begin, pos), writes fillCount
+// copies of value, copies [pos, end) and frees the old block. allocate() is
+// inlined (the "out of memory" check). STLport skips the [pos, end) copy when
+// atEnd is set; this build never reads atEnd and always copies, which is a
+// no-op when pos == end. Callers: mfRegisteredPlayback ctor (resize of its
+// +0x2C vector) and LocomotionStateMf_30F0_h.
+// ─────────────────────────────────────────────────────────────────────────────
+void DynArrayU32::InsertOverflow(uint32_t* pos, const uint32_t& value,
+                                 uint32_t fillCount, bool /*atEnd*/) {
+    const uint32_t oldSize     = static_cast<uint32_t>(m_pEnd - m_pBegin);
+    const uint32_t newCapacity = oldSize + std::max(oldSize, fillCount);
+
+    if (newCapacity > 0x3FFFFFFFu) {
+        fiAsciiTokenizer_1F08_g(g_pOutOfMemoryStr);
+        fiAsciiTokenizer_FB40_g(1);
+    }
+    uint32_t* newBegin = nullptr;
+    if (newCapacity != 0) {
+        newBegin = static_cast<uint32_t*>(xe_EC88(newCapacity * 4));
+    }
+
+    uint32_t* newEnd = newBegin;
+    const std::ptrdiff_t head = pos - m_pBegin;
+    if (head != 0) {
+        std::memmove(newEnd, m_pBegin, head * sizeof(uint32_t));
+        newEnd += head;
+    }
+
+    for (uint32_t i = fillCount; i != 0; --i) {
+        *newEnd++ = value;
+    }
+
+    const std::ptrdiff_t tail = m_pEnd - pos;
+    if (tail != 0) {
+        std::memmove(newEnd, pos, tail * sizeof(uint32_t));
+        newEnd += tail;
+    }
+
+    if (m_pBegin != nullptr) {
+        rage_free_00C0(m_pBegin);
+    }
+    m_pBegin       = newBegin;
+    m_pEnd         = newEnd;
+    m_pCapacityEnd = newBegin + newCapacity;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DynArrayMatrix34::Resize()   — vector<Matrix34>::resize(n, fill)
+// @ 0x8222CD98 | size: 0x11C   (symbol map: fiAsciiTokenizer_CD98)
+//
+// Shrinks by erasing [begin + newSize, end) or grows by inserting copies of
+// fill at the end: in place via _M_fill_insert_aux (0x8222DAF0) when the
+// capacity fits, otherwise via InsertOverflow. Only caller: the
+// mfRegisteredPlayback ctor, sizing its +0x120 vector to the element count
+// of the 4-byte vector at the start of the object its +0x28 points to.
+// ─────────────────────────────────────────────────────────────────────────────
+void DynArrayMatrix34::Resize(uint32_t newSize, const Matrix34& fill) {
+    Matrix34* const end = m_pEnd;
+    const uint32_t size = static_cast<uint32_t>(end - m_pBegin);
+
+    if (newSize < size) {
+        // erase(begin() + newSize, end()): assign [last, end) down onto first.
+        // last == end, so the copy loop the binary keeps never runs.
+        Matrix34* first = m_pBegin + newSize;
+        Matrix34* last  = end;
+        if (first == last) {
+            return;
+        }
+        Matrix34* dst = first;
+        for (int32_t n = static_cast<int32_t>(end - last); n > 0; --n) {
+            *dst++ = *last++;
+        }
+        m_pEnd = dst;
+        return;
+    }
+
+    const uint32_t count = newSize - size;
+    if (count == 0) {
+        return;
+    }
+    if (static_cast<uint32_t>(m_pCapacityEnd - end) >= count) {
+        fiAsciiTokenizer_DAF0_2h(this, end, count, &fill);
+    } else {
+        InsertOverflow(end, fill, count, false);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DynArrayMatrix34::InsertOverflow()   — vector<T>::_M_insert_overflow_aux
+// @ 0x8222D958 | size: 0x198   (symbol map: fiAsciiTokenizer_D958_g)
+//
+// Non-trivial-T grow path: allocates size + max(size, fillCount) elements,
+// copy-constructs [begin, pos), fillCount copies of value and [pos, end) into
+// it, then frees the old block. Each in-place copy carries placement new's
+// null check. As in DynArrayU32::InsertOverflow, atEnd is never read.
+// ─────────────────────────────────────────────────────────────────────────────
+void DynArrayMatrix34::InsertOverflow(Matrix34* pos, const Matrix34& value,
+                                      uint32_t fillCount, bool /*atEnd*/) {
+    const uint32_t oldSize     = static_cast<uint32_t>(m_pEnd - m_pBegin);
+    const uint32_t newCapacity = oldSize + std::max(oldSize, fillCount);
+
+    // allocator<Matrix34>::allocate, inlined
+    if (newCapacity > 0x03FFFFFFu) {
+        fiAsciiTokenizer_1F08_g(g_pOutOfMemoryStr);
+        fiAsciiTokenizer_FB40_g(1);
+    }
+    Matrix34* newBegin = nullptr;
+    if (newCapacity != 0) {
+        newBegin = static_cast<Matrix34*>(xe_EC88(newCapacity * sizeof(Matrix34)));
+    }
+
+    Matrix34* newEnd = fiAsciiTokenizer_DDD0_w(m_pBegin, pos, newBegin);
+
+    if (fillCount == 1) {
+        if (newEnd != nullptr) {
+            *newEnd = value;
+        }
+        ++newEnd;
+    } else {
+        for (uint32_t i = fillCount; i != 0; --i) {
+            if (newEnd != nullptr) {
+                *newEnd = value;
+            }
+            ++newEnd;
+        }
+    }
+
+    newEnd = fiAsciiTokenizer_DDD0_w(pos, m_pEnd, newEnd);
+
+    if (m_pBegin != nullptr) {
+        rage_free_00C0(m_pBegin);
+    }
+    m_pBegin       = newBegin;
+    m_pEnd         = newEnd;
+    m_pCapacityEnd = newBegin + newCapacity;
+}
