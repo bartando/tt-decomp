@@ -902,8 +902,6 @@ TT_DATA_ALIAS("g_debugDrawTypes", "g_ui_object_types");
 TT_DATA_ALIAS("g_debugDrawPriority", "g_ui_object_flags");
 TT_DATA_ALIAS("g_inputScoreByPlayer", "g_pInputScoreTable");                  /* 0x825EAB40 */
 TT_DATA_ALIAS("g_kGeomOffset", "g_pInputArrayTable");                         /* 0x825EAB28 */
-TT_DATA_ALIAS("g_pMatchState", "g_pCamShotMgr");                              /* 0x8271A318 */
-TT_DATA_ALIAS("g_pMatchConfig", "g_pCameraSharedState");                      /* 0x8271A32C */
 TT_DATA_ALIAS("g_pPlayerSlotLookup", "g_pCameraSharedState");
 TT_DATA_ALIAS("g_globalCamPtr1", "g_pCameraSharedState");
 TT_DATA_ALIAS("g_globalCamPtr2", "g_pCamShotMgr");

@@ -143,10 +143,10 @@ extern const float  g_kFloatConst_79FF4;     // @ 0x82079FF4
 // .data globals — game state pointers
 extern void*    g_pGlobalClock;              // @ 0x8271A304
 extern void*    g_pCourtState;               // @ 0x8271A314
-extern void*    g_pMatchState;               // @ 0x8271A318
+extern void*    g_pCamShotMgr;               // @ 0x8271A318
 extern void*    g_pPlayerRecords;            // @ 0x8271A31C
 extern void*    g_pPlayerRecords2;           // @ 0x8271A324
-extern void*    g_pMatchConfig;              // @ 0x8271A32C
+extern void*    g_pCameraSharedState;        // @ 0x8271A32C
 
 // .data globals — game objects
 extern void**   g_pInputArrayTable;          // @ 0x825EAB28
@@ -2084,7 +2084,7 @@ extern void pongPlayer_SetupShotTarget(void* target, float f1, float f2);
 extern void pg_E6E0(int code, uint8_t mask, int p3, int p4);
 extern void pongPlayer_9108_g(void* target, void* syncData);
 
-// g_pMatchState @ 0x8271A318 and g_pMatchConfig @ 0x8271A32C declared at file scope
+// g_pCamShotMgr @ 0x8271A318 and g_pCameraSharedState @ 0x8271A32C declared at file scope
 
 
 /**
@@ -2334,7 +2334,7 @@ void pongPlayer::NotifySlotChangeAndSync(void* slotsBase, uint32_t slotIndex,
  *   3. Stores result in creature state's speed field (+208).
  */
 void pongPlayer::UpdateServeSpeed() {  // pongPlayer_CD48_g @ 0x8218CD48
-    uint8_t* matchBytes = static_cast<uint8_t*>(g_pMatchState);
+    uint8_t* matchBytes = static_cast<uint8_t*>(g_pCamShotMgr);
     int32_t rallyIndex = *reinterpret_cast<int32_t*>(matchBytes + 28);
 
     bool indexValid = false;
@@ -2352,7 +2352,7 @@ void pongPlayer::UpdateServeSpeed() {  // pongPlayer_CD48_g @ 0x8218CD48
         return;
     }
 
-    uint8_t* configBytes = static_cast<uint8_t*>(g_pMatchConfig);
+    uint8_t* configBytes = static_cast<uint8_t*>(g_pCameraSharedState);
     uint8_t configHandedness = configBytes[6];
 
     if (configHandedness == 0) {
@@ -2401,7 +2401,7 @@ void pongPlayer::InitializeReplaySnapshot(void* outSnapshot) {
     // pongPlayer_9420_wrh @ 0x820D9420
     uint8_t* out = reinterpret_cast<uint8_t*>(outSnapshot);
 
-    void** singletonPtr = reinterpret_cast<void**>(g_pMatchState);
+    void** singletonPtr = reinterpret_cast<void**>(g_pCamShotMgr);
     void* singleton = *singletonPtr;
 
     float zero = g_kFloatConst_D110;  // was g_kReplayZero @ 0x8202D110
@@ -3669,7 +3669,7 @@ extern const float g_kPercentScale;      // flt_8202D118 @ 0x8202D118 (100.0f, .
  */
 extern "C" void pongPlayer_9C60_g(void* base, int index, uint32_t value) {
     // Get timing state from match config
-    void* clockData = pongPlayer_7CC0_g(g_pMatchConfig);
+    void* clockData = pongPlayer_7CC0_g(g_pCameraSharedState);
 
     // Read metadata byte from caller's data region
     uint8_t metaByte = *reinterpret_cast<uint8_t*>(

@@ -1623,7 +1623,7 @@ static void*& g_currentViewport = g_pCurrentViewport;
 
 // lbl_8271A318 is the atSingleton<camShotMgr> instance. camShotMgr is an
 // fsmMachine whose base sits at +0x04, so the shot indices are fsmMachine
-// fields. pong_player.cpp declares the same slot as g_pMatchState.
+// fields.
 struct CamShotMgrInstance {
     void**   vtable;          // +0x00
     void**   fsmVtable;       // +0x04 - fsmMachine base; Update calls its slot 4
@@ -1633,19 +1633,19 @@ struct CamShotMgrInstance {
     int32_t  m_requestedShot; // +0x14 - pending state set by 0x82222800
     int32_t  m_latchedShot;   // +0x18 - camShotMgr slot 4 (0x82165458) copies m_currentShot here
 };
-extern void* g_pMatchState;
-static CamShotMgrInstance* ShotMgr() { return static_cast<CamShotMgrInstance*>(g_pMatchState); }
+extern void* g_pCamShotMgr;
+static CamShotMgrInstance* ShotMgr() { return static_cast<CamShotMgrInstance*>(g_pCamShotMgr); }
 
 // lbl_8271A32C: camera state shared with gameplay code. pong_player.cpp declares
-// the same slot as g_pMatchConfig and reads +0x06.
+// the same slot and reads +0x06.
 struct CameraSharedState {
     const CamMatrix44* m_cameraMtx;      // +0x00 - matrix of the source camViewCS is viewing
     uint8_t            field_0x04;       // +0x04 - set to 1 by every Update
     uint8_t            field_0x05;       // +0x05
     uint8_t            m_cameraHasSides; // +0x06 - "CameraHasSides" flag of the current shot
 };
-extern void* g_pMatchConfig;
-static CameraSharedState* SharedCameraState() { return static_cast<CameraSharedState*>(g_pMatchConfig); }
+extern void* g_pCameraSharedState;
+static CameraSharedState* SharedCameraState() { return static_cast<CameraSharedState*>(g_pCameraSharedState); }
 
 // Entry returned by the name lookup at 0x82274870; flag entries hold their value at +0x20.
 struct CameraNamedFlag {
@@ -1718,10 +1718,10 @@ pongCameraMgr::~pongCameraMgr() {
 // cine manager (+0x2C) are left alone, and no member is cleared afterwards.
 // ─────────────────────────────────────────────────────────────────────────────
 void pongCameraMgr::Shutdown() {
-    if (g_pMatchState != nullptr) {
-        DeleteGameObject(g_pMatchState);
+    if (g_pCamShotMgr != nullptr) {
+        DeleteGameObject(g_pCamShotMgr);
     }
-    g_pMatchState = nullptr;
+    g_pCamShotMgr = nullptr;
 
     if (m_sources[0] != nullptr) {
         DeleteGameObject(m_sources[0]);
