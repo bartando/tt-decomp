@@ -38,6 +38,7 @@ extern uint32_t g_phFrameIndex;  // @ 0x825C4898
 extern void* g_renderWorld;   // @ 0x8260641C (SDA offset 25628)
 
 // Draw bucket global — entries are submitted for deferred rendering
+extern "C" const float lbl_8202D110;  // 0.0f
 extern void* g_drawBucket;    // @ 0x826064F4 (SDA offset 25844)
 
 // Shadow rendering state — contains shadow map config and scale transform
@@ -77,40 +78,25 @@ extern void LocomotionStateAnim_3AD8_g(void* matrix,
     void* animTransform); // @ 0x820C3AD8
 
 /**
- * phUpdateObject::~phUpdateObject() — delegating destructor
- * @ 0x8227DA08 | size: 0x30 (vtable slot 0)
+ * phUpdateObject::ReleaseFrame(flags) — vtable slot 0
+ * @ 0x8227DA08 | size: 0x30
  *
- * Checks whether the object has active data (m_pData != NULL).
- * If active, computes a frame-indexed pointer into the double-buffered
- * array at m_pFrameBuffer and dispatches to the virtual Cleanup() method
- * (vtable slot 6) to release per-frame resources.
- *
- * Assembly pattern:
- *   lwz   r11, +20(r3)       ; m_pData
- *   beqlr cr6                ; early-out if NULL
- *   lwz   r9,  0(r3)         ; vtable
- *   lwz   r10, +128(r3)      ; m_pFrameBuffer
- *   lwz   r11, g_phFrameIndex ; frame index
- *   rlwinm r11, r11, 6, 0, 25 ; index * 64
- *   add   r4,  r11, r10      ; frameData = m_pFrameBuffer + (index * 64)
- *   lwz   r8,  24(r9)        ; vtable[6] = Cleanup
- *   bctr                     ; tail-call Cleanup(this, frameData, flags)
+ * If m_pData is set, tail-calls slot 6 (Cleanup) on the current frame's
+ * 64-byte slot of m_pFrameBuffer, passing the caller's flags (r4) on in r5.
+ * Not a destructor.
  */
-phUpdateObject::~phUpdateObject()
+void phUpdateObject::ReleaseFrame(uint32_t flags)
 {
     if (!m_pData)
         return;
 
-    // Compute the frame-indexed slot: each slot is 64 bytes wide
-    uint32_t frameOffset = g_phFrameIndex * 64;
-    void* frameData = static_cast<uint8_t*>(m_pFrameBuffer) + frameOffset;
-
-    // Tail-call virtual Cleanup (slot 6) to release per-frame state
-    Cleanup(frameData, 0);
+    void* frameData = static_cast<uint8_t*>(m_pFrameBuffer) + g_phFrameIndex * 64;
+    typedef void (*CleanupFn)(phUpdateObject*, void*, uint32_t);
+    reinterpret_cast<CleanupFn>(vtable[6])(this, frameData, flags);
 }
 
 /**
- * phUpdateObject::ScalarDtor(int flags) — scalar destructor (vtable slot 1)
+ * phUpdateObject::CommitTransform() — vtable slot 1
  * @ 0x8227D960 | size: 0xA8
  *
  * FIXME: the lift below is incorrect — the slot-1 scaffold is NOT a
@@ -121,9 +107,9 @@ phUpdateObject::~phUpdateObject()
  *        post-multiplies three row vectors of that dst matrix by the
  *        parent transform at `this+112`.  It never frees `this` and takes
  *        no `flags` arg.  This stub preserves the existing signature until
- *        the lift is replaced.
+ *        the lift is replaced (unverified).
  */
-void phUpdateObject::ScalarDtor(int flags)
+void phUpdateObject::CommitTransform()
 {
     // Determine source: use external data pointer if valid, else inline transform
     void* src;
@@ -142,10 +128,6 @@ void phUpdateObject::ScalarDtor(int flags)
     // Upstream also multiplies dst rows 1..3 by the parent transform at
     // this+112 — not implemented here, see FIXME above.
     __builtin_memcpy(dst, src, 64);
-
-    if (flags & 1) {
-        rage_free(this);
-    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -165,7 +147,7 @@ void phUpdateObject::ScalarDtor(int flags)
  * destructors and frees m_pFrameBuffer.
  */
 void phUpdateObject::Destroy(int flags) {
-    // Base class destructor chain: destroy all owned sub-objects
+    vtable = reinterpret_cast<void**>(0x82027AC0u);
     phDemoObject_Dtor(this);
 
     if (flags & 1) {
@@ -306,83 +288,46 @@ void phUpdateObject::Reset(void* world, void* scene) {
  * then submits to pongDrawBucket_AddEntry with the draw priority returned
  * by the drawable's vfn_10.
  */
-void phUpdateObject::AddToRenderBucket() {
-    if (!m_pDrawable)
+void phUpdateObject::AddToRenderBucket(bool skipVisTest) {
+    void* drawable = m_pDrawable;
+    if (!drawable)
         return;
 
-    void* transformPtr = nullptr;
-    bool hasColliderTransform = false;
-
+    void* transform;
     if (m_pCollider) {
-        // Articulated collider path: get transform from collider's
-        // double-buffered frame system
-        uint8_t* colliderData = static_cast<uint8_t*>(m_pCollider);
-        void* colliderState = *reinterpret_cast<void**>(colliderData + 12);
-        uint8_t* stateData = static_cast<uint8_t*>(colliderState);
-
-        void* frameObj = *reinterpret_cast<void**>(stateData + 64);
-        uint32_t frameIdx = *reinterpret_cast<uint32_t*>(stateData + 68);
-        uint32_t frameOffset = (frameIdx << 6) & 0xFFFFFFC0; // index * 64
-
-        uint8_t* frameObjData = static_cast<uint8_t*>(frameObj);
-        void* frameBase = *reinterpret_cast<void**>(frameObjData + 20);
-        transformPtr = static_cast<uint8_t*>(frameBase) + frameOffset;
-        hasColliderTransform = true;
-    } else if (m_pTransformSrc) {
-        // Direct transform source
-        transformPtr = m_pTransformSrc;
+        // The articulated collider's current frame; never culled.
+        uint8_t* state  = *reinterpret_cast<uint8_t**>(static_cast<uint8_t*>(m_pCollider) + 0x0C);
+        uint8_t* frames = *reinterpret_cast<uint8_t**>(state + 0x40);
+        uint32_t index  = *reinterpret_cast<uint32_t*>(state + 0x44);
+        transform = *reinterpret_cast<uint8_t**>(frames + 0x14) + index * 64;
+        skipVisTest = true;
     } else {
-        // Fall back to data descriptor's inline transform
-        transformPtr = static_cast<uint8_t*>(m_pData) + 16;
+        transform = m_pTransformSrc;
+        if (!transform)
+            transform = static_cast<uint8_t*>(m_pData) + 0x10;
     }
 
-    // Initialize LOD test parameters
-    float lodParam = 0.0f;
-    uint8_t visibleFlag = 0;
-
-    if (!hasColliderTransform) {
-        // Perform visibility/LOD test via drawable's vfn_9
-        // Loads:
-        //   renderWorld -> field_40 (frustum) -> field_44 (LOD info)
-        //   -> field_152 (LOD scale distance)
-        uint8_t* renderWorld = static_cast<uint8_t*>(
-            *reinterpret_cast<void**>(
-                static_cast<uint8_t*>(g_renderWorld) + 0));
-        void* frustumObj = *reinterpret_cast<void**>(renderWorld + 40);
-        void* lodInfo = *reinterpret_cast<void**>(
-            static_cast<uint8_t*>(frustumObj) + 44);
-        void* lodScale = *reinterpret_cast<void**>(
-            static_cast<uint8_t*>(lodInfo) + 152);
-
-        // Call m_pDrawable->vfn_9(transform, lodScale, &lodParam, &visibleFlag)
-        void** drawVtable = *reinterpret_cast<void***>(m_pDrawable);
-        typedef int (*VisTestFn)(void*, void*, void*, void*, float*, uint8_t*);
-        VisTestFn visTest = reinterpret_cast<VisTestFn>(
-            *reinterpret_cast<void**>(
-                reinterpret_cast<uint8_t*>(drawVtable) + 36));
-        int isVisible = visTest(m_pDrawable, transformPtr, lodScale,
-            nullptr, &lodParam, &visibleFlag);
-
-        if (!isVisible) {
-            // Object is culled — commit transform and mark inactive
-            ScalarDtor(0);
+    float   lodParam = lbl_8202D110;
+    uint8_t visible  = 0;
+    if (!skipVisTest) {
+        uint8_t* viewer = *reinterpret_cast<uint8_t**>(static_cast<uint8_t*>(g_renderWorld) + 0x28);
+        uint8_t* view   = *reinterpret_cast<uint8_t**>(viewer + 0x2C);
+        uint32_t viewArg = *reinterpret_cast<uint32_t*>(view + 0x98);
+        typedef int (*VisTestFn)(void*, void*, uint32_t, uint8_t*, float*);
+        VisTestFn visTest = reinterpret_cast<VisTestFn>((*reinterpret_cast<void***>(drawable))[9]);
+        if (!visTest(drawable, transform, viewArg, &visible, &lodParam)) {
+            typedef void (*SlotFn)(phUpdateObject*);
+            reinterpret_cast<SlotFn>(vtable[1])(this);   // CommitTransform
             return;
         }
     }
 
-    // Store LOD/visibility state on this object
     m_lodParam = lodParam;
-    m_visFlags = static_cast<uint32_t>(visibleFlag);
+    m_visFlags = visible;
 
-    // Get draw priority from the drawable (vtable slot 10, byte +40)
-    void** drawVtable = *reinterpret_cast<void***>(m_pDrawable);
     typedef void* (*GetPriorityFn)(void*);
-    GetPriorityFn getPriority = reinterpret_cast<GetPriorityFn>(
-        *reinterpret_cast<void**>(
-            reinterpret_cast<uint8_t*>(drawVtable) + 40));
-    void* drawPriority = getPriority(m_pDrawable);
-
-    // Submit to the deferred draw bucket
+    void* drawPriority = reinterpret_cast<GetPriorityFn>(
+        (*reinterpret_cast<void***>(m_pDrawable))[10])(m_pDrawable);
     pongDrawBucket_AddEntry(g_drawBucket, this, drawPriority);
 }
 

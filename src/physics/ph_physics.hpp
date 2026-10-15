@@ -19,58 +19,65 @@
 #include <stdint.h>
 #include <stddef.h>
 
+// Every class here carries the game's vtable as an explicit `vtable` member at
+// +0x00, so slot functions are plain members listed by slot number: a C++
+// virtual would add a hidden vptr in front and shift every field. Call a slot
+// that dispatches dynamically in the game through `vtable[slot]`.
+// Only phUpdateObject's field offsets are checked against the asm; the other
+// classes' "+0x" annotations are access maps, often overlapping, not layouts.
+
 // ── phDemoObject  [vtable @ 0x82056C3C] ──────────────────────────────────────
 struct phDemoObject {
     void**      vtable;           // +0x00
 
-    virtual void Render();        // [2] @ 0x8227CF50
+    void Render();        // [2] @ 0x8227CF50
 };
 
 // ── phDemoWorld  [vtable @ 0x82056E40] ──────────────────────────────────────
 struct phDemoWorld {
     void**      vtable;           // +0x00
 
-    virtual ~phDemoWorld();                   // [0] @ 0x8227E920
-    virtual void ScalarDtor(int flags);       // [1] @ 0x8227E810
+    ~phDemoWorld();                   // [0] @ 0x8227E920
+    void ScalarDtor(int flags);       // [1] @ 0x8227E810
     // [2] @ 0x8227E548 — iterates the pending-object array at (+192 count,
     //   +196 ptr), clearing the "pending" byte at +160 and dispatching
     //   vtable slot 8 on each entry whose +20[+8] word != 0xFFFF.
     //   Likely a "flush pending world objects" pass.  Signature unconfirmed.
-    virtual void vfn_2();                     // [2] @ 0x8227E548
-    virtual void vfn_3();                     // [3] @ 0x8227E5C8
-    virtual void vfn_5();                     // [5] @ 0x8227F378
-    virtual void vfn_6();                     // [6] @ 0x8227E468
-    virtual void vfn_7();                     // [7] @ 0x8227EF30
-    virtual void vfn_14();                    // [14] @ 0x8247E518
-    virtual void vfn_17();                    // [17] @ 0x8247E4C0
-    virtual void vfn_18();                    // [18] @ 0x8247E790
-    virtual void vfn_19();                    // [19] @ 0x8247E5F8
-    virtual void vfn_20();                    // [20] @ 0x8247E260
-    virtual void vfn_21();                    // [21] @ 0x8247EAF8
-    virtual void vfn_26();                    // [26] @ 0x8247EB10
-    virtual void vfn_33();                    // [33] @ 0x8247E988
-    virtual void vfn_34();                    // [34] @ 0x8247E9A0
-    virtual void vfn_35();                    // [35] @ 0x8247EB00
-    virtual void vfn_36();                    // [36] @ 0x8247EA18
-    virtual void vfn_37();                    // [37] @ 0x8247EB18
-    virtual void vfn_40();                    // [40] @ 0x8247EB20
-    virtual void vfn_42();                    // [42] @ 0x8247F600
+    void vfn_2();                     // [2] @ 0x8227E548
+    void vfn_3();                     // [3] @ 0x8227E5C8
+    void vfn_5();                     // [5] @ 0x8227F378
+    void vfn_6();                     // [6] @ 0x8227E468
+    void vfn_7();                     // [7] @ 0x8227EF30
+    void vfn_14();                    // [14] @ 0x8247E518
+    void vfn_17();                    // [17] @ 0x8247E4C0
+    void vfn_18();                    // [18] @ 0x8247E790
+    void vfn_19();                    // [19] @ 0x8247E5F8
+    void vfn_20();                    // [20] @ 0x8247E260
+    void vfn_21();                    // [21] @ 0x8247EAF8
+    void vfn_26();                    // [26] @ 0x8247EB10
+    void vfn_33();                    // [33] @ 0x8247E988
+    void vfn_34();                    // [34] @ 0x8247E9A0
+    void vfn_35();                    // [35] @ 0x8247EB00
+    void vfn_36();                    // [36] @ 0x8247EA18
+    void vfn_37();                    // [37] @ 0x8247EB18
+    void vfn_40();                    // [40] @ 0x8247EB20
+    void vfn_42();                    // [42] @ 0x8247F600
 };
 
 // ── phMaterialMgrImpl  [vtable @ 0x8204EAEC] ─────────────────────────────────
 struct phMaterialMgrImpl {
     void**      vtable;           // +0x00
 
-    virtual ~phMaterialMgrImpl();             // [0] @ 0x8222A7E8
-    virtual void ScalarDtor(int flags);       // [1] @ 0x8222A040
-    virtual void vfn_2();                     // [2] @ 0x8222A460
-    virtual void vfn_3();                     // [3] @ 0x8222A4A8
-    virtual void vfn_4();                     // [4] @ 0x8222A4B8
-    virtual void vfn_8();                     // [8] @ 0x8222A550
-    virtual void vfn_9();                     // [9] @ 0x8222A5B8
-    virtual void vfn_10();                    // [10] @ 0x8222A5C0
-    virtual void vfn_11();                    // [11] @ 0x8222A640
-    virtual void vfn_12();                    // [12] @ 0x8222A670
+    ~phMaterialMgrImpl();             // [0] @ 0x8222A7E8
+    void ScalarDtor(int flags);       // [1] @ 0x8222A040
+    void vfn_2();                     // [2] @ 0x8222A460
+    void vfn_3();                     // [3] @ 0x8222A4A8
+    void vfn_4();                     // [4] @ 0x8222A4B8
+    void vfn_8();                     // [8] @ 0x8222A550
+    void vfn_9();                     // [9] @ 0x8222A5B8
+    void vfn_10();                    // [10] @ 0x8222A5C0
+    void vfn_11();                    // [11] @ 0x8222A640
+    void vfn_12();                    // [12] @ 0x8222A670
 };
 
 // ── phUpdateObject  [vtable @ 0x82027AC0] ────────────────────────────────────
@@ -118,14 +125,20 @@ struct phUpdateObject {
     uint8_t     _pad0x84[1];      // +0x84
     uint8_t     m_bActive;        // +0x85  Object is active / enabled
 
-    virtual ~phUpdateObject();                        // [0] @ 0x8227DA08
-    virtual void ScalarDtor(int flags);               // [1] @ 0x8227D960
-    virtual void Destroy(int flags);                  // [2] @ 0x820C41E8  — deleting destructor
-    virtual void Reset(void* world, void* scene);     // [3] @ 0x8227D5B0  — world sync / init
-    virtual void AddToRenderBucket();                 // [4] @ 0x8227D768
-    virtual void RenderShadow(float shadowScale);     // [5] @ 0x8227D898
-    virtual void Cleanup(void* frameData, uint32_t flags);  // [6] @ 0x8227DA40
+    // Slot functions (not C++ virtuals: `vtable` above is the vptr).
+    void ReleaseFrame(uint32_t flags);                // [0] @ 0x8227DA08  slot 6 on the current frame
+    void CommitTransform();                           // [1] @ 0x8227D960  copies the transform into the frame buffer
+    void Destroy(int flags);                          // [2] @ 0x820C41E8  scalar deleting destructor
+    void Reset(void* world, void* scene);             // [3] @ 0x8227D5B0  world sync / init
+    void AddToRenderBucket(bool skipVisTest);         // [4] @ 0x8227D768
+    void RenderShadow(float shadowScale);             // [5] @ 0x8227D898
+    void Cleanup(void* frameData, uint32_t flags);    // [6] @ 0x8227DA40
 };
+
+static_assert(sizeof(void*) != 4 || offsetof(phUpdateObject, m_pData) == 0x14, "phUpdateObject layout");
+static_assert(sizeof(void*) != 4 || offsetof(phUpdateObject, m_pDrawable) == 0x60, "phUpdateObject layout");
+static_assert(sizeof(void*) != 4 || offsetof(phUpdateObject, m_pCollider) == 0x6C, "phUpdateObject layout");
+static_assert(sizeof(void*) != 4 || offsetof(phUpdateObject, m_pFrameBuffer) == 0x80, "phUpdateObject layout");
 
 namespace rage {
 
@@ -133,14 +146,14 @@ namespace rage {
 struct clothController {
     void**      vtable;           // +0x00
 
-    virtual ~clothController();   // [0] @ 0x823D86C0
+    ~clothController();   // [0] @ 0x823D86C0
 };
 
 // ── rage::environmentCloth  [vtable @ 0x82071C34] ────────────────────────────
 struct environmentCloth {
     void**      vtable;           // +0x00
 
-    virtual ~environmentCloth();  // [0] @ 0x823D7CE0
+    ~environmentCloth();  // [0] @ 0x823D7CE0
 };
 
 // ── rage::phArchetype  [vtable @ 0x82059B4C] ─────────────────────────────────
@@ -148,14 +161,14 @@ struct environmentCloth {
 struct phArchetype {
     void**      vtable;           // +0x00
 
-    virtual ~phArchetype();                   // [0] @ 0x822C9918
-    virtual void vfn_2();                     // [2] @ 0x822C94E0
-    virtual void vfn_3();                     // [3] @ 0x822C9968
-    virtual void vfn_4();                     // [4] @ 0x822C9A28
-    virtual void vfn_5();                     // [5] @ 0x822C9C18
-    virtual void vfn_6();                     // [6] @ 0x822C9CD0
-    virtual void vfn_9();                     // [9] @ 0x822C9500
-    virtual void vfn_11();                    // [11] @ 0x822C9510
+    ~phArchetype();                   // [0] @ 0x822C9918
+    void vfn_2();                     // [2] @ 0x822C94E0
+    void vfn_3();                     // [3] @ 0x822C9968
+    void vfn_4();                     // [4] @ 0x822C9A28
+    void vfn_5();                     // [5] @ 0x822C9C18
+    void vfn_6();                     // [6] @ 0x822C9CD0
+    void vfn_9();                     // [9] @ 0x822C9500
+    void vfn_11();                    // [11] @ 0x822C9510
 
     void Load();  // debug string: "phArchetype::Load() -- .phys file %s does not exist"
 };
@@ -164,17 +177,17 @@ struct phArchetype {
 struct phArchetypeBase {
     void**      vtable;           // +0x00
 
-    virtual ~phArchetypeBase();   // [0] @ 0x822C9498
+    ~phArchetypeBase();   // [0] @ 0x822C9498
 };
 
 // ── rage::phArchetypeDamp  [vtable @ 0x82059BEC] ─────────────────────────────
 struct phArchetypeDamp {
     void**      vtable;           // +0x00
 
-    virtual void vfn_2();         // [2] @ 0x822C9600
-    virtual void vfn_3();         // [3] @ 0x822CA3D8
-    virtual void vfn_4();         // [4] @ 0x822CA438
-    virtual void vfn_5();         // [5] @ 0x822CA680
+    void vfn_2();         // [2] @ 0x822C9600
+    void vfn_3();         // [3] @ 0x822CA3D8
+    void vfn_4();         // [4] @ 0x822CA438
+    void vfn_5();         // [5] @ 0x822CA680
 };
 
 // ── rage::phArchetypeMgr  [vtable @ 0x82059F18] ──────────────────────────────
@@ -186,16 +199,16 @@ struct phArchetypeMgr {
 struct phArchetypePhys {
     void**      vtable;           // +0x00
 
-    virtual void vfn_2();         // [2] @ 0x822C9558
-    virtual void vfn_3();         // [3] @ 0x822C9F38
-    virtual void vfn_4();         // [4] @ 0x822C9F90
-    virtual void vfn_5();         // [5] @ 0x822CA288
-    virtual void vfn_9();         // [9] @ 0x82380920
-    virtual void vfn_10();        // [10] @ 0x822C95F8
-    virtual void vfn_11();        // [11] @ 0x822CA278
-    virtual void vfn_13();        // [13] @ 0x822C9568
-    virtual void vfn_14();        // [14] @ 0x822CA238
-    virtual void vfn_15();        // [15] @ 0x822C95F0
+    void vfn_2();         // [2] @ 0x822C9558
+    void vfn_3();         // [3] @ 0x822C9F38
+    void vfn_4();         // [4] @ 0x822C9F90
+    void vfn_5();         // [5] @ 0x822CA288
+    void vfn_9();         // [9] @ 0x82380920
+    void vfn_10();        // [10] @ 0x822C95F8
+    void vfn_11();        // [11] @ 0x822CA278
+    void vfn_13();        // [13] @ 0x822C9568
+    void vfn_14();        // [14] @ 0x822CA238
+    void vfn_15();        // [15] @ 0x822C95F0
 };
 
 // ── rage::phArticulatedCollider  [vtable @ 0x8204FD74] ───────────────────────
@@ -340,66 +353,66 @@ struct phArticulatedCollider {
     uint8_t     _pad0x3108[1160];
     uint32_t    m_nFrameCount;    // +0x3590  R:1 W:1 — simulation frame counter
 
-    virtual ~phArticulatedCollider();                 // [0] @ 0x8224E580
-    virtual void ScalarDtor(int flags);               // [1] @ 0x8224E6D8
-    virtual void ResetForces();                       // [2] @ 0x8224E720  — zero force vecs, call ResetVelocity
-    virtual void InitFromArchetype();                 // [3] @ 0x8224E1D0  — init collider from archetype
-    virtual void ResetVelocity();                     // [4] @ 0x8224E7A0  — reset velocity state
-    virtual void Step();                              // [5] @ 0x8224E7C8  — advance simulation step
-    virtual void UpdateBounds();                      // [6] @ 0x8224EA28  — update bound geometry
-    virtual void ApplyGravity();                      // [7] @ 0x8224EA70  — apply gravity to joints
-    virtual void IntegrateVelocities();               // [8] @ 0x8224EC58  — integrate joint velocities
-    virtual void PreCollide();                        // [9] @ 0x8224EBC8  — pre-collision setup
-    virtual void GetTransform();                      // [10] @ 0x822CB250 — get world transform matrix
-    virtual void SetTransform();                      // [11] @ 0x822CB360 — set world transform matrix
-    virtual void GetLinearVelocity();                 // [12] @ 0x8224FF70
-    virtual void SetLinearVelocity();                 // [13] @ 0x822500E8
-    virtual void GetAngularVelocity();                // [14] @ 0x82250170
-    virtual void SetAngularVelocity();                // [15] @ 0x822501F8
-    virtual void ApplyImpulse();                      // [17] @ 0x822505B0
-    virtual void ApplyForce();                        // [18] @ 0x82250288
-    virtual void ApplyTorque();                       // [19] @ 0x82250370
-    virtual void ApplyForceAtPoint();                 // [20] @ 0x82250440
-    virtual void GetInverseInertiaWorld();            // [21] @ 0x822CBF30
-    virtual void GetMass();                           // [22] @ 0x8224F220
-    virtual void GetInverseMass();                    // [23] @ 0x8224F228
-    virtual void ComputeInertia();                    // [24] @ 0x822CC700
-    virtual void CastRay();                           // [25] @ 0x8224FD50
-    virtual void CollideDispatch();                   // [27] @ 0x8224FD58
-    virtual void CollideVsBound();                    // [28] @ 0x8224FDA8
-    virtual void CollideVsGeometry();                 // [29] @ 0x8224FE40
-    virtual void CollideVsQuadtree();                 // [30] @ 0x8224FED8
-    virtual void CollideVsOTGrid();                   // [31] @ 0x8224FA98
-    virtual void CollideVsRibbon();                   // [32] @ 0x8224FB90
-    virtual void ComputeSupportDistance();            // [33] @ 0x8224FD30
-    virtual void CopyFrom();                          // [34] @ 0x8224F990
-    virtual void Clone();                             // [35] @ 0x8224FC60
-    virtual void GetPosition();                       // [36] @ 0x8224EFA0
-    virtual void SetPosition();                       // [37] @ 0x8224EFC8
-    virtual void GetOrientation();                    // [38] @ 0x8224EFE0
-    virtual void SetOrientation();                    // [39] @ 0x822504A8
-    virtual void GetBound();                          // [40] @ 0x8224F870
-    virtual void SetBound();                          // [41] @ 0x8224F8C8
-    virtual void GetArchetype();                      // [42] @ 0x8224F910
-    virtual void SetArchetype();                      // [43] @ 0x8224F948
-    virtual void GetPhysicsData();                    // [46] @ 0x8224E248 — returns ptr at +472
-    virtual void ApplyImpulseAtJoint();               // [47] @ 0x82250528
-    virtual void ApplyForceAtJoint();                 // [48] @ 0x82250620
-    virtual void ApplyTorqueAtJoint();                // [49] @ 0x82250710
-    virtual void ApplyLinearImpulseAtJoint();         // [50] @ 0x82250578
-    virtual void ApplyAngularImpulseAtJoint();        // [51] @ 0x822505E8
-    virtual void GetJointLinearVelocity();            // [52] @ 0x82250818
-    virtual void GetJointAngularVelocity();           // [53] @ 0x82250870
-    virtual void GetJointForce();                     // [54] @ 0x82250770
-    virtual void GetJointTorque();                    // [55] @ 0x822508A8
-    virtual void GetJointMassAtIndex();               // [56] @ 0x8224E250 — float from array +508
-    virtual void SetJointLinearVelocity();            // [57] @ 0x822508E0
-    virtual void SetJointAngularVelocity();           // [58] @ 0x82250910
-    virtual void GetJointCount();                     // [59] @ 0x8224F218
-    virtual void GetJointInertiaAtIndex();            // [60] @ 0x8224E260 — float from array +492
-    virtual void GetJointDampingAtIndex();            // [61] @ 0x8224E270 — float from array +500
-    virtual void GetJointFrictionAtIndex();           // [62] @ 0x8224E280 — float from array
-    virtual void GetJointTransform();                 // [63] @ 0x8224E2D8
+    ~phArticulatedCollider();                 // [0] @ 0x8224E580
+    void ScalarDtor(int flags);               // [1] @ 0x8224E6D8
+    void ResetForces();                       // [2] @ 0x8224E720  — zero force vecs, call ResetVelocity
+    void InitFromArchetype();                 // [3] @ 0x8224E1D0  — init collider from archetype
+    void ResetVelocity();                     // [4] @ 0x8224E7A0  — reset velocity state
+    void Step();                              // [5] @ 0x8224E7C8  — advance simulation step
+    void UpdateBounds();                      // [6] @ 0x8224EA28  — update bound geometry
+    void ApplyGravity();                      // [7] @ 0x8224EA70  — apply gravity to joints
+    void IntegrateVelocities();               // [8] @ 0x8224EC58  — integrate joint velocities
+    void PreCollide();                        // [9] @ 0x8224EBC8  — pre-collision setup
+    void GetTransform();                      // [10] @ 0x822CB250 — get world transform matrix
+    void SetTransform();                      // [11] @ 0x822CB360 — set world transform matrix
+    void GetLinearVelocity();                 // [12] @ 0x8224FF70
+    void SetLinearVelocity();                 // [13] @ 0x822500E8
+    void GetAngularVelocity();                // [14] @ 0x82250170
+    void SetAngularVelocity();                // [15] @ 0x822501F8
+    void ApplyImpulse();                      // [17] @ 0x822505B0
+    void ApplyForce();                        // [18] @ 0x82250288
+    void ApplyTorque();                       // [19] @ 0x82250370
+    void ApplyForceAtPoint();                 // [20] @ 0x82250440
+    void GetInverseInertiaWorld();            // [21] @ 0x822CBF30
+    void GetMass();                           // [22] @ 0x8224F220
+    void GetInverseMass();                    // [23] @ 0x8224F228
+    void ComputeInertia();                    // [24] @ 0x822CC700
+    void CastRay();                           // [25] @ 0x8224FD50
+    void CollideDispatch();                   // [27] @ 0x8224FD58
+    void CollideVsBound();                    // [28] @ 0x8224FDA8
+    void CollideVsGeometry();                 // [29] @ 0x8224FE40
+    void CollideVsQuadtree();                 // [30] @ 0x8224FED8
+    void CollideVsOTGrid();                   // [31] @ 0x8224FA98
+    void CollideVsRibbon();                   // [32] @ 0x8224FB90
+    void ComputeSupportDistance();            // [33] @ 0x8224FD30
+    void CopyFrom();                          // [34] @ 0x8224F990
+    void Clone();                             // [35] @ 0x8224FC60
+    void GetPosition();                       // [36] @ 0x8224EFA0
+    void SetPosition();                       // [37] @ 0x8224EFC8
+    void GetOrientation();                    // [38] @ 0x8224EFE0
+    void SetOrientation();                    // [39] @ 0x822504A8
+    void GetBound();                          // [40] @ 0x8224F870
+    void SetBound();                          // [41] @ 0x8224F8C8
+    void GetArchetype();                      // [42] @ 0x8224F910
+    void SetArchetype();                      // [43] @ 0x8224F948
+    void GetPhysicsData();                    // [46] @ 0x8224E248 — returns ptr at +472
+    void ApplyImpulseAtJoint();               // [47] @ 0x82250528
+    void ApplyForceAtJoint();                 // [48] @ 0x82250620
+    void ApplyTorqueAtJoint();                // [49] @ 0x82250710
+    void ApplyLinearImpulseAtJoint();         // [50] @ 0x82250578
+    void ApplyAngularImpulseAtJoint();        // [51] @ 0x822505E8
+    void GetJointLinearVelocity();            // [52] @ 0x82250818
+    void GetJointAngularVelocity();           // [53] @ 0x82250870
+    void GetJointForce();                     // [54] @ 0x82250770
+    void GetJointTorque();                    // [55] @ 0x822508A8
+    void GetJointMassAtIndex();               // [56] @ 0x8224E250 — float from array +508
+    void SetJointLinearVelocity();            // [57] @ 0x822508E0
+    void SetJointAngularVelocity();           // [58] @ 0x82250910
+    void GetJointCount();                     // [59] @ 0x8224F218
+    void GetJointInertiaAtIndex();            // [60] @ 0x8224E260 — float from array +492
+    void GetJointDampingAtIndex();            // [61] @ 0x8224E270 — float from array +500
+    void GetJointFrictionAtIndex();           // [62] @ 0x8224E280 — float from array
+    void GetJointTransform();                 // [63] @ 0x8224E2D8
 
     // Non-virtual methods
     void* GetActiveJointsPointer();
@@ -514,18 +527,18 @@ struct phArticulatedCollider {
 struct phBound {
     void**      vtable;           // +0x00
 
-    virtual void SetType(uint8_t type);                     // [1] @ 0x8228CE18
-    virtual uint8_t GetType();                              // [2] @ 0x8228CE20
-    virtual void CalcAABB();                                // [3] @ 0x8228D0E8  — transform AABB by matrix
-    virtual void SetCentroidOffset(const float* centroid);  // [6] @ 0x8228D178  — store centroid, set flag
-    virtual void GetInertia(float* outInertiaXYZ);          // [9] @ 0x8228CE38  — write inertia to output
-    virtual void DebugDraw();                               // [14] @ 0x8228D2F0 — draw via display object
-    virtual int  CastRay(const void* ray, void* hitOut);    // [25] @ 0x8228D450 — ray/bound intersection
-    virtual int  CollideDispatch(void* other);              // [27] @ 0x8228D978 — dispatch by collision type
-    virtual float GetMargin(void*, bool useOuter);          // [33] @ 0x8228D9F8
-    virtual void CopyFrom(const phBound* src);              // [34] @ 0x8228DA18 — copy bound from source
-    virtual phBound* Clone();                               // [35] @ 0x8228DB08 — allocate and copy bound
-    virtual void LoadFromStream();                          // [37] @ 0x8228D438 — load bound version 110
+    void SetType(uint8_t type);                     // [1] @ 0x8228CE18
+    uint8_t GetType();                              // [2] @ 0x8228CE20
+    void CalcAABB();                                // [3] @ 0x8228D0E8  — transform AABB by matrix
+    void SetCentroidOffset(const float* centroid);  // [6] @ 0x8228D178  — store centroid, set flag
+    void GetInertia(float* outInertiaXYZ);          // [9] @ 0x8228CE38  — write inertia to output
+    void DebugDraw();                               // [14] @ 0x8228D2F0 — draw via display object
+    int  CastRay(const void* ray, void* hitOut);    // [25] @ 0x8228D450 — ray/bound intersection
+    int  CollideDispatch(void* other);              // [27] @ 0x8228D978 — dispatch by collision type
+    float GetMargin(void*, bool useOuter);          // [33] @ 0x8228D9F8
+    void CopyFrom(const phBound* src);              // [34] @ 0x8228DA18 — copy bound from source
+    phBound* Clone();                               // [35] @ 0x8228DB08 — allocate and copy bound
+    void LoadFromStream();                          // [37] @ 0x8228D438 — load bound version 110
 
     // debug string: "phBound::Load_v110 - not defined for this bound type (%d)"
     void Load_v110();
@@ -569,23 +582,23 @@ struct phBoundBox {
     uint8_t     _pad0x01f4[22944];
     uint32_t    m_nBoxImpactIdx;  // +0x5b94  W:2  — impact write index
 
-    virtual void SetCentroidOffset();     // [6] @ 0x822A77E0
-    virtual void TranslateAndDispatch(); // [7] @ 0x822A7898
-    virtual void GetVolume();            // [8] @ 0x822A6A10
-    virtual void GetSupportPoint();      // [9] @ 0x822A7AA0
-    virtual void UpdateBound();          // [11] @ 0x822A69E0
-    virtual void GetMaterialIndex();     // [12] @ 0x822A6A00
-    virtual void SetMaterialIndex();     // [13] @ 0x822A6A08
-    virtual void ContainsPoint();        // [18] @ 0x822AACF0
-    virtual void TestSegment();          // [19] @ 0x822AAEB0
-    virtual void TestMovingSphere();     // [20] @ 0x822AB018
-    virtual void TestAABBOverlap();      // [21] @ 0x822AB2E0
-    virtual void TestSweep();            // [22] @ 0x822ABA68
-    virtual void CollideVsBound();       // [28] @ 0x822A7B10
-    virtual void ComputeSupportDistance(); // [33] @ 0x822A7A00
-    virtual void CopyFrom();             // [34] @ 0x822B99F0
-    virtual void Deserialize();          // [36] @ 0x822A75D0
-    virtual void RecalcBounds();         // [37] @ 0x822A78D0
+    void SetCentroidOffset();     // [6] @ 0x822A77E0
+    void TranslateAndDispatch(); // [7] @ 0x822A7898
+    void GetVolume();            // [8] @ 0x822A6A10
+    void GetSupportPoint();      // [9] @ 0x822A7AA0
+    void UpdateBound();          // [11] @ 0x822A69E0
+    void GetMaterialIndex();     // [12] @ 0x822A6A00
+    void SetMaterialIndex();     // [13] @ 0x822A6A08
+    void ContainsPoint();        // [18] @ 0x822AACF0
+    void TestSegment();          // [19] @ 0x822AAEB0
+    void TestMovingSphere();     // [20] @ 0x822AB018
+    void TestAABBOverlap();      // [21] @ 0x822AB2E0
+    void TestSweep();            // [22] @ 0x822ABA68
+    void CollideVsBound();       // [28] @ 0x822A7B10
+    void ComputeSupportDistance(); // [33] @ 0x822A7A00
+    void CopyFrom();             // [34] @ 0x822B99F0
+    void Deserialize();          // [36] @ 0x822A75D0
+    void RecalcBounds();         // [37] @ 0x822A78D0
 
     // debug string: "phBoundBox::FindImpactsToBox() -- MAX_NUM_IMPACTS %d exceeded"
     void FindImpactsToBox();
@@ -824,26 +837,26 @@ struct phBoundCapsule {
     uint8_t     _pad0x3098[16796];
     uint32_t    m_nTriangleData;  // +0x7234  R:1  — triangle data offset
 
-    virtual void CalcAABB();              // [3] @ 0x822A30C8  — extends base with capsule extents
-    virtual void TranslateAndDispatch(); // [7] @ 0x8233AB50
-    virtual void GetVolume();            // [8] @ 0x822A2DB0
-    virtual void GetSupportPoint();      // [9] @ 0x822A3258
-    virtual void UpdateBound();          // [11] @ 0x822A2DE0
-    virtual void GetMaterialIndex();     // [12] @ 0x8256FBD0
-    virtual void SetMaterialIndex();     // [13] @ 0x822A2E00
-    virtual void ContainsPoint();        // [18] @ 0x822A32B8 — test point inside capsule
-    virtual void TestSegment();          // [19] @ 0x822A3490 — segment vs capsule
-    virtual void TestMovingSphere();     // [20] @ 0x822A3648 — moving sphere vs capsule
-    virtual void TestAABBOverlap();      // [21] @ 0x822A3948 — AABB overlap test
-    virtual void TestSweep();            // [22] @ 0x822A3DB0 — sweep with contact gen
-    virtual void GetClosestPoint();      // [23] @ 0x822A3C70 — closest point on capsule
-    virtual void TestSphereOverlap();    // [24] @ 0x822A3B10 — sphere overlap test
-    virtual void CollideVsBound();       // [28] @ 0x822A48D8 — capsule vs bound collision
-    virtual void CollideVsCapsule();     // [29] @ 0x822A4DC8 — capsule vs capsule collision
-    virtual void ComputeSupportDistance(); // [33] @ 0x822A3268
-    virtual void CopyFrom();             // [34] @ 0x822A2F28 — copy capsule from source
-    virtual void Deserialize();          // [36] @ 0x822A6828 — read data from stream
-    virtual void RecalcBounds();         // [37] @ 0x822A2FE8 — recompute AABB extents
+    void CalcAABB();              // [3] @ 0x822A30C8  — extends base with capsule extents
+    void TranslateAndDispatch(); // [7] @ 0x8233AB50
+    void GetVolume();            // [8] @ 0x822A2DB0
+    void GetSupportPoint();      // [9] @ 0x822A3258
+    void UpdateBound();          // [11] @ 0x822A2DE0
+    void GetMaterialIndex();     // [12] @ 0x8256FBD0
+    void SetMaterialIndex();     // [13] @ 0x822A2E00
+    void ContainsPoint();        // [18] @ 0x822A32B8 — test point inside capsule
+    void TestSegment();          // [19] @ 0x822A3490 — segment vs capsule
+    void TestMovingSphere();     // [20] @ 0x822A3648 — moving sphere vs capsule
+    void TestAABBOverlap();      // [21] @ 0x822A3948 — AABB overlap test
+    void TestSweep();            // [22] @ 0x822A3DB0 — sweep with contact gen
+    void GetClosestPoint();      // [23] @ 0x822A3C70 — closest point on capsule
+    void TestSphereOverlap();    // [24] @ 0x822A3B10 — sphere overlap test
+    void CollideVsBound();       // [28] @ 0x822A48D8 — capsule vs bound collision
+    void CollideVsCapsule();     // [29] @ 0x822A4DC8 — capsule vs capsule collision
+    void ComputeSupportDistance(); // [33] @ 0x822A3268
+    void CopyFrom();             // [34] @ 0x822A2F28 — copy capsule from source
+    void Deserialize();          // [36] @ 0x822A6828 — read data from stream
+    void RecalcBounds();         // [37] @ 0x822A2FE8 — recompute AABB extents
 
     // Non-virtual methods
     int32_t ComputeFixedPointDotProduct();  // @ 0x824C35C8
@@ -910,38 +923,38 @@ struct phBoundComposite {
     uint16_t    m_nVertexCount;   // +0x0080  R:2 W:2  — vertex count
     uint16_t    m_nMaxChildren;   // +0x0082  R:13 W:1  — allocated capacity
 
-    virtual ~phBoundComposite();            // [0] @ 0x8228DF00
-    virtual void CalcAABB();                // [3] @ 0x8228E1E0
-    virtual void GetVolume();               // [8] @ 0x8228EE00
-    virtual void GetSupportPoint();         // [9] @ 0x8228EE78
-    virtual void* GetFirstChildCentroid();  // [10] @ 0x82290808
-    virtual void UpdateChildBounds();       // [11] @ 0x822906F0
-    virtual void RebuildChildBounds();      // [12] @ 0x82290788
-    virtual void SetAllMaterials();         // [13] @ 0x82290830
-    virtual void DebugDraw();               // [14] @ 0x82290898
-    virtual void SelectMaterialForRender(); // [15] @ 0x82290988
-    virtual void GetMaterialCount();        // [16] @ 0x82290918
-    virtual void ContainsPointComposite();  // [17] @ 0x8228F668
-    virtual void ContainsPoint();           // [18] @ 0x8228F910
-    virtual void TestSegment();             // [19] @ 0x8228FB60
-    virtual void TestMovingSphere();        // [20] @ 0x8228FDE0
-    virtual void TestAABBOverlap();         // [21] @ 0x822901C0
-    virtual void TestSweep();               // [22] @ 0x82290428
-    virtual void CollideDispatch();         // [27] @ 0x822909F0
-    virtual void CalculateExtents();        // [28] @ 0x8228DDA0
-    virtual void CopyFrom();               // [34] @ 0x8228F6C0
-    virtual void Clone();                   // [35] @ 0x8228F870
-    virtual void Deserialize();             // [36] @ 0x8228E2B0
-    virtual void SetDefaultFlags();         // [37] @ 0x8228E820
-    virtual void GetChildMaterialIndex();   // [38] @ 0x82290708
-    virtual void SetChildMaterialIndex();   // [39] @ 0x822907A0
+    ~phBoundComposite();            // [0] @ 0x8228DF00
+    void CalcAABB();                // [3] @ 0x8228E1E0
+    void GetVolume();               // [8] @ 0x8228EE00
+    void GetSupportPoint();         // [9] @ 0x8228EE78
+    void* GetFirstChildCentroid();  // [10] @ 0x82290808
+    void UpdateChildBounds();       // [11] @ 0x822906F0
+    void RebuildChildBounds();      // [12] @ 0x82290788
+    void SetAllMaterials();         // [13] @ 0x82290830
+    void DebugDraw();               // [14] @ 0x82290898
+    void SelectMaterialForRender(); // [15] @ 0x82290988
+    void GetMaterialCount();        // [16] @ 0x82290918
+    void ContainsPointComposite();  // [17] @ 0x8228F668
+    void ContainsPoint();           // [18] @ 0x8228F910
+    void TestSegment();             // [19] @ 0x8228FB60
+    void TestMovingSphere();        // [20] @ 0x8228FDE0
+    void TestAABBOverlap();         // [21] @ 0x822901C0
+    void TestSweep();               // [22] @ 0x82290428
+    void CollideDispatch();         // [27] @ 0x822909F0
+    void CalculateExtents();        // [28] @ 0x8228DDA0
+    void CopyFrom();               // [34] @ 0x8228F6C0
+    void Clone();                   // [35] @ 0x8228F870
+    void Deserialize();             // [36] @ 0x8228E2B0
+    void SetDefaultFlags();         // [37] @ 0x8228E820
+    void GetChildMaterialIndex();   // [38] @ 0x82290708
+    void SetChildMaterialIndex();   // [39] @ 0x822907A0
 };
 
 // ── rage::phBoundGeomCullable  [vtable @ 0x82058E7C] ─────────────────────────
 struct phBoundGeomCullable {
     void**      vtable;           // +0x00
 
-    virtual ~phBoundGeomCullable();  // [0] @ 0x822BB2D8
+    ~phBoundGeomCullable();  // [0] @ 0x822BB2D8
 };
 
 // ── rage::phBoundGeometry  [vtable @ 0x82058494] ─────────────────────────────
@@ -1004,35 +1017,35 @@ struct phBoundGeometry {
     uint32_t    m_nGeomTriResult0;// +0x42a0  R:1  — triangle result 0
     uint32_t    m_nGeomTriResult1;// +0x42a4  R:1  — triangle result 1
 
-    virtual ~phBoundGeometry();               // [0] @ 0x82291008
-    virtual void CalcAABB();                  // [3] @ 0x822B00D0
-    virtual void SetCentroidOffset();         // [6] @ 0x82293D88 — CheckBoundsAndUpdate
-    virtual void TranslateAndDispatch();      // [7] @ 0x82293E10 — UpdateBounds
-    virtual void GetVolume();                 // [8] @ 0x822B9468
-    virtual void GetSupportPoint();           // [9] @ 0x822B9918
-    virtual void GetMaterialCount();          // [10] @ 0x82290F60
-    virtual void UpdateBound();               // [11] @ 0x822912A8
-    virtual void GetMaterialAtIndex();        // [12] @ 0x82290F68
-    virtual void SetAllMaterials();           // [13] @ 0x82293D50
-    virtual void DebugDraw();                 // [14] @ 0x82293BE8 — RenderDebugGeometry
-    virtual void SelectMaterialForRender();   // [15] @ 0x82293CF8
-    virtual void GetMaterialCountAlt();       // [16] @ 0x82293C48
-    virtual void ContainsPoint();             // [18] @ 0x822B9AD8
-    virtual void TestSegment();               // [19] @ 0x822B9D40
-    virtual void TestMovingSphere();          // [20] @ 0x822B9DE8
-    virtual void TestAABBOverlap();           // [21] @ 0x822BA048
-    virtual void TestSweep();                 // [22] @ 0x822BA0B0
-    virtual void CollideVsBound();            // [28] @ 0x822B08A8
-    virtual void CollideVsGeometry();         // [29] @ 0x822B0F10
-    virtual void CollideVsQuadtree();         // [30] @ 0x822AD8C8
-    virtual void CollideVsOTGrid();           // [31] @ 0x822B29B0
-    virtual void ComputeSupportDistance();    // [33] @ 0x822B0818
-    virtual void CopyFrom();                  // [34] @ 0x822941D0
-    virtual void Deserialize();               // [36] @ 0x82291738
-    virtual void RecalcBounds();              // [37] @ 0x82293E98
-    virtual void GetTriangleData();           // [38] @ 0x822B94D0
-    virtual void TestSweepTriangles();        // [39] @ 0x822BA530
-    virtual void IsConvex();                  // [40] @ 0x82291260
+    ~phBoundGeometry();               // [0] @ 0x82291008
+    void CalcAABB();                  // [3] @ 0x822B00D0
+    void SetCentroidOffset();         // [6] @ 0x82293D88 — CheckBoundsAndUpdate
+    void TranslateAndDispatch();      // [7] @ 0x82293E10 — UpdateBounds
+    void GetVolume();                 // [8] @ 0x822B9468
+    void GetSupportPoint();           // [9] @ 0x822B9918
+    void GetMaterialCount();          // [10] @ 0x82290F60
+    void UpdateBound();               // [11] @ 0x822912A8
+    void GetMaterialAtIndex();        // [12] @ 0x82290F68
+    void SetAllMaterials();           // [13] @ 0x82293D50
+    void DebugDraw();                 // [14] @ 0x82293BE8 — RenderDebugGeometry
+    void SelectMaterialForRender();   // [15] @ 0x82293CF8
+    void GetMaterialCountAlt();       // [16] @ 0x82293C48
+    void ContainsPoint();             // [18] @ 0x822B9AD8
+    void TestSegment();               // [19] @ 0x822B9D40
+    void TestMovingSphere();          // [20] @ 0x822B9DE8
+    void TestAABBOverlap();           // [21] @ 0x822BA048
+    void TestSweep();                 // [22] @ 0x822BA0B0
+    void CollideVsBound();            // [28] @ 0x822B08A8
+    void CollideVsGeometry();         // [29] @ 0x822B0F10
+    void CollideVsQuadtree();         // [30] @ 0x822AD8C8
+    void CollideVsOTGrid();           // [31] @ 0x822B29B0
+    void ComputeSupportDistance();    // [33] @ 0x822B0818
+    void CopyFrom();                  // [34] @ 0x822941D0
+    void Deserialize();               // [36] @ 0x82291738
+    void RecalcBounds();              // [37] @ 0x82293E98
+    void GetTriangleData();           // [38] @ 0x822B94D0
+    void TestSweepTriangles();        // [39] @ 0x822BA530
+    void IsConvex();                  // [40] @ 0x82291260
 
     // debug string: "phBoundGeometry::Load_v110(%s) -- 'centroid:' not supported"
     void Load_v110();
@@ -1077,24 +1090,24 @@ struct phBoundOTGrid {
     void*       m_pGridMaxY;      // +0x3BCC (15308) - Max Y grid cell
     void*       m_pGridMaxZ;      // +0x3BD0 (15312) - Max Z grid cell
 
-    virtual ~phBoundOTGrid();                         // [0] @ 0x8229B550
-    virtual void GetCellAtIndex();                    // [11] @ 0x8229D448
-    virtual void* QueryCellState();                   // [12] @ 0x8229D488
-    virtual void RenderCell(int cellIndex);           // [14] @ 0x8229D4B8
-    virtual void UpdateCell(int cellIndex);           // [15] @ 0x8229D548
-    virtual void* ProcessCell(int cellIndex);         // [16] @ 0x8229D508
-    virtual bool IsCellValid(int cellIndex);          // [17] @ 0x8229D598
-    virtual void TestSegment();                        // [19] @ 0x8229C888
-    virtual void TestAABBOverlap();                    // [21] @ 0x8229CE38
-    virtual void TestSweep();                          // [22] @ 0x8229D120
-    virtual void CastRay();                            // [25] @ 0x8229CA78
-    virtual void CollideVsBound();                     // [28] @ 0x8229BCB0
-    virtual void CollideVsGeometry();                  // [29] @ 0x8229BF98
-    virtual void CollideVsOTGrid();                    // [31] @ 0x8229C280
-    virtual void Deserialize();                        // [36] @ 0x8229B8D0
-    virtual void RecalcBounds();                       // [37] @ 0x8229B860
-    virtual void GetTriangleData();                    // [38] @ 0x8229B5B8
-    virtual void TestSweepTriangles();                 // [39] @ 0x8229B7A0
+    ~phBoundOTGrid();                         // [0] @ 0x8229B550
+    void GetCellAtIndex();                    // [11] @ 0x8229D448
+    void* QueryCellState();                   // [12] @ 0x8229D488
+    void RenderCell(int cellIndex);           // [14] @ 0x8229D4B8
+    void UpdateCell(int cellIndex);           // [15] @ 0x8229D548
+    void* ProcessCell(int cellIndex);         // [16] @ 0x8229D508
+    bool IsCellValid(int cellIndex);          // [17] @ 0x8229D598
+    void TestSegment();                        // [19] @ 0x8229C888
+    void TestAABBOverlap();                    // [21] @ 0x8229CE38
+    void TestSweep();                          // [22] @ 0x8229D120
+    void CastRay();                            // [25] @ 0x8229CA78
+    void CollideVsBound();                     // [28] @ 0x8229BCB0
+    void CollideVsGeometry();                  // [29] @ 0x8229BF98
+    void CollideVsOTGrid();                    // [31] @ 0x8229C280
+    void Deserialize();                        // [36] @ 0x8229B8D0
+    void RecalcBounds();                       // [37] @ 0x8229B860
+    void GetTriangleData();                    // [38] @ 0x8229B5B8
+    void TestSweepTriangles();                 // [39] @ 0x8229B7A0
 
     // Non-virtual methods
     int SetupCollisionGrid(void* gridMinX, void* gridMinY, void* gridMinZ,
@@ -1122,14 +1135,14 @@ struct phBoundOTGrid {
 struct phBoundOctree {
     void**      vtable;           // +0x00
 
-    virtual ~phBoundOctree();     // [0] @ 0x8229B6F8
-    virtual void TestSegment();    // [19] @ 0x82298DB8
-    virtual void TestAABBOverlap();// [21] @ 0x82298DC0
-    virtual void TestSweep();      // [22] @ 0x82298E10
-    virtual void CastRay();        // [25] @ 0x82298F18
-    virtual void CollideVsBound(); // [28] @ 0x82297660
-    virtual void CollideVsGeometry(); // [29] @ 0x82297790
-    virtual void Deserialize();    // [36] @ 0x822973D0
+    ~phBoundOctree();     // [0] @ 0x8229B6F8
+    void TestSegment();    // [19] @ 0x82298DB8
+    void TestAABBOverlap();// [21] @ 0x82298DC0
+    void TestSweep();      // [22] @ 0x82298E10
+    void CastRay();        // [25] @ 0x82298F18
+    void CollideVsBound(); // [28] @ 0x82297660
+    void CollideVsGeometry(); // [29] @ 0x82297790
+    void Deserialize();    // [36] @ 0x822973D0
 };
 
 // ── rage::phBoundPolyhedron  [vtable @ 0x82058DD4] ───────────────────────────
@@ -1141,15 +1154,15 @@ struct phBoundPolyhedron {
 struct phBoundQuadtree {
     void**      vtable;           // +0x00
 
-    virtual ~phBoundQuadtree();   // [0] @ 0x822AD0F0
-    virtual void TestSegment();    // [19] @ 0x822AED40
-    virtual void TestAABBOverlap();// [21] @ 0x822AEDB0
-    virtual void TestSweep();      // [22] @ 0x822AEE00
-    virtual void CastRay();        // [25] @ 0x822AED78
-    virtual void CollideVsBound(); // [28] @ 0x822AD668
-    virtual void CollideVsGeometry(); // [29] @ 0x822AD798
-    virtual void CollideVsOTGrid();// [31] @ 0x822AD8D8
-    virtual void Deserialize();    // [36] @ 0x822AD358
+    ~phBoundQuadtree();   // [0] @ 0x822AD0F0
+    void TestSegment();    // [19] @ 0x822AED40
+    void TestAABBOverlap();// [21] @ 0x822AEDB0
+    void TestSweep();      // [22] @ 0x822AEE00
+    void CastRay();        // [25] @ 0x822AED78
+    void CollideVsBound(); // [28] @ 0x822AD668
+    void CollideVsGeometry(); // [29] @ 0x822AD798
+    void CollideVsOTGrid();// [31] @ 0x822AD8D8
+    void Deserialize();    // [36] @ 0x822AD358
 };
 
 // ── rage::phBoundRibbon  [vtable @ 0x820589BC] ───────────────────────────────
@@ -1185,19 +1198,19 @@ struct phBoundRibbon {
     uint32_t    m_nMaterialIndex; // +0xA0 (160) — material index
     uint32_t    m_pMaterialData;  // +0xA4 (164) — material data ptr
 
-    virtual ~phBoundRibbon();     // [0] @ 0x8229D970
-    virtual void UpdateBound();    // [11] @ 0x8229D6A0
-    virtual void GetMaterialIndex(); // [12] @ 0x8229D6C0
-    virtual void SetMaterialIndex(); // [13] @ 0x8229D6C8
-    virtual void TestSegment();    // [19] @ 0x822A2300
-    virtual void TestMovingSphere(); // [20] @ 0x822A1E48
-    virtual void TestAABBOverlap();// [21] @ 0x822A2420
-    virtual void TestSweep();      // [22] @ 0x822A25B0
-    virtual void CollideVsBound(); // [28] @ 0x822A09E0
-    virtual void CollideVsGeometry(); // [29] @ 0x822A0BF0
-    virtual void CollideVsOTGrid();// [31] @ 0x822A1198
-    virtual void Deserialize();    // [36] @ 0x822A06D0
-    virtual void RecalcBounds();   // [37] @ 0x8229DDF8
+    ~phBoundRibbon();     // [0] @ 0x8229D970
+    void UpdateBound();    // [11] @ 0x8229D6A0
+    void GetMaterialIndex(); // [12] @ 0x8229D6C0
+    void SetMaterialIndex(); // [13] @ 0x8229D6C8
+    void TestSegment();    // [19] @ 0x822A2300
+    void TestMovingSphere(); // [20] @ 0x822A1E48
+    void TestAABBOverlap();// [21] @ 0x822A2420
+    void TestSweep();      // [22] @ 0x822A25B0
+    void CollideVsBound(); // [28] @ 0x822A09E0
+    void CollideVsGeometry(); // [29] @ 0x822A0BF0
+    void CollideVsOTGrid();// [31] @ 0x822A1198
+    void Deserialize();    // [36] @ 0x822A06D0
+    void RecalcBounds();   // [37] @ 0x8229DDF8
     
     // @ 0x82294AB8 | size: 0xD4
     void CopyFrom(const phBoundRibbon* source);
@@ -1207,25 +1220,25 @@ struct phBoundRibbon {
 struct phBoundSphere {
     void**      vtable;           // +0x00
 
-    virtual void SetCentroidOffset();     // [6] @ 0x8233AB08
-    virtual void TranslateAndDispatch(); // [7] @ 0x82295548
-    virtual void GetVolume();            // [8] @ 0x822954A8
-    virtual void GetSupportPoint();      // [9] @ 0x82295678
-    virtual void UpdateBound();          // [11] @ 0x82295478
-    virtual void GetMaterialIndex();     // [12] @ 0x82295498
-    virtual void SetMaterialIndex();     // [13] @ 0x822954A0
-    virtual void DebugDraw();            // [14] @ 0x8233A8F8
-    virtual void ContainsPoint();                           // [18] @ 0x82295C70
-    virtual int  TestSegment(const float* point, uint8_t* hitOut); // [19] @ 0x82295DC8
-    virtual void TestMovingSphere();     // [20] @ 0x82295FA0
-    virtual void TestAABBOverlap();      // [21] @ 0x82296300
-    virtual void TestSweep();            // [22] @ 0x82296438
-    virtual void GetClosestPoint();      // [23] @ 0x82296B38
-    virtual void TestSphereOverlap();    // [24] @ 0x82296A10
-    virtual void CollideVsBound();       // [28] @ 0x82295898
-    virtual void ComputeSupportDistance(); // [33] @ 0x82295860
-    virtual void Deserialize();          // [36] @ 0x822956A8
-    virtual void RecalcBounds();         // [37] @ 0x82295598
+    void SetCentroidOffset();     // [6] @ 0x8233AB08
+    void TranslateAndDispatch(); // [7] @ 0x82295548
+    void GetVolume();            // [8] @ 0x822954A8
+    void GetSupportPoint();      // [9] @ 0x82295678
+    void UpdateBound();          // [11] @ 0x82295478
+    void GetMaterialIndex();     // [12] @ 0x82295498
+    void SetMaterialIndex();     // [13] @ 0x822954A0
+    void DebugDraw();            // [14] @ 0x8233A8F8
+    void ContainsPoint();                           // [18] @ 0x82295C70
+    int  TestSegment(const float* point, uint8_t* hitOut); // [19] @ 0x82295DC8
+    void TestMovingSphere();     // [20] @ 0x82295FA0
+    void TestAABBOverlap();      // [21] @ 0x82296300
+    void TestSweep();            // [22] @ 0x82296438
+    void GetClosestPoint();      // [23] @ 0x82296B38
+    void TestSphereOverlap();    // [24] @ 0x82296A10
+    void CollideVsBound();       // [28] @ 0x82295898
+    void ComputeSupportDistance(); // [33] @ 0x82295860
+    void Deserialize();          // [36] @ 0x822956A8
+    void RecalcBounds();         // [37] @ 0x82295598
 
     // Non-virtual methods
     void DispatchMaterialAlloc();
@@ -1241,7 +1254,7 @@ struct phBoundSphere {
 struct phBoundSurface {
     void**      vtable;           // +0x00
 
-    virtual float SampleHeightBilinear(float fx, float fy); // [38] @ 0x822AFE88
+    float SampleHeightBilinear(float fx, float fy); // [38] @ 0x822AFE88
 };
 
 // ── rage::phBoundTaperedCapsule  [vtable @ 0x82064FBC] ───────────────────────
@@ -1256,43 +1269,43 @@ struct phBoundTaperedCapsule {
     uint8_t     _pad_0x94[0x58];  // +0x94
     uint32_t    m_nMaterialIndex; // +0xF0  active material/face index (used by slot 12/13)
 
-    virtual ~phBoundTaperedCapsule();                        // [0] @ 0x820C9168
-    virtual void   CalcAABB();                                // [3]  @ 0x8233AB98
-    virtual float  GetVolume();                               // [8]  @ 0x8233A898
-    virtual void   GetSupportPoint(void* direction,
+    ~phBoundTaperedCapsule();                        // [0] @ 0x820C9168
+    void   CalcAABB();                                // [3]  @ 0x8233AB98
+    float  GetVolume();                               // [8]  @ 0x8233A898
+    void   GetSupportPoint(void* direction,
                                    void* outPoint);           // [9]  @ 0x8233AD38
-    virtual void   UpdateBound();                             // [11] @ 0x8233A8C8
-    virtual uint32_t GetMaterialIndex();                      // [12] @ 0x8233A8E8
-    virtual void   SetMaterialIndex(uint32_t idx);            // [13] @ 0x8233A8F0
-    virtual void   ContainsPoint();                           // [18] @ 0x8233B020
-    virtual void   TestSegment();                             // [19] @ 0x8233B1F8
-    virtual void   TestMovingSphere();                        // [20] @ 0x8233ADA8
-    virtual void   TestAABBOverlap();                         // [21] @ 0x8233B6F8
-    virtual void   TestSweep();                               // [22] @ 0x8233BC28
-    virtual void   TestMovingBound();                         // [23] @ 0x8233BA48
-    virtual void   TestMovingCapsule();                       // [24] @ 0x8233B8B8
-    virtual void   CollideVsBound();                          // [28] @ 0x8233C760
-    virtual void   CollideVsBoundEx();                        // [29] @ 0x8233CC50
-    virtual float  ComputeSupportDistance();                  // [33] @ 0x8233AD48
-    virtual void   Deserialize();                             // [36] @ 0x8233E688
-    virtual void   RecalcBounds();                            // [37] @ 0x8233AA00
+    void   UpdateBound();                             // [11] @ 0x8233A8C8
+    uint32_t GetMaterialIndex();                      // [12] @ 0x8233A8E8
+    void   SetMaterialIndex(uint32_t idx);            // [13] @ 0x8233A8F0
+    void   ContainsPoint();                           // [18] @ 0x8233B020
+    void   TestSegment();                             // [19] @ 0x8233B1F8
+    void   TestMovingSphere();                        // [20] @ 0x8233ADA8
+    void   TestAABBOverlap();                         // [21] @ 0x8233B6F8
+    void   TestSweep();                               // [22] @ 0x8233BC28
+    void   TestMovingBound();                         // [23] @ 0x8233BA48
+    void   TestMovingCapsule();                       // [24] @ 0x8233B8B8
+    void   CollideVsBound();                          // [28] @ 0x8233C760
+    void   CollideVsBoundEx();                        // [29] @ 0x8233CC50
+    float  ComputeSupportDistance();                  // [33] @ 0x8233AD48
+    void   Deserialize();                             // [36] @ 0x8233E688
+    void   RecalcBounds();                            // [37] @ 0x8233AA00
 };
 
 // ── rage::phClothVerletBehavior  [vtable @ 0x82079010] ───────────────────────
 struct phClothVerletBehavior {
     void**      vtable;           // +0x00
 
-    virtual ~phClothVerletBehavior();             // [0] @ 0x82421F20
-    virtual void ScalarDtor(int flags);           // [1] @ 0x823D7C50
-    virtual void vfn_5();                         // [5] @ 0x82421FD8
-    virtual void vfn_6();                         // [6] @ 0x82422160
+    ~phClothVerletBehavior();             // [0] @ 0x82421F20
+    void ScalarDtor(int flags);           // [1] @ 0x823D7C50
+    void vfn_5();                         // [5] @ 0x82421FD8
+    void vfn_6();                         // [6] @ 0x82422160
 };
 
 // ── rage::phClothVerletInst  [vtable @ 0x82071BAC] ───────────────────────────
 struct phClothVerletInst {
     void**      vtable;           // +0x00
 
-    virtual ~phClothVerletInst(); // [0] @ 0x823D7C90
+    ~phClothVerletInst(); // [0] @ 0x823D7C90
 };
 
 // ── rage::phCollider  [vtable @ 0x82059C3C] ──────────────────────────────────
@@ -1317,59 +1330,59 @@ struct phCollider {
     uint32_t    m_fGravityScale;  // +0x01b0  R:1 W:1 — gravity scale factor
     uint32_t    m_fTimeStep;      // +0x01b4  W:1    — simulation timestep
 
-    virtual ~phCollider();                        // [0] @ 0x822C1998
-    virtual void ScalarDtor(int flags);           // [1] @ 0x822CABE0
-    virtual void vfn_2();                         // [2] @ 0x822CAD28
-    virtual void vfn_4();                         // [4] @ 0x822CAD78
-    virtual void vfn_5();                         // [5] @ 0x822CAF38
-    virtual void vfn_6();                         // [6] @ 0x822CB070
-    virtual void vfn_7();                         // [7] @ 0x822CB740
-    virtual void vfn_8();                         // [8] @ 0x822CB3B8
-    virtual void vfn_9();                         // [9] @ 0x822CB450
-    virtual void vfn_13();                        // [13] @ 0x822CB8B0
-    virtual void vfn_14();                        // [14] @ 0x822CB988
-    virtual void vfn_15();                        // [15] @ 0x822CBA30
-    virtual void vfn_16();                        // [16] @ 0x822CB998
-    virtual void vfn_18();                        // [18] @ 0x822CBC68
-    virtual void vfn_19();                        // [19] @ 0x822CBCB8
-    virtual void vfn_20();                        // [20] @ 0x822CBE38
-    virtual void vfn_22();                        // [22] @ 0x822CC080
-    virtual void vfn_23();                        // [23] @ 0x822CC128
-    virtual void vfn_25();                        // [25] @ 0x822CC708
-    virtual void vfn_26();                        // [26] @ 0x822CC7B8
-    virtual void vfn_28();                        // [28] @ 0x822CC710
-    virtual void vfn_29();                        // [29] @ 0x822CC748
-    virtual void vfn_30();                        // [30] @ 0x822CC780
-    virtual void vfn_31();                        // [31] @ 0x822CCC48
-    virtual void vfn_32();                        // [32] @ 0x822CCCB0
-    virtual void vfn_33();                        // [33] @ 0x822CCCC8
-    virtual void vfn_34();                        // [34] @ 0x822CC880
-    virtual void vfn_35();                        // [35] @ 0x822CCB88
-    virtual void vfn_36();                        // [36] @ 0x822CC978
-    virtual void vfn_37();                        // [37] @ 0x822CCAB0
-    virtual void vfn_38();                        // [38] @ 0x822CCBA0
-    virtual void vfn_39();                        // [39] @ 0x822CA7D8
-    virtual void vfn_40();                        // [40] @ 0x822CCCE0
-    virtual void vfn_41();                        // [41] @ 0x822CCD18
-    virtual void vfn_42();                        // [42] @ 0x822CCD28
-    virtual void vfn_43();                        // [43] @ 0x822CCDE0
+    ~phCollider();                        // [0] @ 0x822C1998
+    void ScalarDtor(int flags);           // [1] @ 0x822CABE0
+    void vfn_2();                         // [2] @ 0x822CAD28
+    void vfn_4();                         // [4] @ 0x822CAD78
+    void vfn_5();                         // [5] @ 0x822CAF38
+    void vfn_6();                         // [6] @ 0x822CB070
+    void vfn_7();                         // [7] @ 0x822CB740
+    void vfn_8();                         // [8] @ 0x822CB3B8
+    void vfn_9();                         // [9] @ 0x822CB450
+    void vfn_13();                        // [13] @ 0x822CB8B0
+    void vfn_14();                        // [14] @ 0x822CB988
+    void vfn_15();                        // [15] @ 0x822CBA30
+    void vfn_16();                        // [16] @ 0x822CB998
+    void vfn_18();                        // [18] @ 0x822CBC68
+    void vfn_19();                        // [19] @ 0x822CBCB8
+    void vfn_20();                        // [20] @ 0x822CBE38
+    void vfn_22();                        // [22] @ 0x822CC080
+    void vfn_23();                        // [23] @ 0x822CC128
+    void vfn_25();                        // [25] @ 0x822CC708
+    void vfn_26();                        // [26] @ 0x822CC7B8
+    void vfn_28();                        // [28] @ 0x822CC710
+    void vfn_29();                        // [29] @ 0x822CC748
+    void vfn_30();                        // [30] @ 0x822CC780
+    void vfn_31();                        // [31] @ 0x822CCC48
+    void vfn_32();                        // [32] @ 0x822CCCB0
+    void vfn_33();                        // [33] @ 0x822CCCC8
+    void vfn_34();                        // [34] @ 0x822CC880
+    void vfn_35();                        // [35] @ 0x822CCB88
+    void vfn_36();                        // [36] @ 0x822CC978
+    void vfn_37();                        // [37] @ 0x822CCAB0
+    void vfn_38();                        // [38] @ 0x822CCBA0
+    void vfn_39();                        // [39] @ 0x822CA7D8
+    void vfn_40();                        // [40] @ 0x822CCCE0
+    void vfn_41();                        // [41] @ 0x822CCD18
+    void vfn_42();                        // [42] @ 0x822CCD28
+    void vfn_43();                        // [43] @ 0x822CCDE0
 };
 
 // ── rage::phConstrainedCollider  [vtable @ 0x82059DAC] ───────────────────────
 struct phConstrainedCollider {
     void**      vtable;           // +0x00
 
-    virtual ~phConstrainedCollider();             // [0] @ 0x822DA918
-    virtual void vfn_5();                         // [5] @ 0x822DCB08
-    virtual void vfn_6();                         // [6] @ 0x822DCD78
-    virtual void vfn_8();                         // [8] @ 0x822DCE28
-    virtual void vfn_11();                        // [11] @ 0x822DCDB8
-    virtual void vfn_15();                        // [15] @ 0x822DC258
-    virtual void vfn_19();                        // [19] @ 0x822DBBE8
-    virtual void vfn_20();                        // [20] @ 0x822DBDB8
-    virtual void vfn_21();                        // [21] @ 0x822DBED8
-    virtual void vfn_22();                        // [22] @ 0x822DCE68
-    virtual void vfn_36();                        // [36] @ 0x822DCF90
+    ~phConstrainedCollider();             // [0] @ 0x822DA918
+    void vfn_5();                         // [5] @ 0x822DCB08
+    void vfn_6();                         // [6] @ 0x822DCD78
+    void vfn_8();                         // [8] @ 0x822DCE28
+    void vfn_11();                        // [11] @ 0x822DCDB8
+    void vfn_15();                        // [15] @ 0x822DC258
+    void vfn_19();                        // [19] @ 0x822DBBE8
+    void vfn_20();                        // [20] @ 0x822DBDB8
+    void vfn_21();                        // [21] @ 0x822DBED8
+    void vfn_22();                        // [22] @ 0x822DCE68
+    void vfn_36();                        // [36] @ 0x822DCF90
 };
 
 // ── rage::phInst  [vtable @ 0x8205991C] ──────────────────────────────────────
@@ -1511,55 +1524,55 @@ struct phInst {
     uint8_t     _pad0x4fe4[136];
     uint32_t    m_nRenderFlags;   // +0x506c  R:2  — render flags
 
-    virtual ~phInst();                            // [0] @ 0x82346400
-    virtual void vfn_9();                         // [9] @ 0x8248D7C8
-    virtual void vfn_10();                        // [10] @ 0x824829E0
-    virtual void vfn_11();                        // [11] @ 0x82484018
-    virtual void vfn_12();                        // [12] @ 0x82482A40
-    virtual void vfn_13();                        // [13] @ 0x82494160
-    virtual void vfn_14();                        // [14] @ 0x82482A90
-    virtual void vfn_15();                        // [15] @ 0x8248D888
-    virtual void vfn_16();                        // [16] @ 0x8248B8C8
-    virtual void vfn_17();                        // [17] @ 0x8248D840
-    virtual void vfn_18();                        // [18] @ 0x824840A0
-    virtual void vfn_19();                        // [19] @ 0x8248B8D0
-    virtual void vfn_20();                        // [20] @ 0x82484268
-    virtual void vfn_21();                        // [21] @ 0x82483EB0
-    virtual void vfn_22();                        // [22] @ 0x82483E30
-    virtual void vfn_23();                        // [23] @ 0x82483FD8
-    virtual void vfn_24();                        // [24] @ 0x82484650
-    virtual void vfn_25();                        // [25] @ 0x82483F28
-    virtual void vfn_32();                        // [32] @ 0x8248D758
-    virtual void vfn_34();                        // [34] @ 0x8248D868
-    virtual void vfn_35();                        // [35] @ 0x8248D848
-    virtual void vfn_38();                        // [38] @ 0x8248D808
-    virtual void vfn_39();                        // [39] @ 0x8248D818
-    virtual void vfn_40();                        // [40] @ 0x8248D880
-    virtual void vfn_42();                        // [42] @ 0x8248D860
-    virtual void vfn_44();                        // [44] @ 0x8248D810
-    virtual void vfn_45();                        // [45] @ 0x8248D820
-    virtual void vfn_46();                        // [46] @ 0x8248E078
-    virtual void vfn_48();                        // [48] @ 0x8247E2D0
-    virtual void vfn_58();                        // [58] @ 0x8248D9C8
-    virtual void vfn_59();                        // [59] @ 0x8248DA68
-    virtual void vfn_60();                        // [60] @ 0x8248DA88
-    virtual void vfn_61();                        // [61] @ 0x8248DAA8
-    virtual void vfn_62();                        // [62] @ 0x8248DAC8
-    virtual void vfn_63();                        // [63] @ 0x8248DAE8
-    virtual void vfn_64();                        // [64] @ 0x82487FD8
-    virtual void vfn_65();                        // [65] @ 0x82488028
-    virtual void vfn_66();                        // [66] @ 0x8248DB48
-    virtual void vfn_67();                        // [67] @ 0x8248DB68
-    virtual void vfn_68();                        // [68] @ 0x8248DB88
-    virtual void vfn_69();                        // [69] @ 0x8248DBA8
-    virtual void vfn_71();                        // [71] @ 0x82488480
-    virtual void vfn_74();                        // [74] @ 0x82487A20
-    virtual void vfn_75();                        // [75] @ 0x824879A0
-    virtual void vfn_76();                        // [76] @ 0x82487890
-    virtual void vfn_77();                        // [77] @ 0x82487840
-    virtual void vfn_78();                        // [78] @ 0x82487AA8
-    virtual void vfn_79();                        // [79] @ 0x82487CE0
-    virtual void vfn_80();                        // [80] @ 0x82487E60
+    ~phInst();                            // [0] @ 0x82346400
+    void vfn_9();                         // [9] @ 0x8248D7C8
+    void vfn_10();                        // [10] @ 0x824829E0
+    void vfn_11();                        // [11] @ 0x82484018
+    void vfn_12();                        // [12] @ 0x82482A40
+    void vfn_13();                        // [13] @ 0x82494160
+    void vfn_14();                        // [14] @ 0x82482A90
+    void vfn_15();                        // [15] @ 0x8248D888
+    void vfn_16();                        // [16] @ 0x8248B8C8
+    void vfn_17();                        // [17] @ 0x8248D840
+    void vfn_18();                        // [18] @ 0x824840A0
+    void vfn_19();                        // [19] @ 0x8248B8D0
+    void vfn_20();                        // [20] @ 0x82484268
+    void vfn_21();                        // [21] @ 0x82483EB0
+    void vfn_22();                        // [22] @ 0x82483E30
+    void vfn_23();                        // [23] @ 0x82483FD8
+    void vfn_24();                        // [24] @ 0x82484650
+    void vfn_25();                        // [25] @ 0x82483F28
+    void vfn_32();                        // [32] @ 0x8248D758
+    void vfn_34();                        // [34] @ 0x8248D868
+    void vfn_35();                        // [35] @ 0x8248D848
+    void vfn_38();                        // [38] @ 0x8248D808
+    void vfn_39();                        // [39] @ 0x8248D818
+    void vfn_40();                        // [40] @ 0x8248D880
+    void vfn_42();                        // [42] @ 0x8248D860
+    void vfn_44();                        // [44] @ 0x8248D810
+    void vfn_45();                        // [45] @ 0x8248D820
+    void vfn_46();                        // [46] @ 0x8248E078
+    void vfn_48();                        // [48] @ 0x8247E2D0
+    void vfn_58();                        // [58] @ 0x8248D9C8
+    void vfn_59();                        // [59] @ 0x8248DA68
+    void vfn_60();                        // [60] @ 0x8248DA88
+    void vfn_61();                        // [61] @ 0x8248DAA8
+    void vfn_62();                        // [62] @ 0x8248DAC8
+    void vfn_63();                        // [63] @ 0x8248DAE8
+    void vfn_64();                        // [64] @ 0x82487FD8
+    void vfn_65();                        // [65] @ 0x82488028
+    void vfn_66();                        // [66] @ 0x8248DB48
+    void vfn_67();                        // [67] @ 0x8248DB68
+    void vfn_68();                        // [68] @ 0x8248DB88
+    void vfn_69();                        // [69] @ 0x8248DBA8
+    void vfn_71();                        // [71] @ 0x82488480
+    void vfn_74();                        // [74] @ 0x82487A20
+    void vfn_75();                        // [75] @ 0x824879A0
+    void vfn_76();                        // [76] @ 0x82487890
+    void vfn_77();                        // [77] @ 0x82487840
+    void vfn_78();                        // [78] @ 0x82487AA8
+    void vfn_79();                        // [79] @ 0x82487CE0
+    void vfn_80();                        // [80] @ 0x82487E60
 
     // Non-virtual methods
     void* GetBoundPtr();
@@ -1632,14 +1645,14 @@ struct phInstStatic {
 struct phInstBehavior {
     void**      vtable;           // +0x00
 
-    virtual ~phInstBehavior();    // [0] @ 0x82382560
+    ~phInstBehavior();    // [0] @ 0x82382560
 };
 
 // ── rage::phJoint  [vtable @ 0x8204FE9C] ─────────────────────────────────────
 struct phJoint {
     void**      vtable;           // +0x00
 
-    virtual void vfn_17();        // [17] @ 0x8225B430
+    void vfn_17();        // [17] @ 0x8225B430
 };
 
 // ── rage::phJoint1Dof  [vtable @ 0x8203315C] ─────────────────────────────────
@@ -1680,40 +1693,40 @@ struct phJoint1Dof {
     uint32_t    m_fLimitRestitution;// +0x0378  R:5 W:1 — limit bounce coefficient
     uint32_t    m_fLimitSpring;   // +0x037c  W:2     — limit spring constant
 
-    virtual ~phJoint1Dof();                       // [0] @ 0x82259FF8
-    virtual void ScalarDtor(int flags);           // [1] @ 0x82259AB0
-    virtual void vfn_2();                         // [2] @ 0x82126EA0
-    virtual void vfn_3();                         // [3] @ 0x82259910
-    virtual void vfn_4();                         // [4] @ 0x82259958
-    virtual void vfn_5();                         // [5] @ 0x822599C8
-    virtual void vfn_6();                         // [6] @ 0x82259A40
-    virtual void vfn_7();                         // [7] @ 0x82259B78
-    virtual void vfn_8();                         // [8] @ 0x82259BE8
-    virtual void vfn_9();                         // [9] @ 0x82259AB8
-    virtual void vfn_10();                        // [10] @ 0x82259B30
-    virtual void vfn_11();                        // [11] @ 0x82259C50
-    virtual void vfn_12();                        // [12] @ 0x82259DF8
-    virtual void vfn_13();                        // [13] @ 0x82259428
-    virtual void vfn_14();                        // [14] @ 0x822597E0
-    virtual void* GetMotorData();                  // [15] @ 0x82126CF8
-    virtual void vfn_16();                        // [16] @ 0x82255318
-    virtual void vfn_17();                        // [17] @ 0x8225AB78
-    virtual void vfn_18();                        // [18] @ 0x82259E58
-    virtual void vfn_19();                        // [19] @ 0x8225A4B0
-    virtual void vfn_20();                        // [20] @ 0x8225A348
-    virtual void vfn_21();                        // [21] @ 0x8225A540
-    virtual void vfn_22();                        // [22] @ 0x8225A590
-    virtual void vfn_23();                        // [23] @ 0x8225A758
-    virtual void vfn_24();                        // [24] @ 0x8225A5E0
-    virtual void vfn_25();                        // [25] @ 0x8225A6A0
-    virtual void vfn_26();                        // [26] @ 0x8225A800
-    virtual void vfn_27();                        // [27] @ 0x8225AA18
-    virtual void vfn_28();                        // [28] @ 0x8225A8B8
-    virtual void vfn_29();                        // [29] @ 0x8225A960
-    virtual void vfn_30();                        // [30] @ 0x8225AAC0
-    virtual void vfn_31();                        // [31] @ 0x8225A310
-    virtual void vfn_32();                        // [32] @ 0x82126CD0
-    virtual void vfn_33();                        // [33] @ 0x82126C80
+    ~phJoint1Dof();                       // [0] @ 0x82259FF8
+    void ScalarDtor(int flags);           // [1] @ 0x82259AB0
+    void vfn_2();                         // [2] @ 0x82126EA0
+    void vfn_3();                         // [3] @ 0x82259910
+    void vfn_4();                         // [4] @ 0x82259958
+    void vfn_5();                         // [5] @ 0x822599C8
+    void vfn_6();                         // [6] @ 0x82259A40
+    void vfn_7();                         // [7] @ 0x82259B78
+    void vfn_8();                         // [8] @ 0x82259BE8
+    void vfn_9();                         // [9] @ 0x82259AB8
+    void vfn_10();                        // [10] @ 0x82259B30
+    void vfn_11();                        // [11] @ 0x82259C50
+    void vfn_12();                        // [12] @ 0x82259DF8
+    void vfn_13();                        // [13] @ 0x82259428
+    void vfn_14();                        // [14] @ 0x822597E0
+    void* GetMotorData();                  // [15] @ 0x82126CF8
+    void vfn_16();                        // [16] @ 0x82255318
+    void vfn_17();                        // [17] @ 0x8225AB78
+    void vfn_18();                        // [18] @ 0x82259E58
+    void vfn_19();                        // [19] @ 0x8225A4B0
+    void vfn_20();                        // [20] @ 0x8225A348
+    void vfn_21();                        // [21] @ 0x8225A540
+    void vfn_22();                        // [22] @ 0x8225A590
+    void vfn_23();                        // [23] @ 0x8225A758
+    void vfn_24();                        // [24] @ 0x8225A5E0
+    void vfn_25();                        // [25] @ 0x8225A6A0
+    void vfn_26();                        // [26] @ 0x8225A800
+    void vfn_27();                        // [27] @ 0x8225AA18
+    void vfn_28();                        // [28] @ 0x8225A8B8
+    void vfn_29();                        // [29] @ 0x8225A960
+    void vfn_30();                        // [30] @ 0x8225AAC0
+    void vfn_31();                        // [31] @ 0x8225A310
+    void vfn_32();                        // [32] @ 0x82126CD0
+    void vfn_33();                        // [33] @ 0x82126C80
 };
 
 // ── rage::phJoint3Dof  [vtable @ 0x820331EC] ─────────────────────────────────
@@ -1821,35 +1834,35 @@ struct phJoint3Dof {
     uint8_t     _pad0x28a0[1108];
     uint32_t    m_nFinalState;    // +0x2cf4  R:1  — final state tracking
 
-    virtual ~phJoint3Dof();                       // [0] @ 0x822551C8
-    virtual void ScalarDtor(int flags);           // [1] @ 0x822526C8
-    virtual void vfn_3();                         // [3] @ 0x822520C0
-    virtual void vfn_4();                         // [4] @ 0x822522E0
-    virtual void vfn_5();                         // [5] @ 0x82252440
-    virtual void vfn_6();                         // [6] @ 0x82252508
-    virtual void vfn_7();                         // [7] @ 0x82252790
-    virtual void vfn_8();                         // [8] @ 0x82252928
-    virtual void vfn_9();                         // [9] @ 0x82252AA8
-    virtual void vfn_10();                        // [10] @ 0x82252B68
-    virtual void vfn_11();                        // [11] @ 0x82252C10
-    virtual void vfn_12();                        // [12] @ 0x82253358
-    virtual void vfn_13();                        // [13] @ 0x82251200
-    virtual void vfn_14();                        // [14] @ 0x82251268
-    virtual void vfn_17();                        // [17] @ 0x82255340
-    virtual void vfn_18();                        // [18] @ 0x82253460
-    virtual void vfn_19();                        // [19] @ 0x82253BB8
-    virtual void vfn_20();                        // [20] @ 0x822539A8
-    virtual void vfn_21();                        // [21] @ 0x82253D38
-    virtual void vfn_22();                        // [22] @ 0x82254150
-    virtual void vfn_23();                        // [23] @ 0x82254B40
-    virtual void vfn_24();                        // [24] @ 0x82254958
-    virtual void vfn_25();                        // [25] @ 0x82254D28
-    virtual void vfn_26();                        // [26] @ 0x82254D90
-    virtual void vfn_27();                        // [27] @ 0x82254F78
-    virtual void vfn_28();                        // [28] @ 0x82254DF8
-    virtual void vfn_29();                        // [29] @ 0x822550F8
-    virtual void vfn_30();                        // [30] @ 0x82255160
-    virtual void vfn_31();                        // [31] @ 0x82253920
+    ~phJoint3Dof();                       // [0] @ 0x822551C8
+    void ScalarDtor(int flags);           // [1] @ 0x822526C8
+    void vfn_3();                         // [3] @ 0x822520C0
+    void vfn_4();                         // [4] @ 0x822522E0
+    void vfn_5();                         // [5] @ 0x82252440
+    void vfn_6();                         // [6] @ 0x82252508
+    void vfn_7();                         // [7] @ 0x82252790
+    void vfn_8();                         // [8] @ 0x82252928
+    void vfn_9();                         // [9] @ 0x82252AA8
+    void vfn_10();                        // [10] @ 0x82252B68
+    void vfn_11();                        // [11] @ 0x82252C10
+    void vfn_12();                        // [12] @ 0x82253358
+    void vfn_13();                        // [13] @ 0x82251200
+    void vfn_14();                        // [14] @ 0x82251268
+    void vfn_17();                        // [17] @ 0x82255340
+    void vfn_18();                        // [18] @ 0x82253460
+    void vfn_19();                        // [19] @ 0x82253BB8
+    void vfn_20();                        // [20] @ 0x822539A8
+    void vfn_21();                        // [21] @ 0x82253D38
+    void vfn_22();                        // [22] @ 0x82254150
+    void vfn_23();                        // [23] @ 0x82254B40
+    void vfn_24();                        // [24] @ 0x82254958
+    void vfn_25();                        // [25] @ 0x82254D28
+    void vfn_26();                        // [26] @ 0x82254D90
+    void vfn_27();                        // [27] @ 0x82254F78
+    void vfn_28();                        // [28] @ 0x82254DF8
+    void vfn_29();                        // [29] @ 0x822550F8
+    void vfn_30();                        // [30] @ 0x82255160
+    void vfn_31();                        // [31] @ 0x82253920
 
     // Non-virtual methods
     void SetDampingAndStiffness(float arg1, float arg2);
@@ -1903,65 +1916,65 @@ struct phLevelNew {
     uint32_t    m_pSimulator;      // +0x0070  R:23 W:2 — simulator ptr (most-read)
     uint32_t    m_pGravity;        // +0x0074  R:4 W:2  — gravity vector ptr
 
-    virtual ~phLevelNew();                        // [0] @ 0x822DE2E0
-    virtual void vfn_2();                         // [2] @ 0x822C50D8
-    virtual void vfn_3();                         // [3] @ 0x822C5390
-    virtual void vfn_4();                         // [4] @ 0x822C5638
-    virtual void vfn_5();                         // [5] @ 0x822C5528
-    virtual void vfn_6();                         // [6] @ 0x822C5698
-    virtual void vfn_7();                         // [7] @ 0x822C5798
-    virtual void vfn_8();                         // [8] @ 0x822C58B0
-    virtual void vfn_9();                         // [9] @ 0x822C5898
-    virtual void vfn_10();                        // [10] @ 0x822C4D78
-    virtual void vfn_11();                        // [11] @ 0x822C5998
-    virtual void vfn_12();                        // [12] @ 0x822C4E08
-    virtual void vfn_13();                        // [13] @ 0x822C60B0
-    virtual void vfn_14();                        // [14] @ 0x822C4D68
-    virtual void vfn_15();                        // [15] @ 0x822C61B8
-    virtual void vfn_16();                        // [16] @ 0x822C61D0
-    virtual void vfn_17();                        // [17] @ 0x822DE3B8
-    virtual void vfn_18();                        // [18] @ 0x822C6208
-    virtual void vfn_19();                        // [19] @ 0x822C60B8
-    virtual void vfn_20();                        // [20] @ 0x822C6138
-    virtual void vfn_21();                        // [21] @ 0x822C85F0
-    virtual void vfn_22();                        // [22] @ 0x822C76E8
-    virtual void vfn_23();                        // [23] @ 0x822C7A38
-    virtual void vfn_24();                        // [24] @ 0x822C7E78
-    virtual void vfn_25();                        // [25] @ 0x822C8880
-    virtual void vfn_26();                        // [26] @ 0x822C5030
-    virtual void vfn_27();                        // [27] @ 0x822C8B50
-    virtual void vfn_28();                        // [28] @ 0x822C72D0
-    virtual void vfn_29();                        // [29] @ 0x822C7350
+    ~phLevelNew();                        // [0] @ 0x822DE2E0
+    void vfn_2();                         // [2] @ 0x822C50D8
+    void vfn_3();                         // [3] @ 0x822C5390
+    void vfn_4();                         // [4] @ 0x822C5638
+    void vfn_5();                         // [5] @ 0x822C5528
+    void vfn_6();                         // [6] @ 0x822C5698
+    void vfn_7();                         // [7] @ 0x822C5798
+    void vfn_8();                         // [8] @ 0x822C58B0
+    void vfn_9();                         // [9] @ 0x822C5898
+    void vfn_10();                        // [10] @ 0x822C4D78
+    void vfn_11();                        // [11] @ 0x822C5998
+    void vfn_12();                        // [12] @ 0x822C4E08
+    void vfn_13();                        // [13] @ 0x822C60B0
+    void vfn_14();                        // [14] @ 0x822C4D68
+    void vfn_15();                        // [15] @ 0x822C61B8
+    void vfn_16();                        // [16] @ 0x822C61D0
+    void vfn_17();                        // [17] @ 0x822DE3B8
+    void vfn_18();                        // [18] @ 0x822C6208
+    void vfn_19();                        // [19] @ 0x822C60B8
+    void vfn_20();                        // [20] @ 0x822C6138
+    void vfn_21();                        // [21] @ 0x822C85F0
+    void vfn_22();                        // [22] @ 0x822C76E8
+    void vfn_23();                        // [23] @ 0x822C7A38
+    void vfn_24();                        // [24] @ 0x822C7E78
+    void vfn_25();                        // [25] @ 0x822C8880
+    void vfn_26();                        // [26] @ 0x822C5030
+    void vfn_27();                        // [27] @ 0x822C8B50
+    void vfn_28();                        // [28] @ 0x822C72D0
+    void vfn_29();                        // [29] @ 0x822C7350
 };
 
 // ── rage::phMaterialMgr  [vtable @ 0x8204EA3C] ───────────────────────────────
 struct phMaterialMgr {
     void**      vtable;           // +0x00
 
-    virtual ~phMaterialMgr();                     // [0] @ 0x82228BE8
-    virtual void vfn_7();                         // [7] @ 0x82410900
-    virtual void vfn_14();                        // [14] @ 0x824109A0
-    virtual void vfn_15();                        // [15] @ 0x82410AF0
+    ~phMaterialMgr();                     // [0] @ 0x82228BE8
+    void vfn_7();                         // [7] @ 0x82410900
+    void vfn_14();                        // [14] @ 0x824109A0
+    void vfn_15();                        // [15] @ 0x82410AF0
 };
 
 // ── rage::phMorphGeometry  [vtable @ 0x820650F4] ─────────────────────────────
 struct phMorphGeometry {
     void**      vtable;           // +0x00
 
-    virtual ~phMorphGeometry();   // [0] @ 0x82345A48
-    virtual void vfn_36();        // [36] @ 0x82345D90
+    ~phMorphGeometry();   // [0] @ 0x82345A48
+    void vfn_36();        // [36] @ 0x82345D90
 };
 
 // ── rage::phRope  [vtable @ 0x820650B0] ──────────────────────────────────────
 struct phRope {
     void**      vtable;           // +0x00
 
-    virtual ~phRope();                            // [0] @ 0x82342A38
-    virtual void ScalarDtor(int flags);           // [1] @ 0x823433A0
-    virtual void vfn_3();                         // [3] @ 0x82342060
-    virtual void vfn_5();                         // [5] @ 0x823435D8
-    virtual void vfn_6();                         // [6] @ 0x823454A0
-    virtual void vfn_8();                         // [8] @ 0x82344AF8
+    ~phRope();                            // [0] @ 0x82342A38
+    void ScalarDtor(int flags);           // [1] @ 0x823433A0
+    void vfn_3();                         // [3] @ 0x82342060
+    void vfn_5();                         // [5] @ 0x823435D8
+    void vfn_6();                         // [6] @ 0x823454A0
+    void vfn_8();                         // [8] @ 0x82344AF8
 };
 
 // ── rage::phSimulator  [vtable @ 0x8205976C] ─────────────────────────────────
@@ -2000,14 +2013,14 @@ struct phSimulator {
     uint32_t    m_nBreakableCount; // +0x42b0  R:3     — active breakable count
     uint32_t    m_pBreakableInsts; // +0x42b4  R:4     — breakable instance array
 
-    virtual ~phSimulator();                       // [0] @ 0x822C14A0
-    virtual void ScalarDtor(int flags);           // [1] @ 0x822C4C18
-    virtual void vfn_2(uint32_t* breakableRec);   // [2] @ 0x822C4228
-    virtual void vfn_3();                         // [3] @ 0x822C1D18
-    virtual void vfn_4();                         // [4] @ 0x822C1F00
-    virtual void vfn_5();                         // [5] @ 0x822C4308
-    virtual void vfn_6();                         // [6] @ 0x822C3128
-    virtual void vfn_7();                         // [7] @ 0x822C40C0
+    ~phSimulator();                       // [0] @ 0x822C14A0
+    void ScalarDtor(int flags);           // [1] @ 0x822C4C18
+    void vfn_2(uint32_t* breakableRec);   // [2] @ 0x822C4228
+    void vfn_3();                         // [3] @ 0x822C1D18
+    void vfn_4();                         // [4] @ 0x822C1F00
+    void vfn_5();                         // [5] @ 0x822C4308
+    void vfn_6();                         // [6] @ 0x822C3128
+    void vfn_7();                         // [7] @ 0x822C40C0
 
     // Non-virtual slot implementations (called directly via vtable indexing in the
     // recomp; header declarations here so the class name binds correctly).
@@ -2029,9 +2042,9 @@ struct phSimulator {
 struct phSleep {
     void**      vtable;           // +0x00
 
-    virtual ~phSleep();                           // [0] @ 0x822C1A50
-    virtual void Activate();                       // [1] @ 0x822DD238
-    virtual void vfn_2();                         // [2] @ 0x822DD248
+    ~phSleep();                           // [0] @ 0x822C1A50
+    void Activate();                       // [1] @ 0x822DD238
+    void vfn_2();                         // [2] @ 0x822DD248
 };
 
 // ── rage::phSpringAninmatedAttachment  [vtable @ 0x8206AD20] ─────────────────
@@ -2039,8 +2052,8 @@ struct phSleep {
 struct phSpringAninmatedAttachment {
     void**      vtable;           // +0x00
 
-    virtual void ScalarDtor(int flags);  // [1] @ 0x82382548
-    virtual void vfn_5();                // [5] @ 0x82421B98
+    void ScalarDtor(int flags);  // [1] @ 0x82382548
+    void vfn_5();                // [5] @ 0x82421B98
 };
 
 } // namespace rage
@@ -2067,39 +2080,39 @@ struct phObject {
     uint32_t m_field_524;     // +0x20C (524)
     uint32_t m_field_528;     // +0x210 (528)
 
-    virtual ~phObject();                               // [0]
-    virtual void* vfn_1(void*);                        // [1]
-    virtual void vfn_2();                              // [2]
-    virtual void vfn_3();                              // [3]
-    virtual void vfn_4();                              // [4]
-    virtual void* vfn_5();                             // [5]
-    virtual void* vfn_6();                             // [6]
-    virtual void* vfn_7();                             // [7]
-    virtual void* vfn_8();                             // [8]
-    virtual void* vfn_9();                             // [9]
-    virtual void* vfn_10();                            // [10]
-    virtual void vfn_11(void*, void*, void*);          // [11]
-    virtual void* vfn_12();                            // [12]
-    virtual void vfn_13(void*);                        // [13]
-    virtual int32_t vfn_14(int32_t);                   // [14]
-    virtual int32_t vfn_15();                          // [15]
-    virtual void* vfn_16();                            // [16]
-    virtual void* vfn_17(void*);                       // [17]
-    virtual void* vfn_18();                            // [18]
-    virtual void vfn_19();                             // [19]
-    virtual void vfn_20();                             // [20]
-    virtual void* vfn_21();                            // [21]
-    virtual void* vfn_22();                            // [22]
-    virtual void* vfn_23();                            // [23]
-    virtual void* vfn_24();                            // [24]
-    virtual void* vfn_25();                            // [25]
-    virtual void* vfn_26();                            // [26]
-    virtual void* vfn_27();                            // [27]
-    virtual void* vfn_28();                            // [28]
-    virtual void* vfn_29();                            // [29]
-    virtual void* vfn_30();                            // [30]
-    virtual void* vfn_31();                            // [31]
-    virtual void vfn_32();                             // [32]
+    ~phObject();                               // [0]
+    void* vfn_1(void*);                        // [1]
+    void vfn_2();                              // [2]
+    void vfn_3();                              // [3]
+    void vfn_4();                              // [4]
+    void* vfn_5();                             // [5]
+    void* vfn_6();                             // [6]
+    void* vfn_7();                             // [7]
+    void* vfn_8();                             // [8]
+    void* vfn_9();                             // [9]
+    void* vfn_10();                            // [10]
+    void vfn_11(void*, void*, void*);          // [11]
+    void* vfn_12();                            // [12]
+    void vfn_13(void*);                        // [13]
+    int32_t vfn_14(int32_t);                   // [14]
+    int32_t vfn_15();                          // [15]
+    void* vfn_16();                            // [16]
+    void* vfn_17(void*);                       // [17]
+    void* vfn_18();                            // [18]
+    void vfn_19();                             // [19]
+    void vfn_20();                             // [20]
+    void* vfn_21();                            // [21]
+    void* vfn_22();                            // [22]
+    void* vfn_23();                            // [23]
+    void* vfn_24();                            // [24]
+    void* vfn_25();                            // [25]
+    void* vfn_26();                            // [26]
+    void* vfn_27();                            // [27]
+    void* vfn_28();                            // [28]
+    void* vfn_29();                            // [29]
+    void* vfn_30();                            // [30]
+    void* vfn_31();                            // [31]
+    void vfn_32();                             // [32]
 
     // Non-virtual methods
     void ResetState();

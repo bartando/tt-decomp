@@ -1718,7 +1718,7 @@ void phBoundGeometry::CheckBoundsAndUpdate(const float* point) {
     
     if (!allZero) {
         // Point is not at center - update bounds
-        UpdateBounds(offset);  // vfn_7
+        reinterpret_cast<void (*)(phBoundGeometry*, const float*)>(vtable[7])(this, offset);
     }
 }
 
@@ -4083,7 +4083,7 @@ void phInst::ZeroFieldRanges() {  // vfn_32
 //    on this object to perform pre-initialization reset.
 // ---------------------------------------------------------------------------
 void phInst::CallVfn12ThenInit() {  // vfn_9
-    this->vfn_12();
+    reinterpret_cast<void (*)(phInst*)>(vtable[12])(this);
     statePreInit_vfn_6(this);
 }
 
@@ -11230,7 +11230,7 @@ void phBound::LoadFromStream() {
 // thin wrapper so existing callers resolve cleanly.
 // ─────────────────────────────────────────────────────────────────────────────
 void phBound::Load_v110() {
-    this->LoadFromStream();
+    reinterpret_cast<void (*)(phBound*)>(vtable[37])(this);
 }
 
 } // namespace rage
