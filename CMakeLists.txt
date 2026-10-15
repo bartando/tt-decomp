@@ -173,6 +173,7 @@ set(SOURCES
     src/rage/rage_data.cpp
     src/xam/xam_data.cpp
     src/link/linkage_bridges.cpp
+    src/rage/net/dat_bit_buffer.cpp
 )
 
 # Create executable
