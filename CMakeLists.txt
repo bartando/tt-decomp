@@ -181,6 +181,7 @@ set(SOURCES
     src/xam/kernel_import_thunks.c
     src/rage/math/ph_math.cpp
     src/game/input/button_edges.cpp
+    src/game/player/player_state_queries.cpp
 )
 
 # Create executable
