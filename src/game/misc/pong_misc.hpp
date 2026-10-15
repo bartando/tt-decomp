@@ -20,10 +20,10 @@ struct NetMatchTimer {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~NetMatchTimer();                  // [0] @ 0x8239c318
-    virtual void ScalarDtor(int flags); // [1] @ 0x8239c3d0
-    virtual void vfn_2();  // [2] @ 0x8239c4e8
-    virtual void vfn_3();  // [3] @ 0x8239c568
+    ~NetMatchTimer();                  // [0] @ 0x8239c318
+    void ScalarDtor(int flags); // [1] @ 0x8239c3d0
+    void vfn_2();  // [2] @ 0x8239c4e8
+    void vfn_3();  // [3] @ 0x8239c568
 };
 
 namespace Timer {
@@ -45,7 +45,7 @@ struct aiPlayer {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~aiPlayer();                  // [0] @ 0x821a02f0
+    ~aiPlayer();                  // [0] @ 0x821a02f0
 };
 
 // ── aiSpin  [vtable @ 0x8203A904] ──────────────────────────
@@ -62,10 +62,10 @@ struct assetVersions {
     uint8_t _pad[0xC];                 // +0x04  base-class fields (atSingleton)
     uint32_t m_versions[23];           // +0x10  version numbers, one per asset category
 
-    virtual ~assetVersions();                               // [0]  @ 0x82227FE8
-    virtual bool     IsSupported(uint32_t version) const;   // [20] @ 0x82228048
-    virtual void     RegisterFields();                      // [21] @ 0x82227D30
-    virtual const void* GetTypeDescriptor() const;          // [22] @ 0x82228090
+    ~assetVersions();                               // [0]  @ 0x82227FE8
+    bool     IsSupported(uint32_t version) const;   // [20] @ 0x82228048
+    void     RegisterFields();                      // [21] @ 0x82227D30
+    const void* GetTypeDescriptor() const;          // [22] @ 0x82228090
 };
 
 // ── assetVersionsChar  [vtable @ 0x8204E764] ──────────────────────────
@@ -75,10 +75,10 @@ struct assetVersionsChar {
     uint8_t _pad[0xC];                 // +0x04  base-class fields
     uint32_t m_version;                // +0x10  character-asset version number
 
-    virtual ~assetVersionsChar();                               // [0]  @ 0x82228198
-    virtual bool     IsSupported(uint32_t version) const;       // [20] @ 0x822281F8
-    virtual void     RegisterFields();                          // [21] @ 0x82228178
-    virtual const void* GetTypeDescriptor() const;              // [22] @ 0x82228240
+    ~assetVersionsChar();                               // [0]  @ 0x82228198
+    bool     IsSupported(uint32_t version) const;       // [20] @ 0x822281F8
+    void     RegisterFields();                          // [21] @ 0x82228178
+    const void* GetTypeDescriptor() const;              // [22] @ 0x82228240
 };
 
 // ── assetVersionsCharSpecific  [vtable @ 0x8204E7CC] ──────────────────────────
@@ -90,21 +90,21 @@ struct assetVersionsCharSpecific {
     uint32_t m_versionB;               // +0x14  version slot B
     uint32_t m_versionC;               // +0x18  version slot C
 
-    virtual ~assetVersionsCharSpecific();                               // [0]  @ 0x82228360
-    virtual bool     IsSupported(uint32_t version) const;               // [20] @ 0x822283C8
-    virtual void     RegisterFields();                                  // [21] @ 0x822282D0
-    virtual const void* GetTypeDescriptor() const;                      // [22] @ 0x82228410
+    ~assetVersionsCharSpecific();                               // [0]  @ 0x82228360
+    bool     IsSupported(uint32_t version) const;               // [20] @ 0x822283C8
+    void     RegisterFields();                                  // [21] @ 0x822282D0
+    const void* GetTypeDescriptor() const;                      // [22] @ 0x82228410
 };
 
 struct cellData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~cellData();                  // [0] @ 0x8240f9a0
-    virtual void vfn_2();  // [2] @ 0x8240bfb0
-    virtual void PostLoadProperties();  // [20] @ 0x8240beb8
-    virtual void Validate();  // [21] @ 0x8240bf00
-    virtual void PostLoadChildren();  // [22] @ 0x8231f2a8
+    ~cellData();                  // [0] @ 0x8240f9a0
+    void vfn_2();  // [2] @ 0x8240bfb0
+    void PostLoadProperties();  // [20] @ 0x8240beb8
+    void Validate();  // [21] @ 0x8240bf00
+    void PostLoadChildren();  // [22] @ 0x8231f2a8
 };
 
 // ── ctxManager  [vtable @ 0x8204EB50] ──────────────────────────
@@ -117,15 +117,15 @@ struct fontData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x8240bdf0
-    virtual void PostLoadProperties();  // [20] @ 0x8240bcc0
-    virtual void Validate();  // [21] @ 0x8240bd08
-    virtual void PostLoadChildren();  // [22] @ 0x8231f1f8
+    void vfn_2();  // [2] @ 0x8240bdf0
+    void PostLoadProperties();  // [20] @ 0x8240bcc0
+    void Validate();  // [21] @ 0x8240bd08
+    void PostLoadChildren();  // [22] @ 0x8231f1f8
 
     // ── fontData::xmlNodeStructFaceType  [vtable @ 0x82076658] ──
     struct xmlNodeStructFaceType {
         void**      vtable;           // +0x00
-        virtual void vfn_5();  // [5] @ 0x8240bcb0
+        void vfn_5();  // [5] @ 0x8240bcb0
     };
 };
 
@@ -134,7 +134,7 @@ struct fsmMachine {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~fsmMachine();                  // [0] @ 0x82222758
+    ~fsmMachine();                  // [0] @ 0x82222758
 };
 
 // ── listData  [vtable @ 0x8204C434] ──────────────────────────
@@ -142,11 +142,11 @@ struct listData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~listData();                  // [0] @ 0x822184f0
-    virtual void vfn_3();  // [3] @ 0x822185e0
-    virtual void PostLoadProperties();  // [20] @ 0x822184a8
-    virtual void Validate();  // [21] @ 0x82218558
-    virtual void PostLoadChildren();  // [22] @ 0x821e0fc0
+    ~listData();                  // [0] @ 0x822184f0
+    void vfn_3();  // [3] @ 0x822185e0
+    void PostLoadProperties();  // [20] @ 0x822184a8
+    void Validate();  // [21] @ 0x82218558
+    void PostLoadChildren();  // [22] @ 0x821e0fc0
 };
 
 // ── listItemData  [vtable @ 0x8204C3A4] ──────────────────────────
@@ -154,17 +154,17 @@ struct listItemData {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~listItemData();                  // [0] @ 0x822182f0
-    virtual void vfn_2();  // [2] @ 0x82218440
-    virtual void PostLoadProperties();  // [20] @ 0x822182a8
-    virtual void Validate();  // [21] @ 0x82218340
-    virtual void PostLoadChildren();  // [22] @ 0x821e0f00
+    ~listItemData();                  // [0] @ 0x822182f0
+    void vfn_2();  // [2] @ 0x82218440
+    void PostLoadProperties();  // [20] @ 0x822182a8
+    void Validate();  // [21] @ 0x82218340
+    void PostLoadChildren();  // [22] @ 0x821e0f00
 };
 
 // listItemData::xmlNodeStructColType is a nested class; declared separately to avoid name conflict
 struct listItemData_xmlNodeStructColType {
     void**      vtable;           // +0x00
-    virtual void vfn_5();  // [5] @ 0x82218298
+    void vfn_5();  // [5] @ 0x82218298
 };
 
 // ── msgEventHandler  [2 vtables — template/MI] ──────────────────────────
@@ -182,10 +182,10 @@ struct msgEventHandler {
     uint16_t    m_ownedFlag;      // +0x1A  if non-zero, m_pOwnedData is freed
 
     // ── virtual methods ──
-    virtual ~msgEventHandler();                  // [0] @ 0x8225eb50
-    virtual void vfn_3();  // [3] @ 0x8225ed50 — cleanup + dispatch
-    virtual void AcceptsMessage(uint32_t msgType); // [20] @ 0x8225ed08
-    virtual const char* GetName();  // [22] @ 0x8225ec58
+    ~msgEventHandler();                  // [0] @ 0x8225eb50
+    void vfn_3();  // [3] @ 0x8225ed50 — cleanup + dispatch
+    void AcceptsMessage(uint32_t msgType); // [20] @ 0x8225ed08
+    const char* GetName();  // [22] @ 0x8225ec58
 
     // ── non-virtual methods ──
     static msgEventHandler* Create();            // @ 0x8225ec68 — allocate + init
@@ -466,23 +466,23 @@ struct pongBinkMovie {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_2();  // [2] @ 0x82317750
-    virtual void vfn_4();  // [4] @ 0x82317838
-    virtual void vfn_7();  // [7] @ 0x82317a10
-    virtual void vfn_8();  // [8] @ 0x82317a70
-    virtual void vfn_10();  // [10] @ 0x82317b28
-    virtual void OnEnter();  // [11] @ 0x82317b48
-    virtual void vfn_12();  // [12] @ 0x82317b68
-    virtual void GetName();  // [13] @ 0x82317b70
-    virtual void vfn_14();  // [14] @ 0x82317b80
-    virtual void vfn_15();  // [15] @ 0x82317b88
-    virtual void vfn_16();  // [16] @ 0x82317b90
-    virtual void vfn_17();  // [17] @ 0x82317bb0
-    virtual void vfn_18();  // [18] @ 0x82317ba0
-    virtual void vfn_19();  // [19] @ 0x82317bc0
-    virtual void PostLoadProperties();  // [20] @ 0x82317bc8
-    virtual void Validate();  // [21] @ 0x82317d20
-    virtual void PostLoadChildren();  // [22] @ 0x82317dd0
+    void vfn_2();  // [2] @ 0x82317750
+    void vfn_4();  // [4] @ 0x82317838
+    void vfn_7();  // [7] @ 0x82317a10
+    void vfn_8();  // [8] @ 0x82317a70
+    void vfn_10();  // [10] @ 0x82317b28
+    void OnEnter();  // [11] @ 0x82317b48
+    void vfn_12();  // [12] @ 0x82317b68
+    void GetName();  // [13] @ 0x82317b70
+    void vfn_14();  // [14] @ 0x82317b80
+    void vfn_15();  // [15] @ 0x82317b88
+    void vfn_16();  // [16] @ 0x82317b90
+    void vfn_17();  // [17] @ 0x82317bb0
+    void vfn_18();  // [18] @ 0x82317ba0
+    void vfn_19();  // [19] @ 0x82317bc0
+    void PostLoadProperties();  // [20] @ 0x82317bc8
+    void Validate();  // [21] @ 0x82317d20
+    void PostLoadChildren();  // [22] @ 0x82317dd0
 };
 
 // ── pongMovie  [vtable @ 0x82060A8C] ──────────────────────────
@@ -490,9 +490,9 @@ struct pongMovie {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~pongMovie();                  // [0] @ 0x82316e80
-    virtual void vfn_2();  // [2] @ 0x82316fa0
-    virtual void vfn_3();  // [3] @ 0x82316cd8
+    ~pongMovie();                  // [0] @ 0x82316e80
+    void vfn_2();  // [2] @ 0x82316fa0
+    void vfn_3();  // [3] @ 0x82316cd8
 };
 
 // ── pongPlayer  [3 vtables — template/MI] ──────────────────────────
@@ -901,11 +901,11 @@ struct pongPlayer {
     uint32_t     m_field0x525c; // +0x525c  R:1 W:0
 
     // ── virtual methods ──
-    virtual ~pongPlayer();                  // [0] @ 0x8218b3c0
-    virtual void ScalarDtor(int flags); // [1] @ 0x8218edb0
-    virtual void vfn_2();  // [2] @ 0x8218f958
-    virtual void vfn_7();  // [7] @ 0x8218ee10
-    virtual void vfn_9();  // [9] @ 0x821935b8
+    ~pongPlayer();                  // [0] @ 0x8218b3c0
+    void ScalarDtor(int flags); // [1] @ 0x8218edb0
+    void vfn_2();  // [2] @ 0x8218f958
+    void vfn_7();  // [7] @ 0x8218ee10
+    void vfn_9();  // [9] @ 0x821935b8
 
     // ── non-virtual methods (from debug strings) ──
     void Activate();
@@ -960,23 +960,23 @@ struct pongXMVMovie {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void vfn_4();  // [4] @ 0x82316fe8
-    virtual void vfn_5();  // [5] @ 0x82317168
-    virtual void vfn_6();  // [6] @ 0x82317258
-    virtual void vfn_7();  // [7] @ 0x823172a8
-    virtual void vfn_8();  // [8] @ 0x823172f8
-    virtual void vfn_9();  // [9] @ 0x823173b0
-    virtual void vfn_10();  // [10] @ 0x823173d0
-    virtual void OnEnter();  // [11] @ 0x823173d8
-    virtual void vfn_12();  // [12] @ 0x823173e0
-    virtual void GetName();  // [13] @ 0x823173e8
-    virtual void vfn_14();  // [14] @ 0x823173f8
-    virtual void vfn_15();  // [15] @ 0x82317410
-    virtual void vfn_16();  // [16] @ 0x82317428
-    virtual void vfn_19();  // [19] @ 0x82317438
-    virtual void PostLoadProperties();  // [20] @ 0x82317440
-    virtual void Validate();  // [21] @ 0x823174c8
-    virtual void PostLoadChildren();  // [22] @ 0x82317530
+    void vfn_4();  // [4] @ 0x82316fe8
+    void vfn_5();  // [5] @ 0x82317168
+    void vfn_6();  // [6] @ 0x82317258
+    void vfn_7();  // [7] @ 0x823172a8
+    void vfn_8();  // [8] @ 0x823172f8
+    void vfn_9();  // [9] @ 0x823173b0
+    void vfn_10();  // [10] @ 0x823173d0
+    void OnEnter();  // [11] @ 0x823173d8
+    void vfn_12();  // [12] @ 0x823173e0
+    void GetName();  // [13] @ 0x823173e8
+    void vfn_14();  // [14] @ 0x823173f8
+    void vfn_15();  // [15] @ 0x82317410
+    void vfn_16();  // [16] @ 0x82317428
+    void vfn_19();  // [19] @ 0x82317438
+    void PostLoadProperties();  // [20] @ 0x82317440
+    void Validate();  // [21] @ 0x823174c8
+    void PostLoadChildren();  // [22] @ 0x82317530
 };
 
 // ── io  [no vtable] ──────────────────────────

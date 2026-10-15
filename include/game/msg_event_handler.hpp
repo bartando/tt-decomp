@@ -7,6 +7,10 @@
 
 #pragma once
 
+// Classes below that carry the game's vtable pointer as an explicit member
+// list their slot methods non-virtual: a C++ virtual would add a second
+// vtable pointer in front of it and shift every member by 4.
+
 #include <cstdint>
 
 // Forward declarations
@@ -22,16 +26,16 @@ class pcrAnimEvent;
 class msgEventHandler {
 public:
     // Virtual destructor @ 0x8225EB50
-    virtual ~msgEventHandler();
+    ~msgEventHandler();
     
     // Stub virtual function @ 0x8225EC58 (slot 22)
-    virtual void Stub22();
+    void Stub22();
     
     // Match event type @ 0x8225ED08 (slot 20)
-    virtual bool MatchesType(uint32_t eventType);
+    bool MatchesType(uint32_t eventType);
     
     // Process events @ 0x8225ED50 (slot 3)
-    virtual void ProcessEvents();
+    void ProcessEvents();
     
     // Constructor @ 0x8225E8C0
     msgEventHandler();
