@@ -82,3 +82,7 @@ alignas(16) uint32_t g_evtType_SessionDeregistered[6] = {0xFFFFFFFFu, 0x0u, 0x0u
 
 }  // namespace snSession_States
 }  // namespace rage
+
+// @ 0x82072878 (.rdata) — rage::snEvent's vtable (RTTI ".?AVsnEvent@rage@@"),
+// 5 slots of PPC code addresses in the image, null in the port
+extern "C" void* const g_vtbl_snEvent[5] = {};

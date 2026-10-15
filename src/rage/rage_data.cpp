@@ -65,3 +65,7 @@ TT_DATA_ALIAS("g_pMatchResultData", "g_pGrcDevice_clear");
 // @ 0x82037494 (.rdata) — datParserRecord's vtable, 3 slots of PPC code
 // addresses in the image, null in the port. datParser_AddField stores it.
 extern "C" void* const datParserRecord_vtable[3] = {};
+
+// @ 0x825F5AA8 (.data) — the TLS slot of the resource being placed (0 until
+// datResource_PointerFixup first allocates it)
+extern "C" uint32_t g_datResourceTlsSlot = 0x0u;

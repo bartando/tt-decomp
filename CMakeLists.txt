@@ -176,6 +176,9 @@ set(SOURCES
     src/rage/net/dat_bit_buffer.cpp
     src/rage/core/debug_print_nops.cpp
     src/rage/data/dat_parser_fields.cpp
+    src/rage/data/dat_resource_fixup.cpp
+    src/rage/network/sn_event.cpp
+    src/xam/kernel_import_thunks.c
 )
 
 # Create executable
