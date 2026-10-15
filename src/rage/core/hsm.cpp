@@ -14,8 +14,8 @@
  *   jumptable_3A48                @ 0x82453A48 — event-dispatch init (types 1/2)
  *
  * No-op shims (no binary counterpart — link-only):
- *   hsmContext_Init, hsmContext_InitTimers, hsmState_AttachChild,
- *   hsmEvent_Init, HSM_QueueNotification, PostStateTransitionRequest,
+ *   hsmContext_Init, hsmContext_InitTimers, hsmEvent_Init,
+ *   HSM_QueueNotification, PostStateTransitionRequest,
  *   SetTrainingState, gmLogic_StepFrame, gmLogic_StepFrame_impl.
  *
  * Callers access the transition engine through the suffixed symbol
@@ -27,7 +27,7 @@
 #include <cstdio>
 #include <cstring>
 
-#include "game/match/pong_states.hpp"  // hsmState class definition
+#include "rage/hsmState.hpp"  // hsmState class definition
 
 // ─── hsmContext::SetNextState @ 0x82222800 ────────────────────────────────────
 //
@@ -251,11 +251,11 @@ void PostStateTransitionRequest(void* m, int e) { (void)m; (void)e; }
 void SetTrainingState(int s)           { (void)s; }
 void gmLogic_StepFrame(void)           {}
 
-// hsmState_AttachChild and hsmEvent_Init also appear inside namespace rage —
-// callers (snMigrateMachine, snSessionStates) invoke them from within a
-// `namespace rage {}` block, so the mangled names carry the rage:: prefix.
+// hsmEvent_Init also appears inside namespace rage — callers
+// (snMigrateMachine, snSessionStates) invoke it from within a
+// `namespace rage {}` block, so the mangled name carries the rage:: prefix.
+// rage::hsmState_AttachChild is defined with its body further down.
 namespace rage {
-void hsmState_AttachChild(void* parent, void* child) { (void)parent; (void)child; }
 void hsmEvent_Init(void* event) { (void)event; }
 }  // namespace rage
 
@@ -290,9 +290,9 @@ extern "C" void _c_PostStateTransitionRequest(void* m, int e) {
  * Uses virtual dispatch for GetStateName() (vtable slot 2) and
  * GetFullStatePath() (vtable slot 3) to support polymorphic state names.
  */
-void hsmState::GetFullStatePath(char* buffer, unsigned int bufferSize) const {
+char* hsmState::GetFullStatePath(char* buffer, uint32_t bufferSize) const {
     if (!buffer || bufferSize == 0)
-        return;
+        return buffer;
 
     if (m_pParentState) {
         // Recurse into parent first to build the prefix path
@@ -306,7 +306,7 @@ void hsmState::GetFullStatePath(char* buffer, unsigned int bufferSize) const {
         currentLen = static_cast<unsigned int>(p - buffer - 1);
 
         if (currentLen >= bufferSize)
-            return;
+            return buffer;
 
         // Append "/<stateName>" to the existing path
         const char* name = GetStateName();
@@ -323,6 +323,7 @@ void hsmState::GetFullStatePath(char* buffer, unsigned int bufferSize) const {
         }
         *dest = '\0';
     }
+    return buffer;
 }
 
 /**
