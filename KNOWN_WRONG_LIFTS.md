@@ -28,6 +28,15 @@ before relying on any of these; fix and delete the entry when done.
   destructor under unrelated names.
 - `pong_match.hpp`: gmPracticeTarget vtable slot 1 (0x82112DF8) is labelled `ScalarDtor` but is
   the data-file loader; slot 0 (0x82112C70) is the deleting destructor.
+- `pongCreatureInst_SetMatrixImpl`, `_NotifyHeadingChanged` and `_ComputeHeading` are
+  duplicate wrong lifts of `pongCreatureInst` (fragInst) vtable slots 31, 10 and 9; the
+  member versions in `pong_creature.cpp` are the corrected ones.
+- `pongCameraMgr_6280_g` treats a `grcViewport` as a `pongCameraMgr`.
+- `charViewCS` repeats `camBaseCS`'s fields (CameraFOV/Near/Far at +0xA4..+0xAC) as `m_axisHook*`.
+- `camViewCS` slot 9 is named `OnSourceChanged`, but `pongCameraMgr::Update` calls it every frame.
+- 0x82228EA0 reads gameLoop+0x204, which `game_loop_types.h` calls a target FPS; the result is
+  an aspect ratio, so one of the two labels is wrong.
+- 0x82606750 has four names across the codebase (`lbl_82606750` among them).
 - `globals.c`: `g_msgSinkTemplate` is at 0x8261A0C0, not 0x8241A0C0.
 
 ## The recomp is not ground truth
@@ -40,7 +49,7 @@ register tested, no stack frames). Trust `disasm/sections/.text.s` when they dis
 
 | Address | Current name | Really |
 |---|---|---|
-| 0x8271A318 | `g_pMatchState` | camera shot-manager singleton |
+| 0x8271A318 | `g_pMatchState` | `atSingleton<camShotMgr>` instance |
 | 0x8271A32C | `g_pMatchConfig` | shared camera state |
 | 0x825EBAA0 | `g_pHudOverlay` | current `grcViewport` |
 
