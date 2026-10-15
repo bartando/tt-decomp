@@ -6694,12 +6694,11 @@ void pongNetMessageHolder_74F8_w(void* self_v, void* src_v) {
 //   1. Call xam_singleton_init_8D60 to obtain the list-owner object (r31).
 //   2. If owner's "count" field (u16 @+4) is 0, walk the list @+8 (single-
 //      ly-linked via +8 pointer), counting entries.
-//   3. If owner->u16@+6 == 0, allocate count*4 bytes into owner->arr (+0)
+//   3. If owner->u16@+6 == 0, allocate count pointers into owner->arr (+0)
 //      and update owner->u16@+6 = count.
 //   4. Store count at owner->u16@+4. If count > 0, populate owner->arr
-//      with the list entries in order and call fiAsciiTokenizer_1950_g
-//      (sort/index helper) with a static format-string template and +4 key
-//      field size.
+//      with the list entries in order and sort them with
+//      fiAsciiTokenizer_1950_g (the CRT qsort: base, count, width, cmp).
 //   5. Finally, compute owner->u32@+20 = owner->u32@+12 + owner->u32@+16
 //      - 1 (inclusive end-index of the flattened slice). Fields +12/+16/+20
 //      form a classic (offset, length, lastIndex) tuple used by the
@@ -6708,7 +6707,7 @@ void pongNetMessageHolder_74F8_w(void* self_v, void* src_v) {
 // ───────────────────────────────────────────────────────────────────────────
 struct PNMHBatch2Node { uint8_t pad[8]; PNMHBatch2Node* next; };
 struct PNMHBatch2Owner {
-    uint32_t arr;                // +0
+    PNMHBatch2Node** arr;        // +0  list entries, flattened
     uint16_t countA;             // +4
     uint16_t cap;                // +6
     PNMHBatch2Node* head;        // +8
@@ -6716,6 +6715,14 @@ struct PNMHBatch2Owner {
     int32_t  field16;            // +16
     int32_t  endCursor;          // +20
 };
+
+// fiAsciiTokenizer_1950_g @ 0x82431950 is the CRT qsort (EINVAL on a null
+// base with a non-zero count, or on a zero width); the comparator is the
+// 128-byte helper fiAsciiTokenizer_8F28_2h @ 0x82238F28.
+using TokenizerCmp = int (*)(const void*, const void*);
+extern "C" int fiAsciiTokenizer_8F28_2h(const void*, const void*);
+extern void fiAsciiTokenizer_1950_g(void* base, uint32_t count,
+                                    uint32_t width, TokenizerCmp cmp);
 
 void pongNetMessageHolder_8B80_w(void) {
     using Owner = PNMHBatch2Owner;
@@ -6736,10 +6743,10 @@ void pongNetMessageHolder_8B80_w(void) {
         owner->cap = static_cast<uint16_t>(count);
         if (count != 0) {
             uint32_t g = count;
-            uint32_t bytes = (g <= 0x3FFFFFFFu) ? (g * 4u) + 4u : 0xFFFFFFFFu;
-            owner->arr = reinterpret_cast<uintptr_t>(xe_EC88(bytes));
+            uint32_t bytes = (g <= 0x3FFFFFFFu) ? (g * sizeof(Node*)) + 4u : 0xFFFFFFFFu;
+            owner->arr = static_cast<Node**>(xe_EC88(bytes));
         } else {
-            owner->arr = 0;
+            owner->arr = nullptr;
         }
     }
     owner->countA = static_cast<uint16_t>(count);
@@ -6751,23 +6758,16 @@ void pongNetMessageHolder_8B80_w(void) {
     if (cur != nullptr) {
         uint32_t idx = 0;
         while (cur != nullptr) {
-            reinterpret_cast<uint32_t*>(owner->arr)[idx] = reinterpret_cast<uintptr_t>(cur);
+            owner->arr[idx] = cur;
             ++idx;
             cur = cur->next;
         }
     }
-    // Sort / build index. The r6 argument is the comparator function
-    // pointer (fiAsciiTokenizer_8F28_2h @ 0x82238F28, 128-byte helper),
-    // not a format string — fiAsciiTokenizer_1950_g is a qsort-style
-    // helper whose 4th param is `int (*cmp)(const void*, const void*)`.
-    using TokenizerCmp = int (*)(const void*, const void*);
-    extern "C" int fiAsciiTokenizer_8F28_2h(const void*, const void*);
-    extern void fiAsciiTokenizer_1950_g(void* entries, uint32_t keySize,
-                                        int32_t count,
-                                        TokenizerCmp cmp);
-    fiAsciiTokenizer_1950_g(reinterpret_cast<void*>(owner->arr),
-                            4,
-                            static_cast<int32_t>(owner->countA),
+    // Sort the flattened entries: r3 = arr, r4 = count, r5 = 4 (one guest
+    // pointer), r6 = the comparator fiAsciiTokenizer_8F28_2h.
+    fiAsciiTokenizer_1950_g(owner->arr,
+                            owner->countA,
+                            sizeof(Node*),
                             &fiAsciiTokenizer_8F28_2h);
     owner->endCursor = owner->field12 + owner->field16 - 1;
 }
