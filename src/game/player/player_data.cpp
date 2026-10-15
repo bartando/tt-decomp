@@ -146,8 +146,8 @@ extern "C" alignas(16) uint8_t g_ballSplashArray[832] = {};
 TT_DATA_ALIAS("g_playerDataArray2", "g_ballSplashArray");
 
 // @ 0x8271A304 (.data)
-extern "C" void* g_pGlobalClock = nullptr;
-TT_DATA_ALIAS("g_pCourtGeomSingleton", "g_pGlobalClock");
+extern "C" void* g_pTableDims = nullptr;
+TT_DATA_ALIAS("g_pCourtGeomSingleton", "g_pTableDims");
 
 // @ 0x8271A31C (.data)
 extern "C" void* g_pPlayerRecords = nullptr;

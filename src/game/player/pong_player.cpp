@@ -141,7 +141,7 @@ extern const float  g_kFloatConst_79FF8;     // @ 0x82079FF8
 extern const float  g_kFloatConst_79FF4;     // @ 0x82079FF4
 
 // .data globals — game state pointers
-extern void*    g_pGlobalClock;              // @ 0x8271A304
+extern void*    g_pTableDims;              // @ 0x8271A304
 extern void*    g_pCourtState;               // @ 0x8271A314
 extern void*    g_pCamShotMgr;               // @ 0x8271A318
 extern void*    g_pPlayerRecords;            // @ 0x8271A31C
@@ -1454,7 +1454,7 @@ void pongPlayer::UpdateSwingTimingAdjustment() {
     float animPhase = this->m_swingPhaseInput;  // this+68
 
     // Global clock object: +24 = timing value (float)
-    float* clockFloats = static_cast<float*>(g_pGlobalClock);
+    float* clockFloats = static_cast<float*>(g_pTableDims);
     float clockValue = clockFloats[6];  // +24 / 4
     
     // Load constants
@@ -3715,7 +3715,7 @@ extern "C" void* pongPlayer_E7B0_g(void* inputStruct) {
     // Resolve court boundary vectors for the given types
     vec3 boundsA{}, boundsB{};
     pongPlayer_FD20_g(
-        g_pGlobalClock, courtType, &boundsA, &boundsB, courtSubType,
+        g_pTableDims, courtType, &boundsA, &boundsB, courtSubType,
         reinterpret_cast<void*>(static_cast<uintptr_t>(1)), nullptr, 0);
 
     // Pack current position for interpolation
@@ -6624,8 +6624,8 @@ static pongMatchSettingsView* MatchSettings() {
     return reinterpret_cast<pongMatchSettingsView*>(g_pInputArrayTable);
 }
 
-// What 0x8271A304 points at (declared above as g_pGlobalClock, but xe_9DC8
-// fills it with the table's dimensions in metres).
+// What 0x8271A304 (g_pTableDims) points at: xe_9DC8 fills it with the
+// table's dimensions in metres.
 struct pongTableDims {
     uint8_t _pad00[0x10];
     float   width;    // +0x10  1.5224
@@ -6637,7 +6637,7 @@ struct pongTableDims {
 };
 
 static const pongTableDims* TableDims() {
-    return static_cast<const pongTableDims*>(g_pGlobalClock);
+    return static_cast<const pongTableDims*>(g_pTableDims);
 }
 
 extern "C" void* g_pongMatchTiming;  // @ 0x8271A2E8  (named in pong_lerp_queue.cpp)
