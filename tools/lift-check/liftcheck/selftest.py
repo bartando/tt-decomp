@@ -32,6 +32,7 @@ EXPECT = [
     ("lc_camviewcs_update_leaf", "PASS", ()),     # a stub keeps what its leaf callee keeps
     ("lc_xact_image_dtor_thunk", "PASS", ()),     # a call through `b X` is a call to X
     ("lc_drill_strings", "PASS", ()),             # const char* by content, any length
+    ("lc_world_bound_static_init", "PASS", ()),   # the static initializers have run
 ]
 
 MUTATIONS = [

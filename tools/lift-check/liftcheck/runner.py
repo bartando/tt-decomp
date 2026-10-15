@@ -15,6 +15,8 @@ from .build import build_lift
 from .dwarf import arg_registers
 from .machine import (ARENA_BASE, FAKE_BASE, FAKE_SIZE, IMAGE_BASE, STACK_HI, STACK_LO,
                       STACK_TOP, TLS_BASE, CallRecord, Fault, Machine, Stop)
+
+HOST_BASE = FAKE_BASE + 0x8000      # host-only helpers (spec HOST); t.fake_fn() stays below
 from .spec import MODELS, CallCtx, Policy, Trial, alloc, stub
 from .symbols import Symbols
 
@@ -85,9 +87,13 @@ class Checker:
         self.image = Path(image_path).read_bytes()
         source = Path(opts.source) if opts.source else self.repo / self.spec.SOURCE
         workdir = opts.workdir or (Path(__file__).resolve().parent.parent / "build")
+        # host-only helpers (no game address): each gets a fake address and its policy
+        self.host = {name: HOST_BASE + 0x10 * k for k, name in enumerate(getattr(self.spec, "HOST", {}))}
+        externs = dict(getattr(self.spec, "EXTERNS", None) or {})
+        externs.update(self.host)
         self.lift = build_lift(self.repo, self.syms, source, self.spec.FUNCTION, orig_addr=self.addr,
                                workdir=workdir, opt=opts.opt, patches=tuple(opts.patches),
-                               externs_override=getattr(self.spec, "EXTERNS", None),
+                               externs_override=externs,
                                fp_contract=opts.fp_contract or getattr(self.spec, "FP_CONTRACT", "on"),
                                tag=self.name)
         rng = self.syms.func_range(self.addr)
@@ -96,6 +102,13 @@ class Checker:
         self.orig_range = rng
         self.machine = Machine(self.image, self.lift, self.syms, self.syms.helper_ranges())
         m = self.machine
+        if getattr(self.spec, "STATIC_INIT", True):
+            from .staticinit import patch
+            image = bytearray(self.image)
+            for a, data in patch(self.image, m, self.syms):
+                image[a - IMAGE_BASE: a - IMAGE_BASE + len(data)] = data
+                m.uc.mem_write(a, data)
+            self.image = bytes(image)
         m.prescan(*rng)
         for extra in getattr(self.spec, "EXTRA_RANGES", ()):
             m.prescan(*extra)
@@ -127,6 +140,8 @@ class Checker:
                     self.policies[a] = pol
                 else:
                     self.fake_policies[key] = pol
+        for name, pol in getattr(self.spec, "HOST", {}).items():
+            self.policies[self.host[name]] = pol
         for a, pol in list(self.policies.items()):
             self.policies.setdefault(self.canonical(a), pol)
         self.ignore = [tuple(r) for r in getattr(self.spec, "IGNORE", ())]
@@ -593,7 +608,8 @@ class Checker:
 
     def call_name(self, target, t):
         if FAKE_BASE <= target < FAKE_BASE + FAKE_SIZE:
-            return t.fakes.get(target, f"0x{target:08X}")
+            host = next((n for n, a in self.host.items() if a == target), None)
+            return host or t.fakes.get(target, f"0x{target:08X}")
         return self.syms.describe(target)
 
     def call_context(self, oc, lc, k, t):
