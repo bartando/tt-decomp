@@ -31,11 +31,10 @@ unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, a
 
 ## Link blockers (from the link pass, 2026-10-15)
 
-- ~240 data symbols stay undefined because their declared address is missing or wrong
-  (0x8204A5F8 is a string, not a tuning table; 0x82079ADC isn't FLT_MAX; 0x82077054 is a
-  vtable). Each needs a manual check against the asm.
-- Duplicate definitions will become link errors once nothing is undefined: the `charViewCS`
-  vtable (`char_view.cpp` + `pong_camera.cpp`).
+- Data still undefined: `g_sdaBase` is r13+0 (the thread block), so its lift has to change;
+  `g_phJoint3DofTemplate` is the element constructor at 0x8225E3F0, a function. About 17
+  function addresses are taken as data (`cmSampleCamActions_*`, `CCalMoviePlayer_*_p33`,
+  `phDemoWorld_F120`, `fiAsciiTokenizer_8F28_2h`).
 - `rage_atStringCopy` (0x82228990) forwards to the unlifted `CopyNetworkString`; the real
   function looks a key up in the string table (0x82408F08) and writes the entry as UTF-8.
 - Placeholder bodies that callers rely on (not bridged): `at_types.cpp` `atSingleton_*`,
@@ -80,7 +79,6 @@ unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, a
 - `camViewCS` slot 9 is named `OnSourceChanged`, but `pongCameraMgr::Update` calls it every frame.
 - 0x82228EA0 reads gameLoop+0x204, which `game_loop_types.h` calls a target FPS; the result is
   an aspect ratio, so one of the two labels is wrong.
-- 0x82606750 has four names across the codebase (`lbl_82606750` among them).
 - `snJoinMachine.cpp` (not built) calls `rage::hsmState_AttachChild` as
   `snHsmState_AttachChild(void*, void*)`; the real one takes `(hsmStateBase*, hsmStateBase*)`.
 - `rage_free` (0x820C00C0) is declared `extern "C"` in some files and with C++ linkage in others.
@@ -107,7 +105,6 @@ unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, a
   every frame.
 - `gd_data.cpp` passes XML field types by value (asm: by address); 0x825CAF90 is the Int
   handler, not an enum one.
-- `globals.c` swaps the pointer and type arrays at 0x825F3868/0x825F3968.
 - 0x825EBC54 (`boundContext` in `rage_grm.cpp`) behaves like a write counter.
 - `fx_effects.cpp` and `ProcessAnimationList` pass the skeleton to 0x8224C128/0x8224C288
   (LocomotionStateAnim C128/C288) in r4; the asm reads it from r5.
@@ -136,10 +133,6 @@ unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, a
 - `include/globals.h:119` still mentions `RestorePoseFromRollback` (now `SavePoseSnapshot`).
 - 0x820C6378 (`pongCreature` slot 6) still has a TODO body.
 - `pong_strings.hpp`: `g_str_pongDrill_tooManySuccesses` is at 0x82031970, not 0x82033970.
-- `globals.c`: `g_fPrngNormalize` is 1/0xFFFFFFFF, should be 2^-23; `g_prngState` is a scalar
-  used as an array of 2; 0x825C5938 is defined as 0.0 under two names but is -1.0 (drills'
-  "no time limit"). `g_pPracticeTarget`, `g_pTrainingHud`, `g_gdDrillMovementData_classId`
-  have no definitions.
 - `network.cpp`: 0x822FA818/0x822FA878/0x822FA8F0 are hudTrainingHUD setters ("completed",
   "time_low", "arrow_direction"), not SinglesNetworkClient; 0x822FA8F0 has two names.
 - `ph_physics`: 0x82431910 `RoundToNearestInt` is floor; 0x824321F0 is ceil.
@@ -147,8 +140,6 @@ unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, a
   bounds (leaf, keeps r3).
 - `pong_match.hpp`: gmPracticeTarget +0x17 (`field_17`) is a keep-on-table clamp flag.
 - `pong_states.cpp` puts string-address `// @` markers on `rage_debugLog` calls.
-- `msg_event_handler.hpp` puts `g_eventQueueIndex`/`Ptrs` at 0x8271A864/0x8271A868; the asm
-  uses 0x825F3864/0x825F3868.
 - 0x8225E998 (`atSingleton_E998_g`, "NotifyObservers") is a variadic message-argument reader
   driven by a format string.
 - `fx_effects.hpp`: `fxBallTrail::AddSample` (slot 4) takes r4 and r5, declared with one arg.
@@ -157,7 +148,26 @@ unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, a
 - `CheckButtonPressed` is commented as 0x8225FFF8; it's 0x821DFFF8.
 - `include/game/pong_network_io.hpp` gives `BeginNetworkWrite` as "0x822288AE0" (0x82238AE0).
 - `rage_grm.cpp` declares `rage_free_00C0(uint32_t)` (truncates host pointers).
-- `globals.c`: `g_msgSinkTemplate` is at 0x8261A0C0, not 0x8241A0C0.
+- `ClampMovementToCourtBounds` (0x8219D558): the original stores 0 when the positive overshoot
+  is negative and clamps the negative side to -5.0 (0x82079CF0); the lift does neither.
+- `UpdateShotTarget` (0x82195D50) drops the r4 matrix argument.
+- `xam_utils.c` `RegisterStaticInit_*` comments point at 0x8256B9xx; the functions are at
+  0x8257B940..BA40, and the "static init nodes" are command-line option records (netassets,
+  path, fast, …).
+- `xe_0780` puts the "int" string at 0x8202F5B8 into +0xC, not the grmModelFactory vtable.
+- Lifts that store host pointers as `uint32_t`: `*g_globalCamPtr1` (pong_camera vfn_25),
+  `g_kGeomOffset`, `g_playerManagerPtr`, `g_swfCMD_globalState` (a `void*` list head; the
+  32-bit store clears half of it), and `xe_buffers.c`'s vtable loads.
+- `pongAttractState` is defined in both `char_view.cpp` and `pong_attract_state_shims.cpp`.
+- 0x825EB988 has five names; 0x825CAEB8 (sysTimeManager) is split across four files with
+  different layouts. `g_defaultDuration` and `g_zeroFloat` are each declared at two addresses.
+- `pong_creature.cpp:242` dereferences the raw address `(float*)0x82606750`.
+- `g_phRandomSeedPtr`/`ActiveCameraPtr`/`GlobalStatePtr` are dereferenced once too often;
+  `ph_0CC0`'s state stride is 5, not 3.
+- `sysMemAllocator_InitThreadHeap` is 0x820C0038, and its heap is 0x02C00000.
+- `gmLogicSpectator_vfn_18` (`pong_match.cpp`) drops a `lis 1` (offset 0x18DA0).
+- `char_view.cpp` `PurgeFilteredNodes` is 0x82163D88, not 0x8216DB88.
+- The audVoiceStream vtable names are swapped.
 - `ph_ctor_0460_Destructor` stores vtable 0x820014C8; the asm stores 0x82059FA8.
 - `ph_physics.hpp`: the phBoundCapsule/phInst/phArticulatedCollider/phJoint3Dof/phBoundGeometry
   "+0x" annotations overlap; they're access maps, not layouts. Lifts reading them by name are
@@ -224,17 +234,6 @@ comments name those instructions right.
 
 `disasm/sections/.text.s` mis-decodes some AltiVec loads as `vmaddfp128`; cross-check those
 against the recomp or the raw bytes in the game image.
-
-## Misnamed globals (shared across files, rename together)
-
-| Address | Current name | Really |
-|---|---|---|
-| 0x8271A318 | `g_pMatchState` | `atSingleton<camShotMgr>` instance |
-| 0x8271A32C | `g_pMatchConfig` | shared camera state |
-| 0x825EBAA0 | `g_pHudOverlay` | current `grcViewport` |
-| 0x8271A304 | `g_pGlobalClock` | table dimensions |
-| 0x8202D10C | `g_kZero` (defined 0.0f in `globals.c`) | 0.5 (0.0 is at 0x8202D110) |
-| 0x8260633C | `g_swingInFlightFlag` (word) | a byte |
 
 ## Not game code
 
