@@ -204,7 +204,8 @@ struct pongCreatureState {
 // ── Outer class: pongPlayer ───────────────────────────────────────────────
 struct pongPlayer {
     // ── atSingleton base ────────────────────────────────────────────────
-    void**              vtable;              // +0x000
+    // +0x000 is the vtable pointer, the implicit one of the virtuals below:
+    // an explicit member as well put every field 4 bytes past the asm's.
     uint32_t            m_flags;             // +0x004
     pcrCreature*        m_pCreature;         // +0x008
     uint32_t            _unk_0x00C;          // +0x00C

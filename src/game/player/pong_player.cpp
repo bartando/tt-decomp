@@ -3432,7 +3432,7 @@ void pongPlayer::Update() {  // pongPlayer_Update @ 0x8218CF08
     }
     // Virtual dispatch to Update1 (vtable slot 4, byte offset +16)
     typedef void (*UpdateFn)(pongPlayer*);
-    UpdateFn fn = reinterpret_cast<UpdateFn>(vtable[4]);
+    UpdateFn fn = reinterpret_cast<UpdateFn>((*reinterpret_cast<void***>(this))[4]);
     fn(this);
 }
 
