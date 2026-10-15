@@ -198,6 +198,8 @@ def build_lift(repo: Path, syms: Symbols, source: Path, function: str, *, orig_a
     build directories of specs that check the same function apart (parallel runs)."""
     clang = llvm_bin("clang")
     source = source.resolve()
+    if not source.is_relative_to(repo.resolve()):
+        syms.include(source)
     key = hashlib.sha1(repr((str(source), function, opt, patches, extra_flags, fp_contract, tag)
                             ).encode()).hexdigest()[:10]
     out = workdir / f"{source.stem}-{key}"
@@ -284,12 +286,13 @@ def build_lift(repo: Path, syms: Symbols, source: Path, function: str, *, orig_a
         if a is None:
             a = syms.resolve(u, d)
         if a is None:
-            missing.append(d)
+            missing.append(f"{d}: {syms.explain(u, d)}")
         else:
             externs[u] = a
     if missing:
-        raise BuildError("can't map these to original addresses (add them to EXTERNS in the spec,\n"
-                         "or give them a `// @ 0x...` marker):\n  " + "\n  ".join(missing))
+        raise BuildError(f"{len(missing)} symbol(s) the lift uses have no original address (add them "
+                         "to EXTERNS in the spec, or give them a `// @ 0x...` marker):\n  "
+                         + "\n  ".join(missing))
 
     p = _run(base + [f"--defsym={u}=0x{a:X}" for u, a in externs.items()])
     if p.returncode != 0:

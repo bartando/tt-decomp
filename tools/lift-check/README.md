@@ -114,9 +114,15 @@ emulator, the example specs, and nine mutated lifts that must all fail (about 40
   address and the optimiser can't inline or look into it; then `-O2` codegen for
   `powerpc-unknown-elf` (4-byte pointers, so struct layouts match the game's), and
   `ld.lld --gc-sections` at 0x82800000, right after the image. Symbols are resolved from
-  `config/434C4803/master_symbol_map.json` (`by_name`) and `// @ 0x...` markers in `src/`
-  and `include/`, and passed as `--defsym`. A separate `-O1 -g` object supplies the
-  signatures (which registers a call passes and how wide) and struct layouts.
+  `// @ 0x...` markers in `src/` and `include/` (and the TU itself), then
+  `config/434C4803/master_symbol_map.json` (`by_name`), and passed as `--defsym`. A marker
+  counts on the declaration or definition it trails (any line of a multi-line one), from a
+  comment block directly above one (no blank line between), or as `Name @ 0x...` in a
+  comment. Where a name has several addresses, one on the declaration itself beats
+  comment ones; a call statement's trailing marker counts least. A free function declared
+  inside `namespace rage {}` matches `rage::X`; lambdas never resolve. A BUILD error lists
+  each unresolved symbol with its conflicting markers. A separate `-O1 -g` object
+  supplies the signatures (which registers a call passes and how wide) and struct layouts.
 - **Calls.** A block hook catches every jump out of the function (the original's range from
   the symbol map; the lift's own code). The save/restore helpers just run. Both sides get
   the same scripted or random return for the n-th call to a target, and the same clobbered
