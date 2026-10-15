@@ -31,3 +31,10 @@ Reported by the agents using it. Each was worked around in a spec; fix in the to
 - Clang contracts multiply-adds into FMA where the asm rounds separately (Serve needs FTOL
   1e-5). Compiling lifts with `-ffp-contract=off` should fix it.
 - No transparent `run()` for helpers the original inlines (`specs/player_common.py` subclasses it).
+- strcmp isn't modelled; the lift calls the game's (0x82432970) where the original inlines it.
+- Calls through a one-branch thunk (`thunk_rage_free` 0x820C0120) count as a different call.
+- Stubs clobber f6/f7 too.
+- A missing `// @` marker gives a BUILD error with no hint which symbol.
+- A name marked with two addresses fails to build.
+- Values set by static initializers are zero in the boot image (e.g. 0x82619BD0/BE0).
+- Running a callee that calls further functions compares their stack-pointer args raw.

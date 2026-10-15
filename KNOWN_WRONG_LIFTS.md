@@ -9,9 +9,19 @@ Many structs (likely hundreds; `rage_misc.hpp`, `pong_render.hpp`, `char_view.hp
 `cm_operators.hpp`, `rage_grm.hpp`, …) declare a `void** vtable` / `m_vtable` field AND C++
 `virtual` methods. The compiler then adds its own hidden vptr in front, so every field sits
 one pointer late (4 bytes on the game's 32-bit layout). Found by lift-check on `grmModel`
-(+0xC read as +0x10), `hsmStateBase`/`hsmState` and `pongPlayer` (all three fixed). Fix per class: drop one of the
+(+0xC read as +0x10), `hsmStateBase`/`hsmState`, `pongPlayer`, the camera classes in `pong_camera.hpp` (all fixed),
+and `msgMsgSink` in `pong_misc.hpp` (NOT fixed: ~85 virtuals and the struct is also 4 bytes
+short mid-way, so the dialogManager ctor 0x822EC7F8 fails lift-check; spec
+`misc_dialog_manager_ctor` documents it). Fix per class: drop one of the
 two (keep C++ virtuals only where nothing needs the vtable field by name, otherwise make the
 methods non-virtual), then re-verify its lifts.
+
+## Systemic: C++ virtual slot numbers don't match the game's vtables
+
+Headers declare virtuals with gaps (Itanium's two destructor slots, undeclared slots), so a
+C++ virtual call lands in the wrong slot. Found in `pongPlayer` (slot 9 called as 5) and
+`pongCreatureInst` (slots 47/48/53/10 called as 26/27/28/8). Lifted code calls through
+`VCALL` with the game's slot number where verified; other virtual calls are suspect.
 
 ## Wrong lifts
 
@@ -30,9 +40,7 @@ methods non-virtual), then re-verify its lifts.
 - `msgMsgSink::vfn_126` (0x8244FF38, `msg_msg_sink.cpp`): same name lookup as
   `xactGlobalSettings::FindCategory`, but loses the name argument and treats chain indices
   as pointers.
-- `pongNetMessageHolder::RemoveElementByPointer` (0x82134350, `pong_network.cpp`) compares the
-  stored pointer (`*slot == target`); the asm compares the slot address. It is really the
-  stripifier's strip-list erase.
+
 - 0x82134408 (`xe_buffers.c`, `AllocateU32AlignedWithCounter`, stores a pointer as `uint32_t`)
   and 0x821350B8 (`memory.cpp`, `datPtrArray_DestroyAll`) are the strip list's constructor and
   destructor under unrelated names.
@@ -98,6 +106,13 @@ methods non-virtual), then re-verify its lifts.
 - `pongPlayer`'s C++ virtuals don't number like the game's vtable (the Itanium destructor
   takes two slots; slots 3–6 and 8 aren't declared), so any virtual call on it through C++
   is suspect; the serve code calls slot 9 through a helper for that reason.
+- `cmWorldRefreshableCtor_Destructor` (`cm_operators.cpp:44`) skips the allocator's vtable
+  load like `cmOperatorCtor_Allocate` did (fixed there), unverified.
+- 0x8214C8F8 (`CopyAnimationData`, fixed in `pong_creature.cpp`) is also lifted as an empty
+  no-op in `locomotion.cpp`, and that's the copy callers use.
+- `ph_update_object.cpp` marks `g_phFrameIndex` at 0x825C4898; the asm reads 0x826065DC.
+- `include/globals.h:119` still mentions `RestorePoseFromRollback` (now `SavePoseSnapshot`).
+- 0x820C6378 (`pongCreature` slot 6) still has a TODO body.
 - `globals.c`: `g_msgSinkTemplate` is at 0x8261A0C0, not 0x8241A0C0.
 
 
