@@ -818,25 +818,8 @@ void* g_someRenderObj2 = NULL;             // @ 0x825FEAB0
 const char* g_stateName_attract  = "";     // @ 0x8205E094
 const char* g_stateName_charView = "";     // @ 0x8205EF5C
 
-// Game data error strings
-const char* g_str_gdLadder_duplicateLevel       = "";
-const char* g_str_gdLadder_missingLadder        = "";
-const char* g_str_gdLadder_unknownNodeType      = "";
-const char* g_str_gdRivalryData_noCharName      = "";
-const char* g_str_gdRivalryData_noRivalName     = "";
-const char* g_str_gdRivalryData_unknownRival    = "";
-const char* g_str_gdRivalry_duplicateChar       = "";
-const char* g_str_gdRivalry_missingRival        = "";
-const char* g_str_gdRivalry_unknownChar         = "";
-const char* g_str_gdRivalry_unknownNodeType     = "";
-const char* g_str_gdTierMember_noCharName       = "";
-const char* g_str_gdTierMember_unknownChar      = "";
-const char* g_str_gdTier_noTierName             = "";
-const char* g_str_gdTier_unknownNodeType        = "";
-
-// Pong strings
-const char* g_str_pongDrill_tooManySuccesses = "";
-const char* g_str_pongMover_calcInitMatrix   = "";
+// The gd* and pong error strings are defined, with their text, in
+// gd_data_strings.cpp and pong_strings.cpp.
 
 // Swipe patterns array
 struct SwipePattern g_swipePatterns[17] = {{0}};  // @ 0x825D09A0
