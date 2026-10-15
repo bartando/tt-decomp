@@ -847,6 +847,11 @@ void* g_vtable_pong_char_view_context_2  = NULL;
 void* g_vtable_pong_char_view_context_3  = NULL;
 void* g_vtable_pong_char_view_state      = NULL;
 
+// Drills
+void* g_pPracticeTarget = NULL;  // @ 0x826063A8  runtime-initialised (0x821020D8 stores it)
+void* g_pTrainingHud    = NULL;  // @ 0x82606614  runtime-initialised
+void* g_gdDrillMovementData_classId = &g_gdDrillMovementData_classId;  // @ 0x825C6BC4  type token, see g_aiTypeId_3
+
 // XEX exec info
 void* g_xex_exec_info = NULL;             // @ 0x825E6E64
 
