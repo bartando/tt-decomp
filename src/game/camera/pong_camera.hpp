@@ -12,6 +12,11 @@
 #pragma once
 #include <stdint.h>
 
+// The classes below carry the game's vtable pointer as an explicit `vtable`
+// member and call slots through GameVirtual. Their "virtual methods" are
+// listed by slot but declared non-virtual: a C++ virtual would add a second
+// vtable pointer in front of `vtable` and shift every member by 4.
+
 struct pongCMCamera;
 struct pongCineCamMgr;
 namespace rage { struct cmNamedValueSet; }  // RTTI: vtable @ 0x820373AC
@@ -72,7 +77,7 @@ struct camBaseCS {
     float        m_cameraFar;      // +0xAC - "CameraFar"
 
     // ── virtual methods ──
-    virtual ~camBaseCS();                  // [0] @ 0x8216daa0
+    ~camBaseCS();                  // [0] @ 0x8216daa0
 };
 
 // ── CMtoCSAdapter  [vtable @ 0x82036844] ──────────────────────────
@@ -82,9 +87,9 @@ struct CMtoCSAdapter : camBaseCS {
     pongCMCamera* m_cmCamera;       // +0x130 - second ctor argument (pongCameraMgr::m_cmCamera)
 
     // ── virtual methods ──
-    virtual ~CMtoCSAdapter();                  // [0] @ 0x8216e968
-    virtual void vfn_8();  // [8] @ 0x8216f828
-    virtual void vfn_9();  // [9] @ 0x821709f8
+    ~CMtoCSAdapter();                  // [0] @ 0x8216e968
+    void vfn_8();  // [8] @ 0x8216f828
+    void vfn_9();  // [9] @ 0x821709f8
 
     // ── non-virtual methods ──
     void PublishCameraMatrix(const CamMatrix44& cameraMtx);  // @ 0x821722F8
@@ -95,7 +100,7 @@ struct camShot {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual void GetName();  // [13] @ 0x82165448
+    void GetName();  // [13] @ 0x82165448
 };
 
 // ── camShotMgr  [2 vtables — template/MI] ──────────────────────────
@@ -110,13 +115,13 @@ struct camShotMgr {
     uint32_t    m_nextShotIndex;      // +0x1C - next shot index (-1 when none)
 
     // ── virtual methods ──
-    virtual ~camShotMgr();                               // [0] @ 0x82166e38
-    virtual void OnEnter();                              // [4] @ 0x82165458 — copy m_sourceStateId → m_currentShotIndex, call gmLogic::OnEnter
-    virtual void BuildShotArray();                       // [8] @ 0x82165468 — alloc m_shotArray[m_shotCount+1], construct camShot per slot
-    virtual void DestroyShotArray();                     // [9] @ 0x82165558 — virtual-destruct each shot and free m_shotArray
-    virtual void ResetShotIndices();                     // [10] @ 0x821655d8 — set current/previous/next shot indices to -1
-    virtual void GetName();                              // [13] @ 0x821655f0
-    virtual void vfn_14();                               // [14] @ 0x82165608
+    ~camShotMgr();                               // [0] @ 0x82166e38
+    void OnEnter();                              // [4] @ 0x82165458 — copy m_sourceStateId → m_currentShotIndex, call gmLogic::OnEnter
+    void BuildShotArray();                       // [8] @ 0x82165468 — alloc m_shotArray[m_shotCount+1], construct camShot per slot
+    void DestroyShotArray();                     // [9] @ 0x82165558 — virtual-destruct each shot and free m_shotArray
+    void ResetShotIndices();                     // [10] @ 0x821655d8 — set current/previous/next shot indices to -1
+    void GetName();                              // [13] @ 0x821655f0
+    void vfn_14();                               // [14] @ 0x82165608
 };
 
 // ── camViewCS  [vtable @ 0x82036330] ──────────────────────────
@@ -142,13 +147,13 @@ struct camViewCS {
     uint8_t      _pad_0x45[3];      // +0x45..+0x47
 
     // ── virtual methods ──
-    virtual ~camViewCS();                                  // [0] @ 0x8216caf8
-    virtual void RegisterParamHooks(void* paramHost);      // [3] @ 0x8216ceb0 — UseGlobalClip, Clip Near, Clip Far
-    virtual const char* GetTypeName();                     // [6] @ 0x82177830 — returns the .rdata string at 0x82032868
-    virtual const char* GetDebugLabel();                   // [7] @ 0x8216cae8 — returns "camViewCS"
-    virtual void OnReset();                                // [8] @ 0x8216ce40 — resets both sources (slot 8), clears +0x10/+0x14/+0x30
-    virtual void OnSourceChanged();                        // [9] @ 0x8216cd30 — m_source's slot 9, clears m_viewFlags if m_source != m_otherSource
-    virtual void Update();                                 // [10] @ 0x8216cd88 — current viewport gets the source's matrix, m_viewport its FOV/aspect/clip
+    ~camViewCS();                                  // [0] @ 0x8216caf8
+    void RegisterParamHooks(void* paramHost);      // [3] @ 0x8216ceb0 — UseGlobalClip, Clip Near, Clip Far
+    const char* GetTypeName();                     // [6] @ 0x82177830 — returns the .rdata string at 0x82032868
+    const char* GetDebugLabel();                   // [7] @ 0x8216cae8 — returns "camViewCS"
+    void OnReset();                                // [8] @ 0x8216ce40 — resets both sources (slot 8), clears +0x10/+0x14/+0x30
+    void OnSourceChanged();                        // [9] @ 0x8216cd30 — m_source's slot 9, clears m_viewFlags if m_source != m_otherSource
+    void Update();                                 // [10] @ 0x8216cd88 — current viewport gets the source's matrix, m_viewport its FOV/aspect/clip
 };
 
 // ── cameraShake  [vtable @ 0x820363F0] ──────────────────────────
@@ -183,14 +188,14 @@ struct charViewCS {
     uint8_t     m_ownsHeap;             // +0x124 (+292) - destructor-cleanup tag passed to util_1568
 
     // ── virtual methods ──
-    virtual ~charViewCS();                             // [0] @ 0x8216bd20 — cleanup +292, chain to rage dtor, optional delete
-    virtual void RegisterAxisHooks(void* paramHost);   // [3] @ 0x8216dbb8 — register 6 tunable axis hooks with paramHost
-    virtual void ForwardToBoundCapsule();              // [4] @ 0x8216dcb0 — direct forward to phBoundCapsule::vfn_0
-    virtual const char* GetTypeName();                 // [6] @ 0x8216db00 — returns class name string
-    virtual const char* GetDebugLabel();               // [7] @ 0x82177840 — returns debug-friendly label
-    virtual void UpdatePositions();                    // [9] @ 0x8216c200 — per-frame vector/position lerp over 7 slots
-    virtual void DispatchAllSlotInputs();              // [10] @ 0x8216bed0 — for each of 4 slots call ProcessAxisInputs
-    virtual void AccumulateDelta(const void* delta);   // [11] @ 0x8216db88 — v[+64] += *delta; v[+128] += *delta (SIMD)
+    ~charViewCS();                             // [0] @ 0x8216bd20 — cleanup +292, chain to rage dtor, optional delete
+    void RegisterAxisHooks(void* paramHost);   // [3] @ 0x8216dbb8 — register 6 tunable axis hooks with paramHost
+    void ForwardToBoundCapsule();              // [4] @ 0x8216dcb0 — direct forward to phBoundCapsule::vfn_0
+    const char* GetTypeName();                 // [6] @ 0x8216db00 — returns class name string
+    const char* GetDebugLabel();               // [7] @ 0x82177840 — returns debug-friendly label
+    void UpdatePositions();                    // [9] @ 0x8216c200 — per-frame vector/position lerp over 7 slots
+    void DispatchAllSlotInputs();              // [10] @ 0x8216bed0 — for each of 4 slots call ProcessAxisInputs
+    void AccumulateDelta(const void* delta);   // [11] @ 0x8216db88 — v[+64] += *delta; v[+128] += *delta (SIMD)
 
     // ── non-virtual helpers ──
     void ProcessAxisInputs(int slotIndex);             // @ 0x8216bf18 — convert 3 axis bytes → normalized values, call ApplyAxisScaled
@@ -203,11 +208,11 @@ struct gdCameraDef {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~gdCameraDef();                  // [0] @ 0x8220c508
-    virtual void vfn_3();  // [3] @ 0x8220c838
-    virtual void PostLoadProperties();  // [20] @ 0x8220c5d0
-    virtual void Validate();  // [21] @ 0x8220c6d8
-    virtual void PostLoadChildren();  // [22] @ 0x8220c618
+    ~gdCameraDef();                  // [0] @ 0x8220c508
+    void vfn_3();  // [3] @ 0x8220c838
+    void PostLoadProperties();  // [20] @ 0x8220c5d0
+    void Validate();  // [21] @ 0x8220c6d8
+    void PostLoadChildren();  // [22] @ 0x8220c618
 
     // ── non-virtual methods (from debug strings) ──
     void Load();
@@ -219,10 +224,10 @@ struct gdCameraDest {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~gdCameraDest();                  // [0] @ 0x8220bbe8
-    virtual void PostLoadProperties();  // [20] @ 0x8220bc38
-    virtual void Validate();  // [21] @ 0x8220bd48
-    virtual void PostLoadChildren();  // [22] @ 0x8220bc80
+    ~gdCameraDest();                  // [0] @ 0x8220bbe8
+    void PostLoadProperties();  // [20] @ 0x8220bc38
+    void Validate();  // [21] @ 0x8220bd48
+    void PostLoadChildren();  // [22] @ 0x8220bc80
 };
 
 // ── gdCameraInst  [vtable @ 0x820496CC] ──────────────────────────
@@ -230,11 +235,11 @@ struct gdCameraInst {
     void**      vtable;           // +0x00
 
     // ── virtual methods ──
-    virtual ~gdCameraInst();                  // [0] @ 0x8220c068
-    virtual void vfn_3();  // [3] @ 0x8220c338
-    virtual void PostLoadProperties();  // [20] @ 0x8220c138
-    virtual void Validate();  // [21] @ 0x8220c230
-    virtual void PostLoadChildren();  // [22] @ 0x8220c180
+    ~gdCameraInst();                  // [0] @ 0x8220c068
+    void vfn_3();  // [3] @ 0x8220c338
+    void PostLoadProperties();  // [20] @ 0x8220c138
+    void Validate();  // [21] @ 0x8220c230
+    void PostLoadChildren();  // [22] @ 0x8220c180
 };
 
 // Camera machine instance owned by pongCMCamera, built by 0x82261748 from the
@@ -252,7 +257,7 @@ struct pongCMCamera {
     rage::cmNamedValueSet* m_values;         // +0x18 - the 81 named camera values (ids set up by 0x82175248)
 
     // ── virtual methods ──
-    virtual ~pongCMCamera();                  // [0] @ 0x8216dd08
+    ~pongCMCamera();                  // [0] @ 0x8216dd08
 };
 
 // 8-byte block at pongCamGovernor+0x08. The shot-condition helpers take it by
@@ -270,7 +275,7 @@ struct pongCamGovernor {
     CamShotKey  m_shotKey;        // +0x08 - both 0.0 in the ctor
 
     // ── virtual methods ──
-    virtual ~pongCamGovernor();                  // [0] @ 0x82168890
+    ~pongCamGovernor();                  // [0] @ 0x82168890
 };
 
 // ── pongCameraMgr  [2 vtables — template/MI] ──────────────────────────
@@ -310,13 +315,13 @@ struct pongCameraMgr {
     uint8_t     m_activeFlag;       // +0x360 (864)
 
     // ── virtual methods ──
-    virtual ~pongCameraMgr();                  // [0] @ 0x821658e0
-    virtual bool PostLoadProperties(uint32_t value);  // [20] @ 0x821657f8
-    virtual const char* PostLoadChildren();  // [22] @ 0x82165830
-    virtual void vfn_23();  // [23] @ 0x82165960
-    virtual void Shutdown();  // [24] @ 0x82165f30 — frees what vfn_23 built
-    virtual void vfn_25();  // [25] @ 0x82166068
-    virtual void Update();  // [27] @ 0x82166118 — per-frame camera update
+    ~pongCameraMgr();                  // [0] @ 0x821658e0
+    bool PostLoadProperties(uint32_t value);  // [20] @ 0x821657f8
+    const char* PostLoadChildren();  // [22] @ 0x82165830
+    void vfn_23();  // [23] @ 0x82165960
+    void Shutdown();  // [24] @ 0x82165f30 — frees what vfn_23 built
+    void vfn_25();  // [25] @ 0x82166068
+    void Update();  // [27] @ 0x82166118 — per-frame camera update
 
     // ── non-virtual methods ──
     void ChangeCamera();
@@ -493,7 +498,7 @@ struct pongCameraState {
     void*       m_child;          // +0x10 - child object (destroyed in dtor)
 
     // ── virtual methods ──
-    virtual ~pongCameraState();                  // [0] @ 0x82167770
+    ~pongCameraState();                  // [0] @ 0x82167770
 };
 
 // ── pongCineCamMgr  [vtable @ 0x82036070] ──────────────────────────
@@ -508,7 +513,7 @@ struct pongCineCamMgr {
     pongCamGovernor* m_governorB;   // +0x14
 
     // ── virtual methods ──
-    virtual ~pongCineCamMgr();                  // [0] @ 0x82166fd8
+    ~pongCineCamMgr();                  // [0] @ 0x82166fd8
 
     // ── non-virtual methods ──
     void StepActiveGovernor();                  // @ 0x82167558
