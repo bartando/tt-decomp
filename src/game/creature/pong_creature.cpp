@@ -538,88 +538,50 @@ void LocomotionState::ValidateAnimationTiming(uint32_t& animSetIndex, uint32_t& 
     }
 }
 
+// 0x820DEDC0 — no pseudocode available; defined as a no-op further down.
+void pongCreatureInst_EDC0_g(void* a, void* b, void* c);
+
+// What 0x8214C8F8 reads from `this`. Its callers (pongCreature::UpdateReplay
+// and UpdateAnimation, through LocomotionStateAnim_C8F8_g) pass a skeleton,
+// pongCreature+0xAC; LocomotionStateAnim's header layout (which also gets a
+// C++ vptr) doesn't describe it.
+struct skeletonPoseData {
+    uint8_t         _pad00[0x04];
+    const uint32_t* parents;    // +0x04  parent bone index per bone
+    uint8_t         _pad08[0x04];
+    uint16_t        boneCount;  // +0x0C
+};
+
+struct skeletonPoseView {
+    uint8_t                 _pad00[0x04];
+    const skeletonPoseData* data;        // +0x04
+    void*                   rootHelper;  // +0x08
+    uint8_t*                bones;       // +0x0C  0x50-byte bone records
+    uint8_t                 _pad10[0x04];
+    uint8_t*                matrices;    // +0x14  0x40-byte bone matrices
+};
+
 /**
  * LocomotionStateAnim::CopyAnimationData @ 0x8214C8F8 | size: 0xD0
- * 
- * Copies animation transformation data between two internal buffers.
- * This is used during locomotion state transitions to transfer animation
- * pose data from one state to another.
- * 
- * The function handles two cases:
- * 1. If a helper object exists, delegates to pongCreatureInst helper
- * 2. Otherwise, manually copies 64 bytes of transformation data using SIMD
- * 
- * After the initial copy, processes additional animations from an array.
+ * (locomotion.cpp has the same address as LocomotionStateAnim_C8F8_g, a no-op)
+ *
+ * Root bone: with a helper at +0x08, 0x820DEDC0(matrix 0, record 0, helper);
+ * otherwise the record's leading 64 bytes become matrix 0. Every further bone
+ * i goes through 0x820DEDC0(matrix i, record i, matrix of parents[i]).
  */
 void LocomotionStateAnim::CopyAnimationData() {
-    // Get source and destination buffer pointers
-    void* srcBuffer = (void*)this->field_0x000c;   // +0x0C
-    void* dstBuffer = (void*)this->field_0x0014;   // +0x14
+    const skeletonPoseView* skel = reinterpret_cast<const skeletonPoseView*>(this);
 
-    // Check if we have a helper object for the copy operation
-    void* helperObj = (void*)this->field_0x0008;    // +0x08
-    
-    if (helperObj != nullptr) {
-        // Use pongCreatureInst helper to perform the copy
-        // This likely handles more complex transformation logic
-        extern void pongCreatureInst_CopyTransform(void* dst, void* src, void* helper);
-        pongCreatureInst_CopyTransform(dstBuffer, srcBuffer, helperObj);
-    } else {
-        // Manual copy: 64 bytes (4 x 16-byte vectors) of transformation data
-        // This is likely a 4x4 transformation matrix (16 floats = 64 bytes)
-        
-        // Copy using 16-byte aligned SIMD operations
-        // Vector 0: bytes 0-15
-        memcpy(dstBuffer, srcBuffer, 16);
-        
-        // Vector 1: bytes 16-31
-        memcpy((char*)dstBuffer + 16, (char*)srcBuffer + 16, 16);
-        
-        // Vector 2: bytes 32-47
-        memcpy((char*)dstBuffer + 32, (char*)srcBuffer + 32, 16);
-        
-        // Vector 3: bytes 48-63
-        memcpy((char*)dstBuffer + 48, (char*)srcBuffer + 48, 16);
-    }
-    
-    // Process additional animations from the animation array
-    // Get animation info structure from offset +4
-    void* animInfo = (void*)this->field_0x0004;
-    
-    if (animInfo == nullptr) {
-        return;
-    }
-    
-    // Get animation count from offset +12 in animInfo
-    uint16_t animCount = *(uint16_t*)((char*)animInfo + 12);
-    
-    // Get animation array pointer from offset +4 in animInfo
-    uint32_t* animArray = *(uint32_t**)((char*)animInfo + 4);
-    
-    if (animCount <= 1) {
-        return;  // No additional animations to process
-    }
-    
-    // Process each additional animation (skip first one, already handled)
-    for (int i = 0; i < animCount - 1; i++) {
-        // Get animation index from array
-        uint32_t animIndex = animArray[i];
-        
-        // Calculate buffer offsets for this animation
-        // Each animation uses 64-byte destination blocks and 80-byte source blocks
-        uint32_t dstOffset = 64 + (i * 64);   // Start at +64, increment by 64
-        uint32_t srcOffset = 80 + (i * 80);   // Start at +80, increment by 80
-        
-        // Calculate indexed destination offset: animIndex * 64
-        uint32_t indexedDstOffset = animIndex * 64;
-        
-        // Copy animation data using helper
-        void* dstPtr = (char*)dstBuffer + dstOffset;
-        void* srcPtr = (char*)srcBuffer + srcOffset;
-        void* indexedDstPtr = (char*)dstBuffer + indexedDstOffset;
-        
-        extern void pongCreatureInst_CopyTransform(void* dst, void* src, void* indexed);
-        pongCreatureInst_CopyTransform(dstPtr, srcPtr, indexedDstPtr);
+    if (skel->rootHelper != nullptr)
+        pongCreatureInst_EDC0_g(skel->matrices, skel->bones, skel->rootHelper);
+    else
+        memcpy(skel->matrices, skel->bones, 64);
+
+    const skeletonPoseData* data = skel->data;
+    const int boneCount = data->boneCount;
+    for (int i = 1; i < boneCount; ++i) {
+        pongCreatureInst_EDC0_g(skel->matrices + 0x40 * i, skel->bones + 0x50 * i,
+                                skel->matrices + 0x40 * data->parents[i]);
     }
 }
 
@@ -1873,10 +1835,11 @@ extern fragCacheEntry* fragCachePool_Acquire(fragCachePool* pool);
 // @ 0x8212A700 (ph_A700) — binds the entry to the instance (entry+0x1B4 = inst,
 // inst+0x54 = entry). With a type, the last three go to ph_A808, which sets
 // bit `index` of the entry's bitset at +0x1CC when markIndex is set; without
-// one, arg5 and index are only stored at entry+0x1B8 / +0x1BC.
+// one, arg5 and index are only stored at entry+0x1B8 / +0x1BC. index comes
+// in r8 (stored with sth) and arg5 in r9.
 extern void fragCacheEntry_Init(fragCacheEntry* entry, fragTypeHolder* typeHolder, fragType* type,
-                                const float* matrix, pongCreatureInst* inst, void* arg5,
-                                uint16_t index, bool markIndex);
+                                const float* matrix, pongCreatureInst* inst, uint16_t index,
+                                void* arg5, bool markIndex);
 // @ 0x82120120 (fragInst_vfn_30), not lifted. Returns null unless flag 0x2 at
 // +0x50 is set, and the instance at once unless bit 0 of its fragType's byte
 // +0x1AF is set. Otherwise gets a cache entry through slot 43 if there is none
@@ -2023,8 +1986,10 @@ bool pongCreatureInst::AttachToScene(bool rejectIfKeyCached) {
     self->flags |= FRAG_INST_FLAG_ATTACHED;
     manager->onAttach.thunk(&manager->onAttach, self->managerHandle);
 
+    // The game's slot 48 (InitializeTransform); the header's virtuals don't
+    // follow the game's slot order, so a C++ virtual call would miss it.
     if (self->ResolvedType() != nullptr)
-        InitializeTransform();  // vtable slot 48
+        VCALL(this, 48, void (*)(pongCreatureInst*))(this);
 
     fragTypeHolder* holder = self->typeHolder;
     if (holder == nullptr)
@@ -2068,8 +2033,10 @@ fragCacheEntry* pongCreatureInst::AcquireCacheEntry() {
         return nullptr;
     }
 
-    void* arg5 = GetPhysicsAllocator();  // vtable slot 53
-    fragCacheEntry_Init(entry, self->typeHolder, self->type, &self->matrix[0][0], this, arg5, 0xFF, false);
+    // The game's slot 53 (GetPhysicsAllocator); a C++ virtual call would use
+    // the header's slot order, which isn't the game's.
+    void* arg5 = VCALL(this, 53, void* (*)(pongCreatureInst*))(this);
+    fragCacheEntry_Init(entry, self->typeHolder, self->type, &self->matrix[0][0], this, 0xFF, arg5, false);
     return entry;
 }
 
@@ -2091,8 +2058,10 @@ void pongCreatureInst::UpdateWorldBound() {
 
     // The original transposes the matrix and takes three 4-wide dot products
     // with (centroid.xyz, w): the mask at 0x82619BE0 keeps xyz and the
-    // constant at 0x82619BD0 supplies w, assumed 1.0 since row 3 (the
-    // translation) has to count. Unverified: the .data bytes aren't in the repo.
+    // constant at 0x82619BD0 supplies w = 1.0. Both are zero in the image and
+    // filled by static initializers: 0x8257DBF8 copies (0, 0, 0, 1) from
+    // 0x825C5850, 0x8257DBD8 copies 0x82619C20, whose xyz 0x8257DB68 sets to
+    // the all-ones word at 0x825CB7F0.
     const float cx = bound->centroidOffset[0];
     const float cy = bound->centroidOffset[1];
     const float cz = bound->centroidOffset[2];
@@ -2105,7 +2074,9 @@ void pongCreatureInst::UpdateWorldBound() {
     fragInstManager* manager = FragInstManager();
     manager->onBoundMoved.thunk(&manager->onBoundMoved, self->managerHandle);
 
-    SyncBoneMatrices();  // vtable slot 47
+    // The game's slot 47 (SyncBoneMatrices); a C++ virtual call would use the
+    // header's slot order, which isn't the game's.
+    VCALL(this, 47, void (*)(pongCreatureInst*))(this);
 }
 
 // Slots 2 and 3: phInst's own slot 2 (0x823D8CD0) returns the current matrix at
@@ -2131,6 +2102,14 @@ void pongCreatureInst::SetLastMatrix(const float* matrix) {
     memcpy(Layout(this)->lastMatrix, matrix, sizeof(Layout(this)->lastMatrix));
 }
 
+// The game's slot 10 (ApplyAt). The header's virtuals have gaps, so a C++
+// virtual call to ApplyAt would go through slot 8.
+static void CallApplyAt(pongCreatureInst* inst, const float* vec, const float* point, int component,
+                        int element) {
+    VCALL(inst, 10, void (*)(pongCreatureInst*, const float*, const float*, int, int))(
+        inst, vec, point, component, element);
+}
+
 /**
  * pongCreatureInst::ApplyAtPosition @ 0x822C90B0 | size: 0x1C  [vtable slot 9]
  *
@@ -2138,7 +2117,7 @@ void pongCreatureInst::SetLastMatrix(const float* matrix) {
  * the point and component and element 0.
  */
 void pongCreatureInst::ApplyAtPosition(const float* vec) {
-    ApplyAt(vec, Layout(this)->matrix[3], 0, 0);  // vtable slot 10
+    CallApplyAt(this, vec, Layout(this)->matrix[3], 0, 0);
 }
 
 /**
@@ -2179,7 +2158,7 @@ void pongCreatureInst::ApplyToRope(const float* vec, const float* point, int com
  * rage::phInst's: tail-calls slot 10 with element 0.
  */
 void pongCreatureInst::ApplyAtComponent(const float* vec, const float* point, int component) {
-    ApplyAt(vec, point, component, 0);  // vtable slot 10
+    CallApplyAt(this, vec, point, component, 0);
 }
 
 /**
@@ -3507,11 +3486,10 @@ extern "C" void pongCreatureInst_E828_v12(void* self, unsigned int flags) {
 // reproduce the recomp control flow at the C++ level.
 
 // Forward-declared free helpers lifted elsewhere in the build.
-extern "C" void rage_C668(void* unk, int flag);                         // @ 0x8225C668
-extern "C" void pongShadowMap_EC70_g(void* a, void* b,
-                                     void* c, void* d,
-                                     void* e, int flags);               // @ 0x8213EC70
-extern "C" void LocomotionState_CD70_g(void* self);                     // @ 0x8214CD70
+extern "C" void rage_C668(void* charData, void* snapshot, int index);    // @ 0x8225C668
+extern "C" void pongShadowMap_EC70_g(void* emitter, void* atlas, uint32_t charFlags,
+                                     void* snapshot, int flags);        // @ 0x8213EC70
+extern "C" void LocomotionState_CD70_g(void* skeleton, void* poseSnapshot);  // @ 0x8214CD70
 
 // Physics-frame ring-buffer cursors used by the rollback / shadow hooks.
 // Both are declared in include/globals.h — redeclared here as C++-linkage
@@ -3530,81 +3508,72 @@ extern "C" uint32_t g_phFrameIndex;    // @ 0x826065DC
 extern "C" void* g_phShadowAtlasSlot;  // @ 0x82606350
 
 // ─────────────────────────────────────────────────────────────────────────────
-// pongCreature::~pongCreature()  [vtable 0x82027B08 slot 0 @ 0x820C6358 | size: 0x1C]
+// pongCreature::UpdateWithIdentity(int updateMode)
+//                                [vtable 0x82027B08 slot 0 @ 0x820C6358 | size: 0x1C]
 //
-// Slot 0 of the phUpdateObject-base vtable (see the header): looks up the
-// object's own vtable and jumps to its slot 6. Lifted as the destructor
-// because a number of lifted callers bind to it.
+// (Was lifted as ~pongCreature; it destroys nothing.) Tail-calls slot 6 of the
+// object's own vtable with the identity matrix at 0x825CB800 and the caller's
+// argument: `mr r5, r4; addi r4, ..., -0x4800; lwz r9, 0x18(r10); bctr`.
 // ─────────────────────────────────────────────────────────────────────────────
-pongCreature::~pongCreature() {
-    // The stub loads slot index 6 from the object's own vtable and tail-calls
-    // it — the 0x820C6358 binary literally does `lwz r9,24(r10); bctr` (24
-    // bytes = slot 6 * 4), with r5 set to the caller's flags arg.
-    void** vt = *(void***)this;
-    ((void(*)(void*, int))vt[6])(this, 0);
+void pongCreature::UpdateWithIdentity(int updateMode) {
+    VCALL(this, 6, void (*)(pongCreature*, const float*, int))(this, g_identityMatrixRef, updateMode);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// pongCreature::DestroyThunk()  [vtable 0x82027B08 slot 2 @ 0x820C8618 | size: 0x8]
+// pongCreature::DestroyThunk(int flags)
+//                                [vtable 0x82027B08 slot 2 @ 0x820C8618 | size: 0x8]
 //
 // (Previously named "vfn_2" — renamed for clarity.)
 //
-// Multiple-inheritance adjust-and-dispatch thunk. In the retail binary this is
-// 8 bytes: `addi r3,r3,-16; b 0x820C5398`. The pattern rewinds the secondary-
-// subobject `this` pointer to the primary subobject (16-byte MI offset) and
-// tail-calls the scalar-deleting destructor (pongCreature::ScalarDeletingDtor
-// @ 0x820C5398) with flags=0 left over from the caller's r4.
+// Multiple-inheritance adjust-and-dispatch thunk: `addi r3,r3,-16;
+// b 0x820C5398`. Rewinds the phUpdateObject-base `this` to the object's start
+// and tail-calls the scalar deleting destructor
+// (pongCreature::ScalarDeletingDtor @ 0x820C5398) with the caller's flags,
+// which stay in r4.
 // ─────────────────────────────────────────────────────────────────────────────
-void pongCreature::DestroyThunk() {
+void pongCreature::DestroyThunk(int flags) {
     pongCreature* primary = (pongCreature*)((char*)this - 16);
-    primary->ScalarDeletingDtor(0);
+    primary->ScalarDeletingDtor(flags);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// pongCreature::RestorePoseFromRollback()
+// pongCreature::SavePoseSnapshot()
 //                                [vtable 0x82027B08 slot 1 @ 0x820C67C0 | size: 0x80]
 //
-// (Previously misnamed "ScalarDtor" — it is NOT a scalar destructor. The
-// body does not delete and does not call operator delete.)
+// (Was RestorePoseFromRollback; earlier misnamed "ScalarDtor".)
 //
-// Invoked by the physics rollback path every tick. Reads the per-player
-// pose-snapshot pointer from a 50-slot circular buffer embedded in the
-// creature (indexed by g_phFrameIndex). If a snapshot exists:
+// `this` is the phUpdateObject base (creature + 0x10). Picks the pose
+// snapshot for the current frame from the word table at this + 50*4, indexed
+// by g_phFrameIndex, and writes the skeleton's pose into it:
 //
-//   • If the anim descriptor at +0 has bit 0 of byte +17 set, the bone
-//     buffer is still resident — hand off to LocomotionState_CD70_g to
-//     flip the locomotion state's cached pointer in place.
-//   • Otherwise, the pose is cold — rebuild m_pCharCtx's pose cache by
-//     memcpy'ing `count*64` bytes (one 64-byte bone row per entry) from
-//     the snapshot buffer into (m_pCharCtx +20).
+//   • If bit 0 of the byte at +0x11 of the descriptor reached through
+//     character (+0x90) → +0x14 → +0x40 → [0] → [0] is set, the
+//     skeleton and the snapshot go to LocomotionState_CD70_g (tail call).
+//   • Otherwise the skeleton's bone matrices (count * 64 bytes from its
+//     +0x14) are copied into the snapshot.
 // ─────────────────────────────────────────────────────────────────────────────
-void pongCreature::RestorePoseFromRollback() {
-    // Per-frame snapshot slot: byte offset (g_phFrameIndex + 50) * 4.
-    uint32_t slot = g_phFrameIndex + 50;
-    uint32_t snapshot = *((uint32_t*)((char*)this + (slot << 2)));
-    if (snapshot == 0) return;
+void pongCreature::SavePoseSnapshot() {
+    void* const* snapshots = (void* const*)((char*)this + 50 * 4);
+    void* snapshot = snapshots[g_phFrameIndex];
+    if (snapshot == nullptr) return;
 
-    // m_pChar (+144) → collider sub-object (+20) → primary emitter (+64)
-    // → anim descriptor (deref) → flags byte at +17.
-    void*   charObj   = *(void**)((char*)this + 144);
-    void*   sub       = *(void**)((char*)charObj + 20);
-    void*   anim      = *(void**)((char*)sub + 64);
-    void*   descRef   = *(void**)anim;
-    uint8_t animFlags = *(uint8_t*)((char*)descRef + 17);
+    void*   charObj   = *(void**)((char*)this + 0x90);   // creature +0xA0
+    void*   charData  = *(void**)((char*)charObj + 0x14);
+    void*   emitter   = *(void**)((char*)charData + 0x40);
+    void*   holder    = *(void**)emitter;
+    void*   desc      = *(void**)holder;
+    uint8_t animFlags = *(uint8_t*)((char*)desc + 0x11);
 
-    void* charCtx = *(void**)((char*)this + 156);
+    void* skeleton = *(void**)((char*)this + 0x9C);      // creature +0xAC
     if ((animFlags & 0x1) != 0) {
-        // Fast path — bone buffer still live; just retarget the pointer.
-        LocomotionState_CD70_g(charCtx);
+        LocomotionState_CD70_g(skeleton, snapshot);
         return;
     }
 
-    // Cold path — full bone-row memcpy into the locomotion pose cache.
-    void*    dst   = *(void**)((char*)charCtx + 20);
-    void*    meta  = *(void**)((char*)charCtx + 4);
-    uint16_t count = *(uint16_t*)((char*)meta + 12);
-    size_t   bytes = (size_t)count << 6;  // 64 bytes per bone row
-    memcpy(dst, (void*)(uintptr_t)snapshot, bytes);
+    void*    matrices = *(void**)((char*)skeleton + 0x14);
+    void*    data     = *(void**)((char*)skeleton + 0x04);
+    uint16_t count    = *(uint16_t*)((char*)data + 0x0C);
+    memcpy(snapshot, matrices, (size_t)count << 6);  // 64 bytes per bone matrix
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3613,48 +3582,35 @@ void pongCreature::RestorePoseFromRollback() {
 //
 // (Previously named "vfn_5" — renamed for clarity.)
 //
-// Per-frame hook that binds (or rebinds) this creature's shadow-caster
-// instance to the global pongShadowMap. Behaviour:
+// `this` is the phUpdateObject base (creature + 0x10).
 //
-//   1. Fetch the per-player snapshot pointer from the same 50-slot ring
-//      the rollback path uses (g_phFrameCounter + 50) * 4 bytes into this.
-//   2. Walk m_pChar (+144) → collider sub-object (+20):
-//        • primary shadow emitter  : sub +64
-//        • secondary shadow emitter: sub +72  (only used when
-//                                              useSecondaryEmitter is true)
+//   1. Fetch the snapshot for this frame from the same word table the pose
+//      snapshot slot uses, indexed by g_phFrameCounter.
+//   2. Walk character (+0x90) → +0x14:
+//        • primary shadow emitter  : +0x40
+//        • secondary shadow emitter: +0x48 (when useSecondaryEmitter)
 //      A null emitter short-circuits — nothing to register.
-//   3. Drop the previous shadow binding via rage_C668(snapshot, -1)
-//      (single-vector-store cleanup), then call pongShadowMap_EC70_g to
-//      install the new one. The trailing flag word is
-//        `(useSecondaryEmitter ? 0 : 0x10000) | 63`
-//      — low 6 bits are a mask, bit 16 signals "primary path".
+//   3. rage_C668(charData, snapshot, -1), then pongShadowMap_EC70_g(emitter,
+//      atlas, charData's +4 word, snapshot, flags) with flags
+//        `(useSecondaryEmitter ? 0 : 0x10000) | 63`.
 // ─────────────────────────────────────────────────────────────────────────────
 void pongCreature::RegisterShadowCasters(bool useSecondaryEmitter) {
-    const uint8_t flagByte = useSecondaryEmitter ? 1u : 0u;
+    void* const* snapshots = (void* const*)((char*)this + 50 * 4);
+    void* snapshot = snapshots[g_phFrameCounter];
 
-    // Per-tick snapshot slot.
-    uint32_t slotIdx  = g_phFrameCounter + 50;
-    uint32_t snapshot = *((uint32_t*)((char*)this + (slotIdx << 2)));
+    void*    charObj   = *(void**)((char*)this + 0x90);   // creature +0xA0
+    void*    charData  = *(void**)((char*)charObj + 0x14);
+    void*    atlas     = g_phShadowAtlasSlot;
+    uint32_t charFlags = *(uint32_t*)((char*)charData + 0x04);
 
-    void*    charObj  = *(void**)((char*)this + 144);
-    void*    sub      = *(void**)((char*)charObj + 20);
-    void*    atlas    = g_phShadowAtlasSlot;
-    uint32_t subFlags = *(uint32_t*)((char*)sub + 4);
-
-    // Select primary vs secondary emitter.
-    void* emitter = *(void**)((char*)sub + 64);
-    if (flagByte != 0) {
-        emitter = *(void**)((char*)sub + 72);
-    }
+    void* emitter = useSecondaryEmitter ? *(void**)((char*)charData + 0x48)
+                                        : *(void**)((char*)charData + 0x40);
     if (emitter == nullptr) return;
 
-    // Release previous binding, then (re-)register with the shadow map.
-    rage_C668((void*)(uintptr_t)snapshot, -1);
+    rage_C668(charData, snapshot, -1);
 
-    const int composedFlags = ((flagByte == 0) ? 0x10000 : 0) | 63;
-    pongShadowMap_EC70_g(emitter, atlas, (void*)(uintptr_t)subFlags,
-                         (void*)(uintptr_t)snapshot,
-                         nullptr, composedFlags);
+    const int flags = (useSecondaryEmitter ? 0 : 0x10000) | 63;
+    pongShadowMap_EC70_g(emitter, atlas, charFlags, snapshot, flags);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3674,8 +3630,8 @@ void pongCreature::RegisterShadowCasters(bool useSecondaryEmitter) {
 //        • Zero the host's live-anim fields (+60..+65) and mark the
 //          "needs rebuild" bit at +64 on its local anim buffer (offset +16).
 //        • If an active anim descriptor lives at host+48, zero its first
-//          4 header bytes and its 16-byte transform vector, reset its sign
-//          scale to 1.0, and zero the phase counter at +32.
+//          4 header bytes, the word at +8, its 16-byte vector at +16 and
+//          the float at +32.
 //
 //   2. Forward-chain to phUpdateObject::vfn_3(this, world, scene) — the
 //      actual physics-world bind step.
@@ -3728,8 +3684,9 @@ void pongCreature::Reset(void* world, void* scene) {
         memset(animBuf, 0, 16);
         animBuf[16] = 1;
 
-        // If an active anim descriptor exists at +48, zero its header +
-        // transform and restore scale = 1.0f.
+        // If an active anim descriptor exists at +48, zero its header bytes,
+        // the vector at +16, the word at +8 and the float at +32 (the asm
+        // loads 0.0f from 0x8202D110).
         void* activeAnim = *(void**)((char*)colliderBlock + 48);
         if (activeAnim != nullptr) {
             *(uint8_t*)((char*)activeAnim + 4) = 0;
@@ -3738,8 +3695,7 @@ void pongCreature::Reset(void* world, void* scene) {
             *(uint8_t*)((char*)activeAnim + 7) = 0;
             memset((char*)activeAnim + 16, 0, 16);
             *(uint32_t*)((char*)activeAnim + 8) = 0;
-            // Restore unit sign-scale (stored as .rdata float constant +32).
-            *(float*)((char*)activeAnim + 32) = 1.0f;
+            *(float*)((char*)activeAnim + 32) = 0.0f;
         }
     }
 
@@ -3758,8 +3714,8 @@ void pongCreature::Reset(void* world, void* scene) {
     // --- Step 5: decide mover-flip based on render ownership.
     extern void* g_render_obj_ptr;  // @ 0x825EAB2C
     int32_t thisPlayer  = *(int32_t*)((char*)this + 188);
-    void*   renderObj   = g_render_obj_ptr;
-    int32_t boundPlayer = renderObj ? *(int32_t*)((char*)renderObj + 296) : -1;
+    void*   renderObj   = g_render_obj_ptr;  // not null-checked in the asm
+    int32_t boundPlayer = *(int32_t*)((char*)renderObj + 296);
     bool    needsFlip   = (thisPlayer == boundPlayer);
 
     pongMover_Reset(*(void**)((char*)this + 152), needsFlip);
@@ -3808,8 +3764,8 @@ struct pongCreatureSkeletonData {
 static const uint32_t SKELETON_FLAG_APPLY_C288 = 0x1;  // animations go through 0x8224C288, not 0x8224C128
 
 // The skeleton at pongCreature+0xAC, and the one a fragment cache entry keeps
-// at +0x1E4 (inferred: RestorePoseFromRollback copies boneCount 64-byte rows
-// into +0x14, and 0x8224C128 indexes 0x50-byte records at +0x0C).
+// at +0x1E4 (inferred: SavePoseSnapshot copies boneCount 64-byte rows
+// from +0x14, and 0x8224C128 indexes 0x50-byte records at +0x0C).
 struct pongCreatureSkeleton {
     uint8_t                   _pad00[0x04];
     pongCreatureSkeletonData* data;          // +0x04
