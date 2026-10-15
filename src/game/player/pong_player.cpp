@@ -7199,14 +7199,17 @@ void pongPlayer_TossServeBall(pongPlayer* player, pongBallBody* ball, float flig
     vec3 hitPoint;
     game_D1C0(&hitPoint, self->creature->blender->swingAnim);
 
-    // The asm takes 1/t with vrefp plus one Newton-Raphson step (the 1.0
-    // vector at 0x825CB7C0), and runs every vector step on the w lane too.
+    // The asm takes 1/t with vrefp plus one Newton-Raphson step against the
+    // (1, 1, 1, 0) vector at 0x825CB7C0, so the w lane's "1/t" is
+    // e * (0 - t*e) + e, which is 0 up to the estimate's error. The w lane is
+    // therefore 0, not
+    // velocity._pad = (hitPoint._pad - ball->position._pad) * invTime;
     float invTime = 1.0f / flightTime;
     vec3 velocity;
     velocity.x = (hitPoint.x - ball->position.x) * invTime;
     velocity.y = (hitPoint.y - ball->position.y) * invTime;
     velocity.z = (hitPoint.z - ball->position.z) * invTime;
-    velocity._pad = (hitPoint._pad - ball->position._pad) * invTime;
+    velocity._pad = 0.0f;
     velocity.y = velocity.y - halfGravity * flightTime;
 
     const float mass = ball->mass;
