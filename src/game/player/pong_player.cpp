@@ -6548,6 +6548,15 @@ static pongPlayerServeLayout* ServeLayout(pongPlayer* player) {
     return reinterpret_cast<pongPlayerServeLayout*>(player);
 }
 
+// Slot 9 of the game's pongPlayer vtable (byte offset 0x24), the function at
+// 0x821935B8. pongPlayer's C++ virtuals don't number like the game's (the
+// Itanium destructor takes two slots, slots 3-6 and 8 aren't declared), so
+// player->OnButtonReleased() would load slot 5; call through the table.
+static void CallOnButtonReleased(pongPlayer* player) {
+    void** vtable = *reinterpret_cast<void***>(player);
+    reinterpret_cast<void (*)(pongPlayer*)>(vtable[9])(player);
+}
+
 // One 416-byte entry of the per-player table at 0x8261A3D0 (g_ballSplashArray
 // above), indexed by pongPlayer+0x1D0. The record at +0x30 is the one
 // 0x821D6100 and 0x8219F9C0's 0x821D5F70 take.
@@ -7059,7 +7068,7 @@ void pongPlayer_InitSwing(pongPlayer* player)
     self->field_19E2 = 0;
     shot.field150 = 0;
 
-    player->OnButtonReleased();  // vtable slot 9 (0x821935B8)
+    CallOnButtonReleased(player);
 
     shot.shotType = pongPlayer_SelectShotType(&self->serveTypeFlags, self->playerIndex);
     pongShotRecord_SetGravity(&shot, MatchSettings()->field_9C[self->playerIndex]);
@@ -7331,7 +7340,7 @@ void pongPlayer_SetupServe(pongPlayer* player)
     reinterpret_cast<pongPlayer*>(self->shotTarget)->FinalizeServeSetup();
 
     self->sub17F0->flag22 = 0;
-    player->OnButtonReleased();  // vtable slot 9 (0x821935B8)
+    CallOnButtonReleased(player);
 
     self->serveTypeFlags.flag4 = 0;
     self->serveTypeFlags.flag6 = 0;
