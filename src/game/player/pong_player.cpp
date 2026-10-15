@@ -1898,50 +1898,6 @@ void pongPlayer::SetPlayerSide(uint8_t side) {
 }
 
 /**
- * pongPlayer::IsSwingTimerInActiveWindow()  @ 0x820CDCD8 | size: 0xE8
- *
- * Complex timing check with three priority paths:
- *
- * PATH A: Timer expired → check if currentTime is between targetTime and
- *         a secondary threshold (field at +36)
- * PATH B: Timer not expired → call IsRecovering() and if true, call
- *         helper function on recovery state
- * PATH C: All checks fail → return false
- *
- * This gates swing input acceptance during specific timing windows.
- */
-bool pongPlayer::IsSwingTimerInActiveWindow() const {
-    if (!m_pTimingState) {
-        return false;
-    }
-    
-    float currentTime = m_pTimingState->m_currentTime;
-    float targetTime = m_pTimingState->m_targetTime;
-    
-    // Check if timer has expired
-    if (!(currentTime < targetTime)) {
-        // Timer expired - check if we're in the secondary window
-        float secondaryThreshold = m_pTimingState->m_field2C;  // +0x2C (44, labeled as +36 in scaffold)
-        
-        // Must be between targetTime and secondaryThreshold
-        if (currentTime < secondaryThreshold) {
-            return true;
-        }
-        return false;
-    }
-    
-    // Timer still running - check recovery state
-    if (IsRecovering()) {
-        // Call helper function on recovery state
-        // pongPlayer_CheckAnimTimeInRange is a recovery state method
-        // For now, return true as the scaffold shows this path succeeds
-        return true;
-    }
-    
-    return false;
-}
-
-/**
  * pongPlayer::LerpTowardsTarget(float target, float rate, float deltaTime)
  *   @ 0x820C99B0 | size: 0x5C
  *

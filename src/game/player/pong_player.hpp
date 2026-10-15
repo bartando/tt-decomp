@@ -320,7 +320,6 @@ struct pongPlayer {
     void InitializeCollisionGrid(int r4, uint8_t metadataByte);
     bool IsSwingTimerExpiredAndReady() const;
     void SetPlayerSide(uint8_t side);
-    bool IsSwingTimerInActiveWindow() const;
     bool LerpTowardsTarget(float target, float rate, float deltaTime);
     bool IsRecoveryTimerBelowThreshold() const;
     void* GetStateObjectByIndex(uint32_t index) const;
