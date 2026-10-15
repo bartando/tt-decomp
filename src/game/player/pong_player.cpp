@@ -1898,50 +1898,6 @@ void pongPlayer::SetPlayerSide(uint8_t side) {
 }
 
 /**
- * pongPlayer::IsSwingTimerInActiveWindow()  @ 0x820CDCD8 | size: 0xE8
- *
- * Complex timing check with three priority paths:
- *
- * PATH A: Timer expired → check if currentTime is between targetTime and
- *         a secondary threshold (field at +36)
- * PATH B: Timer not expired → call IsRecovering() and if true, call
- *         helper function on recovery state
- * PATH C: All checks fail → return false
- *
- * This gates swing input acceptance during specific timing windows.
- */
-bool pongPlayer::IsSwingTimerInActiveWindow() const {
-    if (!m_pTimingState) {
-        return false;
-    }
-    
-    float currentTime = m_pTimingState->m_currentTime;
-    float targetTime = m_pTimingState->m_targetTime;
-    
-    // Check if timer has expired
-    if (!(currentTime < targetTime)) {
-        // Timer expired - check if we're in the secondary window
-        float secondaryThreshold = m_pTimingState->m_field2C;  // +0x2C (44, labeled as +36 in scaffold)
-        
-        // Must be between targetTime and secondaryThreshold
-        if (currentTime < secondaryThreshold) {
-            return true;
-        }
-        return false;
-    }
-    
-    // Timer still running - check recovery state
-    if (IsRecovering()) {
-        // Call helper function on recovery state
-        // pongPlayer_CheckAnimTimeInRange is a recovery state method
-        // For now, return true as the scaffold shows this path succeeds
-        return true;
-    }
-    
-    return false;
-}
-
-/**
  * pongPlayer::LerpTowardsTarget(float target, float rate, float deltaTime)
  *   @ 0x820C99B0 | size: 0x5C
  *
@@ -2752,30 +2708,25 @@ void pongPlayer::ComputePositionWithOffset() {  // pongPlayer_6308_g @ 0x821D630
 }
 
 
+// 0x821E0270 maps a button id through a pad record's flags.
+extern int pongPad_RemapButton(void* pad, int32_t button);  // @ 0x821E0270
+
 // ===========================================================================
-// SECTION 33 — CheckHandednessDifference  @ 0x821E04B0 | size: 0x54 (84 bytes)
+// SECTION 33 — pongPlayer_04B0_g  @ 0x821E04B0 | size: 0x54 (84 bytes)
 // ===========================================================================
 /**
- * pongPlayer::CheckHandednessDifference()
+ * pongPlayer_04B0_g(pad, button)  (was pongPlayer::CheckHandednessDifference)
  *
- * Calls pongPlayer_GetInputStepIndex to get an index, uses it to look up a 4-byte
- * entry in the table at this+796.  XORs byte[0] with byte[3] of that entry;
- * if the XOR result > 127, returns true (significant difference), else false.
+ * A pad-record function, not pongPlayer's: it takes the pad in r3 and a
+ * button id in r4, which 0x821E0270 remaps through the pad's flags at
+ * +0x04..+0x07. The result indexes the 4-byte entries at pad+0x31C; true when
+ * bit 7 differs between bytes 0 and 3 of that entry.
  */
-extern int pongPlayer_GetInputStepIndex(pongPlayer* p);
-
-bool pongPlayer::CheckHandednessDifference() {  // pongPlayer_04B0_g @ 0x821E04B0
-    int index = pongPlayer_GetInputStepIndex(this);
-
-    uint8_t* base = reinterpret_cast<uint8_t*>(this);
-    uint8_t* tableBase = *reinterpret_cast<uint8_t**>(base + 796);
-    uint8_t* entry = tableBase + (index * 4);
-
-    uint8_t byte3 = entry[3];
-    uint8_t byte0 = entry[0];
-    uint8_t diff = byte3 ^ byte0;
-
-    return diff > 127;
+bool pongPlayer_04B0_g(void* pad, int32_t button) {
+    int index = pongPad_RemapButton(pad, button);
+    const uint8_t* entries = *reinterpret_cast<uint8_t* const*>(static_cast<uint8_t*>(pad) + 0x31C);
+    const uint8_t* entry = entries + index * 4;
+    return static_cast<uint8_t>(entry[3] ^ entry[0]) > 127;
 }
 
 
@@ -3432,7 +3383,7 @@ void pongPlayer::Update() {  // pongPlayer_Update @ 0x8218CF08
     }
     // Virtual dispatch to Update1 (vtable slot 4, byte offset +16)
     typedef void (*UpdateFn)(pongPlayer*);
-    UpdateFn fn = reinterpret_cast<UpdateFn>(vtable[4]);
+    UpdateFn fn = reinterpret_cast<UpdateFn>((*reinterpret_cast<void***>(this))[4]);
     fn(this);
 }
 
@@ -6597,6 +6548,15 @@ static pongPlayerServeLayout* ServeLayout(pongPlayer* player) {
     return reinterpret_cast<pongPlayerServeLayout*>(player);
 }
 
+// Slot 9 of the game's pongPlayer vtable (byte offset 0x24), the function at
+// 0x821935B8. pongPlayer's C++ virtuals don't number like the game's (the
+// Itanium destructor takes two slots, slots 3-6 and 8 aren't declared), so
+// player->OnButtonReleased() would load slot 5; call through the table.
+static void CallOnButtonReleased(pongPlayer* player) {
+    void** vtable = *reinterpret_cast<void***>(player);
+    reinterpret_cast<void (*)(pongPlayer*)>(vtable[9])(player);
+}
+
 // One 416-byte entry of the per-player table at 0x8261A3D0 (g_ballSplashArray
 // above), indexed by pongPlayer+0x1D0. The record at +0x30 is the one
 // 0x821D6100 and 0x8219F9C0's 0x821D5F70 take.
@@ -6744,8 +6704,7 @@ static void* PlayerPad(int32_t playerIndex) {
 }
 
 // @ 0x821E04B0 — true when bit 7 differs between bytes 0 and 3 of the button's
-// entry in the pad record. The lift above as pongPlayer::CheckHandednessDifference
-// takes a pongPlayer and drops the button argument.
+// entry in the pad record (lifted in SECTION 33).
 extern bool pongPlayer_04B0_g(void* pad, int32_t button);
 // @ 0x821921D0 — 0, or the stick's direction as 1..8; going by how
 // ReadSwingDirectionInput maps it, 1 is up and they run clockwise.
@@ -7109,7 +7068,7 @@ void pongPlayer_InitSwing(pongPlayer* player)
     self->field_19E2 = 0;
     shot.field150 = 0;
 
-    player->OnButtonReleased();  // vtable slot 9 (0x821935B8)
+    CallOnButtonReleased(player);
 
     shot.shotType = pongPlayer_SelectShotType(&self->serveTypeFlags, self->playerIndex);
     pongShotRecord_SetGravity(&shot, MatchSettings()->field_9C[self->playerIndex]);
@@ -7199,14 +7158,17 @@ void pongPlayer_TossServeBall(pongPlayer* player, pongBallBody* ball, float flig
     vec3 hitPoint;
     game_D1C0(&hitPoint, self->creature->blender->swingAnim);
 
-    // The asm takes 1/t with vrefp plus one Newton-Raphson step (the 1.0
-    // vector at 0x825CB7C0), and runs every vector step on the w lane too.
+    // The asm takes 1/t with vrefp plus one Newton-Raphson step against the
+    // (1, 1, 1, 0) vector at 0x825CB7C0, so the w lane's "1/t" is
+    // e * (0 - t*e) + e, which is 0 up to the estimate's error. The w lane is
+    // therefore 0, not
+    // velocity._pad = (hitPoint._pad - ball->position._pad) * invTime;
     float invTime = 1.0f / flightTime;
     vec3 velocity;
     velocity.x = (hitPoint.x - ball->position.x) * invTime;
     velocity.y = (hitPoint.y - ball->position.y) * invTime;
     velocity.z = (hitPoint.z - ball->position.z) * invTime;
-    velocity._pad = (hitPoint._pad - ball->position._pad) * invTime;
+    velocity._pad = 0.0f;
     velocity.y = velocity.y - halfGravity * flightTime;
 
     const float mass = ball->mass;
@@ -7378,7 +7340,7 @@ void pongPlayer_SetupServe(pongPlayer* player)
     reinterpret_cast<pongPlayer*>(self->shotTarget)->FinalizeServeSetup();
 
     self->sub17F0->flag22 = 0;
-    player->OnButtonReleased();  // vtable slot 9 (0x821935B8)
+    CallOnButtonReleased(player);
 
     self->serveTypeFlags.flag4 = 0;
     self->serveTypeFlags.flag6 = 0;

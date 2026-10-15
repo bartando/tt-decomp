@@ -204,7 +204,8 @@ struct pongCreatureState {
 // ── Outer class: pongPlayer ───────────────────────────────────────────────
 struct pongPlayer {
     // ── atSingleton base ────────────────────────────────────────────────
-    void**              vtable;              // +0x000
+    // +0x000 is the vtable pointer, the implicit one of the virtuals below:
+    // an explicit member as well put every field 4 bytes past the asm's.
     uint32_t            m_flags;             // +0x004
     pcrCreature*        m_pCreature;         // +0x008
     uint32_t            _unk_0x00C;          // +0x00C
@@ -319,7 +320,6 @@ struct pongPlayer {
     void InitializeCollisionGrid(int r4, uint8_t metadataByte);
     bool IsSwingTimerExpiredAndReady() const;
     void SetPlayerSide(uint8_t side);
-    bool IsSwingTimerInActiveWindow() const;
     bool LerpTowardsTarget(float target, float rate, float deltaTime);
     bool IsRecoveryTimerBelowThreshold() const;
     void* GetStateObjectByIndex(uint32_t index) const;
@@ -344,7 +344,6 @@ struct pongPlayer {
     int GetFrameIndexDelta(void* frameData);
     void ComputePositionWithOffsets(void* inputData);
     void ComputePositionWithOffset();
-    bool CheckHandednessDifference();
     void SyncByteField(void* target, void* source);
     void SyncFloatField(void* target, void* source);
     void UpdateDirtyFlags(void* obj, uint8_t forceReset);
