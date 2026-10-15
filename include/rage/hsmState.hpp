@@ -47,8 +47,8 @@ public:
      */
     virtual void Reset();
 
-protected:
-    void** m_vtable;              // +0x00
+    // +0x00 is the vptr the C++ virtuals above already put there; no explicit
+    // vtable member (one would push every field 4 bytes down).
 };
 
 /**
@@ -130,7 +130,7 @@ public:
                                            rage::hsmStateBase* child);
 
 protected:
-    void** m_vtable;              // +0x00
+    // +0x00: vptr (from rage::hsmStateBase)
     void* m_pManager;             // +0x04 - State manager/context
     hsmState* m_pParentState;     // +0x08 - Parent state in hierarchy
     hsmState* m_pChildState;      // +0x0C - Active child state

@@ -555,6 +555,11 @@ void fiAsciiTokenizer::MatchVector3NoStageField(float outV3[3]) {
 
 } // namespace rage
 
+// STLport's type-dispatch tags (__true_type / __false_type). Empty; the grow
+// helpers take one by reference (a pointer in a register) and never read it.
+struct StlTrueType {};
+struct StlFalseType {};
+
 // ═════════════════════════════════════════════════════════════════════════════
 // Standalone allocator functions (same compilation unit, not class methods)
 // ═════════════════════════════════════════════════════════════════════════════
@@ -650,7 +655,7 @@ struct DynArrayU32 {
     uint32_t* m_pCapacityEnd;    // also the allocator proxy passed to allocate()
 
     DynArrayU32& operator=(const DynArrayU32& other);                  // @ 0x8222D150
-    void InsertOverflow(uint32_t* pos, const uint32_t& value,
+    void InsertOverflow(uint32_t* pos, const uint32_t& value, const StlTrueType& trivialCopy,
                         uint32_t fillCount, bool atEnd);               // @ 0x8222D278
 };
 
@@ -756,7 +761,7 @@ struct DynArrayMatrix34 {
     Matrix34* m_pCapacityEnd;    // also the allocator proxy
 
     void Resize(uint32_t newSize, const Matrix34& fill);                 // @ 0x8222CD98
-    void InsertOverflow(Matrix34* pos, const Matrix34& value,
+    void InsertOverflow(Matrix34* pos, const Matrix34& value, const StlFalseType& trivialCopy,
                         uint32_t fillCount, bool atEnd);                 // @ 0x8222D958
 };
 
@@ -775,10 +780,9 @@ char* game_DD78_h(const char* first, const char* last, char* dest);
 Matrix34* fiAsciiTokenizer_DDD0_w(const Matrix34* first, const Matrix34* last, Matrix34* dest);
 
 // @ 0x8222DAF0 — vector<Matrix34>::_M_fill_insert_aux: inserts `count` copies
-// of *value at pos when the capacity already fits. Not lifted yet; callers
-// also pass a type-dispatch tag pointer in r7.
+// of *value at pos when the capacity already fits. Not lifted yet.
 void fiAsciiTokenizer_DAF0_2h(DynArrayMatrix34* vec, Matrix34* pos, uint32_t count,
-                              const Matrix34* value);
+                              const Matrix34* value, const StlFalseType* trivialCopy);
 
 } // extern "C"
 
@@ -991,12 +995,14 @@ DynArrayU32& DynArrayU32::operator=(const DynArrayU32& other) {
 // Grow path of insert(pos, fillCount, value): allocates
 // size + max(size, fillCount) elements, copies [begin, pos), writes fillCount
 // copies of value, copies [pos, end) and frees the old block. allocate() is
-// inlined (the "out of memory" check). STLport skips the [pos, end) copy when
+// inlined (the "out of memory" check). The unread type tag comes in r6, so
+// fillCount is in r7 and atEnd in r8. STLport skips the [pos, end) copy when
 // atEnd is set; this build never reads atEnd and always copies, which is a
 // no-op when pos == end. Callers: mfRegisteredPlayback ctor (resize of its
 // +0x2C vector) and LocomotionStateMf_30F0_h.
 // ─────────────────────────────────────────────────────────────────────────────
 void DynArrayU32::InsertOverflow(uint32_t* pos, const uint32_t& value,
+                                 const StlTrueType& /*trivialCopy*/,
                                  uint32_t fillCount, bool /*atEnd*/) {
     const uint32_t oldSize     = static_cast<uint32_t>(m_pEnd - m_pBegin);
     const uint32_t newCapacity = oldSize + std::max(oldSize, fillCount);
@@ -1069,10 +1075,11 @@ void DynArrayMatrix34::Resize(uint32_t newSize, const Matrix34& fill) {
     if (count == 0) {
         return;
     }
+    const StlFalseType trivialCopy;
     if (static_cast<uint32_t>(m_pCapacityEnd - end) >= count) {
-        fiAsciiTokenizer_DAF0_2h(this, end, count, &fill);
+        fiAsciiTokenizer_DAF0_2h(this, end, count, &fill, &trivialCopy);
     } else {
-        InsertOverflow(end, fill, count, false);
+        InsertOverflow(end, fill, trivialCopy, count, false);
     }
 }
 
@@ -1083,9 +1090,11 @@ void DynArrayMatrix34::Resize(uint32_t newSize, const Matrix34& fill) {
 // Non-trivial-T grow path: allocates size + max(size, fillCount) elements,
 // copy-constructs [begin, pos), fillCount copies of value and [pos, end) into
 // it, then frees the old block. Each in-place copy carries placement new's
-// null check. As in DynArrayU32::InsertOverflow, atEnd is never read.
+// null check. As in DynArrayU32::InsertOverflow, the tag (r6) and atEnd (r8)
+// are never read.
 // ─────────────────────────────────────────────────────────────────────────────
 void DynArrayMatrix34::InsertOverflow(Matrix34* pos, const Matrix34& value,
+                                      const StlFalseType& /*trivialCopy*/,
                                       uint32_t fillCount, bool /*atEnd*/) {
     const uint32_t oldSize     = static_cast<uint32_t>(m_pEnd - m_pBegin);
     const uint32_t newCapacity = oldSize + std::max(oldSize, fillCount);
