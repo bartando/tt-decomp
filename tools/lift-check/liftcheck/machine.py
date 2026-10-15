@@ -15,7 +15,7 @@ from unicorn import (UC_ARCH_PPC, UC_HOOK_BLOCK, UC_HOOK_CODE, UC_HOOK_INTR, UC_
                      UC_MODE_BIG_ENDIAN, UC_MODE_PPC32, Uc, UcError)
 from unicorn import ppc_const as P
 
-from .assist import Assist, Trap, needs_assist
+from .assist import Assist, Trap, is_wide, needs_assist, needs_predict
 from .vmx import Unsupported
 
 M32 = 0xFFFFFFFF
@@ -119,7 +119,7 @@ class Machine:
         self.tramp_ret = 0
         self.helpers = helper_ranges
         self.assist = Assist(self)
-        self.hi_shadow: list = [None] * 32
+        self.hi_shadow: list = [None] * 32      # per GPR: {low word: upper word} or None
         self._hooked: set[int] = set()
 
         uc.hook_add(UC_HOOK_BLOCK, self._on_block)
@@ -137,13 +137,19 @@ class Machine:
         self.heap_next = HEAP_BASE
 
     # ── pre-scan: hook the instructions Python has to run ──────────────────
-    def prescan(self, lo: int, hi: int):
+    def prescan(self, lo: int, hi: int, wide: bool | None = None):
+        """Hooks what Python has to run. `wide`: also track the upper halves of native
+        32-bit results (default: when the range has a 64-bit integer instruction)."""
         data = self.uc.mem_read(lo, hi - lo)
+        words = [int.from_bytes(data[off:off + 4], "big") for off in range(0, hi - lo, 4)]
+        if wide is None:
+            wide = any(is_wide(w) for w in words)
         added = False
-        for off in range(0, hi - lo, 4):
-            w = int.from_bytes(data[off:off + 4], "big")
-            a = lo + off
-            if needs_assist(w) and a not in self._hooked:
+        for k, w in enumerate(words):
+            a = lo + 4 * k
+            if a in self._hooked:
+                continue
+            if needs_assist(w) or wide and needs_predict(w):
                 self._hooked.add(a)
                 self.uc.hook_add(UC_HOOK_CODE, self._on_assist, begin=a, end=a)
                 added = True
@@ -156,19 +162,28 @@ class Machine:
 
     def set_gpr(self, n, v):
         self.uc.reg_write(GPR[n], v & M32)
+        self.hi_shadow[n] = None
 
     def gpr64(self, n):
         lo = self.uc.reg_read(GPR[n]) & M32
         sh = self.hi_shadow[n]
-        if sh is not None and sh[1] == lo:
-            return (sh[0] << 32) | lo
+        if sh is not None and lo in sh:
+            return (sh[lo] << 32) | lo
         return (lo | 0xFFFFFFFF00000000) if lo & 0x80000000 else lo
+
+    def has_upper(self, n):
+        """Whether r<n>'s upper half is known rather than assumed sign-extended."""
+        sh = self.hi_shadow[n]
+        return sh is not None and (self.uc.reg_read(GPR[n]) & M32) in sh
 
     def set_gpr64(self, n, v):
         v &= (1 << 64) - 1
         lo = v & M32
         self.uc.reg_write(GPR[n], lo)
-        self.hi_shadow[n] = (v >> 32, lo)
+        self.hi_shadow[n] = {lo: v >> 32}
+
+    def spr_lr_ctr(self, spr):
+        return self.uc.reg_read(P.UC_PPC_REG_LR if spr == 8 else P.UC_PPC_REG_CTR) & M32
 
     def fpr_raw(self, n):
         return self.uc.reg_read(FPR[n])
@@ -272,7 +287,11 @@ class Machine:
     def _on_assist(self, uc, addr, size, _):
         w = int.from_bytes(uc.mem_read(addr, 4), "big")
         if not needs_assist(w):
-            return              # the code here changed since the pre-scan
+            if needs_predict(w):
+                for n, values in self.assist.predict(w):
+                    self.hi_shadow[n] = None if values is None else \
+                        {v & M32: (v >> 32) & M32 for v in values}
+            return              # runs natively
         try:
             self.assist.execute(w, addr)
         except Unsupported as e:

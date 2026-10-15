@@ -141,6 +141,13 @@ def _mc_text(line: str) -> str | None:
     return f"{mnem} {re.sub(r'\b(?:r|v|f|cr)(\d+)\b', r'\1', rest)}".strip()
 
 
+def _encoding(e: str) -> int | None:
+    try:
+        return int.from_bytes(bytes(int(b, 16) for b in e.split(",")), "big")
+    except ValueError:          # a fixup (label operand)
+        return None
+
+
 def prime(lines: list[str]):
     """Assembles every standard instruction in one llvm-mc run (one per line is slow)."""
     todo = sorted({t for t in map(_mc_text, lines) if t and t not in _MC})
@@ -154,10 +161,10 @@ def prime(lines: list[str]):
             q = subprocess.run([llvm_bin("llvm-mc"), "-triple=powerpc64", "-mcpu=pwr7", "-show-encoding"],
                                input=t + "\n", capture_output=True, text=True)
             e = re.findall(r"encoding: \[([^\]]+)\]", q.stdout)
-            _MC[t] = int.from_bytes(bytes(int(b, 16) for b in e[0].split(",")), "big") if e else None
+            _MC[t] = _encoding(e[0]) if e else None
         return
     for t, e in zip(todo, enc):
-        _MC[t] = int.from_bytes(bytes(int(b, 16) for b in e.split(",")), "big")
+        _MC[t] = _encoding(e)
 
 
 def assemble(lines: list[str]) -> list[int] | None:
@@ -217,7 +224,7 @@ class _NoLift:
 
 
 def _value(text: str):
-    text = text.strip()
+    text = re.sub(r"(?<=[0-9A-Fa-f])(?:ull|ul|u|ll|l)$", "", text.strip(), flags=re.I)
     if text.startswith("["):
         return [int(x, 16) for x in text.strip("[]").split(",")]
     if re.match(r"^-?\d+\.\d*(e[-+]?\d+)?$|^-?inf$|^nan$", text, re.I):
@@ -243,7 +250,7 @@ def run_test(m: Machine, t) -> str | None:
     uc = m.uc
     uc.mem_write(CODE, b"".join(struct.pack(">I", w) for w in words) + struct.pack(">I", 0x4E800020))
     uc.ctl_flush_tb()
-    m.prescan(CODE, CODE + 4 * len(words))
+    m.prescan(CODE, CODE + 4 * len(words), wide=True)
     uc.mem_write(0x10000000, bytes(0x10000))
     regs = {"gpr": [0] * 32, "fpr": [0.0] * 32, "ctr": 0, "cr": 0, "gpr64": {}}
     vregs = [[0, 0, 0, 0] for _ in range(128)]
@@ -281,11 +288,6 @@ def run_test(m: Machine, t) -> str | None:
         elif reg.startswith("r"):
             n = int(reg[1:])
             got = m.gpr64(n)
-            sh = m.hi_shadow[n]
-            if sh is None or sh[1] != (got & 0xFFFFFFFF):
-                # written natively: the emulator only has the low word
-                got &= 0xFFFFFFFF
-                exp &= 0xFFFFFFFF
             if got != exp & 0xFFFFFFFFFFFFFFFF:
                 errs.append(f"{reg} 0x{got:016X} != 0x{exp & 0xFFFFFFFFFFFFFFFF:016X}")
         elif reg.startswith("f"):
@@ -310,7 +312,11 @@ def run_test(m: Machine, t) -> str | None:
 
 ASSISTED_FILES = re.compile(
     r"^instr_(v\w+|lv\w+|stv\w+|rldic[lr]|sld|srd|srad|sradi|extsw|mulld|mulhdu?|divdu?|cntlzd|"
-    r"cmp|cmpi|cmpl|cmpli|fctixz|fsqrt|td|tdi)\.s$")
+    r"cmp|cmpi|cmpl|cmpli|fctixz|fsqrt|td|tdi|"
+    # 32-bit ops, run natively; their 64-bit results come from Assist.predict
+    r"add|addc|adde|addic|addis|addme|addze|and|andc|andi|andis|cntlzw|divwu?|eqv|extsb|extsh|"
+    r"mulhwu?|mulli|mullw|neg|nor|ori|rlwimi|rlwinm|rlwnm|slw|sraw|srawi|srw|subf|subfc|subfe|"
+    r"subfic|subfme|subfze)\.s$")
 
 
 def main(tests_dir: Path = DEFAULT_TESTS, verbose=False) -> int:

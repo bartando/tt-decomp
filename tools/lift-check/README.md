@@ -97,7 +97,8 @@ emulator, the example specs, and nine mutated lifts that must all fail (about 40
   every 64-bit, FP or vector instruction raises exception 96 there, and on the 970 models
   stores go nowhere. Xenon titles run with MSR[SF]=0 anyway (record forms compare the low
   word), so 32-bit mode is the right model. What the G4 can't do runs in Python
-  (`assist.py`, `vmx.py`): 64-bit integer ops (upper GPR halves live in a shadow), fsqrt,
+  (`assist.py`, `vmx.py`): 64-bit integer ops (upper GPR halves live in a shadow, which
+  the 32-bit ops in the same function keep up to date), fsqrt,
   fcfid/fctid/fctiw, dcbz128, and every vector instruction, AltiVec and VMX128 alike
   (Unicorn doesn't expose vector registers). The image is pre-scanned and only those
   addresses are hooked. A CA bit computed in Python goes in through a 4-instruction
@@ -128,9 +129,11 @@ emulator, the example specs, and nine mutated lifts that must all fail (about 40
   fres and frsqrte the G4's estimate. Lifts that divide where the original estimates differ
   by a few ulps, hence `FTOL`. The VMX multiply-adds round the product (non-fused), per
   Xenia's tests; scalar fmadd is fused.
-- **Upper GPR halves** after native 32-bit instructions read as the sign extension of the
-  low word (`mfcr`, `lwz` really zero-extend). Only matters for 64-bit code that mixes the
-  two (ld/std pairs and extsw/clrldi are exact).
+- **Upper GPR halves**: in a function (or `run()` callee, `EXTRA_RANGES`) that has any
+  64-bit integer instruction, every native 32-bit instruction that writes a GPR gets its
+  64-bit result tracked too (`mulld` + `add` carries, `lwz` zero-extends). Elsewhere a
+  native result reads as the sign extension of its low word. Record forms and CA use the
+  low word, as with MSR[SF]=0.
 - **Headers that don't cross-compile**: 125 of the 157 TUs in `src/` build. The rest have
   errors of their own (missing headers, declarations that don't match) or are the host
   layer (`src/xam`, `src/crt`: SDL, pthread, sockets). `shim/` covers the libc/libstdc++

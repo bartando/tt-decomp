@@ -28,6 +28,7 @@ EXPECT = [
     ("pong_player_toss_serve_ball", "PASS|FAIL:_pad", ()),
     ("pong_player_toss_serve_ball", "PASS", (TOSS_W_FIX,)),
     ("ccal_dispatch_color_constants", "UNSUPPORTED", ()),
+    ("lc_drill_on_rally_end", "PASS", ()),
 ]
 
 MUTATIONS = [
@@ -51,6 +52,10 @@ MUTATIONS = [
      [TOSS_W_FIX, ("    ball->vfn_1();\n    phSimulator_CBB8_g", "    phSimulator_CBB8_g")]),
     ("pong_player_toss_serve_ball", "pongBallBody padding 4 bytes short (mass at +0x60)",
      [TOSS_W_FIX, ("    uint8_t     _pad14[0x50];", "    uint8_t     _pad14[0x4C];")]),
+    # what lift-check itself computed before it tracked native ops' upper halves
+    ("lc_drill_on_rally_end", "carry = the sum's sign (a 32-bit add's upper half)",
+     [("uint32_t nNewCarry = (uint32_t)(nNext >> 32);",
+       "uint32_t nNewCarry = (uint32_t)((int32_t)nNewSeed >> 31);")]),
 ]
 
 
