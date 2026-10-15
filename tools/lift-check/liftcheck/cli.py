@@ -1,4 +1,5 @@
-"""lift-check <spec> [--trials N] [--seed S] [--ftol X]   |   lift-check selftest"""
+"""lift-check <spec> [--trials N] [--seed S] [--ftol X]   |   lift-check all [--jobs N]
+[--filter PREFIX]   |   lift-check selftest"""
 from __future__ import annotations
 
 import argparse
@@ -23,6 +24,9 @@ def main(argv=None) -> int:
     if argv[:1] == ["selftest"]:
         from .selftest import main as selftest
         return selftest(argv[1:])
+    if argv[:1] == ["all"]:
+        from .batch import main as run_all
+        return run_all(argv[1:])
     ap = argparse.ArgumentParser(prog="lift-check", description=__doc__)
     ap.add_argument("spec", nargs="+", help="spec file or name in tools/lift-check/specs/")
     ap.add_argument("--trials", type=int, help="random trials (default: spec TRIALS or 200)")

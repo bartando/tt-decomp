@@ -64,8 +64,14 @@ into the repo.
    - `BUILD name: ...` [2]: the TU didn't cross-compile, or a symbol the lift calls has no
      original address (add it to `EXTERNS = {"name": 0x82...}` or give it a `// @ 0x` marker).
 
+`tools/lift-check/lift-check all [--jobs N] [--filter PREFIX] [--trials N] [-v]` runs every
+spec (skipping `_`-prefixed helpers and files without a `FUNCTION`) in parallel, prints each
+one's status line as it finishes and a summary listing the non-PASS ones, and exits 1 unless
+all pass (about 45 s for 180 specs at 8 jobs). `-v` adds the context lines of failures.
+
 `tools/lift-check/lift-check selftest` runs Xenia's instruction tests through the
-emulator, the example specs, and nine mutated lifts that must all fail (about 40 s).
+emulator, the marker scan on a made-up TU, the example specs, and mutated lifts that must
+all fail (about 40 s).
 
 ### Spec reference
 

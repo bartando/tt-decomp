@@ -1,7 +1,10 @@
 """Names to original addresses: the master symbol map plus `// @ 0x...` markers in src/."""
 from __future__ import annotations
 
+import hashlib
 import json
+import os
+import pickle
 import re
 from functools import cached_property
 from pathlib import Path
@@ -11,6 +14,7 @@ _IDENT_CALL = re.compile(r"([A-Za-z_~][\w:~]*)\s*\(")
 _QUALIFIED = re.compile(r"\b([A-Za-z_]\w*(?:::[A-Za-z_~]\w*)+)")
 _STRUCT = re.compile(r"^\s*(?:struct|class|union)\s+(?:alignas\([^)]*\)\s*)?([A-Za-z_]\w*)\b[^;]*$")
 _ADDR_SUFFIX = re.compile(r"(?:^|_)([0-9A-Fa-f]{8})$")
+_SOURCE_SUFFIXES = (".cpp", ".hpp", ".h", ".c", ".inc")
 _NAMESPACE = re.compile(r"\bnamespace\s+([A-Za-z_]\w*)\s*\{")
 _NOT_A_TYPE = re.compile(r"[=(){};+\-/%!?.\[\]|^]")
 _STATEMENT_WORDS = {"return", "else", "case", "delete", "new", "throw", "goto", "co_return",
@@ -104,7 +108,37 @@ class Symbols:
     #   0  a call statement's trailing marker, a name mentioned elsewhere in the comment
     @cached_property
     def marker_index(self) -> dict[str, dict[int, tuple[int, str]]]:
-        """name -> {address: (strength, "file:line")}"""
+        """name -> {address: (strength, "file:line")}, cached in build/ by file mtimes."""
+        paths = list((self.repo / "src").rglob("*")) + list((self.repo / "include").rglob("*"))
+        paths = sorted({p for p in paths if p.suffix in _SOURCE_SUFFIXES} | set(self.extra_files))
+        h = hashlib.sha1(Path(__file__).read_bytes())
+        for p in paths:
+            try:
+                st = p.stat()
+            except OSError:
+                continue
+            h.update(f"{p}\0{st.st_mtime_ns}\0{st.st_size}\n".encode())
+        cache = Path(__file__).resolve().parent.parent / "build" / f"markers-{h.hexdigest()[:16]}.pickle"
+        try:
+            index, self.namespaces = pickle.loads(cache.read_bytes())
+            return index
+        except (OSError, pickle.PickleError, EOFError, ValueError):
+            pass
+        index = self._scan(paths)
+        if self.extra_files:
+            return index
+        try:
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            for old in cache.parent.glob("markers-*.pickle"):
+                old.unlink(missing_ok=True)
+            tmp = cache.with_suffix(f".{os.getpid()}.tmp")
+            tmp.write_bytes(pickle.dumps((index, self.namespaces)))
+            os.replace(tmp, cache)
+        except OSError:
+            pass
+        return index
+
+    def _scan(self, paths) -> dict[str, dict[int, tuple[int, str]]]:
         index: dict[str, dict[int, tuple[int, str]]] = {}
         self.namespaces: set[str] = set()
 
@@ -116,10 +150,7 @@ class Symbols:
             if addr not in have or have[addr][0] < strength:
                 have[addr] = (strength, where)
 
-        paths = list((self.repo / "src").rglob("*")) + list((self.repo / "include").rglob("*"))
-        for path in sorted(set(paths) | set(self.extra_files)):
-            if path.suffix not in (".cpp", ".hpp", ".h", ".c", ".inc"):
-                continue
+        for path in paths:
             try:
                 lines = path.read_text(errors="replace").splitlines()
             except OSError:
