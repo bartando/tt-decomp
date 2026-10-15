@@ -34,13 +34,10 @@ extern const float lbl_8202D110;  /* 4-byte float constant (heavily reused) */
 extern const double lbl_8202CFF4; /* 8-byte .rdata constant */
 
 /* .data SDA globals — untyped raw storage */
-extern uint32_t lbl_825C803C;     /* 8 bytes .data — aiTypeId / attrHash / xmlNodeStruct_typeId alias */
-extern uint32_t lbl_825C8038;     /* 4 bytes .data — aiTypeId / attrHash alias */
 extern uint32_t lbl_825CAF88;     /* 4 bytes .data — resource/string field type slot */
 extern uint32_t lbl_825C93D0;     /* 8 bytes .data — cameraProperty2 / sgNode_typeId alias */
 extern uint8_t  lbl_8261A0C0[16]; /* default viewport rect / scene reset matrix */
 extern uint8_t  lbl_82619BE0[16]; /* SIMD comparison mask */
-extern uint8_t  lbl_825CB800[64]; /* identity matrix ref */
 extern uint32_t lbl_8260641C;     /* SDA+25628 — renderer state ptr slot */
 extern uint8_t  lbl_82607C40[65616]; /* SDA+31808 — TemplateRegistry backing */
 extern uint8_t  lbl_826064CC;     /* SDA+25804 — UI input enable flag */
@@ -262,7 +259,7 @@ const float g_identityMatrixRef[16] = {
     1.0f, 0.0f, 0.0f, 0.0f,
     0.0f, 1.0f, 0.0f, 0.0f,
     0.0f, 0.0f, 1.0f, 0.0f,
-    0.0f, 0.0f, 0.0f, 1.0f
+    0.0f, 0.0f, 0.0f, 0.0f   /* the image's fourth row is all zero */
 };
 
 // SIMD comparison mask @ 0x82619BE0
@@ -361,8 +358,6 @@ uint32_t g_drillCleanupParam = 0;
 // Shot type validation globals for noSoftShotsTipData
 // Used by PostLoadProperties @ 0x821F2678 to validate allowed shot types
 uint32_t g_shotType1_825C5F50 = 0;  // @ 0x825C5F50 (.data, 4 bytes)
-uint32_t g_shotType2_825C803C = 0;  // @ 0x825C803C (.data, 4 bytes)
-uint32_t g_shotType3_825C8038 = 0;  // @ 0x825C8038 (.data, 4 bytes)
 
 // ============================================================================
 // Threading Globals
@@ -548,16 +543,17 @@ struct SwipePattern {
 
 // AI type IDs
 uint32_t* g_aiTypeId_1 = NULL;             // @ 0x825C60B4
-uint32_t* g_aiTypeId_2 = NULL;             // @ 0x825C803C
-uint32_t* g_aiTypeId_3 = NULL;             // @ 0x825C8038
+/* Type tokens: in the image each of these words holds its own address, and
+ * the code loads it as a unique id. Names that read it as uint32_t get the low
+ * half of the host address, which is still unique. */
+uint32_t* g_aiTypeId_3 = (uint32_t*)&g_aiTypeId_3;   // @ 0x825C8038
+uint32_t* g_aiTypeId_2 = (uint32_t*)&g_aiTypeId_2;   // @ 0x825C803C
 
 // Animation
 const float g_animBlendWeight = 0.0f;      // @ 0x8202D110
 
 // Ball / swing attribute hashes
-uint32_t g_attrHash_HitZone    = 0;        // @ 0x825C761C
-uint32_t g_attrHash_SwingType1 = 0;        // @ 0x825C8038
-uint32_t g_attrHash_SwingType2 = 0;        // @ 0x825C803C
+void* g_attrHash_HitZone = &g_attrHash_HitZone;  // @ 0x825C761C  type token, see g_aiTypeId_3
 const float g_alphaMultiplier  = 0.0f;     // @ 0x82079BE0
 
 // CRT atexit guards
@@ -591,8 +587,6 @@ uint32_t g_charViewSelectCounter  = 0;     // @ 0x82606490
 uint32_t g_charViewSelectFlag     = 0;     // @ 0x82606494
 uint32_t g_charViewTypeId         = 0;     // @ 0x825C2BC4
 uint32_t g_character_type_id      = 0;     // @ 0x825C2BC0
-uint32_t g_character_type_id_2    = 0;     // @ 0x825C803C
-uint32_t g_character_type_id_3    = 0;     // @ 0x825C8038
 
 // Network: cmRefreshableCtor vtable (RTTI, 20 vtables / virtual base MI).
 // Typed as const uint8_t* while this file stays in C; the C++ typed form
@@ -861,8 +855,6 @@ void* g_vtable_pong_char_view_state      = NULL;
 void* g_xex_exec_info = NULL;             // @ 0x825E6E64
 
 // XML node struct type IDs
-uint32_t g_xmlNodeStruct_typeId  = 0;      // @ 0x825C803C
-uint32_t g_xmlNodeStruct_typeId2 = 0;      // @ 0x825C8038
 
 // Zero / constant floats
 const float g_zeroConstant = 0.0f;         // @ 0x8202D110
@@ -896,6 +888,20 @@ TT_DATA_ALIAS("g_eventQueueIndex", "g_ui_state_counter");                    /* 
 TT_DATA_ALIAS("g_eventQueuePtrs", "g_ui_object_ptrs");
 TT_DATA_ALIAS("g_eventQueueMasks", "g_ui_object_types");
 TT_DATA_ALIAS("g_eventQueueFlags", "g_ui_object_flags");
+TT_DATA_ALIAS("g_shotType3_825C8038", "g_aiTypeId_3");  /* 0x825C8038 */
+TT_DATA_ALIAS("g_attrHash_SwingType1", "g_aiTypeId_3");
+TT_DATA_ALIAS("g_character_type_id_3", "g_aiTypeId_3");
+TT_DATA_ALIAS("g_xmlNodeStruct_typeId2", "g_aiTypeId_3");
+TT_DATA_ALIAS("g_pongBallHitData_hashC", "g_aiTypeId_3");
+TT_DATA_ALIAS("lbl_825C8038", "g_aiTypeId_3");
+TT_DATA_ALIAS("g_shotType2_825C803C", "g_aiTypeId_2");  /* 0x825C803C */
+TT_DATA_ALIAS("g_attrHash_SwingType2", "g_aiTypeId_2");
+TT_DATA_ALIAS("g_character_type_id_2", "g_aiTypeId_2");
+TT_DATA_ALIAS("g_xmlNodeStruct_typeId", "g_aiTypeId_2");
+TT_DATA_ALIAS("g_pongBallHitData_hashB", "g_aiTypeId_2");
+TT_DATA_ALIAS("lbl_825C803C", "g_aiTypeId_2");
+TT_DATA_ALIAS("g_pongBallHitData_hashA", "g_attrHash_HitZone");  /* 0x825C761C */
+TT_DATA_ALIAS("lbl_825CB800", "g_identityMatrixRef");  /* 0x825CB800 */
 TT_DATA_ALIAS("lbl_826064F4", "g_drawBucket");                                /* 0x826064F4 */
 TT_DATA_ALIAS("lbl_82606600", "g_globalStreamer");                            /* 0x82606600 */
 TT_DATA_ALIAS("lbl_825C4930", "g_kTimingConstant");                           /* 0x825C4930 */
