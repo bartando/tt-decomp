@@ -34,7 +34,7 @@ extern int32_t*   g_pDrillSaveData;          // @ 0x8271A35C — best rank per d
 
 // PRNG state (Multiply-With-Carry LCG)
 extern uint32_t   g_prngState[2];            // @ 0x825CA2C8 — [0]=seed, [1]=carry
-extern float      g_fPrngNormalize;          // @ 0x82079E68 — 1.0f / 2^23, scales 23-bit int to [0,1)
+extern const float g_fPrngNormalize;          // @ 0x82079E68 — 1.0f / 2^23, scales 23-bit int to [0,1)
 
 // Drill score scaling constant
 extern float      g_fDrillScoreScale;        // @ 0x8202C504 — multiplier for bonus score computation

@@ -163,8 +163,8 @@ uint8_t g_bAppStarted = 0;
 uint8_t g_bInitComplete = 0;
 uint8_t g_bRestartPending = 0;
 uint32_t g_initStateFlag = 0;
-uint32_t g_prngState = 0;
-float g_fPrngNormalize = 1.0f / 0xFFFFFFFF;
+uint32_t g_prngState[2] = {1u, 0x10001u};  // @ 0x825CA2C8  seed, carry (main reseeds it)
+const float g_fPrngNormalize = 1.1920929e-07f;  // @ 0x82079E68  2^-23
 
 // ============================================================================
 // Audio System
