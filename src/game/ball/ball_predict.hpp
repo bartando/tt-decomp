@@ -32,6 +32,13 @@ struct gdBallPredictSample {
 };
 static_assert(sizeof(gdBallPredictSample) == 0x50, "gdBallPredictSample is 0x50 bytes");
 
+// A predicted table contact.
+struct bpBounceEvent {
+    float   time;
+    uint8_t onLocalSide;  // +0x04  the contact is on the side the local player's flag names
+    uint8_t _pad05[3];
+};
+
 // A bound callback (16 bytes); the empty one is the zero template at 0x8261A0C0.
 struct bpFunctor {
     uint32_t words[4];
@@ -56,9 +63,10 @@ struct gdBallPredictData {
     float               m_idTime;                  // +0x2610
     uint8_t             _pad2614[0x2630 - 0x2614];
     uint8_t             m_shot[0xB8];              // +0x2630  the shot this prediction was made for
-    uint8_t             _pad26E8[0x27E0 - 0x26E8];
-    uint32_t            m_27E0;                    // +0x27E0
-    uint8_t             m_27E4;                    // +0x27E4
+    uint8_t             _pad26E8[0x2790 - 0x26E8];
+    bpBounceEvent       m_bounces[10];             // +0x2790  no bounds check: an 11th lands on m_bounceCount
+    int32_t             m_bounceCount;             // +0x27E0
+    uint8_t             m_bouncesBuilt;            // +0x27E4
     uint8_t             _pad27E5[3];
     bpFunctor           m_onPop;                   // +0x27E8  called with each popped sample
 
@@ -73,6 +81,10 @@ struct gdBallPredictData {
     int   FindLastBounceAtOrBefore(int index);
     int   FindFirstHittable();
     int   FindFirstUnhittableFrom(int index);
+    int   FindNextBounce(int from);
+    void  BuildBounceList(bool unused);
+    void  ExtendBounceList(int lastN);
+    void  CountBouncesSoFar(int* localSide, int* otherSide);
 };
 #if UINTPTR_MAX == 0xFFFFFFFFu
 static_assert(__builtin_offsetof(gdBallPredictData, m_head) == 0x25A0, "gdBallPredictData layout");

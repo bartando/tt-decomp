@@ -34,6 +34,12 @@ extern "C" bpBallInstView** g_ppBallInst;           // @ 0x8271A2F4
 
 extern "C" const uint32_t g_vectorComparisonMask[4];   // @ 0x82619BE0
 
+struct bpInputView {
+    uint8_t _pad00[0x40];
+    uint8_t sideFlag;     // +0x40
+};
+extern "C" bpInputView* g_input_obj_ptr;            // @ 0x825EAB28
+
 struct bpMatchTiming {
     uint8_t _pad00[0x30];
     float   now;          // +0x30
@@ -112,8 +118,8 @@ void gdBallPredictData::Reset(const char* caller) {
     m_timeLimit = -1.0f;
     m_hitVel = bpVec4{0.0f, 0.0f, 0.0f, 0.0f};
     m_onPop = g_defaultData16;
-    m_27E0 = 0;
-    m_27E4 = 0;
+    m_bounceCount = 0;
+    m_bouncesBuilt = 0;
 }
 
 // Drops the samples game time has passed (keeping the newest one passed, so there is
@@ -238,6 +244,74 @@ int gdBallPredictData::FindFirstUnhittableFrom(int index) {
         }
     }
     return -1;
+}
+
+// The first contact after at least one sample in the air, from index on; -1 if the
+// ball drops to y <= 0 first, -3 if there is none.
+// @ 0x821D93F0
+int gdBallPredictData::FindNextBounce(int from) {
+    bool airborne = false;
+    for (int i = from; i < m_count; ++i) {
+        const gdBallPredictSample& s = At(i);
+        if (s.pos.y <= 0.0f) {
+            return -1;
+        }
+        if (!s.bounced) {
+            airborne = true;
+        } else if (airborne) {
+            return i;
+        }
+    }
+    return -3;
+}
+
+namespace {
+void AppendBounces(gdBallPredictData* d, int i) {
+    while (i >= 0) {
+        const gdBallPredictSample& s = d->At(i);
+        const bool farSide = s.pos.z > 0.0f;
+        bpBounceEvent e = {};   // the original copies an 8-byte stack temp; its padding is garbage
+        e.time = s.time;
+        e.onLocalSide = (g_input_obj_ptr->sideFlag == static_cast<uint8_t>(farSide));
+        d->m_bounces[d->m_bounceCount++] = e;
+        i = d->FindNextBounce(i);
+    }
+}
+}
+
+// @ 0x821D90B8
+void gdBallPredictData::BuildBounceList(bool) {
+    m_bounceCount = 0;
+    AppendBounces(this, FindNextBounce(0));
+    m_bouncesBuilt = 1;
+}
+
+// @ 0x821D92E8
+void gdBallPredictData::ExtendBounceList(int lastN) {
+    if (!m_bouncesBuilt) {
+        return;
+    }
+    int from = m_count - lastN;
+    if (from <= 0) {
+        from = 0;
+    }
+    AppendBounces(this, FindNextBounce(from));
+}
+
+// @ 0x821D91C0
+void gdBallPredictData::CountBouncesSoFar(int* localSide, int* otherSide) {
+    *otherSide = 0;
+    *localSide = 0;
+    const int n = m_bounceCount;
+    for (int i = 0; i < n; ++i) {
+        if (g_pongMatchTiming->now >= m_bounces[i].time) {
+            if (m_bounces[i].onLocalSide) {
+                ++*localSide;
+            } else {
+                ++*otherSide;
+            }
+        }
+    }
 }
 
 namespace ballPredict {

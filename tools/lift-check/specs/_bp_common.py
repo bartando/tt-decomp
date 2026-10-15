@@ -59,3 +59,27 @@ EXTERNS = {
     "g_pAtSingletonPtr": 0x8271A328,
     "g_defaultData16": 0x8261A0C0,
 }
+
+
+def sparse_bounces(t, d, tail, count, max_bounces=8):
+    """At most max_bounces contact samples (the bounce list has room for 10)."""
+    rng = t.rng
+    for i in range(N):
+        t.w8(sample_addr(d, i) + 8, 0)
+    for _ in range(rng.randrange(max_bounces + 1)):
+        if count:
+            t.w8(logical(d, tail, rng.randrange(count)) + 8, 1)
+    # Mostly above the floor so the walk gets past the first few samples.
+    for i in range(count):
+        if rng.random() < 0.97:
+            t.wf32(logical(d, tail, i) + 0x14, rng.uniform(0.01, 2.0))
+
+
+def zero_stack_fill(t):
+    """The bounce list copies an 8-byte stack temp whose last 3 bytes are never set
+    (the lift zeroes them); a zero stack makes the original copy zeros too."""
+    rng = t.rng
+    if not getattr(rng, "_bp_zero_stack", False):
+        orig = rng.randbytes
+        rng.randbytes = lambda n: bytes(n) if n == 0x9000 else orig(n)
+        rng._bp_zero_stack = True
