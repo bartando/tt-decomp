@@ -28,7 +28,7 @@ extern "C" void   grcSetup_vfn_2_CFD0_1(void* self);         // @ 0x8215CFD0
 extern "C" void   xe_main_thread_init_0038();                // @ 0x820C0038
 
 // SDA-resident globals (r13+0 chain / factory-singleton pointer).
-extern "C" uint32_t g_rageDescriptorHead;                    // @ 0x82600000
+extern "C" void* g_rageDescriptorHead __asm__("_g_tls_base");  // r13+0: the thread's TLS block (globals.c g_tls_base)
 extern "C" rage::grmShaderFactory* g_grmShaderFactory_instance; // @ 0x82606374
 
 namespace rage {

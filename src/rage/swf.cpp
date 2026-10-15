@@ -36,6 +36,7 @@ extern "C" {
 extern void* g_swfScriptObjectPool;  // @ SDA offset 19540
 extern void* g_swfInstancePool;      // @ SDA offset 19536
 extern void* g_swfScriptArrayPool;   // @ SDA offset 19552
+extern const char* g_str_swf_unsupportedMethod;  // @ 0x82075054, defined in pong_strings.cpp
 
 namespace rage {
 
@@ -360,7 +361,6 @@ void swfSCRIPTOBJECT::Invoke(const char* methodName, void* args, int argCount, v
 
     if (!found) {
         // Method not found
-        extern const char* g_str_swf_unsupportedMethod;  // @ 0x82077054
         rage_DebugLog(g_str_swf_unsupportedMethod, methodName);
         resultValue->data = 0;
         resultValue->type = SWF_VALUE_DELETED;  // undefined

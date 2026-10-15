@@ -44,9 +44,9 @@ extern uint32_t g_audCommandWriteIndex;         // audio command write index
 extern uint32_t* g_pAudCommandRingBuffer;        // audio command ring buffer
 
 // Voice free list sentinels.
-extern uint8_t g_audSfxVoiceFreeList[];        // SFX voice free list sentinel @ 0x825F5758
-extern uint8_t g_audStreamVoiceFreeList[];        // Stream voice free list sentinel @ 0x825F57C0
-extern uint32_t* g_pAudSystemActiveFlag;        // Audio system active flag pointer @ 0x825F5810
+extern uint8_t g_audSfxVoiceFreeList[];        // @ 0x825CA91C; +4 is the active-voice list @ 0x825CA920
+extern uint8_t g_audStreamVoiceFreeList[];        // Stream voice free list @ 0x825CA938
+extern uint32_t* g_pAudSystemActiveFlag __asm__("_g_audCtrlMgrControlPrimary");  // @ 0x82606410, defined in aud_data.cpp
 
 // Vtable pointers.
 extern void* g_audVoice_vtable[];          // audVoice base vtable
@@ -78,7 +78,7 @@ extern uint32_t* g_pAudBankEntryData;    // Audio bank entry data base @ 0x825EE
 extern void* g_pAudSceneSingleton;            // Audio scene singleton @ 0x825E7864
 extern void audScene_Shutdown(void* self);
 extern void atList_InsertItem(void* list, void* obj, uint32_t flags);
-extern uint8_t g_audSceneList[];        // Audio scene list @ 0x825E7878
+extern uint8_t g_audSceneList[];        // @ 0x825E7888: XAudio heap handle, not a scene list
 
 namespace {
 
@@ -1801,13 +1801,13 @@ void audControlGroup::UpdateAllControls(void* parserState) {
 // Field-name strings referenced by audControlGroup::LoadParameters.  These
 // live back-to-back in .rdata starting at 0x82035790 and are decoded from the
 // static-recomp scaffold's `addi r5, r11, 22224` / `... 22240` / ... stride.
-extern const char g_str_audControlGroup_field14[]; // @ 0x82035790 — float field at +20
-extern const char g_str_audControlGroup_field1C[]; // @ 0x820357A0 — float field at +28
-extern const char g_str_audControlGroup_field20[]; // @ 0x820357A8 — float field at +32
-extern const char g_str_audControlGroup_field24[]; // @ 0x820357B0 — float field at +36
-extern const char g_str_audControlGroup_field2C[]; // @ 0x820357B8 — bool/byte field at +44
-extern const char g_str_audControlGroup_field2D[]; // @ 0x820357C4 — bool/byte field at +45
-extern const char g_str_audControlGroup_field2E[]; // @ 0x820357D4 — bool/byte field at +46
+extern const char g_str_audControlGroup_field14[]; // @ 0x820356D0 — float field at +20
+extern const char g_str_audControlGroup_field1C[]; // @ 0x820356E0 — float field at +28
+extern const char g_str_audControlGroup_field20[]; // @ 0x820356E8 — float field at +32
+extern const char g_str_audControlGroup_field24[]; // @ 0x820356F0 — float field at +36
+extern const char g_str_audControlGroup_field2C[]; // @ 0x820356F8 — bool/byte field at +44
+extern const char g_str_audControlGroup_field2D[]; // @ 0x82035704 — bool/byte field at +45
+extern const char g_str_audControlGroup_field2E[]; // @ 0x82035714 — bool/byte field at +46
 
 // @ 0x821629B8 | size: 0x114
 // audControlGroup::LoadParameters (vfn_12) — registers the group's seven

@@ -31,7 +31,7 @@ extern const char* g_str_needToPreloadTemplate;               // @ 0x820311B0
 // ────────────────────────────────────────────────────────────────────────────
 // SWF / Scaleform
 // ────────────────────────────────────────────────────────────────────────────
-extern const char* g_str_swf_unsupportedMethod;               // @ 0x82077054
+extern const char* g_str_swf_unsupportedMethod;               // @ 0x82075054
 
 // ────────────────────────────────────────────────────────────────────────────
 // Audio

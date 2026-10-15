@@ -173,6 +173,7 @@ set(SOURCES
     src/rage/audio/aud_data.cpp
     src/rage/network/sn_data.cpp
     src/rage/rage_data.cpp
+    src/rage/ld_rage_data.cpp
     src/xam/xam_data.cpp
     src/link/linkage_bridges.cpp
     src/rage/net/dat_bit_buffer.cpp

@@ -33,7 +33,7 @@ extern void SinglesNetworkClient_F090(void* inputState);  // @ 0x8221F090
 extern const float kDefaultPanY;          // rdata @ 0x8202D110 + 0
 extern const float kSlowOrbitMul;         // rdata @ 0x8202D110 + 8
 extern const float kFastTurnMul;          // rdata @ 0x8202D110 + 116
-extern float g_fastOrbitMul;              // @ 0x82028A50 (.data)
+extern float g_fastOrbitMul;              // @ 0x825C8A50 (.data)
 extern float g_slowTurnMul;              // @ 0x825C90BC (.data)
 
 // Semantic aliases for recovered engine entry points.

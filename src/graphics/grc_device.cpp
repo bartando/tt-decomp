@@ -38,9 +38,9 @@ void grcDevice_shutdownAlt(void);
 /* ── Global device-state pointers (extern, defined in globals) ───────────── */
 
 extern uint32_t g_grcDeviceState[100];       /* @ 0x825EBB8C — device state flags array */
-extern void*    g_pGrcDeviceObj;             /* @ 0x825EBB94 — primary device object pointer */
-extern void*    g_pGrcDeviceAlt;             /* @ 0x825EBB9C — alternate device object pointer */
-extern void*    g_pGrcTextureCache;          /* @ 0x825EBB40 — texture cache pointer */
+extern void*    g_pGrcDeviceObj __asm__("_g_binkVideoPlayer");  /* @ 0x825EB988, defined in globals.c */
+extern void*    g_pGrcDeviceAlt;             /* @ 0x825EBA9C — alternate device object pointer */
+extern void*    g_pGrcTextureCache;          /* @ 0x825EBC40 — texture cache pointer */
 extern void*    g_grcRenderObjects[2];       /* @ 0x82617E60 — render object pair */
 extern void*    g_grcRefCountedObjs[4];      /* @ 0x826063E8 — refcounted render objects (2 pairs) */
 
