@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 
 extern "C" {
@@ -58,8 +59,11 @@ uint8_t fiAsciiTokenizer_ReadBool(void* tokenizer, void* dst, void* key) {
     return 0;
 }
 
+// 0x82433310 is the CRT's free() (HeapFree on the CRT heap, errno from
+// GetLastError on failure), not a tokenizer method; ph_physics.cpp's
+// 0x82430460 frees its buffer through it. Bridged to the host heap.
 void fiAsciiTokenizer_Destroy(void* tokenizer) {
-    (void)tokenizer;
+    free(tokenizer);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
