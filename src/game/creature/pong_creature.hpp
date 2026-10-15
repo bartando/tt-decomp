@@ -819,7 +819,7 @@ struct pongCreature {
     // scalar deleting destructor 0x820C5398) and 0x82027B08 for the
     // rage::phUpdateObject base at +0x10, whose slots get that base as `this`
     // (slot 2 subtracts 16 before deleting):
-    //   [0] 0x820C6358 — calls slot 6 of the object's own vtable
+    //   [0] UpdateWithIdentity(int)          @ 0x820C6358 — slot 6 with the identity matrix
     //   [1] SavePoseSnapshot                 @ 0x820C67C0
     //   [2] DestroyThunk                     @ 0x820C8618 — this-16, scalar delete
     //   [3] Reset(...)                       @ 0x820C6840
@@ -830,12 +830,12 @@ struct pongCreature {
     //   [8] nullsub                          @ 0x8240E6D0
     //
     // The declarations below don't reproduce that order.
-    virtual ~pongCreature();                                       // [0] @ 0x820C6358
+    virtual void UpdateWithIdentity(int updateMode);               // [0] @ 0x820C6358
     virtual void SavePoseSnapshot();                               // [1] @ 0x820C67C0
     virtual void DestroyThunk();                                   // [2] @ 0x820C8618
     virtual void Reset(void* world, void* scene);                  // [3] @ 0x820C6840
     virtual void RegisterShadowCasters(bool useSecondaryEmitter);  // [5] @ 0x820C60C8
-    virtual void UpdateShadowAndAnimState(int updateMode);         // [6] @ 0x820C6378  (TODO-body)
+    virtual void UpdateShadowAndAnimState(const float* matrix, int updateMode);  // [6] @ 0x820C6378  (TODO-body)
     virtual void StepLocomotion();                                 // [7] @ 0x820C5D18
 
     // ── non-virtual methods (from debug strings) ──

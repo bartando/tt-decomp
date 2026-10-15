@@ -3534,18 +3534,15 @@ extern "C" uint32_t g_phFrameIndex;    // @ 0x826065DC
 extern "C" void* g_phShadowAtlasSlot;  // @ 0x82606350
 
 // ─────────────────────────────────────────────────────────────────────────────
-// pongCreature::~pongCreature()  [vtable 0x82027B08 slot 0 @ 0x820C6358 | size: 0x1C]
+// pongCreature::UpdateWithIdentity(int updateMode)
+//                                [vtable 0x82027B08 slot 0 @ 0x820C6358 | size: 0x1C]
 //
-// Slot 0 of the phUpdateObject-base vtable (see the header): looks up the
-// object's own vtable and jumps to its slot 6. Lifted as the destructor
-// because a number of lifted callers bind to it.
+// (Was lifted as ~pongCreature; it destroys nothing.) Tail-calls slot 6 of the
+// object's own vtable with the identity matrix at 0x825CB800 and the caller's
+// argument: `mr r5, r4; addi r4, ..., -0x4800; lwz r9, 0x18(r10); bctr`.
 // ─────────────────────────────────────────────────────────────────────────────
-pongCreature::~pongCreature() {
-    // The stub loads slot index 6 from the object's own vtable and tail-calls
-    // it — the 0x820C6358 binary literally does `lwz r9,24(r10); bctr` (24
-    // bytes = slot 6 * 4), with r5 set to the caller's flags arg.
-    void** vt = *(void***)this;
-    ((void(*)(void*, int))vt[6])(this, 0);
+void pongCreature::UpdateWithIdentity(int updateMode) {
+    VCALL(this, 6, void (*)(pongCreature*, const float*, int))(this, g_identityMatrixRef, updateMode);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
