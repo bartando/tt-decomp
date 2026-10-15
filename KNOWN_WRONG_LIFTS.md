@@ -28,9 +28,6 @@ before relying on any of these; fix and delete the entry when done.
   destructor under unrelated names.
 - `pong_match.hpp`: gmPracticeTarget vtable slot 1 (0x82112DF8) is labelled `ScalarDtor` but is
   the data-file loader; slot 0 (0x82112C70) is the deleting destructor.
-- `pongCreatureInst_SetMatrixImpl`, `_NotifyHeadingChanged` and `_ComputeHeading` are
-  duplicate wrong lifts of `pongCreatureInst` (fragInst) vtable slots 31, 10 and 9; the
-  member versions in `pong_creature.cpp` are the corrected ones.
 - `pongCameraMgr_6280_g` treats a `grcViewport` as a `pongCameraMgr`.
 - `charViewCS` repeats `camBaseCS`'s fields (CameraFOV/Near/Far at +0xA4..+0xAC) as `m_axisHook*`.
 - `camViewCS` slot 9 is named `OnSourceChanged`, but `pongCameraMgr::Update` calls it every frame.
@@ -67,6 +64,15 @@ before relying on any of these; fix and delete the entry when done.
   handler, not an enum one.
 - `globals.c` swaps the pointer and type arrays at 0x825F3868/0x825F3968.
 - 0x825EBC54 (`boundContext` in `rage_grm.cpp`) behaves like a write counter.
+- `fx_effects.cpp` and `ProcessAnimationList` pass the skeleton to 0x8224C128/0x8224C288
+  (LocomotionStateAnim C128/C288) in r4; the asm reads it from r5.
+- `pongPlayer_B208_g` and `pongPlayer_D7B0_g` are `pongPlayerState` functions.
+- `pongMover::Reset` is still broadly wrong (only its teleport call was fixed).
+- `ph_physics.cpp` has two conflicting names for 0x820C3F98 (builds a rotation about y).
+- 0x8271A2EC/0x8271A2F0 hold replay data in `pong_creature.cpp` but are called "shadow
+  table"/"match logic" elsewhere; 0x8271A2F4 is stored as `uint32_t` in `pong_ball`.
+- `pongCreature::Reset`, `RegisterShadowCasters`, `RestorePoseFromRollback` look rough and
+  were never checked against the asm.
 - `globals.c`: `g_msgSinkTemplate` is at 0x8261A0C0, not 0x8241A0C0.
 
 ## The recomp is not ground truth
