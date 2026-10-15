@@ -16,7 +16,7 @@
 /* ── External Dependencies ────────────────────────────────────────────────── */
 
 /* Global singleton pointers */
-extern void* g_pHudOverlay;            /* @ 0x825EBAA0 — HUD overlay object */
+extern void* g_pCurrentViewport;            /* @ 0x825EBAA0 — current grcViewport */
 
 /* Memory management */
 extern void sysMemAllocator_Free(void* ptr);             /* @ 0x820C00C0 — sysMemFree */
@@ -169,8 +169,8 @@ void grcDevice_shutdownAlt(void)
 
     if (pDevice != NULL) {
         /* If this device is also the HUD overlay, clear that reference. */
-        if (g_pHudOverlay == pDevice) {
-            g_pHudOverlay = NULL;
+        if (g_pCurrentViewport == pDevice) {
+            g_pCurrentViewport = NULL;
         }
 
         /* Free the device memory. */

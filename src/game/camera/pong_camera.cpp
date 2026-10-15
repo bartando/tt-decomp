@@ -1617,9 +1617,9 @@ static T& FieldAt(void* base, uint32_t offset) {
 
 // lbl_825EBAA0 holds the current grcViewport: ~grcViewport clears it and
 // 0x82153070 re-uploads a viewport that is current. globals.c defines the slot
-// as g_pHudOverlay.
-extern "C" void* g_pHudOverlay;
-static void*& g_currentViewport = g_pHudOverlay;
+// as g_pCurrentViewport.
+extern "C" void* g_pCurrentViewport;
+static void*& g_currentViewport = g_pCurrentViewport;
 
 // lbl_8271A318 is the atSingleton<camShotMgr> instance. camShotMgr is an
 // fsmMachine whose base sits at +0x04, so the shot indices are fsmMachine

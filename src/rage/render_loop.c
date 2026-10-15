@@ -52,7 +52,7 @@ extern void* g_pPhysicsWorld;
 extern void* g_pRootGameObj;
 
 /* HUD overlay object pointer (8-byte descriptor) @ 0x825EBAA0 */
-extern void* g_pHudOverlay;
+extern void* g_pCurrentViewport;
 
 /* Camera singleton pointer @ 0x825EBC3C */
 extern void* g_pCamera;
@@ -430,7 +430,7 @@ void gameLoop_EndRender(gameLoop* pLoop)
  *
  * Key operations:
  *   A. FPS overlay — formats an FPS string from render timing data and
- *      passes it to the HUD overlay object (g_pHudOverlay).
+ *      passes it to the HUD overlay object (g_pCurrentViewport).
  *   B. Aspect ratio — polls XGetVideoMode and updates the camera's
  *      m_fAspectRatio (g_pCamera[+36]) based on hi-def vs standard output.
  *   C. Dirty-flag processing — resets g_renderTimingA/B dirty flags and
@@ -456,8 +456,8 @@ void gameLoop_PostRender(gameLoop* pLoop)
 
         /* HUD projected dimensions (pixels, loaded as floats). */
         float projW = 0.0f, projH = 0.0f;
-        if (g_pHudOverlay != NULL) {
-            uint8_t* pHud = (uint8_t*)g_pHudOverlay;
+        if (g_pCurrentViewport != NULL) {
+            uint8_t* pHud = (uint8_t*)g_pCurrentViewport;
             projW = (float)(*(int32_t*)(pHud + 8));
             projH = (float)(*(int32_t*)(pHud + 12));
         }
@@ -472,7 +472,7 @@ void gameLoop_PostRender(gameLoop* pLoop)
                   (int32_t)projW, (int32_t)projH);
 
         /* TODO @ 0x82229CD4: pass fpsBuf to HUD rendering system.
-         * Assembly calls into HUD object at g_pHudOverlay[+816] etc. */
+         * Assembly calls into HUD object at g_pCurrentViewport[+816] etc. */
         (void)fpsBuf;
     }
 

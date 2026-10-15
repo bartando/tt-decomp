@@ -132,7 +132,7 @@ void* g_display_obj_ptr = NULL;
 /* Page-group manager (credits roll, fades): a 64-byte object gameLoop_Init
  * (0x82228F30) allocates; null until then. */
 void* g_uiManager = NULL;  // @ 0x8271A358
-void* g_pHudOverlay = NULL;
+void* g_pCurrentViewport = NULL;  // @ 0x825EBAA0  current grcViewport; ~grcViewport clears it
 void* g_pStencilMgrObj = NULL;
 
 // UI input enable flag
