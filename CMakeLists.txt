@@ -174,6 +174,7 @@ set(SOURCES
     src/xam/xam_data.cpp
     src/link/linkage_bridges.cpp
     src/rage/net/dat_bit_buffer.cpp
+    src/rage/core/debug_print_nops.cpp
 )
 
 # Create executable
