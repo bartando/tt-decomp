@@ -1210,6 +1210,9 @@ void pcrSwingData_ctor_B888(void* thisPtr, void* segmentData) {
 // ─────────────────────────────────────────────────────────────────────────────
 // pongCreatureInst — Small vtable methods and utility functions
 // ─────────────────────────────────────────────────────────────────────────────
+//
+// Slots 2, 3, 9-11, 14, 22, 30, 31 and 37 sit with the fragInst methods further
+// down, where pongCreatureInstLayout is defined.
 
 /**
  * pongCreatureInst::GetType @ 0x8210CC40 | size: 0x8  [vtable slot 1]
@@ -1219,16 +1222,6 @@ void pcrSwingData_ctor_B888(void* thisPtr, void* segmentData) {
  */
 int pongCreatureInst::GetType() {  // vfn_1
     return 3;
-}
-
-/**
- * pongCreatureInst::GetEmbeddedObject @ 0x820C8ED8 | size: 0x8  [vtable slot 2]
- *
- * Returns a pointer to the embedded sub-object at offset +224 (0xE0).
- * This is the creature's collision/physics shape data.
- */
-void* pongCreatureInst::GetEmbeddedObject() {  // vfn_2
-    return (char*)this + 0xE0;  // embedded sub-object at +0xE0
 }
 
 /**
@@ -1253,36 +1246,6 @@ void pongCreatureInst::ClearBoundingVector(void* outVector) {  // vfn_4
 }
 
 /**
- * pongCreatureInst::ForwardToUpdateBounds @ 0x822C90A0 | size: 0x10  [vtable slot 10]
- *
- * Tail-calls vtable slot 15 on self. Forwards the update-bounds
- * request to the more specific implementation.
- */
-void pongCreatureInst::ForwardToUpdateBounds() {  // vfn_10
-    VCALL(this, 15, void(*)(void*))(this);
-}
-
-/**
- * pongCreatureInst::UpdateBoundsWithDefaults @ 0x822C90B0 | size: 0x1C  [vtable slot 9]
- *
- * Calls vtable slot 10 with default parameters (outMin=this+64, outMax=0, flags=0).
- * Sets up the default bounding volume query.
- */
-void pongCreatureInst::UpdateBoundsWithDefaults() {  // vfn_9
-    VCALL(this, 10, void(*)(void*, void*, void*, int))(this, &this->field_0x0040, nullptr, 0);
-}
-
-/**
- * pongCreatureInst::ComputeBoundsPartial @ 0x822C90E0 | size: 0x14  [vtable slot 14]
- *
- * Calls vtable slot 10 with flags=0, passing through the caller's
- * min/max pointers.
- */
-void pongCreatureInst::ComputeBoundsPartial(void* outMin, void* outMax) {  // vfn_14
-    VCALL(this, 10, void(*)(void*, void*, void*, int))(this, outMin, outMax, 0);
-}
-
-/**
  * pongCreatureInst::GetEntityByIndex @ 0x822C9318 | size: 0x18  [vtable slot 38]
  *
  * Looks up a sub-entity by index. Follows: this->field_4 -> field_12 -> field_120,
@@ -1291,79 +1254,6 @@ void pongCreatureInst::ComputeBoundsPartial(void* outMin, void* outMax) {  // vf
 void* pongCreatureInst::GetEntityByIndex(int index) {  // vfn_38
     void* inner = (void*)this->field_0x0004;
     void* pool = *(void**)((char*)inner + 12);
-    char* base = *(char**)((char*)pool + 120);
-    return base + (index << 6);
-}
-
-/**
- * pongCreatureInst::GetBoneTransform @ 0x8211DDB8 | size: 0x3C  [vtable slot 22]
- *
- * Returns a pointer to a bone's transform matrix. Looks up the bone
- * array through the creature's skeleton data.
- */
-void* pongCreatureInst::GetBoneTransform(int boneIndex) {  // vfn_22
-    void* skeletonData = (void*)this->field_0x0050;
-    if (!skeletonData) return nullptr;
-
-    void* boneArray = *(void**)((char*)skeletonData + 12);
-    char* boneBase = *(char**)((char*)boneArray + 120);
-    return boneBase + (boneIndex << 6);
-}
-
-/**
- * pongCreatureInst::GetCreatureInfo @ 0x820C8F80 | size: 0x24  [vtable slot 30]
- *
- * Returns creature info by reading through the creature data chain:
- * this->field_4 -> field_84 (the creature info/stats pointer).
- */
-void* pongCreatureInst::GetCreatureInfo() {  // vfn_30
-    void* creatureData = (void*)this->field_0x0004;
-    if (!creatureData) return nullptr;
-    return *(void**)((char*)creatureData + 84);
-}
-
-/**
- * pongCreatureInst::GetPhysicsState @ 0x822C9200 | size: 0x38  [vtable slot 31]
- *
- * Returns a pointer to the creature's physics state data by walking
- * the data chain: this->field_4 -> field_12 -> field_84.
- * Returns nullptr if any link is null.
- */
-void* pongCreatureInst::GetPhysicsState() {  // vfn_31
-    void* inner = (void*)this->field_0x0004;
-    if (!inner) return nullptr;
-    void* physics = *(void**)((char*)inner + 12);
-    if (!physics) return nullptr;
-    return *(void**)((char*)physics + 84);
-}
-
-/**
- * pongCreatureInst::GetCollisionFlags @ 0x822C92D8 | size: 0x40  [vtable slot 37]
- *
- * Returns collision flag data from the creature's physics subsystem.
- * Walks: this->field_4 -> field_12 -> field_84, then reads the
- * collision flags at +16 of the resulting object.
- */
-uint32_t pongCreatureInst::GetCollisionFlags() {  // vfn_37
-    void* inner = (void*)this->field_0x0004;
-    if (!inner) return 0;
-    void* physics = *(void**)((char*)inner + 12);
-    if (!physics) return 0;
-    void* collisionData = *(void**)((char*)physics + 84);
-    if (!collisionData) return 0;
-    return *(uint32_t*)((char*)collisionData + 16);
-}
-
-/**
- * pongCreatureInst::GetSubObjectTransform @ 0x820C8E98 | size: 0x40  [vtable slot 3]
- *
- * Returns a 4x4 matrix pointer for the creature's sub-object at the
- * specified index. Walks: this->field_80 -> field_12 -> buffer[index*64].
- */
-void* pongCreatureInst::GetSubObjectTransform(int index) {  // vfn_3
-    void* subObjMgr = (void*)this->field_0x0050;
-    if (!subObjMgr) return nullptr;
-    void* pool = *(void**)((char*)subObjMgr + 12);
     char* base = *(char**)((char*)pool + 120);
     return base + (index << 6);
 }
@@ -1807,36 +1697,16 @@ void pongCreature::ScalarDeletingDtor(int flags) {  // vfn_0_5398_1
     }
 }
 
-/**
- * pongCreatureInst::Detach @ 0x8211D470 | size: 0x58
- *
- * Detaches this creature instance from its parent. Sets the vtable to
- * the base class, calls the parent's remove method (vtable slot 3) to
- * unlink from the parent list, then calls the cleanup helper.
- */
-void pongCreatureInst::Detach() {  // D470_p33
-    extern void* g_creatureManager;  // @ 0x826063B8 (SDA)
-
-    // Set vtable to base phInst class
-    *(void**)this = (void*)0x82022D2C;  // phInst vtable
-
-    // Remove from parent's child list
-    void* parent = *(void**)((char*)g_creatureManager + 876);
-    void* childToRemove = (void*)this->field_0x00c0;  // m_childLink
-    VCALL(parent, 3, void(*)(void*, void*))(parent, childToRemove);
-
-    // Run cleanup
-    pongCreatureInst_Cleanup(this);
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-// pongCreatureInst — rage::fragInst attach, fragment cache and world bound
+// pongCreatureInst — rage::phInst / rage::fragInst slots, fragment cache
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // pongCreatureInst derives from rage::fragInst (vtable 0x82032D2C), which
-// derives from rage::phInst: the base destructor at 0x8211D470 (lifted above
-// as Detach) restores the fragInst vtable and then runs phInst's (0x822C8FD0).
-// The slots below work on fragInst members. The flat field_0x.. list in
+// derives from rage::phInst: fragInst's destructor body (0x8211D470,
+// FragInstDtor below) restores the fragInst vtable and then runs phInst's
+// (0x822C8FD0). Slots 9, 10, 14, 31 and 37 are phInst's code, 11 and 22
+// fragInst's; 2, 3 and 30 are pongCreatureInst's own overrides.
+// The slots below work on phInst/fragInst members. The flat field_0x.. list in
 // pong_creature.hpp also holds rage::fragType members (the XML tuning readers
 // at 0x82118E70..0x82119180 and fragType's constructor at 0x8211BB30 write
 // +0x20..+0x1BF), so these methods read the object through
@@ -1844,6 +1714,11 @@ void pongCreatureInst::Detach() {  // D470_p33
 // fragInst's resource constructor (0x8211D3B8) prove.
 
 struct fragType;  // rage::fragType (vtable 0x82032CA4), opaque here
+
+namespace rage {
+struct phInstBehavior;  // vtable 0x82065080
+struct phRope;          // vtable 0x820650B0, derives from phInstBehavior
+}
 
 // Chained hash map from a 32-bit key to a 16-bit use count. The fragment
 // cache pool keeps one (pool+0x1C) counting the cached instances per fragInst
@@ -1873,9 +1748,21 @@ struct CacheKeyMap {
 // (0x821263B8) takes a free entry while used < capacity, otherwise it steals
 // one whose instance's world bound sphere (inst+0x70 / +0x80) lies outside
 // the six view planes at g_creatureManager+0x1D0.
+// Acquire stamps every entry it hands out with currentStamp, and steals only
+// entries stamped before currentStamp - 1.
 struct fragCachePool {
-    uint8_t      _pad00[0x1C];  // capacity +0x00, used +0x04, free list +0x0C
+    uint8_t      _pad00[0x08];  // capacity +0x00, used +0x04
+    uint32_t     currentStamp;  // +0x08
+    uint8_t      _pad0C[0x10];  // free list +0x0C
     CacheKeyMap* keyCounts;     // +0x1C
+};
+
+// Entry of that pool, reduced to what these methods read.
+struct fragCacheEntry {
+    uint8_t               _pad000[0x0C];
+    uint32_t              lastUsedStamp;  // +0x0C  fragCachePool::currentStamp when last used
+    uint8_t               _pad010[0x1F0];
+    rage::phInstBehavior* behavior;       // +0x200  ApplyToRope casts it to phRope
 };
 
 // Callback object (rage::Functor1 layout, assumed): the caller loads the
@@ -1887,9 +1774,9 @@ struct fragInstCallback {
 
 // The object behind g_creatureManager (0x826063B8), reduced to what these
 // methods touch. Its fragInst callbacks sit 0x10 apart from +0x32C: attach,
-// detach (DetachFromScene), bound moved, create (+0x35C: fragInst's resource
+// detach (DetachFromScene), bound moved, create (fragInst's resource
 // constructor passes the instance and keeps the result at inst+0xC0) and
-// destroy (+0x36C: fragInst's destructor at 0x8211D470).
+// destroy (fragInst's destructor passes that result back).
 struct fragInstManager {
     uint8_t          _pad000[0x2F0];
     fragCachePool*   cachePool;     // +0x2F0
@@ -1897,16 +1784,22 @@ struct fragInstManager {
     fragInstCallback onAttach;      // +0x32C
     fragInstCallback onDetach;      // +0x33C
     fragInstCallback onBoundMoved;  // +0x34C
+    fragInstCallback onCreate;      // +0x35C  thunk returns the handle (not called here)
+    fragInstCallback onDestroy;     // +0x36C
 };
 
 // The parts of rage::phArchetype / rage::phBound read below. phBound's
 // SetCentroidOffset (0x8228D178) stores the vector at +0x30; +0x08 is the
 // radius of the bounding sphere around that centroid.
 struct phBoundView {
-    uint8_t _pad00[0x08];
-    float   radiusAroundCentroid;  // +0x08
-    uint8_t _pad0C[0x24];
-    float   centroidOffset[4];     // +0x30  w unused
+    uint8_t  _pad00[0x08];
+    float    radiusAroundCentroid;  // +0x08
+    uint8_t  _pad0C[0x24];
+    float    centroidOffset[4];     // +0x30  w unused
+    uint8_t  _pad40[0x30];
+    void**   parts;                 // +0x70  part pointers, null for an empty slot
+    uint8_t  _pad74[0x0E];          // +0x78: 64-byte part matrices (GetEntityByIndex)
+    uint16_t partCount;             // +0x82
 };
 
 struct phArchetypeView {
@@ -1949,7 +1842,9 @@ struct pongCreatureInstLayout {
     uint32_t                cacheKey;          // +0x98  counted in fragCachePool::keyCounts, 0 = none
     uint8_t                 _pad9C[0x24];
     void*                   managerHandle;     // +0xC0  returned by the manager's create callback
-    uint8_t                 _padC4[0x60];
+    uint8_t                 _padC4[0x1C];
+    float                   lastMatrix[4][4];  // +0xE0  pongCreatureInst's; Get/SetLastMatrix
+    uint8_t                 _pad120[0x04];
     void*                   bounds;            // +0x124  atArray of 0x100-byte phBound objects
     uint16_t                boundCount;        // +0x128
     uint16_t                boundCapacity;     // +0x12A
@@ -1969,6 +1864,41 @@ extern fragCacheEntry* fragCachePool_Acquire(fragCachePool* pool);
 extern void fragCacheEntry_Init(fragCacheEntry* entry, fragTypeHolder* typeHolder, fragType* type,
                                 const float* matrix, pongCreatureInst* inst, void* arg5,
                                 uint16_t index, bool markIndex);
+// @ 0x82120120 (fragInst_vfn_30), not lifted. Returns null unless flag 0x2 at
+// +0x50 is set, and the instance at once unless bit 0 of its fragType's byte
+// +0x1AF is set. Otherwise gets a cache entry through slot 43 if there is none
+// (null if that fails), hands the pointer at entry+0x1EC out through outObject,
+// sets flag 0x2 again and returns the instance (one more check can return
+// null). It also restamps the cache entry of a fragInst found through arg2..arg4.
+extern void* fragInst_PrepareForActivation(pongCreatureInst* inst, void** outObject,
+                                           void* arg2, void* arg3, void* arg4);
+// @ 0x823458F0 (pongCreatureInst_58F0_wrh). Splits vec between the two
+// particles at the ends of the rope's segment `segment` (segments at rope+0x08,
+// 0x60 bytes each, particle indices at +0x34/+0x38; particles at rope+0x0C,
+// 0x170 bytes each), each particle's share being the other one's distance from
+// point over the sum of both distances, and adds the shares to the particles'
+// +0xC0 vectors.
+extern void phRope_ApplyAtSegment(rage::phRope* rope, const float* vec, const float* point, int segment);
+
+// MSVC RTTI type descriptors (.data, decorated name at +8)
+struct RTTITypeDescriptor;
+extern RTTITypeDescriptor g_typeDescriptor_phInstBehavior;  // @ 0x825D4520  ".?AVphInstBehavior@rage@@"
+extern RTTITypeDescriptor g_typeDescriptor_phRope;          // @ 0x825D4544  ".?AVphRope@rage@@"
+// @ 0x82430978 (SinglesNetworkClient_0978_g in the symbol map): MSVC's __RTDynamicCast
+extern "C" void* RTDynamicCast(void* object, int32_t vfDelta, RTTITypeDescriptor* sourceType,
+                               RTTITypeDescriptor* targetType, int32_t isReference);
+
+// dynamic_cast<rage::phRope*>(behavior), the call the compiler emitted
+static rage::phRope* AsRope(rage::phInstBehavior* behavior) {
+    return static_cast<rage::phRope*>(
+        RTDynamicCast(behavior, 0, &g_typeDescriptor_phInstBehavior, &g_typeDescriptor_phRope, 0));
+}
+
+// .data vector at 0x82606750; probably zero (0x823458F0 falls back to it for a
+// zero length), but the bytes aren't in the repo
+extern "C" const float lbl_82606750[4];
+
+static const uintptr_t FRAG_INST_VTABLE = 0x82032D2C;  // rage::fragInst
 
 static fragInstManager* FragInstManager() {
     return static_cast<fragInstManager*>(g_creatureManager);
@@ -2032,11 +1962,28 @@ void* pongCreatureInst::ScalarDeletingDtor(int flags) {
             rage_free(cookie);
     }
 
-    Detach();  // 0x8211D470: ~fragInst
+    FragInstDtor();  // ~fragInst
 
     if (flags & 1)
         rage_free(this);
     return this;
+}
+
+/**
+ * pongCreatureInst::FragInstDtor @ 0x8211D470 | size: 0x58  (was Detach)
+ *
+ * rage::fragInst's destructor body: restores the fragInst vtable, hands the
+ * manager's destroy callback (+0x36C) the handle its create callback returned
+ * for this instance, then runs ~phInst (0x822C8FD0).
+ */
+void pongCreatureInst::FragInstDtor() {
+    pongCreatureInstLayout* self    = Layout(this);
+    fragInstManager*        manager = FragInstManager();
+
+    self->vtable = reinterpret_cast<void**>(FRAG_INST_VTABLE);
+    manager->onDestroy.thunk(&manager->onDestroy, self->managerHandle);
+
+    pongCreatureInst_Cleanup(this);  // ~phInst
 }
 
 /**
@@ -2146,6 +2093,138 @@ void pongCreatureInst::UpdateWorldBound() {
     manager->onBoundMoved.thunk(&manager->onBoundMoved, self->managerHandle);
 
     SyncBoneMatrices();  // vtable slot 47
+}
+
+// Slots 2 and 3: phInst's own slot 2 (0x823D8CD0) returns the current matrix at
+// +0x10 and its slot 3 does nothing; callers such as 0x820C5FCC pass an instance
+// its own +0x10 matrix through slot 3. pongCreatureInst keeps that copy at +0xE0.
+// The names (last matrix) are inferred from that pattern.
+
+/**
+ * pongCreatureInst::GetLastMatrix @ 0x820C8ED8 | size: 0x8  [vtable slot 2]
+ * (was GetEmbeddedObject)
+ */
+const float* pongCreatureInst::GetLastMatrix() {
+    return Layout(this)->lastMatrix[0];
+}
+
+/**
+ * pongCreatureInst::SetLastMatrix @ 0x820C8E98 | size: 0x40  [vtable slot 3]
+ * (was GetSubObjectTransform)
+ *
+ * Copies the 4x4 at matrix into +0xE0 (four 16-byte vector loads and stores).
+ */
+void pongCreatureInst::SetLastMatrix(const float* matrix) {
+    memcpy(Layout(this)->lastMatrix, matrix, sizeof(Layout(this)->lastMatrix));
+}
+
+/**
+ * pongCreatureInst::ApplyAtPosition @ 0x822C90B0 | size: 0x1C  [vtable slot 9]
+ *
+ * rage::phInst's: tail-calls slot 10 with the matrix translation (+0x40) as
+ * the point and component and element 0.
+ */
+void pongCreatureInst::ApplyAtPosition(const float* vec) {
+    ApplyAt(vec, Layout(this)->matrix[3], 0, 0);  // vtable slot 10
+}
+
+/**
+ * pongCreatureInst::ApplyAt @ 0x822C90A0 | size: 0x10  [vtable slot 10]
+ *
+ * rage::phInst's: tail-calls slot 15 with the same arguments. What element
+ * means is unknown; slots 9 and 14 pass 0.
+ */
+void pongCreatureInst::ApplyAt(const float* vec, const float* point, int component, int element) {
+    VCALL(this, 15, void(*)(pongCreatureInst*, const float*, const float*, int, int))(
+        this, vec, point, component, element);
+}
+
+/**
+ * pongCreatureInst::ApplyToRope @ 0x821210A8 | size: 0x8C  [vtable slot 11]
+ *
+ * rage::fragInst's. Calls slot 16 with the same arguments, which is all
+ * phInst's slot 11 (0x822C90D0) does. Then, for a cached instance whose cache
+ * entry's behaviour is a rage::phRope, spreads vec over the rope segment
+ * `component` (see phRope_ApplyAtSegment).
+ */
+void pongCreatureInst::ApplyToRope(const float* vec, const float* point, int component) {
+    VCALL(this, 16, void(*)(pongCreatureInst*, const float*, const float*, int))(
+        this, vec, point, component);
+
+    fragCacheEntry* entry = Layout(this)->cacheEntry;
+    if (entry == nullptr)
+        return;
+
+    rage::phRope* rope = AsRope(entry->behavior);
+    if (rope != nullptr)
+        phRope_ApplyAtSegment(rope, vec, point, component);
+}
+
+/**
+ * pongCreatureInst::ApplyAtComponent @ 0x822C90E0 | size: 0x14  [vtable slot 14]
+ *
+ * rage::phInst's: tail-calls slot 10 with element 0.
+ */
+void pongCreatureInst::ApplyAtComponent(const float* vec, const float* point, int component) {
+    ApplyAt(vec, point, component, 0);  // vtable slot 10
+}
+
+/**
+ * pongCreatureInst::TouchCacheEntry @ 0x8211DDB8 | size: 0x3C  [vtable slot 22]
+ * (was GetBoneTransform)
+ *
+ * rage::fragInst's: stamps the instance's cache entry with the pool's current
+ * stamp, which keeps fragCachePool_Acquire from stealing it for now. Always
+ * returns true, like phInst's slot 22 (0x8210CBD0).
+ */
+bool pongCreatureInst::TouchCacheEntry() {
+    fragCacheEntry* entry = Layout(this)->cacheEntry;
+    if (entry != nullptr)
+        entry->lastUsedStamp = FragInstManager()->cachePool->currentStamp;
+    return true;
+}
+
+/**
+ * pongCreatureInst::PrepareForActivation @ 0x820C8F80 | size: 0x24  [vtable slot 30]
+ * (was GetCreatureInfo)
+ *
+ * Runs fragInst's slot 30 (0x82120120) with the same arguments, then returns
+ * null where fragInst's returns the instance. Callers such as 0x822C4690 and
+ * 0x822C4830 pass &out and three nulls and only go on with a non-null result;
+ * the name is inferred from that.
+ */
+void* pongCreatureInst::PrepareForActivation(void** outObject, void* arg2, void* arg3, void* arg4) {
+    fragInst_PrepareForActivation(this, outObject, arg2, arg3, arg4);
+    return nullptr;
+}
+
+/**
+ * pongCreatureInst::FillMatrixFromConstant @ 0x822C9200 | size: 0x38  [vtable slot 31]
+ * (was GetPhysicsState)
+ *
+ * rage::phInst's: writes the 16-byte vector at 0x82606750 to all four rows of
+ * outMatrix. this is not read.
+ */
+void pongCreatureInst::FillMatrixFromConstant(float* outMatrix) {
+    for (int row = 0; row < 4; ++row)
+        memcpy(outMatrix + row * 4, lbl_82606750, sizeof(lbl_82606750));
+}
+
+/**
+ * pongCreatureInst::CountBoundParts @ 0x822C92D8 | size: 0x40  [vtable slot 37]
+ * (was GetCollisionFlags)
+ *
+ * rage::phInst's: counts the non-null part pointers of the archetype's bound.
+ */
+int pongCreatureInst::CountBoundParts() {
+    const phBoundView* bound = Layout(this)->archetype->bound;
+
+    int count = 0;
+    for (uint32_t i = 0; i < bound->partCount; ++i) {
+        if (bound->parts[i] != nullptr)
+            ++count;
+    }
+    return count;
 }
 
 /**
@@ -3714,17 +3793,19 @@ void pongCreature::Reset(void* world, void* scene) {
 // ═════════════════════════════════════════════════════════════════════════════
 
 // External helpers
-extern "C" void util_9D98(void* obj, int flags);  // @ 0x822C9D98 — phInst child destructor
+// @ 0x822C9D98 — phArchetype release: does nothing (returns 1) while the byte at
+// 0x826064E1 is clear; otherwise drops the u16 refcount at +0x1A and, when it
+// reaches zero, calls slot 0 with flags 1 (deleteWhenUnused set) or slot 3.
+extern "C" void util_9D98(void* archetype, int deleteWhenUnused);
 
 /**
  * phInst::Cleanup @ 0x822C8FD0 | size: 0x5C
  *
- * Tears down a phInst to its base rage::datBase class. Sets the vtable
- * to rage::phInst, destroys the child object at +4 if present (via its
- * scalar deleting destructor with flags=1), nulls the child pointer,
- * then sets the vtable to rage::datBase.
+ * rage::phInst's destructor body: sets the rage::phInst vtable, releases the
+ * archetype at +4 (if any) through 0x822C9D98, nulls it, then sets the
+ * rage::datBase vtable.
  *
- * Called from pongCreatureInst::Detach, pongBallInstance::~pongBallInstance,
+ * Called from pongCreatureInst::FragInstDtor, pongBallInstance::~pongBallInstance,
  * phInst::~phInst, and phClothVerletInst::~phClothVerletInst.
  */
 extern "C" void pongCreatureInst_Cleanup(void* obj) {
@@ -3733,15 +3814,10 @@ extern "C" void pongCreatureInst_Cleanup(void* obj) {
     // Set vtable to rage::phInst @ 0x8205991C
     *(void**)self = (void*)0x8205991C;
 
-    // If child object at +4 is non-null, destroy it
-    void* child = *(void**)(self + 4);
-    if (child != nullptr) {
-        // Call child's scalar deleting destructor (vtable slot 0) with flags=1
-        void** childVt = *(void***)child;
-        ((void(*)(void*, int))childVt[0])(child, 1);
-    }
+    void* archetype = *(void**)(self + 4);
+    if (archetype != nullptr)
+        util_9D98(archetype, 1);
 
-    // Null out child pointer
     *(void**)(self + 4) = nullptr;
 
     // Set vtable to rage::datBase @ 0x820276C4
