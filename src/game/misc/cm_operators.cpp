@@ -344,9 +344,11 @@ typedef void* (*AllocFn)(void* self, uint32_t size, uint32_t alignment);
  */
 static void* cmOperatorCtor_Allocate(uint32_t size) {
     sysMemAllocator_InitMainThread();
-    uint32_t* sdaCtx = (uint32_t*)(uintptr_t)g_sda_base[0];
-    void** allocator = (void**)(uintptr_t)sdaCtx[1];
-    AllocFn alloc = (AllocFn)allocator[1];
+    // r13 word 0 is the thread block; its +4 is the current allocator, a C++
+    // object whose vtable slot 1 is Allocate(size, align).
+    void** thread = *reinterpret_cast<void***>(g_sda_base);
+    void** allocator = static_cast<void**>(thread[1]);
+    AllocFn alloc = reinterpret_cast<AllocFn>(static_cast<void**>(allocator[0])[1]);
     return alloc(allocator, size, 16);
 }
 
@@ -2739,8 +2741,8 @@ struct TriStripList {
     // @ 0x82134350 — deletes the strip in `slot` (its two arrays, then itself)
     // and closes the gap. It matches the slot's address, not the strip;
     // pong_network.cpp lifts it as pongNetMessageHolder::RemoveElementByPointer.
-    void       Erase(TriStrip** slot);
-    TriStrip** TakeBest(const StripVertexCache* cache);
+    void       Erase(TriStrip** slot);                  // @ 0x82134350
+    TriStrip** TakeBest(const StripVertexCache* cache);  // @ 0x82134C10
 };
 
 // The driver's stack object, 16 bytes. The driver frees m_triFlags and then
