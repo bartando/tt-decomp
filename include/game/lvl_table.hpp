@@ -73,3 +73,57 @@ static_assert(offsetof(LvlTableConstraintView, responseScale) == 0x38);
 // array bases are rounded down to 16 bytes, matching lvx/stvx addressing.
 void lvlTable_85B8_2hr(const LvlTableConstraintView* self, uint32_t constraint,
                        LvlTableVector* positions, const LvlTableVector& anchor);
+
+// Partial views for cloth/capsule collision; these names are inferred from the
+// type-1 bound dispatch and projection onto a finite axis, not original symbols.
+struct ClothParticleGroup {
+    const uint32_t* indices;
+    uint16_t count;
+    uint16_t capacity;
+};
+
+struct ClothCapsuleCollisionView {
+    uint8_t _pad00[8];
+    int32_t firstMovableParticle;          // +0x08, signed comparison
+    uint8_t _pad0C[0x10];
+    LvlTableVector* positions;              // +0x1C
+    uint8_t _pad20[4];
+    const LvlTableVector* previousPositions; // +0x24
+    uint8_t _pad28[0xE0];
+    const ClothParticleGroup* groups;       // +0x108
+};
+
+struct ClothCapsuleBoundView {
+    uint8_t _pad00[8];
+    float broadRadius;                     // +0x08
+    uint8_t _pad0C[0x34];
+    LvlTableVector center;                 // +0x40
+    uint8_t _pad50[0x20];
+    LvlTableVector radius;                 // +0x70
+    LvlTableVector axisLength;             // +0x80
+    LvlTableVector axisStart;              // +0x90
+    uint8_t _padA0[0x10];
+    LvlTableVector axisDirection;          // +0xB0
+};
+
+#if UINTPTR_MAX == UINT32_MAX
+static_assert(sizeof(ClothParticleGroup) == 8);
+static_assert(offsetof(ClothCapsuleCollisionView, firstMovableParticle) == 0x08);
+static_assert(offsetof(ClothCapsuleCollisionView, positions) == 0x1C);
+static_assert(offsetof(ClothCapsuleCollisionView, previousPositions) == 0x24);
+static_assert(offsetof(ClothCapsuleCollisionView, groups) == 0x108);
+#endif
+static_assert(offsetof(ClothCapsuleBoundView, broadRadius) == 0x08);
+static_assert(offsetof(ClothCapsuleBoundView, center) == 0x40);
+static_assert(offsetof(ClothCapsuleBoundView, radius) == 0x70);
+static_assert(offsetof(ClothCapsuleBoundView, axisLength) == 0x80);
+static_assert(offsetof(ClothCapsuleBoundView, axisStart) == 0x90);
+static_assert(offsetof(ClothCapsuleBoundView, axisDirection) == 0xB0);
+
+// Original ABI: r3=self, r4=bound, r5=group, r6=reduction, r7=expansion,
+// r8=mode. The entry uses ordinary pointers; its two callees need the VMX
+// bridges documented above. Vector addresses are rounded down as by lvx/stvx.
+// Group indices need room for count rounded up to 32, including padding entries.
+void clothCollideCapsule(const ClothCapsuleCollisionView* self, const ClothCapsuleBoundView* bound,
+                         uint32_t group, const LvlTableVector* reduction,
+                         const LvlTableVector* expansion, uint32_t mode);
