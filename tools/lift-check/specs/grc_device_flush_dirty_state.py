@@ -59,7 +59,7 @@ CALLS = {
     "phBoundBVH_2980_p39": boundary("refresh vertex fetch"),
     "grcDevice_ApplyShaderState": boundary("apply shaders"),
     0x82362658: boundary("registers", 256),
-    "phBoundBVH_2718": boundary("fetch descriptors", 768),
+    0x82362718: boundary("fetch descriptors", 768),
     "phBoundBVH_2858_p39": boundary("float constants", 4096),
 }
 
