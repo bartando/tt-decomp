@@ -17,12 +17,13 @@ extern const float lbl_825CB7D0[4];    // @ 0x825CB7D0 — (0.5, 0.5, 0.5, 0)
 
 namespace {
 
+// Builtin copies keep the bit casts inline in freestanding builds too.
 float maskLane(float value, uint32_t mask, float extra = 0.0f) {
     uint32_t bits, extraBits;
-    std::memcpy(&bits, &value, sizeof(bits));
-    std::memcpy(&extraBits, &extra, sizeof(extraBits));
+    __builtin_memcpy(&bits, &value, sizeof(bits));
+    __builtin_memcpy(&extraBits, &extra, sizeof(extraBits));
     bits = (bits & mask) | extraBits;
-    std::memcpy(&value, &bits, sizeof(value));
+    __builtin_memcpy(&value, &bits, sizeof(value));
     return value;
 }
 
@@ -36,10 +37,10 @@ float dot(const LvlTableVector& a, const LvlTableVector& b, int count) {
 
 float flushVmx(float value) {
     uint32_t bits;
-    std::memcpy(&bits, &value, sizeof(bits));
+    __builtin_memcpy(&bits, &value, sizeof(bits));
     if ((bits & 0x7F800000u) == 0) {
         bits &= 0x80000000u;
-        std::memcpy(&value, &bits, sizeof(value));
+        __builtin_memcpy(&value, &bits, sizeof(value));
     }
     return value;
 }
@@ -151,6 +152,126 @@ uint32_t lvlTable_7D28_2h(int32_t count, const LvlTableVector* points, const uin
         }
     }
     return accepted;
+}
+
+// @ 0x82338730
+void clothCollideCapsule(const ClothCapsuleCollisionView* self, const ClothCapsuleBoundView* bound,
+                         uint32_t group, const LvlTableVector* reduction,
+                         const LvlTableVector* expansion, uint32_t mode) {
+    const ClothParticleGroup& particles = self->groups[group & 0x1FFFFFFFu];
+    if (particles.count == 0)
+        return;
+
+    const auto aligned = [](const LvlTableVector* value) {
+        return reinterpret_cast<const LvlTableVector*>(reinterpret_cast<uintptr_t>(value) & ~uintptr_t(15));
+    };
+    const auto* boundBytes = reinterpret_cast<const uint8_t*>(bound);
+    const auto loadBound = [&](uint32_t offset) {
+        return *aligned(reinterpret_cast<const LvlTableVector*>(boundBytes + offset));
+    };
+    const LvlTableVector padding = *aligned(expansion);
+    const LvlTableVector capsuleRadius = loadBound(0x70);
+    const LvlTableVector center = loadBound(0x40);
+    const LvlTableVector axisStart = loadBound(0x90);
+    LvlTableVector axis = loadBound(0xB0);
+    const LvlTableVector axisLength = loadBound(0x80);
+    LvlTableVector radius, radiusSq, broadRadiusSq;
+    for (int lane = 0; lane < 4; ++lane) {
+        axis.lane[lane] = flushVmx(axis.lane[lane]);
+        radius.lane[lane] = flushVmx(flushVmx(capsuleRadius.lane[lane]) + flushVmx(padding.lane[lane]));
+        radiusSq.lane[lane] = flushVmx(radius.lane[lane] * radius.lane[lane]);
+        const float broadRadius = flushVmx(flushVmx(bound->broadRadius) + flushVmx(padding.lane[lane]));
+        broadRadiusSq.lane[lane] = flushVmx(broadRadius * broadRadius);
+    }
+
+    LvlTableVector* positions = self->positions;
+    const LvlTableVector* previous = self->previousPositions;
+    const int32_t firstMovable = self->firstMovableParticle;
+    const uint32_t* indices = particles.indices;
+    const uint32_t paddedCount = (static_cast<uint32_t>(particles.count) + 31) & ~31u;
+    auto* candidates = static_cast<uint32_t*>(__builtin_alloca(paddedCount * sizeof(uint32_t)));
+    const uint32_t candidateCount = lvlTable_7D28_2h(paddedCount, positions, indices, candidates,
+                                                   broadRadiusSq, center);
+    auto* deltas = static_cast<LvlTableVector*>(__builtin_alloca(candidateCount * sizeof(LvlTableVector)));
+    auto* distances = static_cast<LvlTableVector*>(__builtin_alloca(candidateCount * sizeof(LvlTableVector)));
+    auto* hits = static_cast<uint32_t*>(__builtin_alloca(candidateCount * sizeof(uint32_t)));
+    uint32_t hitCount = 0;
+    for (uint32_t candidate = 0; candidate < candidateCount; ++candidate) {
+        const uint32_t index = candidates[candidate];
+        // Only later occurrences of the group's FIRST index are skipped. This
+        // is not a general duplicate filter, nor an unconditional pinned index.
+        if (candidate > 0 && index == indices[0])
+            continue;
+        const LvlTableVector point = aligned(positions)[index & 0x0FFFFFFFu];
+        LvlTableVector relative;
+        for (int lane = 0; lane < 4; ++lane)
+            relative.lane[lane] = flushVmx(flushVmx(point.lane[lane]) - flushVmx(axisStart.lane[lane]));
+        const float projection = flushVmx(dot(axis, relative, 3));
+        LvlTableVector delta;
+        for (int lane = 0; lane < 4; ++lane) {
+            const uint32_t mask = lbl_82619BE0[lane];
+            const float maskedProjection = flushVmx(maskLane(projection, mask));
+            const float upperTest = flushVmx(maskLane(projection, mask, lbl_82619BD0[lane]));
+            const float lowerTest = flushVmx(maskLane(lbl_82606750[lane], mask, lbl_82619BD0[lane]));
+            const float upper = flushVmx(maskLane(axisLength.lane[lane], mask));
+            float clamped = upperTest > upper ? axisLength.lane[lane] : projection;
+            if (lowerTest > maskedProjection)
+                clamped = lbl_82606750[lane];
+            const float product = flushVmx(flushVmx(axis.lane[lane]) * flushVmx(clamped));
+            const float closest = flushVmx(product + flushVmx(axisStart.lane[lane]));
+            delta.lane[lane] = flushVmx(flushVmx(point.lane[lane]) - closest);
+        }
+        const float distanceSq = flushVmx(dot(delta, delta, 3));
+        bool inside = true;
+        for (int lane = 0; lane < 4; ++lane)
+            inside &= radiusSq.lane[lane] > distanceSq;
+        // The original overwrites the next slot even when rejecting a point.
+        hits[hitCount] = index;
+        deltas[hitCount] = delta;
+        distances[hitCount] = {{distanceSq, distanceSq, distanceSq, distanceSq}};
+        hitCount += inside;
+    }
+
+    for (uint32_t hit = 0; hit < hitCount; ++hit) {
+        const uint32_t index = hits[hit];
+        if (static_cast<int32_t>(index) < firstMovable)
+            continue;
+        const float distanceSq = distances[hit].lane[0];
+        // VMX estimates are approximated here; preserve each refinement and
+        // rounding step, including the w lane's different one/half constants.
+        const float estimate = flushVmx(static_cast<float>(1.0 / std::sqrt(static_cast<double>(distanceSq))));
+        LvlTableVector length;
+        for (int lane = 0; lane < 4; ++lane) {
+            const float y = estimate == flushVmx(lbl_82619BF0[lane]) ? lbl_82606750[lane] : estimate;
+            const float square = flushVmx(flushVmx(y) * flushVmx(y));
+            const float halfY = flushVmx(flushVmx(lbl_825CB7D0[lane]) * flushVmx(y));
+            const float error = flushVmx(-flushVmx(flushVmx(distanceSq * square)
+                                                  - flushVmx(lbl_825CB7C0[lane])));
+            const float inverseLength = flushVmx(flushVmx(error * halfY) + flushVmx(y));
+            length.lane[lane] = flushVmx(distanceSq * inverseLength);
+        }
+        const float reciprocal = flushVmx(1.0f / length.lane[0]);
+        const LvlTableVector shrink = *aligned(reduction);
+        LvlTableVector direction, step;
+        for (int lane = 0; lane < 4; ++lane) {
+            const float error = flushVmx(-flushVmx(flushVmx(reciprocal * length.lane[0])
+                                                  - flushVmx(lbl_825CB7C0[lane])));
+            const float inverseLength = flushVmx(flushVmx(reciprocal * error) + reciprocal);
+            direction.lane[lane] = flushVmx(deltas[hit].lane[lane] * inverseLength);
+            const float excess = flushVmx(radius.lane[lane] - length.lane[lane]);
+            const float penetration = flushVmx(excess - flushVmx(shrink.lane[lane]));
+            const float zero = flushVmx(lbl_82606750[lane]);
+            // vmaxfp propagates NaNs; std::max would silently select an operand.
+            step.lane[lane] = penetration != penetration || zero != zero
+                                  ? penetration + zero : (penetration > zero ? penetration : zero);
+        }
+        const uint32_t slot = index & 0x0FFFFFFFu;
+        // r4 retains the unaligned base; the callee rounds it down itself.
+        auto* position = reinterpret_cast<LvlTableVector*>(reinterpret_cast<uintptr_t>(positions) + slot * 16u);
+        const LvlTableVector origin = aligned(previous)[slot];
+        lvlTable_7008_2h(reinterpret_cast<const LvlTableMotionView*>(self), position, mode,
+                         direction, step, origin);
+    }
 }
 
 // @ 0x823D85B8
