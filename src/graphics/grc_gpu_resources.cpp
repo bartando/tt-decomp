@@ -524,4 +524,48 @@ void grcDevice_FlushDirtyRegisterGroup(void* device, uint64_t dirty, uint32_t fi
     state[0] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor));
 }
 
+// Each dirty bit selects six consecutive registers; callers pass a nonzero mask.
+// @ 0x82362718
+void grcDevice_FlushDirtySixRegisterGroups(void* device, uint64_t dirty, uint32_t /* firstRegister */,
+                                           const uint32_t* values) {
+    auto* state = static_cast<uint32_t*>(device);
+    auto* cursor = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(state[0]));
+    uint32_t firstRegister = 0x4800;
+    uint32_t offset = 0;
+    do {
+        const uint32_t skip = static_cast<uint32_t>(__builtin_clzll(dirty));
+        dirty <<= skip;
+        offset += skip * 6;
+        firstRegister += skip * 6;
+        const uint32_t count = dirty == UINT64_MAX ? 64 : static_cast<uint32_t>(__builtin_clzll(~dirty));
+        const uint32_t words = count * 6;
+        if (static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor) + words * 4 + 4) >= state[1]) {
+            const auto before = reinterpret_cast<const uint32_t*>(
+                reinterpret_cast<uintptr_t>(values) + offset * 4 - 4);
+            cursor = grcDevice_WriteRegisterRunOverflow(device, cursor, firstRegister, before, words, 6);
+            offset += words;
+            dirty = count == 64 ? 0 : dirty << count;
+        } else {
+            cursor[1] = 0x80000000;
+            cursor = reinterpret_cast<uint32_t*>(reinterpret_cast<uintptr_t>(cursor)
+                                                  + (reinterpret_cast<uintptr_t>(cursor) & 7));
+            *++cursor = ((words - 1) << 16) | firstRegister;
+            for (uint32_t i = 0; i < words; ++i) {
+                *++cursor = values[offset++];
+            }
+            dirty = count == 64 ? 0 : dirty << count;
+        }
+        firstRegister += words;
+    } while (dirty != 0);
+    state[0] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor));
+    if (state[0] > state[2]) {
+        cursor = static_cast<uint32_t*>(rage_A980(device));
+    }
+    *++cursor = 0x25000;
+    *++cursor = 0;
+    *++cursor = 0;
+    *++cursor = 0;
+    state[0] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor));
+}
+
 } // extern "C"
