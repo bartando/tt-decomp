@@ -60,7 +60,7 @@ CALLS = {
     "grcDevice_ApplyShaderState": boundary("apply shaders"),
     0x82362658: boundary("registers", 256),
     0x82362718: boundary("fetch descriptors", 768),
-    "phBoundBVH_2858_p39": boundary("float constants", 4096),
+    0x82362858: boundary("float constants", 4096),
 }
 
 

@@ -32,8 +32,8 @@ extern void grcDevice_ApplyShaderState(void* device);  // @ 0x82363500
 // Packet emitters: dirty bits run from the most significant end of the 64-bit mask.
 void grcDevice_FlushDirtySixRegisterGroups(void* device, uint64_t dirty, uint32_t firstRegister,
                                            const uint32_t* values);  // defined below
-extern void phBoundBVH_2858_p39(void* device, uint64_t mask, uint32_t firstRegister,
-                               const void* values);  // @ 0x82362858
+void grcDevice_FlushDirtySixteenRegisterGroups(void* device, uint64_t dirty, uint32_t firstRegister,
+                                              const uint32_t* values);  // defined below
 extern void phBoundBVH_2980_p39(void* device);  // @ 0x82362980 — refresh vertex fetch state
 
 // grc_5ED0 — viewport apply function
@@ -560,11 +560,13 @@ void grcDevice_FlushDirtyState(void* device) {
 
     // Vertex and pixel float constants, 16 dwords per dirty bit.
     if (dirty(0x10) != 0) {
-        phBoundBVH_2858_p39(device, dirty(0x10), 0x4000, data + 0x780);
+        grcDevice_FlushDirtySixteenRegisterGroups(device, dirty(0x10), 0x4000,
+                                                  reinterpret_cast<const uint32_t*>(data + 0x780));
         dirty(0x10) = 0;
     }
     if (dirty(0x18) != 0) {
-        phBoundBVH_2858_p39(device, dirty(0x18), 0x4400, data + 0x1780);
+        grcDevice_FlushDirtySixteenRegisterGroups(device, dirty(0x18), 0x4400,
+                                                  reinterpret_cast<const uint32_t*>(data + 0x1780));
         dirty(0x18) = 0;
     }
 
@@ -648,6 +650,40 @@ void grcDevice_FlushDirtySixRegisterGroups(void* device, uint64_t dirty, uint32_
     *++cursor = 0;
     *++cursor = 0;
     *++cursor = 0;
+    state[0] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor));
+}
+
+// Each dirty bit selects sixteen consecutive registers; callers pass a nonzero mask.
+// @ 0x82362858
+void grcDevice_FlushDirtySixteenRegisterGroups(void* device, uint64_t dirty, uint32_t firstRegister,
+                                               const uint32_t* values) {
+    auto* state = static_cast<uint32_t*>(device);
+    auto* cursor = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(state[0]));
+    uint32_t offset = 0;
+    do {
+        const uint32_t skip = static_cast<uint32_t>(__builtin_clzll(dirty));
+        dirty <<= skip;
+        offset += skip * 16;
+        firstRegister += skip * 16;
+        const uint32_t count = dirty == UINT64_MAX ? 64 : static_cast<uint32_t>(__builtin_clzll(~dirty));
+        const uint32_t words = count * 16;
+        if (static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor) + (words + 3) * 4) >= state[1]) {
+            const auto before = reinterpret_cast<const uint32_t*>(
+                reinterpret_cast<uintptr_t>(values) + offset * 4 - 4);
+            cursor = grcDevice_WriteRegisterRunOverflow(device, cursor, firstRegister, before, words, 16);
+        } else {
+            cursor[1] = cursor[2] = cursor[3] = 0x80000000;
+            cursor = reinterpret_cast<uint32_t*>(reinterpret_cast<uintptr_t>(cursor)
+                                                  + ((-8u - reinterpret_cast<uintptr_t>(cursor)) & 15));
+            *++cursor = ((words - 1) << 16) | firstRegister;
+            for (uint32_t i = 0; i < words; ++i) {
+                *++cursor = values[offset + i];
+            }
+        }
+        offset += words;
+        firstRegister += words;
+        dirty = count == 64 ? 0 : dirty << count;
+    } while (dirty != 0);
     state[0] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor));
 }
 
