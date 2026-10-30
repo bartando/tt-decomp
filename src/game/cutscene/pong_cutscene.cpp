@@ -479,24 +479,17 @@ void pongCSActionCharAnim::Init() {
 }
 
 // ── pongCSActionCharAnim::Update() [slot 4 @ 0x8234a590] ────────────────────
-// Resolves the active char-anim-names container via a game-side "names
-// manager", then looks up its primary anim via pongCSActionCamAnim_8878;
-// if that fails it retries with the fallback label at +24. On success it
-// caches the chosen resource's first vtable-entry-load into self+24.
-// NOTE: the names-manager call is `pg_9C00_g(g_namesMgr, handle)` where
-//       g_namesMgr is the .data singleton at lbl_8271A308 (same one used
-//       by pongCSActionCharAmbAnim_vfn_6). The followup `*(r11+44)` load
-//       pulls the hash-root; this mirrors the FindRandAnimData entry path.
-//       source: pass5_final pongCSActionCharAmbAnim_vfn_6 @ 0x8234AD98 +
-//       gdCSCharAnimNames_FindRandAnimData @ 0x8240D4A8
+// Resolves character animation names through pongMatch_GetCharacterForSlot
+// @ 0x821C9C00, then selects the primary or fallback animation label.
+// The resolver ignores r3; r4 is the match player slot. The returned
+// gdCharacter's +44 member supplies the character animation-name data.
 void pongCSActionCharAnim::Update() {
     CharAnim* self = reinterpret_cast<CharAnim*>(this);
     CharAnimData* data = static_cast<CharAnimData*>(self->m_pData);
 
-    // The original fetches a global names-manager and asks it for the
-    // anim container matching data->m_pNameArray[0]->handle. We hoist that
-    // to a single opaque call site here; the cached result lands at +24.
-    void* resolved = nullptr;  // NOTE: pg_9C00_g(lbl_8271A308, handle) per scaffold
+    // TODO: resolve the match player slot to its character data, then select
+    // the animation resource. The cached result belongs at +24.
+    void* resolved = nullptr;  // TODO: pongMatch_GetCharacterForSlot(unused, playerSlot)
     if (resolved) {
         self->m_pResource = *reinterpret_cast<void**>(
             reinterpret_cast<uintptr_t>(resolved) + 4);
@@ -801,8 +794,8 @@ void pongCSActionIf::Stop() {
 // Cancels any ambient (crowd) anim this action launched.
 void pongCSActionCharAmbAnim::Stop() {
     // NOTE: pass5_final pongCSActionCharAmbAnim_vfn_6 @ 0x8234AD98 shows
-    //       this fetches the names-manager (pg_9C00_g @ 0x821C9C00 with
-    //       r3=lbl_8271A308 singleton, r4=m_pData+20 handle), snprintf's
+    //       this resolves character data (pongMatch_GetCharacterForSlot
+    //       @ 0x821C9C00, r3 unused, r4=player slot at m_pData+20), snprintf's
     //       a label into the stack slot, walks the crowd roster at
     //       lbl_8260668C (-32160+26252; confirmed .data 4-byte ptr), and
     //       on a name match invokes the roster entry's vtable slot 4

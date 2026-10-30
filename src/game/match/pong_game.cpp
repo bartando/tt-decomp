@@ -29,6 +29,7 @@
  */
 
 #include "pong_game.hpp"
+#include "../../scene/sg_scene_graph.hpp"
 
 #include <stdint.h>
 #include <cstring>
@@ -53,7 +54,6 @@ extern "C" {
     void  pg_A070_h(void* arg);                                   // @ 0x8219A070
     void  atSingleton_5A68_h(void* a, void* b);                   // @ 0x821B5A68
     void  atSingleton_A600_h(void* arg, float f);                 // @ 0x8240A600
-    void  pongGameContext_A070(void* guardRec);                   // @ 0x823DA070
     // pongGameContext_6970_h defined in this file below (uses pongGameContext fields).
     bool  pongGameContext_CEE8_wrh(void* data);                   // @ 0x821CCEE8
     void  pongLerpQueue_C838_g(void* list);                       // @ 0x821CC838
@@ -341,12 +341,11 @@ void pongGameContext::OnUpdate() {
         void** gsVtable = *(void***)gsPtr;
         reinterpret_cast<Vfn>(gsVtable[2])(gsPtr);  // slot 2 (byte +8)
 
-        struct GuardRec { uint32_t a, b; };
-        GuardRec guard;
+        sgTypedIterator guard;
         uint32_t payload = *(uint32_t*)((uint8_t*)lbl_8271A2F0 + 4);
-        guard.a = payload;
-        guard.b = payload;
-        pongGameContext_A070(&guard);
+        guard.m_pRoot = reinterpret_cast<sgNode*>(static_cast<uintptr_t>(payload));
+        guard.m_pCurrent = guard.m_pRoot;
+        guard.Prime();
 
         void* sub = *(void**)((uint8_t*)lbl_8271A2F0 + 32);
         if (sub != nullptr) {
@@ -422,12 +421,11 @@ void pongGameContext::OnRender() {
         return;
     }
 
-    struct GuardRec { uint32_t a, b; };
-    GuardRec guard;
+    sgTypedIterator guard;
     uint32_t payload = *(uint32_t*)((uint8_t*)lbl_8271A2F0 + 4);
-    guard.a = payload;
-    guard.b = payload;
-    pongGameContext_A070(&guard);
+    guard.m_pRoot = reinterpret_cast<sgNode*>(static_cast<uintptr_t>(payload));
+    guard.m_pCurrent = guard.m_pRoot;
+    guard.Prime();
 
     void* sub = *(void**)((uint8_t*)lbl_8271A2F0 + 36);
     if (sub != nullptr) {
@@ -495,12 +493,11 @@ bool pongGameContext_6970_h(pongGameContext* ctx) {
  */
 void pongGameContext::OnShutdown() {
     if (pongGameContext_6970_h(this)) {
-        struct GuardRec { uint32_t a, b; };
-        GuardRec guard;
+        sgTypedIterator guard;
         uint32_t payload = *(uint32_t*)((uint8_t*)lbl_8271A2F0 + 4);
-        guard.a = payload;
-        guard.b = payload;
-        pongGameContext_A070(&guard);
+        guard.m_pRoot = reinterpret_cast<sgNode*>(static_cast<uintptr_t>(payload));
+        guard.m_pCurrent = guard.m_pRoot;
+        guard.Prime();
 
         void* sub = *(void**)((uint8_t*)lbl_8271A2F0 + 40);
         if (sub != nullptr) {
@@ -551,12 +548,11 @@ void pongGameContext::OnShutdown() {
  * Shadow-mode==1 AND shadowTable+0x8CFA != 0 ⇒ pongShadowMap_2700_g.
  */
 void pongGameContext::PostLoadChildren() {
-    struct GuardRec { uint32_t a, b; };
-    GuardRec guard;
+    sgTypedIterator guard;
     uint32_t payload = *(uint32_t*)((uint8_t*)lbl_8271A2F0 + 4);
-    guard.a = payload;
-    guard.b = payload;
-    pongGameContext_A070(&guard);
+    guard.m_pRoot = reinterpret_cast<sgNode*>(static_cast<uintptr_t>(payload));
+    guard.m_pCurrent = guard.m_pRoot;
+    guard.Prime();
 
     void* spec = *(void**)((uint8_t*)lbl_8271A2F0 + 44);
     if (spec != nullptr) {
@@ -1264,198 +1260,6 @@ void game_CheckNetworkAndTransitionToState6(void* stateObj) {
         }
     }
 }
-
-// ────────────────────────────────────────────────────────────────────────────
-// Scene-graph iterator helpers — used by OnUpdate/OnRender as a 2-word
-// "GuardRec" walker (fields +0=root, +4=current). The triple forms a
-// pre-order traversal over sgNode children rooted at the match-logic
-// singleton's child list. Each visit VCALLs slot 20 (type-gate, returns
-// nonzero to bail) and slot 19 (getter emitted into sgIter debug log).
-//
-// Node layout (from recomp offsets):
-//   +0x00 : parent/root back-pointer
-//   +0x04 : left child  (first descendant)
-//   +0x08 : right sibling
-//   +0x0C : first-child link (primary descent)
-//
-// All three are free functions — they operate on an iterator record
-// passed by pointer, NOT on a pongGameContext. The names are kept in
-// pongGameContext_* form because the debug symbols live under that
-// prefix in the binary. Extern-"C" wrappers match the 4 existing call
-// sites in OnUpdate/OnRender above.
-// ────────────────────────────────────────────────────────────────────────────
-
-namespace {
-
-// sgIter record — what GuardRec in OnUpdate/OnRender actually is.
-// First word is the list root; second word is the "current" cursor the
-// iterator re-writes as it descends.
-struct sgIterRec {
-    uint32_t m_pRoot;     // +0x00
-    uint32_t m_pCurrent;  // +0x04
-};
-
-// sgNode — opaque 16-byte-ish tree node. Only the four link offsets
-// used by the iterator are typed.
-struct sgNode {
-    uint32_t m_pParent;      // +0x00
-    uint32_t m_pLeft;        // +0x04
-    uint32_t m_pRight;       // +0x08
-    uint32_t m_pFirstChild;  // +0x0C
-};
-
-// Shared debug-log format string referenced by pongGameContext_A070.
-static constexpr uint32_t kSgIterSkipFormat = 0x82071DC8u;  // "sgIter - Skipping non-sgNode '%s'"
-
-} // namespace
-
-extern "C" {
-
-/**
- * pongGameContext_A0F8_h  @ 0x823DA0F8 | size: 0x40
- *
- * "Find leftmost descendant with a first-child link, stopping at the
- * root sentinel." Walks the +4/+8 chain of `iter->m_pCurrent`. Returns
- * the +8 (right-sibling) of the first node whose own first-child (+8)
- * slot is non-null; returns 0 if the chain hits the root or dead-ends.
- *
- * Called from pongGameContext_9FD0_w when a direct descent failed.
- */
-void* pongGameContext_A0F8_h(void* iterPtr, void* nodePtr) {
-    sgIterRec* iter = reinterpret_cast<sgIterRec*>(iterPtr);
-    sgNode*    node = reinterpret_cast<sgNode*>(nodePtr);
-
-    uint32_t cur = node->m_pLeft;  // r4+4
-    if (cur == 0) {
-        return nullptr;
-    }
-    uint32_t root = iter->m_pRoot;  // r3+0
-    while (true) {
-        if (cur == root) {
-            return nullptr;
-        }
-        sgNode* curNode = reinterpret_cast<sgNode*>(static_cast<uintptr_t>(cur));
-        uint32_t firstChild = curNode->m_pRight;  // +8
-        if (firstChild != 0) {
-            return reinterpret_cast<void*>(static_cast<uintptr_t>(firstChild));
-        }
-        cur = curNode->m_pLeft;  // +4
-        if (cur == 0) {
-            return nullptr;
-        }
-    }
-}
-
-/**
- * pongGameContext_9FD0_w  @ 0x823D9FD0 | size: 0x9C
- *
- * Iterator advance: given `iter` (sgIterRec), consult `iter->m_pCurrent`
- * and compute the next-in-pre-order node. Priority:
- *   1. descend into +12 (first-child) if present;
- *   2. if sibling chain is empty (current is root), park at null;
- *   3. if current has a right-sibling +8, take it;
- *   4. else fall back to pongGameContext_A0F8_h to bubble up and find
- *      the next-right across ancestors.
- * After choosing the new node, store it into iter+4 and call
- * pongGameContext_A070 to visit / recurse.
- */
-void pongGameContext_9FD0_w(void* iterPtr) {
-    sgIterRec* iter = reinterpret_cast<sgIterRec*>(iterPtr);
-    uint32_t   nextRaw = 0;
-
-    uint32_t curRaw = iter->m_pCurrent;
-    if (curRaw != 0) {
-        sgNode* cur = reinterpret_cast<sgNode*>(static_cast<uintptr_t>(curRaw));
-
-        // Primary descent: first-child at +12.
-        uint32_t firstChild = cur->m_pFirstChild;
-        if (firstChild != 0) {
-            nextRaw = firstChild;
-        } else {
-            uint32_t rootRaw = iter->m_pRoot;
-            if (curRaw == rootRaw) {
-                // Cursor already sits on the root sentinel → park.
-                nextRaw = 0;
-            } else {
-                // Try right sibling at +8.
-                uint32_t rightRaw = cur->m_pRight;
-                if (rightRaw != 0) {
-                    nextRaw = rightRaw;
-                } else {
-                    // Neither child nor sibling — bubble up through
-                    // left-parent chain. If leftLink itself carries a
-                    // +8 right-sibling we take it directly; else we
-                    // recurse through the deep-leftmost helper, which
-                    // walks the +4 chain until it finds a node with
-                    // a non-null +8 or falls off.
-                    uint32_t leftRaw = cur->m_pLeft;
-                    void* fallback = nullptr;
-                    if (leftRaw != 0 && leftRaw != rootRaw) {
-                        sgNode* leftNode =
-                            reinterpret_cast<sgNode*>(static_cast<uintptr_t>(leftRaw));
-                        if (leftNode->m_pRight != 0) {
-                            fallback = reinterpret_cast<void*>(
-                                static_cast<uintptr_t>(leftNode->m_pRight));
-                        } else {
-                            fallback = pongGameContext_A0F8_h(iter, leftNode);
-                        }
-                    }
-                    nextRaw = fallback
-                        ? static_cast<uint32_t>(
-                              reinterpret_cast<uintptr_t>(fallback))
-                        : 0u;
-                }
-            }
-        }
-    }
-
-    iter->m_pCurrent = nextRaw;
-    pongGameContext_A070(iter);
-}
-
-/**
- * pongGameContext_A070  @ 0x823DA070 | size: 0x88
- *
- * Visit the iterator's current node: VCALL slot 20 (type-gate — byte
- * offset +80 on the node's vtable). Returns early if the gate reports
- * nonzero (wrong node type). Otherwise VCALL slot 19 (byte +76, the
- * node's name getter) and feed it through the debug sink with the
- * "sgIter - Skipping non-sgNode '%s'" format at 0x82071DC8, then recurse
- * through pongGameContext_9FD0_w to advance.
- *
- * Mutates: none on iter directly (9FD0_w does the store).
- */
-void pongGameContext_A070(void* iterPtr) {
-    sgIterRec* iter = reinterpret_cast<sgIterRec*>(iterPtr);
-    uint32_t   curRaw = iter->m_pCurrent;
-    if (curRaw == 0) {
-        return;
-    }
-
-    void*  curNode  = reinterpret_cast<void*>(static_cast<uintptr_t>(curRaw));
-    void** curVt    = *reinterpret_cast<void***>(curNode);
-
-    // Slot 20 (byte +80) — returns u8 gate; nonzero ⇒ this is a real
-    // sgNode subtype and we should NOT emit the skip log.
-    using GateFn = uint32_t (*)(void*);
-    uint32_t gate = reinterpret_cast<GateFn>(curVt[20])(curNode) & 0xFFu;
-    if (gate != 0) {
-        return;
-    }
-
-    // Slot 19 (byte +76) — returns const char* node name for the log line.
-    using NameFn = const char* (*)(void*);
-    const char* name = reinterpret_cast<NameFn>(curVt[19])(curNode);
-
-    // Debug log — format @ 0x82071DC8.
-    nop_8240E6D0(reinterpret_cast<void*>(static_cast<uintptr_t>(kSgIterSkipFormat)),
-                 name);
-
-    // Tail-recurse through the advance function.
-    pongGameContext_9FD0_w(iter);
-}
-
-} // extern "C"
 
 // ────────────────────────────────────────────────────────────────────────────
 // Net-exhibition quit shims — both tail-call pg_6B40_w(this=input, r4=1)

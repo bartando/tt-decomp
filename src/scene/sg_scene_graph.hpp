@@ -64,7 +64,7 @@ struct sgTraverseInitialize  : sgTraverseBase {  // vtable @ 0x82071D4C
     void Apply(sgNode* pNode);           // @ 0x823D9F10
 
     // @ 0x823D9E90 — drive a typed iterator, calling Apply() on each node
-    // whose current position passes the cmSimple type filter. Loops until
+    // whose current position passes the sgNode type filter. Loops until
     // the iterator terminates (m_pCurrent == nullptr).
     void Traverse(sgTypedIterator* pIter);
 };
@@ -101,15 +101,14 @@ struct sgTraverseDrawDebug   : sgTraverseBase {  // vtable @ 0x82071DAC
 //   Prime  (@0x823DA070): if current is non-null and IS-NOT the target type
 //                         (slot 20 returned 0), logs a type mismatch via
 //                         slot 19 → fmt-stub @0x8240E6D0 and Advance()s.
-//                         The filter vtable loaded from +0x820562D0 is
-//                         rage::cmSimple, so this iterator visits cmSimple
-//                         subtree nodes specifically.
+//                         The filter type ID is loaded from 0x825C93D0;
+//                         only the low byte of the virtual result is tested.
 //   Advance(@0x823D9FD0): pre-order successor —
 //                           first try m_pCurrent->m_pFirstChild (+0x0C)
 //                           else if m_pCurrent == m_pRoot, terminate
 //                           else try m_pCurrent->m_pNextSibling (+0x08)
 //                           else climb via m_pParent (+0x04) and try its
-//                           sibling (or nullptr at root).
+//                           sibling, continuing up ancestors until the root.
 //                         After moving, re-Prime to skip type-mismatches.
 // ---------------------------------------------------------------------------
 struct sgTypedIterator {
@@ -120,6 +119,8 @@ struct sgTypedIterator {
     void Prime();
     // @ 0x823D9FD0 — advance to the next pre-order node, then Prime()
     void Advance();
+    // @ 0x823DA0F8 — sibling of an ancestor below the walk boundary
+    sgNode* FindAncestorSibling(sgNode* node);
 };
 
 // ---------------------------------------------------------------------------
