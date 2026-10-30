@@ -15,6 +15,8 @@ extern "C" void* rage_alloc(uint32_t size);  // RAGE heap alloc (defined in heap
 #include <math.h>
 #include <string.h>
 
+double crt_sqrt(double value);  // @ 0x824301D0 — fsqrt, rounded by its callers
+
 // ─────────────────────────────────────────────────────────────────────────────
 // File-local helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1555,6 +1557,193 @@ void rage::phBoundCapsule::ApplyTransform(const float* transform, const float* i
 // ═════════════════════════════════════════════════════════════════════════════
 // rage::phBoundGeometry — Collision Geometry Bound Functions
 // ═════════════════════════════════════════════════════════════════════════════
+
+// Sphere contact against a triangle/quad: 0 = vertex, 1 = edge, 2 = face, 3 = miss.
+// Vectors are aligned vec4s; tests use xyz, but all output stores include w.
+// Xenon reserves r4 for the f1 argument. Keep that slot explicit for ppc32
+// compilers which allocate floating-point and integer arguments independently.
+// The two trailing pointers live at caller SP+0x54/+0x5C on Xenon.
+// @ 0x8223BED0
+int phBoundGeometry_BED0(const float* center, float radius, uint32_t /*radiusSlot*/,
+                        const float* vertices, int vertexCount, const float* normal,
+                        float* spherePoint, float* polygonPoint, int* featureIndex,
+                        float* contactNormal, float* depth) {
+    // vmsum3fp128 accumulates the three products before rounding to float.
+    const auto dot3 = [](const float* a, const float* b) {
+        return static_cast<float>(static_cast<double>(a[0]) * b[0]
+                                + static_cast<double>(a[1]) * b[1]
+                                + static_cast<double>(a[2]) * b[2]);
+    };
+    float offset[4];
+    for (int lane = 0; lane < 4; ++lane) {
+        offset[lane] = center[lane] - vertices[lane];
+    }
+    const float planeDistance = dot3(normal, offset);
+    if (!(fabsf(planeDistance) <= radius)) {
+        return 3;
+    }
+
+    int regions[4];
+    bool inside = true;
+    int edgeIndex = 0;
+    for (; edgeIndex < vertexCount; ++edgeIndex) {
+        const float* start = vertices + 4 * edgeIndex;
+        const float* end = vertices + 4 * ((edgeIndex + 1) % vertexCount);
+        float edge[4], fromStart[4], side[3];
+        for (int lane = 0; lane < 4; ++lane) {
+            edge[lane] = end[lane] - start[lane];
+            fromStart[lane] = center[lane] - start[lane];
+        }
+        // normal x edge. VMX multiply/subtract rounds each product separately;
+        // vnmsub is -(product - accumulator), including its sign of zero.
+        for (int lane = 0; lane < 3; ++lane) {
+            const int y = (lane + 1) % 3;
+            const int z = (lane + 2) % 3;
+            const float a = edge[y] * normal[z];
+            const float b = edge[z] * normal[y];
+            side[lane] = -(a - b);
+        }
+        regions[edgeIndex] = 0;
+        if (dot3(side, fromStart) >= 0.0f) {
+            regions[edgeIndex] = 1;
+            continue;
+        }
+        inside = false;
+        if (!(dot3(edge, fromStart) >= 0.0f)) {
+            regions[edgeIndex] = -1;
+            continue;
+        }
+        float fromEnd[4];
+        for (int lane = 0; lane < 4; ++lane) {
+            fromEnd[lane] = center[lane] - end[lane];
+        }
+        if (!(dot3(edge, fromEnd) <= 0.0f)) {
+            regions[edgeIndex] = -2;
+            continue;
+        }
+        if (dot3(normal, fromStart) <= 0.0f) {
+            continue;
+        }
+
+        const float startSq = dot3(fromStart, fromStart);
+        const float endSq = dot3(fromEnd, fromEnd);
+        const float edgeSq = dot3(edge, edge);
+        const float difference = startSq - endSq;
+        const float sum = endSq + startSq;
+        const float inverseEdgeSq = 1.0f / edgeSq;
+        const float differenceSq = difference * difference;
+        const float combined = __builtin_fmaf(sum, 2.0f, -edgeSq);
+        const float distanceSq = __builtin_fmaf(-differenceSq, inverseEdgeSq, combined) * 0.25f;
+        float distance = 0.0f;
+        if (!(distanceSq <= 0.0f)) {
+            if (distanceSq > radius * radius) {
+                return 3;
+            }
+            distance = static_cast<float>(crt_sqrt(distanceSq));
+        }
+        *featureIndex = edgeIndex;
+        *depth = radius - distance;
+        const float alongSq = (startSq - distanceSq) * inverseEdgeSq;
+        if (!(alongSq <= 0.0f)) {
+            const float along = static_cast<float>(crt_sqrt(alongSq));
+            for (int lane = 0; lane < 4; ++lane) {
+                polygonPoint[lane] = edge[lane] * along;
+            }
+        } else {
+            for (int lane = 0; lane < 4; ++lane) {
+                polygonPoint[lane] = 0.0f;
+            }
+        }
+        for (int lane = 0; lane < 4; ++lane) {
+            polygonPoint[lane] += start[lane];
+        }
+        float separation[4];
+        for (int lane = 0; lane < 4; ++lane) {
+            separation[lane] = center[lane] - polygonPoint[lane];
+            contactNormal[lane] = separation[lane];
+        }
+        const float separationSq = dot3(separation, separation);
+        if (!(separationSq <= 1.0e-12f)) {  // epsilon at 0x82079C58
+            const float length = static_cast<float>(crt_sqrt(separationSq));
+            const float reciprocal = 1.0f / length;
+            const float product = reciprocal * length;
+            for (int lane = 0; lane < 4; ++lane) {
+                // The refinement constant is (1,1,1,0), clearing normal.w.
+                const float error = -(product - (lane == 3 ? 0.0f : 1.0f));
+                const float correction = reciprocal * error;
+                contactNormal[lane] *= correction + reciprocal;
+            }
+        } else {
+            memcpy(contactNormal, normal, 16);
+        }
+        const float penetration = *depth;
+        for (int lane = 0; lane < 4; ++lane) {
+            const float product = contactNormal[lane] * penetration;
+            spherePoint[lane] = -(product - polygonPoint[lane]);
+        }
+        return 1;
+    }
+
+    if (inside) {
+        *featureIndex = 0;
+        *depth = radius - planeDistance;
+        for (int lane = 0; lane < 4; ++lane) {
+            const float product = normal[lane] * planeDistance;
+            polygonPoint[lane] = -(product - center[lane]);
+        }
+        for (int lane = 0; lane < 4; ++lane) {
+            const float product = normal[lane] * radius;
+            spherePoint[lane] = -(product - center[lane]);
+        }
+        memcpy(contactNormal, normal, 16);
+        return 2;
+    }
+
+    int vertexIndex = 0;
+    for (; vertexIndex < vertexCount; ++vertexIndex) {
+        const int next = (vertexIndex + 1) % vertexCount;
+        if ((regions[vertexIndex] == -2 || regions[next] == -1)
+            && regions[vertexIndex] != regions[next]) {
+            vertexIndex = next;
+            break;
+        }
+    }
+    if (vertexIndex == vertexCount) {
+        return 3;
+    }
+    memcpy(polygonPoint, vertices + 4 * vertexIndex, 16);
+    float separation[4];
+    for (int lane = 0; lane < 4; ++lane) {
+        separation[lane] = center[lane] - polygonPoint[lane];
+        contactNormal[lane] = separation[lane];
+    }
+    const float separationSq = dot3(separation, separation);
+    // These vector writes precede rejection in the original.
+    if (separationSq > radius * radius) {
+        return 3;
+    }
+    *featureIndex = vertexIndex;
+    float distance = 0.0f;
+    if (!(separationSq <= 1.0e-12f)) {  // epsilon at 0x82079C58
+        distance = static_cast<float>(crt_sqrt(separationSq));
+        const float reciprocal = 1.0f / distance;
+        const float product = reciprocal * distance;
+        for (int lane = 0; lane < 4; ++lane) {
+            const float error = -(product - (lane == 3 ? 0.0f : 1.0f));
+            const float correction = reciprocal * error;
+            contactNormal[lane] *= correction + reciprocal;
+        }
+    } else {
+        memcpy(contactNormal, normal, 16);
+    }
+    const float penetration = radius - distance;
+    *depth = penetration;
+    for (int lane = 0; lane < 4; ++lane) {
+        const float product = contactNormal[lane] * penetration;
+        spherePoint[lane] = -(product - polygonPoint[lane]);
+    }
+    return 0;
+}
 
 namespace rage {
 
