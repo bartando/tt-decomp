@@ -353,7 +353,9 @@ class Checker:
                  for _ in range(128)]
         self.spec.inputs(t)
         for reg, v in t.reg_args.items():
-            if reg.startswith("r"):
+            if reg == "fpscr":
+                regs["fpscr"] = int(v) & M32
+            elif reg.startswith("r"):
                 n_ = int(reg[1:])
                 regs["gpr"][n_] = int(v) & M32
                 regs["gpr64"][n_] = int(v) & ((1 << 64) - 1)
@@ -614,6 +616,9 @@ class Checker:
             if ov != lv:
                 raise Divergence(f"{fn} returns 0x{ov:016X} (original) vs 0x{lv:016X} (lift)",
                                  self.args_line(regs))
+        if getattr(self.spec, "CHECK_FPSCR", False) and o.fpscr != l.fpscr:
+            raise Divergence(f"FPSCR = 0x{o.fpscr:08X} (original) vs 0x{l.fpscr:08X} (lift)",
+                             self.args_line(regs))
         # memory
         diffs = []
         init = self.initial(t)

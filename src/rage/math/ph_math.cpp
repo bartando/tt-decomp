@@ -17,7 +17,7 @@
 
 // The mixed FP/integer Xenon interfaces leave GPR slots for FP arguments.
 // Explicit unused slots keep these declarations callable under ppc32 SysV too.
-uint32_t _fp_set_fpscr_bits(uint32_t desired, uint32_t mask);  // @ 0x82436530
+uint32_t _ctrlfp(uint32_t desired, uint32_t mask);  // @ 0x82436530
 int crt_fp_classify(double value);  // @ 0x824357A8
 double crt_fp_adjust_exponent(uint32_t unused, int delta, double value);  // @ 0x82435770
 double crt_fp_round(double value);  // @ 0x82436B30
@@ -207,7 +207,7 @@ double crt_cos(double x) {
 // @ 0x82432628 — CRT tan, formerly misidentified as a tokenizer.
 double crt_tan(double x) {
     constexpr uint32_t MASK = 0xC007FEFFu;
-    const uint32_t control = _fp_set_fpscr_bits(0xF8, MASK);
+    const uint32_t control = _ctrlfp(0xF8, MASK);
     if ((Bits(x) & 0x7FF0000000000000ull) == 0x7FF0000000000000ull) {
         const int kind = crt_fp_classify(x);
         if (kind == 3) {
@@ -217,7 +217,7 @@ double crt_tan(double x) {
                                 kind > 0 && kind <= 2 ? kTrigNaN : x + 1.0);
     }
     if (x == 0.0) {
-        _fp_set_fpscr_bits(control, MASK);
+        _ctrlfp(control, MASK);
         return x;
     }
     if (__builtin_fabs(x) > 0x1.1c5831add62e4p+28) {
@@ -249,7 +249,7 @@ double crt_tan(double x) {
     if ((control & 8) == 0) {
         return crt_fp_exception(16, 32, 0, 0, control, x, result);
     }
-    _fp_set_fpscr_bits(control, MASK);
+    _ctrlfp(control, MASK);
     return result;
 }
 
@@ -314,7 +314,7 @@ double crt_sqrt(double x) {
 // The only entry thunks, 0x82430E88/0x82430E90, supply selectors 0/1.
 double crt_asin_acos(double x, uint32_t /*unused*/, int acosMode) {
     constexpr uint32_t CONTROL_MASK = 0xC007FEFFu;
-    const uint32_t control = _fp_set_fpscr_bits(0xF8, CONTROL_MASK);
+    const uint32_t control = _ctrlfp(0xF8, CONTROL_MASK);
     const int operation = acosMode != 0 ? 13 : 14;
 
     if ((Bits(x) & 0x7FF0000000000000ull) == 0x7FF0000000000000ull) {
@@ -349,7 +349,7 @@ double crt_asin_acos(double x, uint32_t /*unused*/, int acosMode) {
                 }
                 if (reduced == 1.0) {
                     if (acosMode != 0 && x >= 0.0) {
-                        _fp_set_fpscr_bits(control, CONTROL_MASK);
+                        _ctrlfp(control, CONTROL_MASK);
                         return 0.0;
                     }
                     reduced = 0.0;
@@ -393,7 +393,7 @@ double crt_asin_acos(double x, uint32_t /*unused*/, int acosMode) {
         }
     }
 
-    _fp_set_fpscr_bits(control, CONTROL_MASK);
+    _ctrlfp(control, CONTROL_MASK);
     return result;
 }
 

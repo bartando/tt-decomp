@@ -26,17 +26,20 @@ struct XmaRenderStream {
     uint32_t inputOffset;
     uint8_t format;
     uint8_t channels;
-    uint8_t pad0[6];
+    uint8_t pad0[2];
+    uint32_t inputRate;
     float* output;
     uint32_t outputFrames;
     uint32_t outputOffset;
-    uint32_t unknown20;
+    uint32_t outputRate;
     float previousGain;
     float gain;
     float resampleRate;
     float resamplePosition;
     uint32_t filterHistory[6];
-    uint8_t pad1[12];
+    void (*process)(XmaRenderStream*);
+    uint32_t dirty;
+    uint32_t flags;
 };
 
 struct SourceLink {
@@ -91,6 +94,8 @@ struct XmaSourceLayout {
 #if UINTPTR_MAX == UINT32_MAX
 static_assert(sizeof(AudioFrame) == 12);
 static_assert(sizeof(XmaRenderStream) == 88);
+static_assert(offsetof(XmaRenderStream, inputRate) == 16);
+static_assert(offsetof(XmaRenderStream, process) == 76);
 static_assert(sizeof(XmaLoopRegion) == 12);
 static_assert(offsetof(XmaSourceBuffer, state) == 96);
 static_assert(offsetof(XmaSourceLayout, gain) == 108);
@@ -120,6 +125,48 @@ void XmaDecoder_Consume(void* decoder, uint32_t stream, uint32_t frames, const v
 uint32_t XmaDecoder_SamplesPlayed(void* decoder, uint32_t stream);// @ 0x8246B550
 int32_t XmaSource_SubmitBuffers(XmaSourceLayout* source);        // @ 0x82467278
 int32_t XmaDecoder_Unlock(void* decoder);                       // @ 0x8246B9E0
+
+using XmaRenderKernel = void (*)(XmaRenderStream*);
+extern "C" const XmaRenderKernel g_xaudioRenderKernels[120]; // @ 0x82006AF8
+
+// @ 0x82470CC0 | size: 0x1C0
+// Formerly ph_0CC0 / phStateMachineUpdate. XMA source render calls this on
+// its embedded stream; the table selects audio kernels by rate, format and
+// channel count. This is a descriptive name, not a recovered SDK symbol.
+uint32_t XmaRenderStream_Process(XmaRenderStream* stream) {
+    uint32_t initialOffset = stream->inputOffset;
+    if (initialOffset >= stream->inputFrames) return 0;
+    if (stream->outputOffset >= stream->outputFrames) return 0;
+
+    if (stream->dirty != 0) {
+        if ((stream->dirty & 3) != 0) {
+            // frsp on each integer conversion precedes the single-precision
+            // divide. Dividing in double and rounding once changes the rate.
+            stream->resampleRate = static_cast<float>(stream->inputRate)
+                                 / static_cast<float>(stream->outputRate);
+            uint32_t mode = (stream->flags & 0x80) ? 0 : 3;
+            if (stream->flags & 1) {
+                if (stream->inputRate == stream->outputRate) {
+                    mode += 1;
+                } else if (stream->inputRate * 2u == stream->outputRate) {
+                    // The original slwi/cmplw compares the low 32 bits.
+                    mode += 2;
+                }
+            }
+            uint32_t channelSlot = 0;
+            switch (stream->channels) {
+            case 1: case 2: case 4: case 6:
+                channelSlot = (stream->channels >> 1) + 1;
+                break;
+            }
+            uint32_t index = (mode * 4 + stream->format) * 5 + channelSlot;
+            stream->process = g_xaudioRenderKernels[index];
+        }
+        stream->dirty = 0;
+    }
+    stream->process(stream);
+    return stream->inputOffset - initialOffset;
+}
 
 // Descriptive decoder names inferred from the context fields they access.
 int32_t XmaDecoder_HasInputSpace(void* decoder, uint32_t stream); // @ 0x8246B050

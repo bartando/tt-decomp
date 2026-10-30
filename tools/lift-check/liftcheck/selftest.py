@@ -329,6 +329,13 @@ def main(argv=None) -> int:
         print(f"     {line}")
     bad += bool(msr_errors)
 
+    from .calltests import fpscr_regressions
+    fpscr_errors = fpscr_regressions()
+    print(f"{'ok  ' if not fpscr_errors else 'FAIL'} opt-in FPSCR input/output regressions")
+    for line in fpscr_errors:
+        print(f"     {line}")
+    bad += bool(fpscr_errors)
+
     packed_errors = _normpacked32()
     print(f"{'ok  ' if not packed_errors else 'FAIL'} vpkd3d128/vupkd3d128 NORMPACKED32 regression")
     for line in packed_errors:
