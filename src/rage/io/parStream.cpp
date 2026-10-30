@@ -1660,19 +1660,6 @@ uint32_t _ctype_is_punct(int ch) {
 }
 
 /**
- * _ctype_get_class @ 0x8243A348 | size: 0x1C
- *
- * Gets the full character classification word from the locale ctype table.
- * Masks char to 0-255 range, returns upper 17 bits (mask 0xFFFF8000).
- */
-uint32_t _ctype_get_class(int ch) {
-    extern void* g_localeData;  // from locale struct at +5336
-    uint16_t** ctypePtr = reinterpret_cast<uint16_t**>(&g_localeData);
-    uint16_t* table = ctypePtr[50];  // offset +200
-    return table[ch & 0xFF] & 0xFFFF8000;
-}
-
-/**
  * _ctype_test_masked @ 0x82436C30 | size: 0x30
  *
  * Tests if character ch (0-255) has any of the specified mask bits set
