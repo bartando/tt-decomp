@@ -255,7 +255,8 @@ class Machine:
 
     # ── hooks ──────────────────────────────────────────────────────────────
     def _on_write(self, uc, access, addr, size, value, _):
-        if STACK_LO <= addr < STACK_HI:
+        # The XER trampoline parks r0 in SCRATCH; that's the harness, not the function.
+        if STACK_LO <= addr < STACK_HI or SCRATCH <= addr < SCRATCH + 0x10000:
             return
         pc = uc.reg_read(P.UC_PPC_REG_PC) & M32
         for k in range(size):
