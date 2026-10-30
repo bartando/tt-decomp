@@ -58,13 +58,15 @@ def _fixture(orig_words, lift_words, callees, policies=None):
     return c
 
 
-def _sides(c, args=None):
+def _sides(c, args=None, fpscr=None):
     t = Trial(random.Random(1), c.syms)
     t.alloc(16, 'output', fill='zero')
     t.stack_fill = bytes(0x9000)
     regs = {'gpr': [0] * 32, 'fpr': [0.] * 32, 'ctr': 0, 'cr': 0}
     regs['gpr'][1], regs['gpr'][13] = STACK_TOP, TLS_BASE
     regs['gpr64'] = args or {}
+    if fpscr is not None:
+        regs['fpscr'] = fpscr
     for n, value in (args or {}).items():
         regs['gpr'][n] = value & 0xFFFFFFFF
     results = []
@@ -74,6 +76,45 @@ def _sides(c, args=None):
         assert not c.machine.run_frames, f'{side}: leaked run() frames'
         results.append(res)
     return t, regs, results
+
+
+def fpscr_regressions():
+    """Native mffs/mtfsfi prove input, reset, capture and opt-in comparison."""
+    errors = []
+    # mffs f0; stfd f0,-8(r1); lwz r3,-4(r1); blr
+    read = [0xFC00048E, 0xD801FFF8, 0x8061FFFC, 0x4E800020]
+    try:
+        c = _fixture(read, read, {})
+        c._dw = None
+        c.spec.inputs = lambda t: t.args(fpscr=0x20002)
+        _, regs, _ = c.make_trial(0)
+        assert regs['fpscr'] == 0x20002, 't.args(fpscr=...) was not applied'
+        for value in (0, 1, 2, 3, 4, 0x20000, 0x21000000):
+            t, regs, results = _sides(c, fpscr=value)
+            for res in results:
+                assert res.fpscr == value and res.gpr[3] == value, 'FPSCR input/capture mismatch'
+            c.spec.CHECK_FPSCR = True
+            c.compare(t, regs, *results)
+        _, _, results = _sides(c)
+        assert all(res.fpscr == 0 and res.gpr[3] == 0 for res in results), 'FPSCR leaked across trials'
+
+        # Only the original sets RN=3. Legacy comparisons must still pass.
+        c = _fixture([0xFF80310C, 0x4E800020], [0x4E800020], {})
+        t, regs, results = _sides(c)
+        assert results[0].fpscr == 3 and results[1].fpscr == 0
+        c.compare(t, regs, *results)
+        c.spec.CHECK_FPSCR = False
+        c.compare(t, regs, *results)
+        c.spec.CHECK_FPSCR = True
+        try:
+            c.compare(t, regs, *results)
+        except Divergence as e:
+            assert 'FPSCR' in e.title, e.title
+        else:
+            raise AssertionError('opt-in FPSCR comparison missed a dropped write')
+    except Exception as e:
+        errors.append(str(e))
+    return errors
 
 
 def msr_regressions():

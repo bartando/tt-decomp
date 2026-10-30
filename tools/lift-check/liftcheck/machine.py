@@ -90,6 +90,7 @@ class SideResult:
     gpr64: list
     fpr: list
     instructions: int = 0
+    fpscr: int = 0
 
 
 @dataclass
@@ -416,7 +417,7 @@ class Machine:
         uc.reg_write(P.UC_PPC_REG_CTR, regs["ctr"])
         uc.reg_write(P.UC_PPC_REG_CR, regs["cr"])
         uc.reg_write(P.UC_PPC_REG_XER, 0)
-        uc.reg_write(P.UC_PPC_REG_FPSCR, 0)
+        uc.reg_write(P.UC_PPC_REG_FPSCR, regs.get("fpscr", 0))
         uc.reg_write(P.UC_PPC_REG_MSR, uc.reg_read(P.UC_PPC_REG_MSR) | MSR_FP | MSR_VEC)
         try:
             uc.emu_start(entry, SENTINEL, timeout=timeout_us, count=max_insns)
@@ -430,7 +431,7 @@ class Machine:
         return SideResult(side, self.fault, self.writes, self.calls,
                           [self.gpr(n) for n in range(32)],
                           [self.gpr64(n) for n in range(32)],
-                          [self.fpr(n) for n in range(32)])
+                          [self.fpr(n) for n in range(32)], fpscr=self.fpscr())
 
     def restore(self, addrs, initial):
         """Puts back the initial bytes at every address a side wrote."""

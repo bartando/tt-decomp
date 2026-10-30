@@ -121,6 +121,9 @@ on a made-up TU, the example specs, and mutated lifts that must all fail.
 - `EXTERNS`, `FTOL` (relative float tolerance, default 0), `TRIALS`, `RET` (`"r3"`, `"f1"`,
   `None`; default from the lift's return type), `EXTRA_RANGES` (more code ranges that belong
   to the original function), `IGNORE = [(addr, size), ...]` (left out of the memory diff).
+- `CHECK_FPSCR = True`: compare the final FPSCR exactly. Opt in for routines whose
+  contract includes FP control/status; other specs keep their existing comparisons.
+  `t.args(fpscr=bits)` sets its initial value on both sides (default 0).
 - `HOST = {"rage::rage_alloc_aligned": model(...)}`: helpers the lift calls that have no
   game address (host code standing in for something the original inlines). Each gets a
   fake address and its policy, usually a transparent model of the inlined code.
