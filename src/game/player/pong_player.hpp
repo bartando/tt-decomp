@@ -294,7 +294,6 @@ struct pongPlayer {
     bool IsCreatureStateReady()   const;  // @ 0x820CD660
     bool IsCreatureState2Active() const;  // @ 0x820CD6B8
     bool CanAcceptSwingInput()    const;  // @ 0x820CC3C8
-    bool IsSwingApexReached(float threshold) const;  // @ 0x820CDA58
     bool IsActionComplete()       const;                 // @ 0x820C7890
     bool CheckOpponentSwingApex() const;                 // @ 0x820C5890 (approx)
 
@@ -391,7 +390,7 @@ struct pongPlayer {
 // fields declared there; rtti has no class of this name. Every caller of the
 // functions below reaches them through m_pPlayerState, so they live here only.
 struct pongPlayerState : pongPlayer {
-    bool IsSwingApexReached(float threshold) const;  // @ 0x820CDA58 (pongPlayerState override)
+    bool IsSwingApexReached() const;  // @ 0x820CDA58
     void CancelSwing();                              // @ 0x820CD908
     bool IsBeforeSwingPeak()                const;  // @ 0x820CDCD8
     bool IsSwingSystemIdle()                const;  // @ 0x820CDDC0
