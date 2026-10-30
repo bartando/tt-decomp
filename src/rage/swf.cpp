@@ -23,7 +23,6 @@ extern "C" {
     void swfCMD_PlaceObject2ClipEvent_D3E8(void* instance, int event, const char* name);  // @ 0x823FD3E8
     void rage_free(void* ptr);                  // @ 0x820C00C0 — canonical heap free (see src/crt/heap.c)
     void swfContext_Cleanup(void* ctx);         // @ 0x823F9B80 — cleanup stub (no-op in final binary)
-    uint8_t atSingleton_Find(void* ptr);        // @ 0x820F90D0 — singleton registry lookup, returns nonzero if found
     void atHashMap_Clear(void* ptr);            // @ 0x8234C0E0 — iterates linked-list hash buckets, frees all nodes
     void swfFile_DestroyResources(void* ptr);   // @ 0x824035B0 — releases child resource array entries
     void swfInstance_Cleanup(void* ptr);        // @ 0x823FB670 — unlinks instance from display list

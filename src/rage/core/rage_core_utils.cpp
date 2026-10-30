@@ -22,6 +22,7 @@
 #include <cctype>
 #include <cmath>
 #include "game/template_registry.hpp"
+#include "rage/singleton.h"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Forward declarations
@@ -126,7 +127,7 @@ extern "C" void sysMemAllocator_PlatformFree(void* a, unsigned int b) {
  * rage_free — Free memory allocated by RAGE allocators (C++ linkage)
  *
  * On Xbox 360 @ 0x820C00C0 (rage_free_00C0), this checked if the pointer
- * was tracked by the singleton pool (atSingleton_Find_90D0), and if not,
+ * was tracked by the singleton pool (rage_FindSingleton), and if not,
  * freed it via the global allocator's vtable slot 2 (Free).
  * On the host, we use standard free().
  *
@@ -332,7 +333,7 @@ extern void datResourceMgr_RemoveEntry(void* key);  // @ 0x820F8EE8
 extern void _locale_register(void* ptr, void* flags);  // @ 0x820C02D0
 
 /** Check whether a pointer falls within a tracked singleton interval. */
-extern "C" uint8_t rage_FindSingleton(void* ptr) {
+extern "C" uint32_t rage_FindSingleton(void* ptr) {
     uint32_t value = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(ptr));
     if (static_cast<int32_t>(value) >= 0)
         return 0;

@@ -72,10 +72,6 @@ void* sysMemAllocator_Allocate(void* ptr, size_t size);
 /** sysMemAllocator_Free @ 0x82186228 | size: 0x74 */
 void sysMemAllocator_Free(void* ptr);
 
-/** rage::FindSingleton @ 0x820F90D0 | size: 0xA4
- *  Returns nonzero if pointer is owned by a registered singleton. */
-// Declared in rage namespace — see rage/rage_singleton.hpp
-
 #ifdef __cplusplus
 }
 #endif

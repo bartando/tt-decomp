@@ -8,7 +8,7 @@
  *
  * Real, address-backed lifts that share these names live in:
  *   - src/rage/memory/atArray.cpp       (atArray_Destructor @ 0x820C2980)
- *   - src/rage/memory/atSingleton.cpp   (atSingleton_CAD0_g, ..._Find_90D0,
+ *   - src/rage/memory/atSingleton.cpp   (atSingleton_CAD0_g,
  *                                        ..._23C0, numbered variants)
  *   - src/rage/memory/rage_memory.cpp   (atSingleton_0128_wrh, _2038, _23C0,
  *                                        datArray_Grow sites)
@@ -308,12 +308,6 @@ void* atArray_Destructor(void* pArray) { (void)pArray; return nullptr; }
 // real lift sites. Duplicates here intentionally kept *very* thin so the
 // real ones in rage/memory/atSingleton.cpp (when added to CMakeLists) win.
 // ─────────────────────────────────────────────────────────────────────────────
-uint8_t atSingleton_Find(void* ptr) {
-    // Real: atSingleton_Find_90D0 @ 0x820F90D0 — hashed registry lookup.
-    (void)ptr;
-    return 0;
-}
-
 void atSingleton_Remove(void* singleton) {
     // Real: atSingleton_1C70_fw @ 0x82151C70.
     (void)singleton;

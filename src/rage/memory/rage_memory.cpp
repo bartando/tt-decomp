@@ -7,6 +7,7 @@
  * when C++ code calls these functions.
  */
 
+#include "rage/singleton.h"
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -16,7 +17,6 @@
 extern "C" {
     void rage_free(void* ptr);
     void* sysMemAllocator_Allocate(void* ptr, size_t size);
-    uint8_t rage_FindSingleton(void* ptr);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -139,16 +139,6 @@ void* rage_alloc_aligned(unsigned long size, unsigned long alignment) {
 // ============================================================================
 // Singleton Management Functions
 // ============================================================================
-
-/**
- * FindSingleton
- * 
- * Check if a pointer is owned by a registered singleton.
- * Delegates to the C implementation.
- */
-uint8_t FindSingleton(void* ptr) {
-    return ::rage_FindSingleton(ptr);
-}
 
 /**
  * InitializeSingleton
@@ -753,9 +743,6 @@ extern void atSingleton_dtor_7628(void* element);
 /* Free memory @ 0x820C00C0 */
 extern void sysMemAllocator_Free(void* ptr);
 
-/* Find singleton ownership @ 0x820F90D0 */
-extern uint8_t atSingleton_IsTracked(void* ptr);
-
 /* Heap allocator @ 0x820DEC88 */
 extern void* rage_Alloc(uint32_t size);
 
@@ -1021,7 +1008,7 @@ void atSingleton_DCE8_gen(void* data) {
                     continue;
                 }
 
-                uint8_t isSingleton = atSingleton_IsTracked(ptr);
+                uint8_t isSingleton = rage_FindSingleton(ptr);
                 if (isSingleton != 0) {
                     continue;
                 }
@@ -1077,7 +1064,7 @@ void atSingleton_DB60(void* data) {
         // Check main data pointer
         void* ptr = *(void**)cursor;
         if (ptr != nullptr) {
-            uint8_t isSingleton = atSingleton_IsTracked(ptr);
+            uint8_t isSingleton = rage_FindSingleton(ptr);
             if (isSingleton == 0) {
                 // Deallocate through global singleton manager
                 uint32_t* sdaBase = *(uint32_t**)0x82600000;
@@ -1201,7 +1188,7 @@ void atSingleton_F5C0_h(void* arrayDesc, int32_t newCapacity) {
 
     // Free old buffer if allocated
     if (oldData != nullptr) {
-        uint8_t isSingleton = atSingleton_IsTracked(oldData);
+        uint8_t isSingleton = rage_FindSingleton(oldData);
         if (isSingleton != 0) {
             *(void**)desc = newData;
             return;
