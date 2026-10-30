@@ -5,6 +5,7 @@
  * Core graphics device functions:
  *   - grcDevice_shutdown    @ 0x8214FA58 — Primary shutdown sequence
  *   - grcDevice_shutdownAlt @ 0x821540D0 — Alternate shutdown path
+ *   - grcDevice_SetScissorRect @ 0x823537B0 — scissor commands, including tiled rendering
  *   - grcDevice_setSamplerMinFilter @ 0x82355418 — Xenos texture fetch state
  *   - grcDevice_setSamplerMagFilter @ 0x823555A8 — Xenos texture fetch state
  *   - grcDevice_setSamplerMaxAnisotropy @ 0x82355828 — Xenos texture fetch state
@@ -188,6 +189,86 @@ void grcDevice_shutdownAlt(void)
 
     /* Clear device pointer. */
     g_pGrcDeviceAlt = NULL;
+}
+
+extern "C" void* rage_A980(void* device); // @ 0x8235A980 — refill the command buffer, return its cursor
+
+// Xenon ABI: r3 = device, r4..r7 = signed left/top/right/bottom (exclusive bounds).
+// The cursor points at the last written word: every command store preincrements it.
+// Tiled rendering is valid only when each nonzero bound render target matches its
+// tiled counterpart. It intersects the scissor with each tile and restores the bin
+// mask afterward. Coordinates truncate to 14 bits; window offsets use 15 bits.
+// @ 0x823537B0
+extern "C" void grcDevice_SetScissorRect(void* device, int32_t left, int32_t top,
+                                        int32_t right, int32_t bottom) {
+    uint8_t* state = static_cast<uint8_t*>(device);
+    const auto field = [state](uint32_t offset) -> uint32_t& {
+        return *reinterpret_cast<uint32_t*>(state + offset);
+    };
+    auto* command = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(field(0)));
+    if (field(0) > field(8)) {
+        command = static_cast<uint32_t*>(rage_A980(device));
+    }
+    const auto emit = [&command](uint32_t word) { *++command = word; };
+    const auto packScissor = [](int32_t x, int32_t y) {
+        return (static_cast<uint32_t>(x) & 0x3FFFu) | ((static_cast<uint32_t>(y) & 0x3FFFu) << 16);
+    };
+
+    bool tiled = (state[10432] & 0x10) != 0;
+    for (uint32_t i = 0; tiled && i < 5; ++i) {
+        const uint32_t target = field(12536 + i * 4);
+        if (target != 0 && target != field(12976 + i * 4)) {
+            tiled = false;
+        }
+    }
+
+    if (!tiled) {
+        // Type-0 write: PA_SC_WINDOW_OFFSET, WINDOW_SCISSOR_TL and BR.
+        emit(0x00022080);
+        emit(0);
+        emit(packScissor(left, top));
+        emit(packScissor(right, bottom));
+    } else {
+        for (uint32_t i = 0; i < field(12996); ++i) {
+            const uint32_t tile = 13000 + i * 16;
+            int32_t clipLeft = static_cast<int32_t>(field(tile));
+            int32_t clipTop = static_cast<int32_t>(field(tile + 4));
+            int32_t clipRight = static_cast<int32_t>(field(tile + 8));
+            int32_t clipBottom = static_cast<int32_t>(field(tile + 12));
+            if (left > clipLeft) clipLeft = left;
+            if (top > clipTop) clipTop = top;
+            if (right < clipRight) clipRight = right;
+            if (bottom < clipBottom) clipBottom = bottom;
+            if (clipLeft >= clipRight || clipTop >= clipBottom) {
+                clipLeft = clipTop = clipRight = clipBottom = 0;
+            }
+
+            // PPC slw uses six shift bits and yields zero for shifts 32..63.
+            const uint32_t shift = (i * 2) & 63u;
+            emit(0xC0015000); // SET_BIN_MASK, two bits per tile
+            emit(shift < 32 ? 3u << shift : 0);
+            emit(0);
+            emit(0xC0032D01); // SET_CONSTANT: window offset and scissor registers
+            emit(0x00040080);
+            const uint32_t offsetX = (0u - field(tile + 240)) & 0x7FFFu;
+            const uint32_t offsetY = (0u - field(tile + 244)) & 0x7FFFu;
+            emit(offsetX | (offsetY << 16));
+            emit(packScissor(clipLeft, clipTop));
+            emit(packScissor(clipRight, clipBottom));
+
+            field(0) = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(command));
+            if (field(0) > field(8)) {
+                command = static_cast<uint32_t*>(rage_A980(device));
+            }
+        }
+        emit(0xC0015000);
+        const uint32_t mask = field(12960);
+        emit(mask != 0 ? mask : 0xFFFFFFFFu);
+        emit(0);
+    }
+
+    field(0) = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(command));
+    *reinterpret_cast<uint64_t*>(state + 32) |= UINT64_C(0x3800);
 }
 
 extern const uint32_t g_grcAnisoFilterTable[17];  // @ 0x82065D10
