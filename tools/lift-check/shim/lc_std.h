@@ -21,6 +21,7 @@ using ::intptr_t; using ::uintptr_t; using ::ptrdiff_t;
 inline float  abs(float x)  { return __builtin_fabsf(x); }
 inline float  fabs(float x) { return __builtin_fabsf(x); }
 inline float  sqrt(float x) { return __builtin_sqrtf(x); }
+inline float fma(float a, float b, float c) { return __builtin_fmaf(a, b, c); }
 using ::fabsf; using ::sqrtf; using ::floorf; using ::ceilf; using ::sinf; using ::cosf;
 using ::atan2f; using ::acosf; using ::asinf; using ::atanf; using ::powf; using ::fmodf;
 using ::fabs; using ::sqrt; using ::floor; using ::ceil;

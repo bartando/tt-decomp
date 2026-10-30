@@ -81,6 +81,8 @@ extern "C" uint8_t g_sysMemDebugFillFlag = 0;  // @ 0x8260642D
 
 namespace rage {
 uint32_t g_sysMemAllocatorInitLock = 0;  // @ 0x825EBCF8
+int32_t g_swfPointerX = 0;              // @ 0x825F312C
+int32_t g_swfPointerY = 0;              // @ 0x825F3138
 void* g_swfGlobalObject = nullptr;      // @ 0x82602818
 void* g_currentSwfContext = nullptr;    // @ 0x8260281C
 void* g_swfRootObject = nullptr;        // @ 0x82602828
