@@ -241315,7 +241315,7 @@
       "size": 132
     },
     "0x82359dc0": {
-      "name": "phInst_9DC0_p42",
+      "name": "grcDevice_CommitCommandSpace",
       "type": "function",
       "section": ".text",
       "size": 188
@@ -241327,7 +241327,7 @@
       "size": 520
     },
     "0x8235a088": {
-      "name": "grc_A088",
+      "name": "grcDevice_AllocateCommandData",
       "type": "function",
       "section": ".text",
       "size": 200
@@ -354943,9 +354943,9 @@
     "grc_9B60": "0x82359b60",
     "rage_9C88": "0x82359c88",
     "ke_9D38": "0x82359d38",
-    "phInst_9DC0_p42": "0x82359dc0",
+    "grcDevice_CommitCommandSpace": "0x82359dc0",
     "phInst_9E80_p42": "0x82359e80",
-    "grc_A088": "0x8235a088",
+    "grcDevice_AllocateCommandData": "0x8235a088",
     "rage_A150": "0x8235a150",
     "rage_A270": "0x8235a270",
     "phInst_A340_p42": "0x8235a340",

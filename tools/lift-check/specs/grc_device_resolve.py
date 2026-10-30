@@ -119,7 +119,7 @@ CALLS = {
     "game_37B0": stub(ret="void", args=("r3", "r4", "r5", "r6", "r7")),
     "grc_3E20": model(flush, args=("r3",)),
     "grc_DBF8": model(setup, args=("r3", "r4")),
-    "grc_A088": model(vertices, args=("r3", "r4", "r5")),
+    "grcDevice_AllocateCommandData": model(vertices, args=("r3", "r4", "r5")),
     "grcDevice_SetViewport": viewport("viewport", 24, 12808),
     "grc_5E08": viewport("scissor", 16, 12832),
     "grc_CFD8": model(deferred, args=("r3", "r4", "f1")),

@@ -83,7 +83,7 @@ def grow_fixups(ctx):
 CALLS = {
     "grcDevice_FlushDirtyState": model(flush, args=("r3",)),
     "rage_A980": model(rollover, args=("r3",)),
-    "grc_A088": model(vertices, args=("r3", "r4", "r5")),
+    "grcDevice_AllocateCommandData": model(vertices, args=("r3", "r4", "r5")),
     "grc_9B60": model(grow_fixups, args=("r3",)),
 }
 

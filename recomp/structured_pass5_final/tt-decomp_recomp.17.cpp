@@ -10296,7 +10296,7 @@ loc_823576EC:
 	// mr r3,r31
 	ctx.r3.u64 = var_r31;
 	// bl 0x8235a088
-	grc_A088(ctx, base);
+	grcDevice_AllocateCommandData(ctx, base);
 	// mr. r28,r3
 	var_r28 = ctx.r3.u32;
 	// li r3,0
@@ -15492,7 +15492,7 @@ loc_82359BA8:
 	// li r4,4224
 	ctx.r4.s64 = 4224;
 	// bl 0x8235a088
-	grc_A088(ctx, base);
+	grcDevice_AllocateCommandData(ctx, base);
 	// mr. r7,r3
 	ctx.r7.u64 = ctx.r3.u64;
 	// bne 0x82359bf4
@@ -15732,8 +15732,8 @@ loc_82359D88:
 	return;
 }
 
-__attribute__((alias("__imp__phInst_9DC0_p42"))) PPC_WEAK_FUNC(phInst_9DC0_p42);
-PPC_FUNC_IMPL(__imp__phInst_9DC0_p42) {
+__attribute__((alias("__imp__grcDevice_CommitCommandSpace"))) PPC_WEAK_FUNC(grcDevice_CommitCommandSpace);
+PPC_FUNC_IMPL(__imp__grcDevice_CommitCommandSpace) {
 	PPC_FUNC_PROLOGUE();
 	uint32_t var_r31 = 0;
 	uint32_t var_r30 = 0;
@@ -15906,7 +15906,7 @@ PPC_FUNC_IMPL(__imp__phInst_9E80_p42) {
 					PPC_STORE_U32(ctx.r3.u32 + 14016, ctx.r4.u32);
 					// b 0x82359f78
 					// bl 0x82359dc0
-					phInst_9DC0_p42(ctx, base);
+					grcDevice_CommitCommandSpace(ctx, base);
 					// mr r3,r31
 					ctx.r3.u64 = var_r31;
 					// b 0x8235a080
@@ -15919,7 +15919,7 @@ PPC_FUNC_IMPL(__imp__phInst_9E80_p42) {
 					PPC_STORE_U32(ctx.r3.u32 + 14016, ctx.r4.u32);
 					// b 0x82359f78
 					// bl 0x82359dc0
-					phInst_9DC0_p42(ctx, base);
+					grcDevice_CommitCommandSpace(ctx, base);
 					// mr r3,r31
 					ctx.r3.u64 = var_r31;
 					// b 0x8235a080
@@ -15936,7 +15936,7 @@ PPC_FUNC_IMPL(__imp__phInst_9E80_p42) {
 			PPC_STORE_U32(ctx.r3.u32 + 14016, ctx.r4.u32);
 			// b 0x82359f78
 			// bl 0x82359dc0
-			phInst_9DC0_p42(ctx, base);
+			grcDevice_CommitCommandSpace(ctx, base);
 			// mr r3,r31
 			ctx.r3.u64 = var_r31;
 			// b 0x8235a080
@@ -16001,7 +16001,7 @@ PPC_FUNC_IMPL(__imp__phInst_9E80_p42) {
 		PPC_STORE_U32(ctx.r3.u32 + 14024, ctx.r4.u32);
 	loc_82359F78:
 		// bl 0x82359dc0
-		phInst_9DC0_p42(ctx, base);
+		grcDevice_CommitCommandSpace(ctx, base);
 		// mr r3,r31
 		ctx.r3.u64 = var_r31;
 		// b 0x8235a080
@@ -16137,7 +16137,7 @@ loc_8235A060:
 	// lwz r5,14020(r3)
 	ctx.r5.u64 = PPC_LOAD_U32(ctx.r3.u32 + 14020);
 	// bl 0x82359dc0
-	phInst_9DC0_p42(ctx, base);
+	grcDevice_CommitCommandSpace(ctx, base);
 	// subf r11,r30,r31
 	ctx.r11.s64 = (int64_t)(int32_t)var_r31 - (int64_t)(int32_t)var_r30;
 	// mr r3,r30
@@ -16153,8 +16153,8 @@ loc_8235A080:
 	return;
 }
 
-__attribute__((alias("__imp__grc_A088"))) PPC_WEAK_FUNC(grc_A088);
-PPC_FUNC_IMPL(__imp__grc_A088) {
+__attribute__((alias("__imp__grcDevice_AllocateCommandData"))) PPC_WEAK_FUNC(grcDevice_AllocateCommandData);
+PPC_FUNC_IMPL(__imp__grcDevice_AllocateCommandData) {
 	PPC_FUNC_PROLOGUE();
 	uint32_t var_r31 = 0;
 	// FRAME: size=112, manual
@@ -16786,7 +16786,7 @@ loc_8235A53C:
 	// mr r3,r31
 	ctx.r3.u64 = var_r31;
 	// bl 0x8235a088
-	grc_A088(ctx, base);
+	grcDevice_AllocateCommandData(ctx, base);
 	// cmplwi r3,0
 	// beq 0x8235a534
 	if (ctx.r3.u32 == 0) {
@@ -17419,7 +17419,7 @@ PPC_FUNC_IMPL(__imp__rage_A980) {
 		// mr r3,r31
 		ctx.r3.u64 = var_r31;
 		// bl 0x8235a088
-		grc_A088(ctx, base);
+		grcDevice_AllocateCommandData(ctx, base);
 		// mr. r4,r3
 		ctx.r4.u64 = ctx.r3.u64;
 		// beq 0x8235a9f8
@@ -21815,7 +21815,7 @@ loc_8235C998:
 	// mr r3,r29
 	ctx.r3.u64 = var_r29;
 	// bl 0x8235a088
-	grc_A088(ctx, base);
+	grcDevice_AllocateCommandData(ctx, base);
 	// cmplwi r3,0
 	// beq 0x8235cb40
 	if (ctx.r3.u32 == 0) {
@@ -22464,7 +22464,7 @@ loc_8235CDB0:
 	// mr r3,r31
 	ctx.r3.u64 = var_r31;
 	// bl 0x8235a088
-	grc_A088(ctx, base);
+	grcDevice_AllocateCommandData(ctx, base);
 	// cmplwi r3,0
 	// bne 0x8235cdd0
 	if (ctx.r3.u32 == 0) {
@@ -23484,7 +23484,7 @@ loc_8235D414:
 		// mr r3,r30
 		ctx.r3.u64 = var_r30;
 		// bl 0x8235a088
-		grc_A088(ctx, base);
+		grcDevice_AllocateCommandData(ctx, base);
 		// cmplwi r3,0
 		// beq 0x8235d6f4
 		if (ctx.r3.u32 == 0) {
@@ -26194,7 +26194,7 @@ loc_8235E648:
 	// mr r3,r31
 	ctx.r3.u64 = var_r31;
 	// bl 0x8235a088
-	grc_A088(ctx, base);
+	grcDevice_AllocateCommandData(ctx, base);
 	// cmplwi r3,0
 	// bne 0x8235e668
 	if (ctx.r3.u32 == 0) {
@@ -47971,7 +47971,7 @@ loc_82367C00:
 	// mr r3,r31
 	ctx.r3.u64 = var_r31;
 	// bl 0x8235a088
-	grc_A088(ctx, base);
+	grcDevice_AllocateCommandData(ctx, base);
 	// lis r30,16384
 	var_r30 = 1073741824;
 	// mr. r29,r3
@@ -48019,7 +48019,7 @@ loc_82367C5C:
 	// mr r3,r31
 	ctx.r3.u64 = var_r31;
 	// bl 0x8235a088
-	grc_A088(ctx, base);
+	grcDevice_AllocateCommandData(ctx, base);
 	// cmplwi r3,0
 	// mr r4,r3
 	ctx.r4.u64 = ctx.r3.u64;

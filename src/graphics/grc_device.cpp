@@ -1205,7 +1205,7 @@ extern void game_37B0(void* device, int32_t left, int32_t top,
                       int32_t right, int32_t bottom);  // @ 0x823537B0
 extern void grc_3E20(void* device);  // @ 0x82363E20
 extern uint32_t* grc_DBF8(void* device, uint32_t* cursor);  // @ 0x8235DBF8
-extern float* grc_A088(void* device, uint32_t count, uint32_t stride);  // @ 0x8235A088
+extern float* grcDevice_AllocateCommandData(void* device, uint32_t count, uint32_t stride);  // @ 0x8235A088
 extern void grc_CFD8(void* device, uint32_t flags, const int32_t* rect, const float* color,
                      float depth, uint32_t stencil);  // @ 0x8235CFD8
 extern void rage_AD98(void* device);  // @ 0x8235AD98
@@ -1268,7 +1268,7 @@ extern "C" void* grcDevice_BeginDrawPrimitiveUP(void* device, uint32_t primitive
     if (word(0) > word(8)) {
         cursor = static_cast<uint32_t*>(rage_A980(device));
     }
-    void* vertices = grc_A088(device, vertexWords, 16);
+    void* vertices = grcDevice_AllocateCommandData(device, vertexWords, 16);
     if (vertices == nullptr) {
         word(0) = address(cursor);
         return nullptr;
@@ -1521,7 +1521,7 @@ extern "C" void grcDevice_Resolve(void* device, uint32_t flags, const int32_t* s
         }
     }
     cursor = available();
-    float* vertices = grc_A088(device, 6, 4);
+    float* vertices = grcDevice_AllocateCommandData(device, 6, 4);
     if (!vertices) {
         saveCursor(cursor);
         return;

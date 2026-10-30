@@ -3227,7 +3227,7 @@ exit_final:
 
 // External graphics helpers
 extern "C" void* rage_A980(void* pDevice);  // @ 0x8235A980 - get/refresh device pointer
-extern "C" void* grc_A088(void* pDevice, int paramA, int paramB); // @ 0x8235A088 - alloc shader constant block
+extern "C" void* grcDevice_AllocateCommandData(void* pDevice, uint32_t wordCount, uint32_t alignment); // @ 0x8235A088
 extern "C" void grcDevice_SetScissorRect(void* device, int32_t left, int32_t top, int32_t right, int32_t bottom);
 extern "C" void grc_CFD8(void* pDevice, float f1, uint32_t r5, uint32_t r6,
                           void* r7, uint32_t r8, uint32_t r9);  // @ 0x8235CFD8 - dispatch shader pass
@@ -3261,8 +3261,8 @@ extern "C" void CCalMoviePlayer_SetupShaderConstants(void* pDevice) {
         dev = (char*)pDevice;
     }
 
-    // Allocate shader constant block (21 float4s, type 4)
-    void* constBlock = grc_A088(pDevice, 21, 4);
+    // Allocate 21 words of command data with 4-byte alignment
+    void* constBlock = grcDevice_AllocateCommandData(pDevice, 21, 4);
     if (constBlock == nullptr) {
         // Store fallback write ptr and return
         *(uint32_t*)(dev + 0) = *(uint32_t*)(dev + 0);
