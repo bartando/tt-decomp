@@ -297,8 +297,7 @@ bool clipAabbToActiveCamera(void* context, float (*box)[4], const float* referen
     const auto* cameras = *reinterpret_cast<const uint8_t* const*>(owner + 24);
     const uint32_t frame = *reinterpret_cast<const uint32_t*>(0x825C4898u);
     const auto* camera = cameras + frame * 912;
-    // The existing 0x82143E98 lift is still filed under pongCameraMgr.
-    const float aspect = reinterpret_cast<const pongCameraMgr*>(camera)->GetAspectRatio();
+    const float aspect = reinterpret_cast<const grcViewport*>(camera)->GetAspectRatio();
     const float nearClip = *reinterpret_cast<const float*>(camera + 832);
     const float cap = *reinterpret_cast<const float*>(0x8202CFE8u);
     const double fallback = *reinterpret_cast<const double*>(0x82079FB8u);

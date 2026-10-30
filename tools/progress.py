@@ -35,18 +35,31 @@ MARKER = re.compile(r"@\s*0x(82[0-9A-Fa-f]{6})")
 
 def _defines(text, marker):
     """True if the marker belongs to a definition: code on its own line ending
-    in `{` or `}` (a one-line body), or the code after its comment reaching `{`
-    before `;`."""
+    in `{` or `}` (a one-line body), or the next code after its comment being a
+    file-scope signature (column 0, has `(`) that reaches `{` before `;`.
+    Comments naming several addresses are lists or cross-references, and markers
+    inside a function body are remarks; neither counts."""
     if text.rfind("/*", 0, marker.start()) > text.rfind("*/", 0, marker.start()):
-        rest = text[text.find("*/", marker.end()) + 2:]
+        start = text.rfind("/*", 0, marker.start())
+        end = text.find("*/", marker.end())
+        if len(set(MARKER.findall(text[start:end]))) > 1:
+            return False
+        rest = text[end + 2:]
     else:
         line_start = text.rfind("\n", 0, marker.start()) + 1
-        code_before = text[line_start:marker.start()].split("//")[0].strip()
+        line = text[line_start:marker.start()]
+        code_before = line.split("//")[0].strip()
         if code_before:
             return code_before.endswith(("{", "}"))
+        if line[:len(line) - len(line.lstrip())]:
+            return False  # an indented comment sits inside a body
         rest = text[text.find("\n", marker.end()) + 1:]
     rest = re.sub(r"/\*.*?\*/|//[^\n]*", "", rest[:1500], flags=re.S)
-    brace, semi = rest.find("{"), rest.find(";")
+    code = rest.lstrip("\n")
+    first = code.split("\n", 1)[0]
+    if not first or first[0].isspace() or "(" not in code[:400]:
+        return False
+    brace, semi = code.find("{"), code.find(";")
     return brace != -1 and (semi == -1 or brace < semi)
 
 
