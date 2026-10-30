@@ -427,7 +427,7 @@ extern "C" uint32_t grcGpuResource_Release(void* resource) {
     return 0;
 }
 
-extern "C" void grc_5E08(void* device, void* out);  // @ 0x82355E08
+extern "C" void grc_5E08(void* device, const void* rect);  // @ 0x82355E08
 extern const float g_grcHalf;                       // @ 0x8202D10C
 
 // D3DVIEWPORT9 layout.
@@ -846,4 +846,317 @@ extern "C" void grcDevice_FlushRenderState() {
     }
     g_grmShaderFx_flushRequired = 0;
     g_grmShaderFx_forceResetFlag = 0;
+}
+
+extern "C" {
+extern void grc_89D0(void* texture, uint32_t slice, uint32_t level, uint32_t* pitch,
+                     uint32_t* size, uint32_t* offset, uint32_t* packedSize, uint32_t* width,
+                     uint32_t* height, uint32_t* depth, uint32_t* address);  // @ 0x823589D0
+extern void CCalMoviePlayer_D700_p39(void* device, uint32_t index, float depth,
+                                    uint32_t stencil);  // @ 0x8235D700
+// The color arrives in v1 on Xenon, independently of r3..r6.
+extern void fiAsciiTokenizer_D808_fw(uint32_t format, uint32_t numberFormat,
+                                    uint32_t* low, uint32_t* high);  // @ 0x8235D808
+extern void game_37B0(void* device, int32_t left, int32_t top,
+                      int32_t right, int32_t bottom);  // @ 0x823537B0
+extern void grc_3E20(void* device);  // @ 0x82363E20
+extern uint32_t* grc_DBF8(void* device, uint32_t* cursor);  // @ 0x8235DBF8
+extern float* grc_A088(void* device, uint32_t count, uint32_t stride);  // @ 0x8235A088
+extern void grc_CFD8(void* device, uint32_t flags, const int32_t* rect, const float* color,
+                     float depth, uint32_t stencil);  // @ 0x8235CFD8
+extern void rage_AD98(void* device);  // @ 0x8235AD98
+}
+extern const float g_grcResolveConstants[];  // @ 0x8202D10C
+extern const uint16_t g_grcResolveFormatInfo[64];  // @ 0x82065C68
+extern const int32_t g_grcResolveOrigin[2];  // @ 0x82065E50
+extern const uint32_t g_grcResolveVertexProgram[15];  // @ 0x8202C12C
+extern const uint32_t g_grcResolveViewport[6];  // @ 0x82065CE8
+extern const uint32_t g_grcResolveScissor[4];  // @ 0x82065D00
+extern uint32_t g_grcResolveDisableWait;  // @ 0x82606640
+extern uint32_t g_grcResolveForceShaderControl;  // @ 0x82606644
+extern uint32_t g_grcResolveExtraWaits;  // @ 0x82606648
+extern uint32_t g_grcResolveSubmit;  // @ 0x8260664C
+extern uint32_t g_grcResolveSkipShaderControl;  // @ 0x82606650
+
+// Resolve an EDRAM color/depth target into a texture, optionally clearing the source.
+// Xenon: r3..r10 are the first eight arguments, depth is in f1, stencil at caller +0x5C.
+// Destination level (r8) and resolve parameters (caller +0x64) are unused by this implementation.
+// slice selects a destination subresource.
+// @ 0x8235DD08
+extern "C" void grcDevice_Resolve(void* device, uint32_t flags, const int32_t* sourceRect,
+                                   void* texture, const int32_t* destinationPoint, uint32_t /*destinationLevel*/,
+                                   uint32_t slice, const float* clearColor, float clearDepth,
+                                   uint32_t clearStencil, const void* /*resolveParameters*/) {
+    uint8_t* state = static_cast<uint8_t*>(device);
+    auto word = [state](uint32_t offset) -> uint32_t& {
+        return *reinterpret_cast<uint32_t*>(state + offset);
+    };
+    auto dirty = [state](uint32_t offset) -> uint64_t& {
+        return *reinterpret_cast<uint64_t*>(state + offset);
+    };
+    auto pointer = [](uint32_t address) -> uint32_t* {
+        return reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(address));
+    };
+    auto available = [&]() -> uint32_t* {
+        uint32_t* cursor = pointer(word(0));
+        if (word(0) > word(8)) {
+            cursor = static_cast<uint32_t*>(rage_A980(device));
+        }
+        return cursor;
+    };
+    auto saveCursor = [&](uint32_t* cursor) {
+        word(0) = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor));
+    };
+    auto physical = [](uint32_t address) {
+        return (address & 0x1FFFFFFFu) + ((((address >> 20) + 512u) & 0x1000u));
+    };
+    auto signed15 = [](uint32_t value) {
+        return static_cast<int32_t>(value << 17) >> 17;
+    };
+    uint32_t* header = static_cast<uint32_t*>(texture);
+    const uint32_t target = flags & 7u;
+    if ((flags & 0x70u) == 0) {
+        const uint32_t surface = word(target == 4 ? 12552 : (target + 3134u) * 4u);
+        const uint32_t samples = *reinterpret_cast<const uint16_t*>(
+            reinterpret_cast<const uint8_t*>(pointer(surface)) + 48) & 3u;
+        flags |= samples == 0 ? 0x10u : samples == 1 ? 0x50u : 0x70u;
+    }
+    alignas(16) float defaultColor[4] = {
+        g_grcResolveConstants[1], g_grcResolveConstants[1],
+        g_grcResolveConstants[1], g_grcResolveConstants[1]
+    };
+    if (!clearColor) {
+        clearColor = defaultColor;
+    }
+    const bool volume = (header[9] & 0x600u) == 0x400u;
+    const uint32_t dimensionBias = ((header[7] >> 30) & 2u) + 1u;
+    uint32_t width = (header[6] & (volume ? 0x7FFu : 0x1FFFu)) + dimensionBias;
+    uint32_t height = ((header[6] >> (volume ? 11 : 13)) & (volume ? 0x7FFu : 0x1FFFu)) + dimensionBias;
+    uint32_t pitch = (header[4] >> 17) & 0x3FE0u;
+    uint32_t base = header[5] & 0xFFFFF000u;
+    const uint32_t bytesPerBlock = (g_grcResolveFormatInfo[header[5] & 63u] >> 3) & 31u;
+    uint32_t unusedSize, unusedOffset, unusedPackedSize, unusedDepth;
+    if (slice != 0) {
+        uint32_t pitchBytes;
+        grc_89D0(texture, slice, 0, &pitchBytes, &unusedSize, &unusedOffset,
+                 &unusedPackedSize, &width, &height, &unusedDepth, &base);
+        if (bytesPerBlock == 0) {
+            __builtin_trap();
+        }
+        pitch = pitchBytes / bytesPerBlock;
+    }
+    int32_t defaultRect[4] = {0, 0, static_cast<int32_t>(width), static_cast<int32_t>(height)};
+    if (!sourceRect) {
+        sourceRect = defaultRect;
+    }
+    if (!destinationPoint) {
+        destinationPoint = g_grcResolveOrigin;
+    }
+    const uint32_t destinationHeight = height - static_cast<uint32_t>(destinationPoint[1]);
+    const uint32_t destination = physical(base)
+        + ((static_cast<uint32_t>(destinationPoint[1]) - static_cast<uint32_t>(sourceRect[1])) * pitch
+            + ((static_cast<uint32_t>(destinationPoint[0]) - static_cast<uint32_t>(sourceRect[0])) << 5))
+           * bytesPerBlock;
+
+    const bool forcedControl = g_grcResolveForceShaderControl != 0;
+    if (forcedControl) {
+        word(10400) |= 0x100u;
+        uint32_t* cursor = available();
+        *++cursor = 1480; *++cursor = 0x20000; *++cursor = 3841; *++cursor = word(10400);
+        saveCursor(cursor);
+    }
+    uint32_t deferredClear = 0;
+    if ((word(10400) & 0x100u) != 0
+        && ((*reinterpret_cast<uint16_t*>(state + 11456) & 3u) != 2 || (flags & 0x70u) != 0x70u)) {
+        deferredClear = flags & 0x300u;
+        flags &= ~0x300u;
+    }
+    uint32_t format = header[5] & 63u;
+    switch (format) {
+    case 54: format = 7; break;
+    case 55: format = 16; break;
+    case 56: format = 17; break;
+    case 27: format = 30; break;
+    case 28: format = 31; break;
+    case 29: format = 32; break;
+    case 22: case 23: format = 6; break;
+    }
+    const uint32_t endian = (header[4] >> 2) & 3u;
+    uint32_t numberFormat = (endian == 1 ? 1u : 0u) + ((header[7] & 1u) ? 2u : 0u);
+    if (format == 30 || format == 31 || format == 32 || format == 36 || format == 37
+        || format == 38 || format == 57 || format == 63) {
+        numberFormat = 7;
+    }
+    const uint32_t copyFlags = ((flags >> 26) & 63u) | ((header[7] & 14u) ? 0x100u : 0u);
+    uint32_t destinationInfo = (((((copyFlags & 319u) << 3) | numberFormat) << 6) | format) << 7;
+    destinationInfo |= (header[5] >> 6) & 3u;
+    if (volume) {
+        word(11908) = pitch * height;
+        destinationInfo |= ((slice << 4) & 0x70u) | 8u;
+        dirty(48) |= 0x10000000u;
+    }
+    const uint32_t copyMode = (flags & 0x2000u) ? 3u : target == 4 ? 0u : 1u;
+    const uint32_t copyControl = (copyMode << 20) | ((flags & 887u) - 16u);
+    word(11876) = destinationInfo;
+    word(11868) = destination;
+    word(11872) = ((destinationHeight << 16) & 0x3FFF0000u) | (pitch & 0x3FFFu);
+    word(11864) = copyControl;
+    dirty(48) |= UINT64_C(0xF000000000);
+    const bool clearDepthEnabled = (flags & 0x200u) != 0;
+    if (clearDepthEnabled) {
+        CCalMoviePlayer_D700_p39(device, 0, clearDepth, clearStencil);
+    }
+    if ((flags & 0x100u) != 0) {
+        const uint32_t colorTarget = copyControl & 7u;
+        const uint32_t colorInfo = word(colorTarget == 0 ? 11460 : (colorTarget + 2866u) * 4u);
+        uint32_t low, high;
+#if defined(__powerpc__) || defined(__ppc__)
+        // lvx deliberately rounds down to 16 bytes, as the original lvx128 does.
+        __asm__ volatile("lvx 1, 0, %0" : : "r"(clearColor) : "v1", "memory");
+#endif
+        fiAsciiTokenizer_D808_fw((colorInfo >> 16) & 15u, (colorInfo >> 20) & 63u, &low, &high);
+        word(11888) = low;
+        word(11892) = high;
+        dirty(48) |= UINT64_C(0x300000000);
+    }
+
+    const int32_t left = sourceRect[0], top = sourceRect[1];
+    const int32_t right = static_cast<int32_t>((static_cast<uint32_t>(sourceRect[2]) + 7u) & ~7u);
+    const int32_t bottom = static_cast<int32_t>((static_cast<uint32_t>(sourceRect[3]) + 7u) & ~7u);
+    const bool expandScissor = left < signed15(word(11524)) || top < signed15(word(11524) >> 16)
+        || right > signed15(word(11528)) || bottom > signed15(word(11528) >> 16);
+    if (expandScissor) {
+        game_37B0(device, left, top, right, bottom);
+    }
+    grc_3E20(device);
+    bool tiledTargets = (state[10432] & 16u) != 0;
+    for (uint32_t i = 0; i < 5 && tiledTargets; ++i) {
+        tiledTargets = word(12536 + i * 4) == 0 || word(12536 + i * 4) == word(12976 + i * 4);
+    }
+    if (tiledTargets) {
+        for (uint32_t i = 0; i < word(12996); ++i) {
+            const uint32_t address = destination
+                + (word(13244 + i * 16) * pitch + (word(13240 + i * 16) << 5)) * bytesPerBlock;
+            uint32_t* cursor = available();
+            const uint32_t shift = (i * 2u) & 63u;
+            *++cursor = 0xC0015000; *++cursor = shift < 32 ? 3u << shift : 0;
+            *++cursor = 0; *++cursor = 0xC0012D01; *++cursor = 0x40319; *++cursor = address;
+            saveCursor(cursor);
+        }
+        uint32_t* cursor = available();
+        *++cursor = 0xC0015000; *++cursor = word(12960) ? word(12960) : UINT32_MAX; *++cursor = 0;
+        saveCursor(cursor);
+    }
+    uint32_t* cursor = available();
+    if ((state[10434] & 32u) != 0 && g_grcResolveDisableWait == 0) {
+        for (int i = 0; i < 3; ++i) {
+            *++cursor = 0xC0004600; *++cursor = 6;
+        }
+        state[10434] &= ~32u;
+    }
+    *++cursor = 0xC0102B00; *++cursor = 0; *++cursor = 15;
+    for (uint32_t value : g_grcResolveVertexProgram) {
+        *++cursor = value;
+    }
+    *++cursor = 0x12180; *++cursor = 0x10002; *++cursor = 0;
+    *++cursor = 8712; *++cursor = 6; *++cursor = 8704; *++cursor = 0;
+    uint32_t depthControl = 0;
+    if (clearDepthEnabled) {
+        const uint32_t savedFlags = state[10434];
+        depthControl = (word(11648) & ~15u) | (savedFlags >> 7) | ((savedFlags >> 5) & 4u);
+        state[10433] |= 8u;
+        dirty(48) |= 32u;
+    }
+    *++cursor = 8707; *++cursor = depthControl;
+    if (g_grcResolveSkipShaderControl == 0) {
+        *++cursor = 1480; *++cursor = 0x20000;
+    }
+    saveCursor(cursor);
+    if (reinterpret_cast<uintptr_t>(cursor) > word(8)) {
+        cursor = static_cast<uint32_t*>(rage_A980(device));
+    }
+    cursor = grc_DBF8(device, cursor);
+    saveCursor(cursor);
+    if (endian == 3 && target != 4) {
+        const uint32_t index = target == 0 ? 0 : target + 1;
+        const uint32_t colorInfo = word((index + 2865u) * 4u);
+        if ((colorInfo & 0xF0000u) == 0x10000u) {
+            cursor = available();
+            *++cursor = index + 8193u;
+            *++cursor = colorInfo & 0x3F00FFFu;
+            const uint32_t registerIndex = index + 0x20123u;
+            const uint32_t shift = registerIndex & 127u;
+            dirty(16 + (registerIndex >> 16) * 8) |= shift < 64 ? UINT64_C(0x8000000000000000) >> shift : 0;
+            saveCursor(cursor);
+        }
+    }
+    cursor = available();
+    float* vertices = grc_A088(device, 6, 4);
+    if (!vertices) {
+        saveCursor(cursor);
+        return;
+    }
+    const uint32_t vertexAddress = physical(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(vertices)));
+    const float pixelOffset = (word(11776) & 1u) ? g_grcResolveConstants[1] : g_grcResolveConstants[0];
+    const float x = static_cast<float>(left) - pixelOffset;
+    const float y = static_cast<float>(top) - pixelOffset;
+    vertices[0] = x; vertices[2] = x; vertices[3] = y; vertices[5] = y;
+    vertices[4] = static_cast<float>(static_cast<int32_t>(static_cast<uint32_t>(right) - left)) + x;
+    vertices[1] = static_cast<float>(static_cast<int32_t>(static_cast<uint32_t>(bottom) - top)) + y;
+    *++cursor = 0x54800; *++cursor = vertexAddress | 3u; *++cursor = 0x1000001A;
+    *++cursor = 0; *++cursor = 0; *++cursor = 0; *++cursor = 0;
+    *++cursor = 0x25000; *++cursor = 0; *++cursor = 0; *++cursor = 0;
+    *++cursor = 0xC0003601; *++cursor = 0x30088;
+    saveCursor(cursor);
+    cursor = available();
+    if (g_grcResolveDisableWait == 0) {
+        *++cursor = 0xC0004600; *++cursor = 6;
+    }
+    if (g_grcResolveExtraWaits != 0) {
+        for (int i = 0; i < 8; ++i) {
+            *++cursor = 0xC0004600; *++cursor = 6;
+        }
+    }
+    *++cursor = 8199; *++cursor = word(11484);
+    saveCursor(cursor);
+    if (expandScissor) {
+        game_37B0(device, signed15(word(11524)), signed15(word(11524) >> 16),
+                   signed15(word(11528)), signed15(word(11528) >> 16));
+    }
+    const uint32_t resolveBytes = destinationHeight * pitch * bytesPerBlock;
+    header[1] = word(10396);
+    dirty(48) |= 128u;
+    dirty(40) |= UINT64_C(0x62420000000);
+    dirty(32) |= UINT64_C(0x8000000000000000);
+    cursor = available();
+    *++cursor = 2609; *++cursor = 0x3000100; *++cursor = 0x10A2F;
+    *++cursor = (resolveBytes + 8191u) & ~0xFFFu; *++cursor = destination & ~0xFFFu;
+    *++cursor = 0xC0043C00; *++cursor = 3; *++cursor = 2609; *++cursor = 0;
+    *++cursor = 0x80000000; *++cursor = 8;
+    word(11864) = 0;
+    word(11876) = 0;
+    *++cursor = 8984; *++cursor = 0; *++cursor = 8987; *++cursor = 0;
+    saveCursor(cursor);
+    header[1] = word(10396);
+    if (deferredClear != 0) {
+        const uint32_t clearFlags = ((deferredClear & 0x200u) ? 48u : 0u)
+            | ((deferredClear & 0x100u) ? 1u << target : 0u);
+        uint32_t savedViewport[6], savedScissor[4];
+        for (uint32_t i = 0; i < 6; ++i) savedViewport[i] = word(12808 + i * 4);
+        for (uint32_t i = 0; i < 4; ++i) savedScissor[i] = word(12832 + i * 4);
+        grcDevice_SetViewport(device, g_grcResolveViewport);
+        grc_5E08(device, g_grcResolveScissor);
+        grc_CFD8(device, clearFlags, sourceRect, clearColor, clearDepth, clearStencil);
+        grcDevice_SetViewport(device, savedViewport);
+        grc_5E08(device, savedScissor);
+    }
+    if (forcedControl) {
+        cursor = available();
+        word(10400) &= ~0x100u;
+        *++cursor = 1480; *++cursor = 0x20000; *++cursor = 3841; *++cursor = word(10400);
+        saveCursor(cursor);
+    }
+    if (g_grcResolveSubmit != 0) {
+        rage_AD98(device);
+    }
 }
