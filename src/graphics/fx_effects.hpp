@@ -13,6 +13,9 @@
 #pragma once
 #include <stdint.h>
 
+void fxDrawBillboardQuad(uint32_t uvIndex, float angle, float x, float y, float z,
+                         float halfWidth, float halfHeight, uint32_t color);
+
 // ── fxAmbAnimData  [vtable @ 0x8206AA74] ──────────────────────────
 struct fxAmbAnimData {
     void**      vtable;           // +0x00

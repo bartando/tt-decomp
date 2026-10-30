@@ -35,7 +35,6 @@ extern void rage_5908(void*);
 extern void util_C880(void* meshPtr);                 // mesh/resource releaser @ 0x8214C880
 extern int  rage_2A78(int type, int size);            // rage resource allocator @ 0x82152A78
 extern void phBoundCapsule_3DA0_g(void* out, float radius);  // capsule builder @ 0x820C3DA0
-extern void fxBallSpinTex_0058(/*…*/);                // internal draw submission helper @ 0x82410058
 extern int  util_F840(void* /*tmp*/, float arg);      // scratch conversion @ 0x8223F840
 extern void pongDrawBucket_AddEntry(void* bucket, fxCrowdGfx* self, int handle);
 
@@ -863,14 +862,14 @@ void fxBallSpinTex::Reset() {
  *   - scales the spin-axis by `i * kScale * lifetime`
  *   - allocates a phBoundCapsule via rage_2A78(6, 124)
  *   - computes final world transform = xform * (segmentOffset + axis*i)
- *   - submits it through fxBallSpinTex_0058 (internal bucket helper)
+ *   - submits a billboard through fxDrawBillboardQuad in the original
  *
  * Also re-arms the render-pass sentinel at the end (the big
  * `lwz r10,-16(r11)` / `stw r10,0(r11)` block).
  *
  * Because the scaffold has >300 lines of vector permute work this
- * implementation keeps the *shape* only; the innermost matrix-vector
- * multiplication is delegated to fxBallSpinTex_0058 (already lifted).
+ * implementation keeps the *shape* only. The original billboard arguments
+ * have not been recovered here; fxDrawBillboardQuad does no matrix multiplication.
  *
  * FIXME: f26/f27/f28/f30 are pulled from the fxBallSpinTex .rdata float
  *        pool at 0x82077E40-0x82077EE0; exact per-register mapping has not
@@ -900,8 +899,8 @@ void fxBallSpinTex::DrawSpinTrail(float lifetime,
         rage_2A78(6, 124);                              // original return unused
         phBoundCapsule_3DA0_g(capsuleStorage, axisScale);
 
-        // Forward to internal draw-bucket submission.
-        fxBallSpinTex_0058(/* capsule ptr, lifetime, xform, mat, spinAxis */);
+        // FIXME: recover angle, centre, half extents and packed colour before
+        // calling fxDrawBillboardQuad; the old no-argument placeholder was invalid.
         (void)xformRow0; (void)xformRow1; (void)mat; (void)spinAxis; (void)lifetime;
         (void)kDamping;
     }
