@@ -127,3 +127,24 @@ static_assert(offsetof(ClothCapsuleBoundView, axisDirection) == 0xB0);
 void clothCollideCapsule(const ClothCapsuleCollisionView* self, const ClothCapsuleBoundView* bound,
                          uint32_t group, const LvlTableVector* reduction,
                          const LvlTableVector* expansion, uint32_t mode);
+
+// Packed 16-byte cloth distance constraint. Names are inferred from 0x82340900.
+struct ClothDistanceConstraint {
+    uint16_t firstParticle;
+    uint16_t secondParticle;
+    float restLengthSq;
+    float firstWeight;
+    float compressionScale;
+};
+static_assert(sizeof(ClothDistanceConstraint) == 16);
+static_assert(offsetof(ClothDistanceConstraint, restLengthSq) == 4);
+static_assert(offsetof(ClothDistanceConstraint, firstWeight) == 8);
+static_assert(offsetof(ClothDistanceConstraint, compressionScale) == 12);
+
+// r3=count, r4=positions, r5=constraints, f1=relaxation. Positive counts consume
+// constraints rounded UP to eight; all endpoints in a batch are read before any
+// are written. Constraints are 16-byte aligned; position addresses round down.
+// Only xyz are meaningful: the original's w arithmetic uses uninitialized stack
+// scratch. This portable lift retains particle w; no extra ABI argument is needed.
+void clothSolveDistanceConstraints(int32_t count, LvlTableVector* positions,
+                                   const ClothDistanceConstraint* constraints, float relaxation);
