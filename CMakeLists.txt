@@ -114,6 +114,7 @@ set(SOURCES
     src/game/cutscene/gd_cutscene_strings.cpp
     src/game/cutscene/pong_cutscene.cpp
     src/game/data/gd_data.cpp
+    src/game/template_registry.cpp
     src/game/data/gd_data_strings.cpp
     src/game/data/gd_logic_strings.cpp
     src/game/data/gd_vib_event.cpp

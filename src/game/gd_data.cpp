@@ -8,6 +8,7 @@
 #include "game/pong_strings.hpp"
 
 #include "gd_data.hpp"
+#include "template_registry.hpp"
 #include "globals.h"
 
 // External function declarations
@@ -612,66 +613,6 @@ void RegisterSerializedField(void* obj,
  * used for asset management and object instantiation. The registry is a sorted
  * array with binary search for fast lookup.
  */
-
-// Global template registry @ 0x82607C40 (65616 bytes)
-// Structure: 8192 entries of 8 bytes each + 4-byte count at offset 0x10000
-struct TemplateRegistry {
-    struct Entry {
-        uint32_t key1;      // +0x00 - Primary sort key
-        uint32_t key2;      // +0x04 - Secondary sort key
-    };
-    
-    Entry entries[8192];    // 0x10000 bytes (65536)
-    uint32_t count;         // +0x10000 - Active entry count
-    uint32_t padding[19];   // +0x10004..+0x1004F (total size 0x10050)
-};
-
-extern TemplateRegistry g_templateRegistry;  // @ 0x82607C40
-
-/**
- * game_94F0 @ 0x820F94F0 | size: 0xA4
- * 
- * Binary search in sorted template registry.
- * Searches for an entry matching the given key pair.
- * 
- * @param registry Pointer to template registry
- * @param searchKey Pointer to 8-byte key pair to search for
- * @return Index of matching entry, or -1 if not found
- */
-int32_t game_94F0(TemplateRegistry* registry, const uint32_t* searchKey) {
-    int32_t count = registry->count;
-    
-    if (count <= 0) {
-        return -1;
-    }
-    
-    int32_t low = 0;
-    int32_t high = count - 1;
-    uint32_t key1 = searchKey[0];
-    uint32_t key2 = searchKey[1];
-    
-    // Binary search
-    while (low <= high) {
-        int32_t mid = (low + high) / 2;
-        TemplateRegistry::Entry* entry = &registry->entries[mid];
-        
-        // Compare primary key
-        if (key1 < entry->key1) {
-            high = mid - 1;
-            continue;
-        }
-        
-        // Primary key matches or is greater - check secondary key
-        if (key1 == entry->key1 && key2 <= entry->key2) {
-            return mid;  // Found exact match
-        }
-        
-        // Key is greater - search upper half
-        low = mid + 1;
-    }
-    
-    return -1;  // Not found
-}
 
 /**
  * datResourceMgr_RemoveEntry @ 0x820F8EE8 | size: 0xC8

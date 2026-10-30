@@ -21,6 +21,7 @@
 #include <cstring>
 #include <cctype>
 #include <cmath>
+#include "game/template_registry.hpp"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Forward declarations
@@ -326,19 +327,28 @@ extern "C" void rage_ReleaseSingleton(void* a) {
     // No-op on host — singletons are managed differently
 }
 
-/**
- * rage_FindSingleton — Check if a pointer is tracked in the singleton pool
- *
- * On Xbox 360 @ 0x820F90D0 (atSingleton_Find_90D0), this walked the
- * global singleton hash table to check if a pointer was registered.
- * Returns 1 if found, 0 if not.
- *
- * On the host, we always return 0 (not found) since we don't maintain
- * the singleton registry.
- */
+// Shared interval registry used by game_94F0.
+extern void datResourceMgr_RemoveEntry(void* key);  // @ 0x820F8EE8
+extern void _locale_register(void* ptr, void* flags);  // @ 0x820C02D0
+
+/** Check whether a pointer falls within a tracked singleton interval. */
 extern "C" uint8_t rage_FindSingleton(void* ptr) {
-    (void)ptr;
-    return 0;
+    uint32_t value = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(ptr));
+    if (static_cast<int32_t>(value) >= 0)
+        return 0;
+    const uint32_t key[2] = {value, value};
+    int32_t index = game_94F0(&g_templateRegistry, key);
+    if (index == -1)
+        return 0;
+    uint32_t offset = value - g_templateRegistry.entries[index].field1;
+    if (static_cast<int32_t>(offset) < 0)
+        return 0;
+    if (offset == 32 && value - 32 != 0) {
+        void* base = reinterpret_cast<void*>(static_cast<uintptr_t>(value - 32));
+        datResourceMgr_RemoveEntry(base);
+        _locale_register(base, reinterpret_cast<void*>(static_cast<uintptr_t>(0xE0010000u)));
+    }
+    return 1;
 }
 
 // The registry atSingletonPool_AllocEntry (at_types.cpp) appends to.
