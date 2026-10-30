@@ -1,4 +1,5 @@
 #include "game/pong_lerp_queue.hpp"
+#include "game/player/pong_gameplay_queries.hpp"
 #include <cstring>
 #include <cmath>
 #include <cstddef>
@@ -387,8 +388,6 @@ extern "C" {
     // Global timing singleton (lbl_8271A2E8): pointer to a 64-byte timing block
     // whose +48 slot holds the current match-clock reference time.
     extern void* g_pongMatchTiming;
-
-    bool pongPlayer_6AA0_g(pongPlayer* player);
 }
 
 // Shape of the timing block at g_pongMatchTiming. Only the field we need.
@@ -401,7 +400,7 @@ struct pongMatchTiming {
 // The player argument is actually the owning context; its +128 byte offset is
 // where the "remote snapshot" pongLerpQueue mirror lives, and +208 is the
 // remote-velocity vector. Fields +288..+314 are the timing/state window that
-// pongPlayer_6AA0_g consumes.
+// pongAnimClip_IsPlaybackReady consumes.
 struct pongPlayerRemoteSlot {
     uint8_t  _pad_0_127[128];
     pongLerpQueue m_remoteSnapshot;    // +0x080 (128)  — 80-byte lerp entry
@@ -487,7 +486,7 @@ static inline float pongLerpQueueClock_GetFrame(const void* clock) {
 // interpolation slot. Copies header + 3 vectors + 16 bytes of payload, computes
 // the integer frame corresponding to the remote timestamp, calls the frame
 // offset helper to derive a window end, then sets the timing window on the
-// player. Finally it asks pongPlayer_6AA0_g whether the snapshot was accepted;
+// player. Finally it asks pongAnimClip_IsPlaybackReady whether the snapshot was accepted;
 // if not (and this isn't mode==1), it retries with the queue's own frame from
 // its clock and widens the window by -10 frames.
 //
@@ -615,7 +614,7 @@ void pongLerpQueue_ProcessLargeUpdate(pongLerpQueue* queue, pongPlayer* player,
     slot->m_remoteDivisor = divisor;
 
     // ── Stage 5: ask the player whether the snapshot was accepted ───────────
-    const bool accepted = pongPlayer_6AA0_g(player);
+    const bool accepted = pongAnimClip_IsPlaybackReady(player);
 
     if (accepted) {
         slot->m_processedFlag = static_cast<uint8_t>(ctl->m_mode);

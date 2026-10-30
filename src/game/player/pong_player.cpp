@@ -9,6 +9,7 @@
  * Struct field names come from offset-frequency clustering and debug strings.
  */
 
+#include "pong_gameplay_queries.hpp"
 #include "pong_player.hpp"
 #include "../creature/pong_creature.hpp"
 #include <cstring>   // memset
@@ -54,33 +55,12 @@ extern void* g_pButtonStateTable;        // button state table (int32_t array)
 extern const float g_kOneMinusAlpha;     // constant
 // pongPlayer_ClampSwingToBounds: r3=playerState ptr, r4=swingVec, r5=uint8_t suppressFlip
 extern void pongPlayer_ClampSwingToBounds(void* playerState, vec3* swingVec, uint8_t suppressFlip);
-// pongPlayer_GetRacketPosition: r3=out vec3, r4=physBound — both saved in prologue
-extern void pongPlayer_GetRacketPosition(vec3* out, void* physBound);
 // pongPlayer_SelectSwingTarget: returns int; r3=playerState, r4=int, r5=swingStr*, r6=targetDir*, r7=int
 extern int  pongPlayer_SelectSwingTarget(void* playerState, int r4, vec3* swingStrength, vec3* targetDir, int r5);
-// pongPlayer_ProcessSwingInput: r3=this, f1=float  (confirmed from call site)
-extern void pongPlayer_ProcessSwingInput(pongPlayer* p, float f);
-// pongPlayer_ComputeSwingStrength: r3=swingData, r5=outStrength, r6=outTarget, f1=alpha
-extern void pongPlayer_ComputeSwingStrength(void* swingData, vec3* outStrength, vec3* outTarget, float alpha);
 extern void game_D468(void* obj, vec3* v);               // geometry helper
 extern bool pongPlayer_IsLocoStateReady(void* locoState);          // loco check
-// @ 0x820D6AA0 (pong_player_swing.cpp) — takes the clip embedded at pongTimingSubState+0x20.
-extern "C" bool pongPlayer_6AA0_g(void* clip);
 extern int  io_Input_poll_9D68(void* inputObj);           // 0=active input
 extern void pongLerpQueue_Update(void* queue);            // lerp queue update
-
-struct pongSwingData {
-    uint32_t vtable_ptr;  // +0   (32-bit game ptr kept as uint32 for layout)
-    uint8_t  _pad1[337];  // +4..+340
-    uint8_t  _pad341;     // +341
-    uint8_t  m_bTriggered;   // +342  byte flag — 1 = swing triggered
-    uint8_t  _pad343;     // +343
-    float    m_swingStrength; // +344  swing power
-    uint8_t  _pad348[4];  // +348..+351
-    float    m_swingVec[3]; // +352  target vec3
-};
-
-
 
 extern void game_CD20(void* recoveryState);          // flush recovery @ 0x820DCD20
 extern void crAnimBlenderState_Init(void* animSubState);  // reset phase-blocked @ 0x8224C810
@@ -650,11 +630,11 @@ void pongPlayer::ProcessSwingDecision(int r4, int r5,
 
         if (!inputActive) {
             // Input button is down — read the current input vector.
-            pongPlayer_ComputeSwingStrength(m_pPlayerState->m_pSwingData,
-                              &swingStrength, &targetDir, g_kOneMinusAlpha);
+            pongPlayer_42E0_g(m_pPlayerState->m_pSwingData, m_pPlayerState,
+                              &swingStrength.x, &targetDir, g_kOneMinusAlpha);
         } else {
             // No input — predict target position from physics.
-            pongPlayer_GetRacketPosition(&targetDir, m_pPhysicsBound);
+            pongPlayer_AB48_g(&targetDir, m_pPhysicsBound);
         }
     }
 
@@ -669,19 +649,15 @@ void pongPlayer::ProcessSwingDecision(int r4, int r5,
         bool inputActive2 = !io_Input_poll_9D68(g_pInputObj);
 
         if (!inputActive2) {
-            pongPlayer_ComputeSwingStrength(m_pPlayerState->m_pSwingData,
-                              &swingStrength, &targetDir, g_kOneMinusAlpha);
+            pongPlayer_42E0_g(m_pPlayerState->m_pSwingData, m_pPlayerState,
+                              &swingStrength.x, &targetDir, g_kOneMinusAlpha);
 
             // Mark swing triggered on swing data; clear swing active flag.
             pongSwingData* sd = m_pPlayerState->m_pSwingData;
             sd->m_swingStrength  = swingStrength.x;  // float at +344
             sd->m_bTriggered     = 1;                // byte at +342
-            // NOTE: pongSwingData at +352 is m_swingVec (float[3]) per the
-            //       struct definition near the top of this file. Use the typed
-            //       field directly now that the layout is anchored.
-            sd->m_swingVec[0] = targetDir.x;
-            sd->m_swingVec[1] = targetDir.y;
-            sd->m_swingVec[2] = targetDir.z;
+            // The original stvx copies w as well as xyz.
+            __builtin_memcpy(sd->m_swingVec, &targetDir, sizeof(targetDir));
 
             m_bSwingActive = 0;
             SetSwingActiveState(false);
@@ -712,7 +688,7 @@ void pongPlayer::ProcessSwingDecision(int r4, int r5,
 
     if (result == 5) {
         // Swing committed — start the animation and mark active.
-        pongPlayer_ProcessSwingInput(this, g_kZero);
+        pongPlayer_73E8_g(this, g_kZero);
         return;
     }
 
@@ -1185,7 +1161,7 @@ bool pongPlayerState::IsInReturnPosition() const
         return false;
     if (flags & 0x4)
         return false;
-    if (pongPlayer_6AA0_g(clip->m_clip))
+    if (pongAnimClip_IsPlaybackReady(clip->m_clip))
         return false;
 
     float currentTime = timing->m_currentTime;
@@ -2338,7 +2314,7 @@ bool pongPlayer::IsLocomotionReady() const {  // pongPlayer_2578_g @ 0x82192578
     //       "set once at init"). The deep chain is opponent->+188->+120:
     //       opponent's m_pPlayerState (+0xBC = 188) holds a locomotion
     //       sub-object whose +120 (+0x78) slot contains the loco state we
-    //       pass to pongPlayer_6AA0_g (IsLocoStateReady) offset by +32.
+    //       pass to pongAnimClip_IsPlaybackReady (IsLocoStateReady) offset by +32.
     uint8_t* sub1 = reinterpret_cast<uint8_t*>(this->m_pOpponent);
     void* sub2 = *reinterpret_cast<void**>(sub1 + 188);
     void* locoObj = *reinterpret_cast<void**>(
@@ -3821,9 +3797,8 @@ extern "C" bool pongPlayer_5800_h(pongPlayer* self) {
     return self->m_pOpponent->m_pPlayerState->IsBeforeSwingPeak();
 }
 
-// NOTE: pongPlayer_9CD0_g @ 0x821C9CD0 (0x94 bytes) is already
-// implemented in src/game/player/pong_player_swing.cpp as
-// GetCreatureBoneMatrix(), with an extern "C" wrapper.
+// NOTE: pongMatchSettings_GetCourtBounds @ 0x821C9CD0 (0x94 bytes) is already
+// implemented in src/game/player/pong_gameplay_queries.cpp.
 
 
 // ===========================================================================
@@ -4325,7 +4300,6 @@ extern void ServeStartedMessage_CFE8_2h(void* msgObj, void* targetData, int para
 extern void PlayerMovementMessage_D258_2hr(void* msgObj, float posX, float posZ);
 extern void pongPlayer_B208_g(void* state, vec3* swingVec, uint8_t suppressFlip);
 extern void pg_E6E0_msg(int messageId, int flags, int count, void* data);
-extern "C" void pongPlayer_9CD0_g(void*, int, void*, void*);
 
 extern uint32_t g_rngState[2];              // RNG state (lo, hi) @ 0x825CA2C8
 extern const float g_kFloatConst_79E68;     // random scale factor @ 0x82079E68
@@ -4475,9 +4449,9 @@ void pongPlayer::ResetButtonSlotTrackingData(
 void pongPlayer_ComputeClampedPositions(int creatureIndex,
                                         float* outA,
                                         float* outB) {  // pongPlayer_29F8_fw @ 0x821729F8
-    // Get creature bone matrices
+    // Get court bounds
     vec3 bonePos1, bonePos2;
-    pongPlayer_9CD0_g(reinterpret_cast<void*>(g_pInputArrayTable),
+    pongMatchSettings_GetCourtBounds(reinterpret_cast<void*>(g_pInputArrayTable),
                       creatureIndex, &bonePos1, &bonePos2);
 
     // Check mirror flag at inputTable base + creatureIndex + 64
@@ -5023,21 +4997,6 @@ void pongPlayer_AddToSyncedFloatClamped(void* syncRec, float delta, uint32_t bit
 extern "C" void pongPlayer_9EC8_g(void* /*this*/);
 
 /**
- * pongPlayer_AB48_g @ 0x820CAB48 | size: 0x130 (304 bytes)
- *
- * SIMD (vmx128) vector-math helper.  Reads a v3 at (arg1+0x70)+0xA4+148
- * through two vtable indirections, falls through to a scalar fallback that
- * calls game_AF18 (court-bounds sample), then blends the two via
- * pongPlayer_9CD0_g and clamps the output into out[0..3].
- *
- * TODO(researched): game_AF18 and 9CD0_g remain unlifted (suggest_unimplemented
- *       flags them as SIMD leaves). A proper vec4 typedef is already partially
- *       in place (the `vec3` struct with _pad float), but the multi-precision
- *       SIMD refinement steps need a dedicated AltiVec lift. Deferred.
- */
-extern "C" void pongPlayer_AB48_g(void* outVec, void* playerLike);
-
-/**
  * pongPlayer_94F8_wrh @ 0x820D94F8 | size: 0xE4 (228 bytes)
  *
  * Iterates the 120-byte-per-entry global button-slot table (at g_pButtonStateTable
@@ -5169,7 +5128,6 @@ extern "C" void pongPlayer_StateHandler_91E8(void* /*self*/) {}  // @ 0x821991E8
 extern "C" bool pongPlayer_D598_g(pongPlayer* self);                 // IsRecovering (already lifted at method level)
 extern void pongPlayer_B208_g(void* state, vec3* swingVec,
                               uint8_t suppressFlip);                 // @ 0x820CB208 — apply swing vec (stub above)
-extern "C" void pongPlayer_9CD0_g(void*, int, void*, void*);         // @ 0x821C9CD0 — per-player input poll (stub above)
 
 // g_kSwingRadiusConst is declared near the top of the file at +8 of a 0x60
 // table; reuse that symbol.  The 5FB8 scaffold pulls radius from the same
@@ -5505,70 +5463,28 @@ extern "C" void pongPlayer_7358_g(pongPlayer* dst, const pongPlayer* src) {
 }
 
 
-// ---------------------------------------------------------------------------
-// pongPlayer_8B90_fw  @ 0x820D8B90 | size: 0x174 (372 bytes)
-//
-// Network-smoothed transform update.  Takes two vec3 outputs (position @ r5,
-// velocity @ r6), a source transform block at r4 (which lays out three
-// 3-vectors at +0/+16/+32 plus a translation at +48 — i.e. a 3×4 matrix-like
-// layout), and the player at r3.  After zero-initialising the output vecs,
-// it calls pongPlayer_9CD0_g (the input poller) with the player's context
-// pointer at +400, then folds the poll result into the vectors via an
-// affine transform of the form:
-//
-//   out_pos = src_col0 * pos_x  +  src_col1 * pos_y  +  src_col2 * pos_z
-//           + src_translation
-//   out_vel = src_col0 * vel_x  +  src_col1 * vel_y  +  src_col2 * vel_z
-//           + src_translation_vel
-//
-// After writing, it validates the X and Z components: if out_pos.x > out_vel.x
-// OR out_pos.z > out_vel.z, the two 16-byte vectors are swapped.  This
-// enforces an axis-aligned min/max invariant on the extracted AABB.
-// ---------------------------------------------------------------------------
+// Transform both court corners, then swap the complete vectors if X or Z
+// is reversed. The scalar multiply/fmadd order is observable after rounding.
+// @ 0x820D8B90 | size: 0x174
 extern "C" void pongPlayer_8B90_fw(pongPlayer* self, void* srcTransform,
-                                    vec3* outPos, vec3* outVel) {
-    uint8_t* base = reinterpret_cast<uint8_t*>(self);
-    uint8_t* src  = static_cast<uint8_t*>(srcTransform);
+                                  vec3* outPos, vec3* outVel) {
+    auto* base = reinterpret_cast<uint8_t*>(self);
+    const auto* m = static_cast<const float*>(srcTransform);
+    *outPos = {};
+    *outVel = {};
+    const int sideIndex = *reinterpret_cast<int32_t*>(base + 0x190);
+    pongMatchSettings_GetCourtBounds(g_pInputArrayTable, sideIndex, outPos, outVel);
 
-    // Zero both outputs first (matches the vxor prologue).
-    outPos->x = outPos->y = outPos->z = outPos->_pad = 0.0f;
-    outVel->x = outVel->y = outVel->z = outVel->_pad = 0.0f;
+    float x = outPos->x, y = outPos->y, z = outPos->z;
+    outPos->x = __builtin_fmaf(m[0], x, __builtin_fmaf(z, m[8], y * m[4])) + m[12];
+    outPos->y = __builtin_fmaf(m[9], z, __builtin_fmaf(m[1], x, m[5] * y)) + m[13];
+    outPos->z = __builtin_fmaf(z, m[10], __builtin_fmaf(x, m[2], y * m[6])) + m[14];
 
-    // Poll input for this player's context pointer at +400.
-    void* inputCtx = *reinterpret_cast<void**>(base + 400);
-    pongPlayer_9CD0_g(reinterpret_cast<void*>(&g_inputScoreByPlayer[0]),
-                      0, inputCtx, nullptr);
-
-    // Floats now populated in outPos (components at +0/+4/+8) and outVel.
-    float px = outPos->x, py = outPos->y, pz = outPos->z;
-    float vx = outVel->x, vy = outVel->y, vz = outVel->z;
-
-    // Rows of the source transform matrix (column-major 3×4).
-    float m0x = *reinterpret_cast<float*>(src +  0);
-    float m0y = *reinterpret_cast<float*>(src +  4);
-    float m0z = *reinterpret_cast<float*>(src +  8);
-    float m1x = *reinterpret_cast<float*>(src + 16);
-    float m1y = *reinterpret_cast<float*>(src + 20);
-    float m1z = *reinterpret_cast<float*>(src + 24);
-    float m2x = *reinterpret_cast<float*>(src + 32);
-    float m2y = *reinterpret_cast<float*>(src + 36);
-    float m2z = *reinterpret_cast<float*>(src + 40);
-    float tx  = *reinterpret_cast<float*>(src + 48);
-    float ty  = *reinterpret_cast<float*>(src + 52);
-    float tz  = *reinterpret_cast<float*>(src + 56);
-
-    // Affine transform of (px,py,pz) by the 3×4 matrix.
-    outPos->x = m0x * px + m1x * py + m2x * pz + tx;
-    outPos->y = m0y * px + m1y * py + m2y * pz + ty;
-    outPos->z = m0z * px + m1z * py + m2z * pz + tz;
-
-    // Same for (vx,vy,vz).
-    outVel->x = m0x * vx + m1x * vy + m2x * vz + tx;
-    outVel->y = m0y * vx + m1y * vy + m2y * vz + ty;
-    outVel->z = m0z * vx + m1z * vy + m2z * vz + tz;
-
-    // Enforce min/max ordering on X and Z.  If pos > vel on either axis,
-    // swap the 16-byte vectors so caller's "min" and "max" semantics hold.
+    // Reload the second corner after storing the first (outputs may alias).
+    x = outVel->x; y = outVel->y; z = outVel->z;
+    outVel->x = __builtin_fmaf(m[0], x, __builtin_fmaf(z, m[8], y * m[4])) + m[12];
+    outVel->y = __builtin_fmaf(m[9], z, __builtin_fmaf(m[1], x, m[5] * y)) + m[13];
+    outVel->z = __builtin_fmaf(z, m[10], __builtin_fmaf(x, m[2], y * m[6])) + m[14];
     if (outPos->x > outVel->x || outPos->z > outVel->z) {
         vec3 tmp = *outPos;
         *outPos = *outVel;

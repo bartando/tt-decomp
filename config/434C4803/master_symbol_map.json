@@ -189817,7 +189817,7 @@
       "size": 168
     },
     "0x820d6aa0": {
-      "name": "pongPlayer_6AA0_g",
+      "name": "pongAnimClip_IsPlaybackReady",
       "type": "function",
       "section": ".text",
       "size": 236
@@ -207505,7 +207505,7 @@
       "size": 112
     },
     "0x821c9cd0": {
-      "name": "pongPlayer_9CD0_g",
+      "name": "pongMatchSettings_GetCourtBounds",
       "type": "function",
       "section": ".text",
       "size": 148
@@ -226123,13 +226123,13 @@
       "size": 300
     },
     "0x8227d898": {
-      "name": "phUpdateObject_vfn_5",
+      "name": "phUpdateObject_RenderShadow",
       "type": "function",
       "section": ".text",
       "size": 200
     },
     "0x8227d960": {
-      "name": "phUpdateObject_vfn_1",
+      "name": "phUpdateObject_CommitTransform",
       "type": "function",
       "section": ".text",
       "size": 168
@@ -346362,7 +346362,7 @@
     "SinglesNetworkClient_6918_g": "0x820d6918",
     "game_6990": "0x820d6990",
     "ph_ctor_69F8": "0x820d69f8",
-    "pongPlayer_6AA0_g": "0x820d6aa0",
+    "pongAnimClip_IsPlaybackReady": "0x820d6aa0",
     "gdBallPredictData_6B90": "0x820d6b90",
     "game_6D20_h": "0x820d6d20",
     "LocomotionStateAnim_6D48": "0x820d6d48",
@@ -349310,7 +349310,7 @@
     "pg_9B70_g_9B70_1": "0x821c9b70",
     "pg_9C00_g": "0x821c9c00",
     "pongPlayer_9C60_g": "0x821c9c60",
-    "pongPlayer_9CD0_g": "0x821c9cd0",
+    "pongMatchSettings_GetCourtBounds": "0x821c9cd0",
     "io_Input_poll_9D68": "0x821c9d68",
     "xe_9DC8": "0x821c9dc8",
     "xe_9ED8": "0x821c9ed8",
@@ -352413,8 +352413,8 @@
     "rage_D220": "0x8227d220",
     "phUpdateObject_vfn_3": "0x8227d5b0",
     "phUpdateObject_vfn_4": "0x8227d768",
-    "phUpdateObject_vfn_5": "0x8227d898",
-    "phUpdateObject_vfn_1": "0x8227d960",
+    "phUpdateObject_RenderShadow": "0x8227d898",
+    "phUpdateObject_CommitTransform": "0x8227d960",
     "phUpdateObject_vfn_0": "0x8227da08",
     "phUpdateObject_vfn_6": "0x8227da40",
     "crAnimDofFloat_DB78": "0x8227db78",
