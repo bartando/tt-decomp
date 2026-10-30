@@ -348,8 +348,7 @@ bool cmNode_TryConnectUnary(cmUnaryNode* node, cmPortDesc desc);// cmNode_TryCon
 
 // Polymorphic port→data writer
 void cmNode_SetFromPort_Dispatch(void* dst,                     // cmNode_SetFromPort_Dispatch
-                                 const cmNodePort* port,
-                                 int32_t dim);
+                                 const cmNodePort* port);
 
 // Fast sinf polynomial approximation (misnamed phBoundCapsule_01D8_g)
 float rage_sinf_approx(float angle);   // @ 0x824301D8

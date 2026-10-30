@@ -10,7 +10,7 @@ RET = None
 def dispatch(ctx):
     ctx.write(ctx.r(3), ctx.read(ctx.r(4), 4))
 
-CALLS = {0x82275380: model(dispatch, args=("r3", "r4", "r5"), deref={"r4": 8})}
+CALLS = {0x82275380: model(dispatch, args=("r3", "r4"), deref={"r4": 8})}
 
 
 def inputs(t):
