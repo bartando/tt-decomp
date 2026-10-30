@@ -64,6 +64,11 @@ unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, a
 
 ## Wrong lifts
 
+- `s_bucketData[32]` (`src/game/pong_render.cpp`) is a TU-local placeholder passed to
+  the reconstructed bucket `Load`, with no image object behind it. The original
+  `pongDrawBucketManager_Load` uses stack XML scratch and inline bucket setup; trace the
+  callee's third argument to tell shared image state from per-call data. The other 46
+  placeholder globals the sweep found are fixed (commit 3ab53ae has the evidence).
 - `fiAsciiTokenizer_CC50_g` returns `void`; the original returns `this`.
 - 0x82460718 is lifted twice: `ph_vt57D8_20_Constructor` (`ph_physics.cpp`, unused) and
   `ph_vt57D8_20_0718` (`ph_update_object.cpp`, wrong vtable constants). It is an XAudio
