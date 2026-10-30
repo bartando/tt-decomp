@@ -76,3 +76,30 @@ void fxDrawBillboardQuad(uint32_t uvIndex, float angle, float x, float y, float 
     }
     g_fxVertexCount += 4;
 }
+
+extern uint32_t g_fxCurrentColor; // @ 0x825CA604
+extern float g_fxVertexNormalX;   // @ 0x825EBA6C
+extern float g_fxVertexNormalY;   // @ 0x825EBA80
+extern float g_fxVertexNormalZ;   // @ 0x825EBA8C
+extern float g_fxVertexU;         // @ 0x825EBA78
+extern float g_fxVertexV;         // @ 0x825EBA70
+extern const float g_fxVertexDepth; // @ 0x8202D110
+
+// Append a 2D vertex using the current normal, colour and UV state.
+// @ 0x82406010
+void fxEmitVertex2D(float x, float y) {
+    if (g_fxCountOnly == 0 || g_fxVertexCursor != 0) {
+        auto* vertex = reinterpret_cast<FxBillboardVertex*>(static_cast<uintptr_t>(g_fxVertexCursor));
+        g_fxVertexCursor += sizeof(FxBillboardVertex);
+        vertex->position[0] = x;
+        vertex->position[1] = y;
+        vertex->position[2] = g_fxVertexDepth;
+        vertex->normal[0] = g_fxVertexNormalX;
+        vertex->normal[1] = g_fxVertexNormalY;
+        vertex->normal[2] = g_fxVertexNormalZ;
+        vertex->color = g_fxCurrentColor;
+        vertex->uv[0] = g_fxVertexU;
+        vertex->uv[1] = g_fxVertexV;
+    }
+    ++g_fxVertexCount;
+}
