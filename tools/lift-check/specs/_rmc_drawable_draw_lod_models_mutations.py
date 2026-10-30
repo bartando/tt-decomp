@@ -27,15 +27,15 @@ MUTATIONS = (
     ("read adjacent transform byte", "transformIndex = model[0x13]", "transformIndex = model[0x12]"),
     ("normalize model skin flag incorrectly", "model[0x15] != 0", "model[0x15] == 1"),
     ("use all skinning argument bits", "static_cast<uint8_t>(skinned) != 0", "skinned != 0"),
-    ("swap skin and draw contexts", "model, skinContext, shaderGroup, transforms,",
-     "model, drawContext, shaderGroup, transforms,"),
-    ("use transform index as geometry filter", "model[0x10], drawContext, lod);",
-     "model[0x13], drawContext, lod);"),
+    ("use shader group as skin context", "model, skinContext, shaderGroup, transforms,",
+     "model, shaderGroup, shaderGroup, transforms,"),
+    ("use transform index as matrix count", "model[0x10], shaderFilter, lod);",
+     "model[0x13], shaderFilter, lod);"),
     ("only recognize canonical identity flag", "model[0x18] != 0", "model[0x18] == 1"),
     ("always reinstall rigid matrices", "if (currentTransform != wantedTransform)", "if (true)"),
     ("use 48-byte transform stride", "transforms + transformIndex * 16", "transforms + transformIndex * 12"),
     ("omit rigid shader matrix update", "if (lbl_8260633D != 0)", "if (false)"),
-    ("omit rigid draw", "fragDrawable_19C8_h(model, shaderGroup, drawContext, lod);", ""),
+    ("omit rigid draw", "fragDrawable_19C8_h(model, shaderGroup, shaderFilter, lod);", ""),
 )
 
 
@@ -45,7 +45,7 @@ def main():
     spec = Path(__file__).with_name("rmc_drawable_draw_lod_models.py")
     caught = 0
     for name, old, new in MUTATIONS:
-        expected = 2 if name in ("use transform index as geometry filter", "use 48-byte transform stride") else 1
+        expected = 2 if name in ("use transform index as matrix count", "use 48-byte transform stride") else 1
         assert source.count(old) == expected, f"mutation anchor changed: {name}"
         patches = ((old, new),)
         if name == "cache backing array across draw callbacks":
