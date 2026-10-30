@@ -864,7 +864,6 @@ struct phBoundCapsule {
     void ScaleRadius(float scale);
     void ComputeBounds(float scale, float* outMin, float* outMax);
     float ComputeExtent(float param1, float param2) const;
-    void InitializeAxisAlignedX(float halfLength, float* outMatrix);
     void InitializeAxisAlignedY(float halfLength, float* outMatrix);
     void InitializeAxisAlignedZ(float halfLength, float* outMatrix);
     void TransformByDirection(float halfLength, const float* direction, float* outMatrix);
@@ -882,7 +881,6 @@ struct phBoundCapsule {
     int NormalizeVector2D(float* outVec) const;
     void LookupTableValues(void* outValues);
     void SetActiveState(int stateIndex);
-    void DispatchCapsuleFromCamera(void* param1, void* param2);
     int32_t TestPointContainment(const float* point);
     void InitializeCapsule(float halfHeight, float radius);
     uint32_t GetPolygonCount() const;

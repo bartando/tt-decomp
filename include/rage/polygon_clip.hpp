@@ -41,6 +41,8 @@ bool clipAabbToFrustum(void* context, float (*box)[4], const float (*cameraToWor
                        uint32_t r6, uint32_t r7, uint32_t r8, uint32_t r9,
                        const float* referencePoint, float nearClip, float farClip, float fov, float aspect);
 
+bool clipAabbToActiveCamera(void* context, float (*box)[4], const float* referencePoint);
+
 // Project box center + auxiliary offset from camera[4].xyz onto y = limits[1],
 // clamp x/z to +/- limits[0/2], then clip the resulting AABB to the active camera.
 // All vec4 storage is aligned. Empty/rejected projections clear all three output
