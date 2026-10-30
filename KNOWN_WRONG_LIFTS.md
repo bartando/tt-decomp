@@ -231,8 +231,6 @@ unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, a
   applies force (+0x120).
 - `pong_match.cpp` calls an undefined `BallPredictData_Reset`; it's `gdBallPredictData::Reset`
   (0x821D7750, lifted in `ball_predict.cpp`).
-- `ph_physics.cpp` `phBound_TransformPointByMatrixInv` (0x8228D1D0) is backwards: the real
-  function transforms the bound's centroid (+0x30) by the instance matrix, not by its inverse.
 
 
 ## The recomp is not ground truth

@@ -871,31 +871,23 @@ void ph_SinCos(float* outNormalized, float* outTransformed, float input1, float 
     *outTransformed = transformed;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ph_BuildRotationMatrixX @ 0x820C3F10 | size: 0x84
-//
-// Initializes a capsule structure with computed geometry values.
-// Sets up a vertical capsule aligned along the Y axis.
-// ─────────────────────────────────────────────────────────────────────────────
-void ph_BuildRotationMatrixX(void* capsule, float height, float radius) {
-    uint8_t* obj = (uint8_t*)capsule;
-    
-    float normalizedHeight = ph_Cosf(height);
-    float transformedRadius = ph_Sinf(radius);
-    
-    const float negOne = g_floatOne;  // NOTE: 0x8202D108 is g_floatOne (1.0f), comment says -1.0f — verify
-    const float zero = g_floatZero;
-    
-    // Initialize capsule geometry
-    *(float*)(obj + 0) = negOne;              // Start cap X
-    *(float*)(obj + 4) = zero;                // Start cap Y
-    *(float*)(obj + 8) = zero;                // Start cap Z
-    *(float*)(obj + 16) = zero;               // Direction X
-    *(float*)(obj + 20) = normalizedHeight;   // Direction Y (height)
-    *(float*)(obj + 24) = -transformedRadius; // End cap offset
-    *(float*)(obj + 32) = zero;               // Padding
-    *(float*)(obj + 36) = -transformedRadius; // Radius (negated)
-    *(float*)(obj + 40) = normalizedHeight;   // Total height
+// Build a padded 3x3 X rotation from one double-precision angle.
+// ph_BuildRotationMatrixX (was phBoundCapsule_3F10_g) @ 0x820C3F10 | size: 0x84
+// The three padding words and any translation row remain untouched.
+extern double crt_cos(double angle); // @ 0x824302B0
+extern double crt_sin(double angle); // @ 0x824301D8
+void ph_BuildRotationMatrixX(float* matrix, double angle) {
+    const float cosine = static_cast<float>(crt_cos(angle));
+    const float sine = static_cast<float>(crt_sin(angle));
+    matrix[0] = 1.0f;
+    matrix[1] = 0.0f;
+    matrix[2] = 0.0f;
+    matrix[4] = 0.0f;
+    matrix[5] = cosine;
+    matrix[6] = sine;
+    matrix[8] = 0.0f;
+    matrix[9] = -sine;
+    matrix[10] = cosine;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1200,42 +1192,6 @@ float rage::phBoundCapsule::ComputeExtent(float param1, float param2) const {
 
     // General case: compute extent with both parameters
     return ph_Atan2f(param1, param2);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// rage::phBoundCapsule::InitializeAxisAlignedX @ 0x820C3F10 | size: 0x84
-//
-// Initializes a capsule aligned along the X axis.
-// Sets up a 3x3 orientation matrix with X-axis alignment.
-//
-// Parameters:
-//   halfLength - Half the length of the capsule along X axis
-//   outMatrix - Pointer to 44-byte output structure (3x3 matrix + padding)
-// ─────────────────────────────────────────────────────────────────────────────
-void rage::phBoundCapsule::InitializeAxisAlignedX(float halfLength, float* outMatrix) {
-    // Compute capsule parameters
-    float minBound = ph_Cosf(halfLength);
-    float maxBound = ph_Sinf(halfLength);
-    
-    const float* constants = &g_floatZero;  // constant table base
-    const float zero = constants[0];   // +0 = 0.0f
-    const float negOne = constants[-2]; // -8 = -1.0f
-    
-    // Initialize matrix for X-axis alignment
-    // Row 0: [-1, 0, 0]
-    outMatrix[0] = negOne;
-    outMatrix[1] = zero;
-    outMatrix[2] = zero;
-    
-    // Row 1: [0, 0, maxBound]
-    outMatrix[4] = zero;
-    outMatrix[5] = zero;
-    outMatrix[6] = maxBound;
-    
-    // Row 2: [0, minBound, 0]
-    outMatrix[8] = zero;
-    outMatrix[9] = -maxBound;  // Negated
-    outMatrix[10] = minBound;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -6337,8 +6293,6 @@ extern float ph_Atan2f(float x, float y);       // atan2
 extern float ph_Sqrtf(float val);               // sqrtf wrapper
 extern void  phBoundCapsule_ComputeAngleXZ(void* obj, float y, float z);  // angle computation
 extern void  phBoundCapsule_UpdateCapsuleState(void* obj);               // capsule update
-extern void  phBoundCapsule_DispatchCollisionTest(void* thisPtr, void* p1, void* p2, float f1, float f2, float f3, float f4, void* p3);
-extern void  pongCameraMgr_GetCameraAngle(void* obj);                // camera get angle
 extern void  rage_debugLog(const char* name, int param);      // debug log (no-op in release)
 extern int   phBoundCapsule_ResolvePlayerIndex(void* obj);               // resolve player index
 extern int   game_1700(void* obj);                           // get player from object
@@ -6760,117 +6714,9 @@ void rage::phBoundCapsule::SetActiveState(int stateIndex) {
     rage_debugLog(logName, logParam);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 10. rage::phBoundCapsule::DispatchCapsuleFromCamera @ 0x82148608 | size: 0x9C (156B)
-//
-// Sets up and dispatches a capsule collision test relative to the current
-// camera view. Loads the active camera's parameters (position, orientation)
-// and computes the capsule bounds based on the camera's field of view.
-//
-// Parameters:
-//   param1 - First collision parameter (passed through)
-//   param2 - Second collision parameter (passed through)
-// ─────────────────────────────────────────────────────────────────────────────
-void rage::phBoundCapsule::DispatchCapsuleFromCamera(void* param1, void* param2) {
-    // Load global state singleton
-    uint32_t* globalPtr = *(uint32_t**)((char*)0x82060000 + 25628);
-    uint32_t* cameraArray = (uint32_t*)(uintptr_t)globalPtr[6];  // +24
-
-    // Get active camera index from global data
-    int cameraIndex = *(int*)((char*)0x82040000 + 18584);
-
-    // Compute camera entry pointer: cameraArray + cameraIndex * 912
-    void* cameraEntry = (void*)((char*)cameraArray + cameraIndex * 912);
-
-    // Get camera angle
-    pongCameraMgr_GetCameraAngle(cameraEntry);
-    float cameraAngle = *(float*)&cameraEntry;  // result returned in f1
-
-    // Load camera parameters
-    void* camBase = (void*)((char*)cameraArray + cameraIndex * 912);
-    float camPosX = *(float*)((char*)camBase + 824);
-    float camPosY = *(float*)((char*)camBase + 832);
-
-    // Compute clamped value: clamp camPosY to [0, constant]
-    const float clampMax = *(const float*)0x8202CDF8;
-    float diff = clampMax - camPosY;
-    const double zeroDbl = *(const double*)((char*)0x82080000 + (-24648));
-    float clampedY = (diff >= 0.0f) ? camPosY : (float)zeroDbl;
-
-    float camPosZ = *(float*)((char*)cameraArray + cameraIndex * 912 + 836);
-
-    // Get capsule extent at camera offset +64
-    void* capsuleExtent = (void*)((char*)cameraArray + cameraIndex * 912 + 64);
-
-    // Dispatch the full capsule collision test
-    phBoundCapsule_DispatchCollisionTest(this, param1, param2, camPosX, clampedY, camPosZ, cameraAngle, capsuleExtent);
-}
-
-
 // =========================================================================
 // Matrix Transpose-Multiply Utilities
 // =========================================================================
-
-/**
- * phMatrix34TransposeMultiply @ 0x821181C8 | size: 0xB0 (176 bytes)
- *
- * Computes result = transpose(A) * B for two 4x3 matrices (stored as 4 rows
- * of 16-byte SIMD vectors), producing a 4x4 output matrix of dot products.
- *
- * The function also computes a difference vector (A.row3 - B.row3) and dots
- * it with each column of B to fill the fourth output row. This is the
- * classic "transform point into local space" pattern used throughout the
- * physics engine for converting world-space matrices into body-local frames.
- *
- * @param outMatrix  Pointer to 4x16-byte output matrix (4 rows of vec4)
- * @param matrixB    Pointer to 4x16-byte input matrix B (4 rows of vec4)
- */
-void phMatrix34TransposeMultiply(float* outMatrix, const float* matrixB) {
-    // Load all 4 rows of matrix A (outMatrix is reused as input A)
-    const float* rowA0 = outMatrix;        // +0
-    const float* rowA1 = outMatrix + 4;    // +16
-    const float* rowA2 = outMatrix + 8;    // +32
-    const float* rowA3 = outMatrix + 12;   // +48
-
-    // Load all 4 rows of matrix B
-    const float* rowB0 = matrixB;          // +0
-    const float* rowB1 = matrixB + 4;      // +16
-    const float* rowB2 = matrixB + 8;      // +32
-    const float* rowB3 = matrixB + 12;     // +48
-
-    // Compute difference vector: delta = A.row3 - B.row3
-    float delta[4];
-    delta[0] = rowA3[0] - rowB3[0];
-    delta[1] = rowA3[1] - rowB3[1];
-    delta[2] = rowA3[2] - rowB3[2];
-    delta[3] = rowA3[3] - rowB3[3];
-
-    // Row 0: dot3(A.row0, B.row_j)
-    float dot00 = rowA0[0]*rowB0[0] + rowA0[1]*rowB0[1] + rowA0[2]*rowB0[2];
-    float dot01 = rowA0[0]*rowB1[0] + rowA0[1]*rowB1[1] + rowA0[2]*rowB1[2];
-    float dot02 = rowA0[0]*rowB2[0] + rowA0[1]*rowB2[1] + rowA0[2]*rowB2[2];
-
-    // Row 1: dot3(A.row1, B.row_j)
-    float dot10 = rowA1[0]*rowB0[0] + rowA1[1]*rowB0[1] + rowA1[2]*rowB0[2];
-    float dot11 = rowA1[0]*rowB2[0] + rowA1[1]*rowB2[1] + rowA1[2]*rowB2[2];
-    float dot12 = rowA1[0]*rowB1[0] + rowA1[1]*rowB1[1] + rowA1[2]*rowB1[2];
-
-    // Row 2: dot3(A.row2, B.row_j)
-    float dot20 = rowA2[0]*rowB0[0] + rowA2[1]*rowB0[1] + rowA2[2]*rowB0[2];
-    float dot21 = rowA2[0]*rowB2[0] + rowA2[1]*rowB2[1] + rowA2[2]*rowB2[2];
-    float dot22 = rowA2[0]*rowB1[0] + rowA2[1]*rowB1[1] + rowA2[2]*rowB1[2];
-
-    // Row 3: dot3(delta, B.row_j)
-    float dot30 = delta[0]*rowB0[0] + delta[1]*rowB0[1] + delta[2]*rowB0[2];
-    float dot31 = delta[0]*rowB1[0] + delta[1]*rowB1[1] + delta[2]*rowB1[2];
-    float dot32 = delta[0]*rowB2[0] + delta[1]*rowB2[1] + delta[2]*rowB2[2];
-
-    // Pack results into output matrix rows (vmrghw interleave pattern)
-    outMatrix[0]  = dot00;  outMatrix[1]  = dot01;  outMatrix[2]  = dot02;  outMatrix[3]  = 0.0f;
-    outMatrix[4]  = dot10;  outMatrix[5]  = dot12;  outMatrix[6]  = dot11;  outMatrix[7]  = 0.0f;
-    outMatrix[8]  = dot20;  outMatrix[9]  = dot22;  outMatrix[10] = dot21;  outMatrix[11] = 0.0f;
-    outMatrix[12] = dot30;  outMatrix[13] = dot31;  outMatrix[14] = dot32;  outMatrix[15] = 0.0f;
-}
 
 /**
  * phMatrix33TransposeMultiply @ 0x82296D20 | size: 0x94 (148 bytes)
@@ -8353,56 +8199,6 @@ void phCollisionTreeLookup(void* thisPtr, void* queryNode) {
     *(uint32_t*)(obj + 168) = result;
 }
 
-/**
- * phMatrixTransposeMultiply3x4 @ 0x821181C8 | size: 0xB0 (176 bytes)
- *
- * Computes transpose-multiply of two 4x3 matrices in-place. Given
- * matrices A and B, computes C = A^T * B where the transpose is over
- * the 3x3 rotation part, and the translation row uses (A.row3 - B.row3).
- * Result overwrites matrix A.
- */
-void phMatrixTransposeMultiply3x4(float* matA, const float* matB) {
-    float a0[4], a1[4], a2[4], a3[4];
-    float b0[4], b1[4], b2[4], b3[4];
-
-    memcpy(a0, matA + 0, 16);
-    memcpy(a1, matA + 4, 16);
-    memcpy(a2, matA + 8, 16);
-    memcpy(a3, matA + 12, 16);
-
-    memcpy(b0, matB + 0, 16);
-    memcpy(b1, matB + 4, 16);
-    memcpy(b2, matB + 8, 16);
-    memcpy(b3, matB + 12, 16);
-
-    float delta[4];
-    delta[0] = a3[0] - b3[0];
-    delta[1] = a3[1] - b3[1];
-    delta[2] = a3[2] - b3[2];
-    delta[3] = a3[3] - b3[3];
-
-    float dot_a0_b0 = a0[0]*b0[0] + a0[1]*b0[1] + a0[2]*b0[2];
-    float dot_a0_b1 = a0[0]*b1[0] + a0[1]*b1[1] + a0[2]*b1[2];
-    float dot_a0_b2 = a0[0]*b2[0] + a0[1]*b2[1] + a0[2]*b2[2];
-
-    float dot_a1_b0 = a1[0]*b0[0] + a1[1]*b0[1] + a1[2]*b0[2];
-    float dot_a1_b1 = a1[0]*b1[0] + a1[1]*b1[1] + a1[2]*b1[2];
-    float dot_a1_b2 = a1[0]*b2[0] + a1[1]*b2[1] + a1[2]*b2[2];
-
-    float dot_a2_b0 = a2[0]*b0[0] + a2[1]*b0[1] + a2[2]*b0[2];
-    float dot_a2_b1 = a2[0]*b1[0] + a2[1]*b1[1] + a2[2]*b1[2];
-    float dot_a2_b2 = a2[0]*b2[0] + a2[1]*b2[1] + a2[2]*b2[2];
-
-    float dot_delta_b0 = delta[0]*b0[0] + delta[1]*b0[1] + delta[2]*b0[2];
-    float dot_delta_b1 = delta[0]*b1[0] + delta[1]*b1[1] + delta[2]*b1[2];
-    float dot_delta_b2 = delta[0]*b2[0] + delta[1]*b2[1] + delta[2]*b2[2];
-
-    matA[0] = dot_a0_b0;  matA[1] = dot_a0_b1;  matA[2] = dot_a0_b2;  matA[3] = 0.0f;
-    matA[4] = dot_a1_b0;  matA[5] = dot_a1_b1;  matA[6] = dot_a1_b2;  matA[7] = 0.0f;
-    matA[8] = dot_a2_b0;  matA[9] = dot_a2_b1;  matA[10] = dot_a2_b2; matA[11] = 0.0f;
-    matA[12] = dot_delta_b0; matA[13] = dot_delta_b1; matA[14] = dot_delta_b2; matA[15] = 0.0f;
-}
-
 // ═════════════════════════════════════════════════════════════════════════════
 // rage::phArticulatedCollider — Joint Query / Force Dispatch Functions
 // ═════════════════════════════════════════════════════════════════════════════
@@ -9512,46 +9308,42 @@ float phContact_ComputeImpulse(void* thisPtr, void* contactPair) {
     // fsel: if negImpulse >= 0 (i.e. impulse <= 0), return 0.0; else return impulse
     return (negImpulse >= 0.0f) ? 0.0f : impulse;
 }
-/**
- * ph_81C8 — Compute 4x4 matrix-transpose-multiply (row dot products)
- * @ 0x821181C8 | size: 0xB0 (176 bytes)
- *
- * Computes out[i][j] = dot3(A_row[i], B_col[j]) for a 4x3 matrix multiply.
- * The fourth row computes (A_row3 - B_row3) dotted against B columns.
- * Used for physics coordinate frame transformations.
- */
-// ph_81C8
+// VMX dot products accumulate in double before one float rounding; vector
+// operands/results flush subnormals. Bit shuffles must preserve raw input bits.
+static float phFlushVmx(float value) {
+    uint32_t bits;
+    memcpy(&bits, &value, sizeof(bits));
+    if ((bits & 0x7F800000u) == 0) {
+        bits &= 0x80000000u;
+        memcpy(&value, &bits, sizeof(value));
+    }
+    return value;
+}
+
+static float phDotVmx(const float* a, const float* b, unsigned count) {
+    double sum = 0.0;
+    for (unsigned lane = 0; lane < count; ++lane)
+        sum += static_cast<double>(phFlushVmx(a[lane])) * phFlushVmx(b[lane]);
+    return phFlushVmx(static_cast<float>(sum));
+}
+
+// In-place A * inverse(B) for orthonormal row-vector transforms.
+// phMatrix_TransposeMultiply3x4 (was ph_81C8) @ 0x821181C8 | size: 0xB0
+// The final vmrghw packs each input row's X bits into its output W lane.
 void phMatrix_TransposeMultiply3x4(float* dst, const float* src) {
-    const float* aRow0 = dst;
-    const float* aRow1 = dst + 4;
-    const float* aRow2 = dst + 8;
-    float aRow3[4];
-    aRow3[0] = dst[12] - src[12];
-    aRow3[1] = dst[13] - src[13];
-    aRow3[2] = dst[14] - src[14];
-    aRow3[3] = dst[15] - src[15];
-
-    const float* bCol0 = src;
-    const float* bCol1 = src + 4;
-    const float* bCol2 = src + 8;
-
-    float r00 = aRow0[0]*bCol0[0] + aRow0[1]*bCol0[1] + aRow0[2]*bCol0[2];
-    float r01 = aRow0[0]*bCol1[0] + aRow0[1]*bCol1[1] + aRow0[2]*bCol1[2];
-    float r02 = aRow0[0]*bCol2[0] + aRow0[1]*bCol2[1] + aRow0[2]*bCol2[2];
-    float r10 = aRow1[0]*bCol0[0] + aRow1[1]*bCol0[1] + aRow1[2]*bCol0[2];
-    float r11 = aRow1[0]*bCol1[0] + aRow1[1]*bCol1[1] + aRow1[2]*bCol1[2];
-    float r12 = aRow1[0]*bCol2[0] + aRow1[1]*bCol2[1] + aRow1[2]*bCol2[2];
-    float r20 = aRow2[0]*bCol0[0] + aRow2[1]*bCol0[1] + aRow2[2]*bCol0[2];
-    float r21 = aRow2[0]*bCol1[0] + aRow2[1]*bCol1[1] + aRow2[2]*bCol1[2];
-    float r22 = aRow2[0]*bCol2[0] + aRow2[1]*bCol2[1] + aRow2[2]*bCol2[2];
-    float r30 = aRow3[0]*bCol0[0] + aRow3[1]*bCol0[1] + aRow3[2]*bCol0[2];
-    float r31 = aRow3[0]*bCol1[0] + aRow3[1]*bCol1[1] + aRow3[2]*bCol1[2];
-    float r32 = aRow3[0]*bCol2[0] + aRow3[1]*bCol2[1] + aRow3[2]*bCol2[2];
-
-    dst[0]  = r00; dst[1]  = r01; dst[2]  = r02;
-    dst[4]  = r10; dst[5]  = r11; dst[6]  = r12;
-    dst[8]  = r20; dst[9]  = r21; dst[10] = r22;
-    dst[12] = r30; dst[13] = r31; dst[14] = r32;
+    float a[16], b[16], result[16];
+    memcpy(a, dst, sizeof(a));
+    memcpy(b, src, sizeof(b));
+    float delta[3];
+    for (unsigned axis = 0; axis < 3; ++axis)
+        delta[axis] = phFlushVmx(phFlushVmx(a[12 + axis]) - phFlushVmx(b[12 + axis]));
+    for (unsigned row = 0; row < 4; ++row) {
+        const float* input = row == 3 ? delta : a + row * 4;
+        for (unsigned col = 0; col < 3; ++col)
+            result[row * 4 + col] = phDotVmx(input, b + col * 4, 3);
+        memcpy(result + row * 4 + 3, a + row * 4, sizeof(float));
+    }
+    memcpy(dst, result, sizeof(result));
 }
 
 /**
@@ -9746,7 +9538,7 @@ float phBoundCapsule_26B8(float height, float radius) {
 
 // (3F08 already lifted above as ValidateAndSetExtents)
 
-// (8608, CF48, DB10 already lifted above as DispatchCapsuleFromCamera/LookupTableValues/SetupCapsuleFromState)
+// (8608 is rage::clipAabbToActiveCamera; CF48/DB10 are LookupTableValues/SetupCapsuleFromState above)
 
 /**
  * phBoundCapsule_ComputeNormalizedAngle @ 0x822238A8 | size: 0x6C (108 bytes)
@@ -11525,71 +11317,22 @@ uint8_t phBound_SegmentBoxOverlap(const float* boundCentre,
     return inside ? 1u : 0u;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// phBound_TransformPointByMatrixInv (was phBound_D1D0_p39)
-//                                      @ 0x8228D1D0 | size: 0x80 (128B)
-//
-// 4×4 matrix × vec4 transform with an axis-flip mask baked in.  The
-// scaffold reads three row-basis vectors from the matrix at r3+0x00,
-// r3+0x10, r3+0x20, r3+0x30 (columns 0..3 after the vmrghw/vmrglw
-// unpack), loads a 16-byte bit-mask from lbl_82619BE0, and applies:
-//
-//      outCol0 = dot4(mask ·& rot, colA)
-//      outCol1 = dot4(mask ·& rot, colB)
-//      outCol2 = dot4(mask ·& rot, colC)
-//      out     = splat shuffle { col2, col1, col0, _ }
-//
-// This is the inverse-transform pattern R* uses for moving a phBound
-// query point from world space into the bound's local frame (treating the
-// rotation basis as orthonormal, so transpose = inverse).  The mask
-// clears the w-lane of the rotation rows before the dp4 so the translate
-// column of the matrix does not contaminate the rotational projection.
-//
-// Both call sites (pongCreatureInst_5D78_g and phLevelNew_E3D0) feed a
-// phBound matrix + a world-space point and expect a local-space result.
-//
-// The scaffold additionally reads two 16-byte masks from .data at
-// 0x82619BE0 (w-clear) and 0x82619BF0 (combine/splat).  Those are
-// runtime-initialised and the math they perform is "clear w lane" +
-// "reorder result" — effects baked directly into the reconstruction
-// below rather than carried as raw bit patterns.
-// ─────────────────────────────────────────────────────────────────────────────
-void phBound_TransformPointByMatrixInv(const float* matrix,
-                                       const float* pointIn,
-                                       float*       pointOut) { // @ 0x8228D1D0
-    // Matrix rows (world transform): rot0..rot2 and the translate column
-    // are laid out as 4 consecutive 16-byte vectors at +0x00..+0x30.
-    const float* rotX = matrix + 0;    // basis row 0
-    const float* rotY = matrix + 4;    // basis row 1
-    const float* rotZ = matrix + 8;    // basis row 2
-    // +0x30 (translate column) is also read in the scaffold but only used
-    // for the inverse-translate step which the mask zeroes out below.
-
-    // Point in world space.
-    const float px = pointIn[0];
-    const float py = pointIn[1];
-    const float pz = pointIn[2];
-    const float pw = pointIn[3];
-
-    // Project onto each basis row — equivalent to multiplying by the
-    // transpose of the rotation (its inverse for an orthonormal frame).
-    // The w-lane is cleared via the bit-mask so `pw` never pollutes the
-    // dot product; we enforce that explicitly by not using pw below.
-    (void)pw;  // consumed by the mask in the original.
-
-    const float outX = rotX[0] * px + rotX[1] * py + rotX[2] * pz;
-    const float outY = rotY[0] * px + rotY[1] * py + rotY[2] * pz;
-    const float outZ = rotZ[0] * px + rotZ[1] * py + rotZ[2] * pz;
-
-    // Store in the original vec4 lane order with the splat-combine mask
-    // (the trailing vmrghw pair in the scaffold reorders to {outZ, outY,
-    // outX, 0} before the final stvx — but both call sites immediately
-    // re-load as float[4] so the canonical {x,y,z,0} layout is what the
-    // game actually reads).
-    pointOut[0] = outX;
-    pointOut[1] = outY;
-    pointOut[2] = outZ;
-    pointOut[3] = 0.0f;
+// Forward-transform the bound's local centroid; force homogeneous input W=1.
+// phBound_TransformCentroid (was phBound_D1D0_p39) @ 0x8228D1D0 | size: 0x80
+// Matrix rows are basis X/Y/Z and translation. Output W is the masked input X
+// bits left by the original's final merge, not the matrix's fourth column.
+void phBound_TransformCentroid(const float* bound, const float* matrix, float* out) {
+    float point[4];
+    memcpy(point, bound + 12, sizeof(point));
+    point[3] = 1.0f;
+    float result[4];
+    for (unsigned axis = 0; axis < 3; ++axis) {
+        const float column[4] = {matrix[axis], matrix[4 + axis],
+                                 matrix[8 + axis], matrix[12 + axis]};
+        result[axis] = phDotVmx(point, column, 4);
+    }
+    memcpy(result + 3, point, sizeof(float));
+    memcpy(out, result, sizeof(result));
 }
 
 // The 0x8223E648 SAT helper consumes only xyz from each aligned vector.
@@ -11734,7 +11477,7 @@ uint8_t phLevelNew_QueryOverlapsInstance(const phLevelQuery* query, const phInst
     const auto* bound = reinterpret_cast<const float*>(
         static_cast<uintptr_t>(*reinterpret_cast<const uint32_t*>(archetype + 0x0C)));
     alignas(16) float centre[4];
-    phBound_TransformPointByMatrixInv(bound, reinterpret_cast<const float*>(inst + 0x10), centre);
+    phBound_TransformCentroid(bound, reinterpret_cast<const float*>(inst + 0x10), centre);
     const float boundRadius = bound[2];
 
     // VMX flushes subnormal operands/results. vmsum3fp128 rounds once after
@@ -11831,7 +11574,7 @@ uint8_t phLevelNew_QueryOverlapsInstance(const phLevelQuery* query, const phInst
 //                               (was phBound_C1F0_wrh @ 0x8228C1F0).
 //   • phBound_SegmentBoxOverlap
 //                             — lifted (was phBound_D6B0_wrh @ 0x8228D6B0).
-//   • phBound_TransformPointByMatrixInv
+//   • phBound_TransformCentroid
 //                             — lifted (was phBound_D1D0_p39 @ 0x8228D1D0).
 //   • phBound::LoadFromStream — detoxified the phBound_LoadWarnPrintf shim
 //                               and routed through the existing nop_8240E6D0.

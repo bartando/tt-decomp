@@ -1,4 +1,5 @@
 #include "rage/polygon_clip.hpp"
+#include "game/camera/pong_camera.hpp"
 
 // The VMX interpolation rounds its multiply before adding the previous vertex.
 #if defined(__clang__)
@@ -27,7 +28,6 @@ namespace rage {
 
 // These names describe the actual helpers, rather than their capsule/animation auto-names.
 extern void invertAffineInPlace(float (*matrix)[4]); // @ 0x820D7B30
-extern bool clipAabbToActiveCamera(void* context, float (*box)[4], const float* referencePoint); // @ 0x82148608
 // LTCG leaves the output in r8, with unused integer slots r4..r7.
 extern void buildClipFrustumPlanes(void* context, uint32_t, uint32_t, uint32_t, uint32_t,
                                    float (*planes)[4], float nearClip, float farClip,
@@ -288,6 +288,25 @@ bool clipAabbToFrustum(void* context, float (*box)[4], const float (*cameraToWor
     // The original writes indeterminate stack words to center.w/size.w on success.
     // Preserve those padding lanes; the auxiliary vector is untouched on success.
     return true;
+}
+
+// clipAabbToActiveCamera (was phBoundCapsule_8608_g) @ 0x82148608 | size: 0x9C
+// Cache the frame camera before the aspect call, then reload its clip fields.
+bool clipAabbToActiveCamera(void* context, float (*box)[4], const float* referencePoint) {
+    const auto* owner = *reinterpret_cast<const uint8_t* const*>(0x8260641Cu);
+    const auto* cameras = *reinterpret_cast<const uint8_t* const*>(owner + 24);
+    const uint32_t frame = *reinterpret_cast<const uint32_t*>(0x825C4898u);
+    const auto* camera = cameras + frame * 912;
+    // The existing 0x82143E98 lift is still filed under pongCameraMgr.
+    const float aspect = reinterpret_cast<const pongCameraMgr*>(camera)->GetAspectRatio();
+    const float nearClip = *reinterpret_cast<const float*>(camera + 832);
+    const float cap = *reinterpret_cast<const float*>(0x8202CFE8u);
+    const double fallback = *reinterpret_cast<const double*>(0x82079FB8u);
+    const float selectedNear = cap - nearClip >= 0.0f ? nearClip : static_cast<float>(fallback);
+    return clipAabbToFrustum(context, box, reinterpret_cast<const float (*)[4]>(camera + 64),
+                             0, 0, 0, 0, referencePoint, selectedNear,
+                             *reinterpret_cast<const float*>(camera + 836),
+                             *reinterpret_cast<const float*>(camera + 824), aspect);
 }
 
 // projectAabbToHorizontalPlane @ 0x821493F8 | size: 0x350

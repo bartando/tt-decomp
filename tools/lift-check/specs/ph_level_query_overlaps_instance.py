@@ -5,8 +5,8 @@ unknown types with null bounds, strict/inclusive tangencies, segment start/end/
 interior and zero length, capsule clamp endpoints, cylinder Y independence,
 ignored w lanes, negative/zero radii, NaNs/infinities and subnormals. Random
 matrices and nonzero local centroids exercise the transform call's arguments.
-Execute the original 0x8228D1D0 transform on both sides; this does not validate
-its existing C++ lift. No ignored memory, patched original code or tolerance.
+Execute the original 0x8228D1D0 transform on both sides; its C++ lift has its
+own ph_bound_transform_centroid spec. No ignored memory, code patches or tolerance.
 VMX dot rounding/flush behavior is the emulator model, not console evidence.
 """
 from liftcheck.spec import *
