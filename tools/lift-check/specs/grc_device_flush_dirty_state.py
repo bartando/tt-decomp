@@ -56,7 +56,7 @@ def boundary(name, source_size=0):
 
 
 CALLS = {
-    "phBoundBVH_2980_p39": boundary("refresh vertex fetch"),
+    0x82362980: boundary("refresh vertex fetch"),
     "grcDevice_ApplyShaderState": boundary("apply shaders"),
     0x82362658: boundary("registers", 256),
     0x82362718: boundary("fetch descriptors", 768),

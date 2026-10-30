@@ -34,7 +34,6 @@ void grcDevice_FlushDirtySixRegisterGroups(void* device, uint64_t dirty, uint32_
                                            const uint32_t* values);  // defined below
 void grcDevice_FlushDirtySixteenRegisterGroups(void* device, uint64_t dirty, uint32_t firstRegister,
                                               const uint32_t* values);  // defined below
-extern void phBoundBVH_2980_p39(void* device);  // @ 0x82362980 — refresh vertex fetch state
 
 // grc_5ED0 — viewport apply function
 // @ 0x82355ED0 — applies a viewport rectangle to the GPU device
@@ -531,6 +530,43 @@ void grcDevice_FlushDirtyRegisterGroup(void* device, uint64_t dirty, uint32_t fi
     state[0] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor));
 }
 
+// @ 0x82362980
+void grcDevice_RefreshVertexFetchState(void* device) {
+    auto* data = static_cast<uint8_t*>(device);
+    auto word = [](void* base, uint32_t offset) -> uint32_t& {
+        return *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(base) + offset);
+    };
+    auto wide = [](void* base, uint32_t offset) -> uint64_t& {
+        return *reinterpret_cast<uint64_t*>(static_cast<uint8_t*>(base) + offset);
+    };
+    auto* declaration = reinterpret_cast<void*>(static_cast<uintptr_t>(word(device, 0x2C90)));
+    if (declaration == nullptr) {
+        return;
+    }
+
+    uint32_t remaining = word(declaration, 12) + 1;
+    uint32_t selector = 0x5AAB6;
+    uint32_t i = 0;
+    do {
+        const uint32_t offset = word(device, 0x310C + i * 8);
+        auto* buffer = reinterpret_cast<void*>(static_cast<uintptr_t>(word(device, 0x3110 + i * 8)));
+        if (buffer != nullptr) {
+            const uint32_t address = word(buffer, 12) + offset;
+            const uint32_t size = word(buffer, 16) - offset;
+            word(data, 0x77C - i * 8) = (size & ~0x30000000u) | 0x10000000u;
+            word(data, 0x778 - i * 8) = (address & 0x1FFFFFFFu) + (((address >> 20) + 512) & 0x1000);
+            const uint32_t shift = ((selector >> 16) + 26) & 127;
+            wide(device, 0x20) |= shift < 64 ? (uint64_t(1) << 63) >> shift : 0;
+        }
+        ++i;
+        selector -= 0x5556;
+    } while (--remaining != 0);
+    if (wide(device, 0x2CA0) != wide(device, 0x3190)
+        || wide(device, 0x2CA8) != wide(device, 0x3198)) {
+        wide(device, 0x30) |= 0x80;
+    }
+}
+
 // Flush cached device state before draw submission, in dependency order.
 // @ 0x82363C00
 void grcDevice_FlushDirtyState(void* device) {
@@ -542,7 +578,7 @@ void grcDevice_FlushDirtyState(void* device) {
     // Helpers can dirty later groups, so reload each mask after every call.
     if (dirty(0x30) != 0) {
         if ((dirty(0x30) & 0x400) != 0) {
-            phBoundBVH_2980_p39(device);
+            grcDevice_RefreshVertexFetchState(device);
         }
         if ((dirty(0x30) & 0x1E0) != 0) {
             grcDevice_ApplyShaderState(device);
