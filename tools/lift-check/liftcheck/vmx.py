@@ -386,7 +386,18 @@ class VectorUnit:
         if x3 == 1904:
             v[d] = [_signed(uimm, 5) & M32] * 4; return "vspltisw128"
         if x3 == 2032:
-            raise Unsupported("vupkd3d128")
+            # Only NORMPACKED32 (type 2, uimm >> 2), as used by pg_5BD8_g. Match
+            # ReXGlue build_vupkd3d128: the packed word is our guest word 3;
+            # x/y/z become 3.0 + signed 10-bit (-512 -> NaN), w becomes 1.0 + 2-bit.
+            if uimm >> 2 != 2:
+                raise Unsupported("vupkd3d128")
+            packed = B[3]
+            out = []
+            for k in range(3):
+                field = ((packed >> (10 * k)) & 0x3FF) - (0x400 if (packed >> (10 * k + 9)) & 1 else 0)
+                out.append(0x7FC00000 if field == -512 else (0x40400000 + field) & M32)
+            v[d] = out + [(packed >> 30) | 0x3F800000]
+            return "vupkd3d128"
         xo = i & 0x3D0
         cmps = {0: ("vcmpeqfp128", _cmpeqfp), 128: ("vcmpgefp128", _cmpgefp),
                 256: ("vcmpgtfp128", _cmpgtfp), 384: ("vcmpbfp128", _cmpbfp),

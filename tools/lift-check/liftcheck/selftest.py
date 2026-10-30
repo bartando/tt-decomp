@@ -149,6 +149,24 @@ def _normpacked32() -> list[str]:
             errors.append(f"normpacked32 accepted unsupported form 0x{word:08X}")
         except Unsupported:
             pass
+    # vupkd3d128 v12,v12,8 (pg_5BD8_g): packed word in guest word 3.
+    unpack_cases = [
+        (0x000805FF, [0x404001FF, 0x403FFE01, 0x40400000, 0x3F800000]),
+        (0xE0180601, [0x403FFE01, 0x403FFE01, 0x403FFE01, 0x3F800003]),
+        (0x00000200, [0x7FC00000, 0x40400000, 0x40400000, 0x3F800000]),
+        (0x7FFFFFFF, [0x403FFFFF, 0x403FFFFF, 0x403FFFFF, 0x3F800001]),
+    ]
+    for packed, expected in unpack_cases:
+        v = VectorUnit(None)
+        v.v[12] = [0xCDCDCDCD] * 3 + [packed]
+        v.execute(0x198867F0, 0)
+        if v.v[12] != expected:
+            errors.append(f"vupkd3d128 0x{packed:08X}: got {[hex(w) for w in v.v[12]]}")
+    try:
+        VectorUnit(None).execute(0x198467F0, 0)
+        errors.append("vupkd3d128 accepted unsupported type 1")
+    except Unsupported:
+        pass
     return errors
 
 
@@ -204,7 +222,7 @@ def main(argv=None) -> int:
     bad = 0
 
     packed_errors = _normpacked32()
-    print(f"{'ok  ' if not packed_errors else 'FAIL'} vpkd3d128 NORMPACKED32 regression")
+    print(f"{'ok  ' if not packed_errors else 'FAIL'} vpkd3d128/vupkd3d128 NORMPACKED32 regression")
     for line in packed_errors:
         print(f"     {line}")
     bad += bool(packed_errors)

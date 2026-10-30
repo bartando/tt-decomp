@@ -23,7 +23,7 @@ struct PgVertexBuffer {
     uint32_t tangentSize;               // +0x94: bytes for the raw-copy format
     uint8_t pad98[0x3C];
     uint32_t stride;                    // +0xD4
-    uint8_t padD8;
+    uint8_t packedNormal;               // +0xD8
     uint8_t packedTangent;              // +0xD9
     uint8_t padDA;
     uint8_t mapped;                     // +0xDB
@@ -35,6 +35,7 @@ static_assert(offsetof(PgVertexBuffer, tangentOffset) == 0x2E);
 static_assert(offsetof(PgVertexBuffer, normalSize) == 0x68);
 static_assert(offsetof(PgVertexBuffer, tangentSize) == 0x94);
 static_assert(offsetof(PgVertexBuffer, stride) == 0xD4);
+static_assert(offsetof(PgVertexBuffer, packedNormal) == 0xD8);
 static_assert(offsetof(PgVertexBuffer, mapped) == 0xDB);
 
 // Xenon's VMX non-Java mode flushes subnormal inputs/results to signed zero.
@@ -69,6 +70,28 @@ uint32_t packNormPacked32(const float* v) {
         packed |= (bits & (k < 3 ? 0x3FFu : 3u)) << (10 * k);
     }
     return packed;
+}
+
+// vupkd3d128 (NORMPACKED32) turns each signed 10-bit field into 3.0f + n * 2^-22
+// (-512 into NaN) and w into 1.0f + its 2 bits; the constants at 0x82034D80
+// then scale that back to n / 511 (w: n / 3) with one vnmsubfp.
+void unpackNormPacked32(uint32_t packed, float* out) {
+    static constexpr float kScale[2] = {-8208.03125f, -2796202.75f};
+    static constexpr float kBias[2] = {-24624.09375f, -2796202.75f};
+    for (unsigned k = 0; k < 4; ++k) {
+        uint32_t bits;
+        if (k < 3) {
+            const int32_t field = static_cast<int32_t>(packed << (22 - 10 * k)) >> 22;
+            bits = field == -512 ? 0x7FC00000u : 0x40400000u + static_cast<uint32_t>(field);
+        } else {
+            bits = (packed >> 30) | 0x3F800000u;
+        }
+        float unpacked;
+        std::memcpy(&unpacked, &bits, sizeof(unpacked));
+        volatile float product = unpacked * kScale[k / 3];
+        // -(a*b - c), not c - a*b: the negation also flips NaN and zero signs.
+        out[k] = vmxFloat(-(vmxFloat(product) - kBias[k / 3]));
+    }
 }
 
 const float* align16(const float* p) {
@@ -192,4 +215,31 @@ extern "C" void pg_6B20_g(void* vertexBuffer, uint32_t /*index*/, const float* t
     } else {
         std::memcpy(destination, tangent, buffer->tangentSize);
     }
+}
+
+// Reads the staging vertex's normal back as four floats (unpacked from
+// 2:10:10:10 or copied raw); `out` is left alone when there is no normal.
+// @ 0x82155BD8
+extern "C" float* pg_5BD8_g(float* out, void* vertexBuffer) {
+    auto* buffer = static_cast<PgVertexBuffer*>(vertexBuffer);
+    auto* format = reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(buffer->formatAddress));
+    if ((*format & 0x8) == 0) {
+        return out;
+    }
+    if (buffer->mapped == 0) {
+        pg_7578_g(buffer);
+    }
+
+    const uint32_t source = buffer->stagingAddress + buffer->normalOffset;
+    alignas(16) float result[4];
+    if (buffer->packedNormal != 0) {
+        uint32_t packed;
+        std::memcpy(&packed, reinterpret_cast<const void*>(static_cast<uintptr_t>(source)), sizeof(packed));
+        unpackNormPacked32(packed, result);
+    } else {
+        std::memcpy(result, align16(reinterpret_cast<const float*>(static_cast<uintptr_t>(source))),
+                    sizeof(result));
+    }
+    std::memcpy(const_cast<float*>(align16(out)), result, sizeof(result));
+    return out;
 }
