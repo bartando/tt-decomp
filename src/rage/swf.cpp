@@ -38,6 +38,7 @@ extern "C" {
     int _stricmp(const char*, const char*);     // case-insensitive string compare
     float swfComputeFramePosition(void* ctx, void* entry, float* outMin, float* outMax);
     const char* util_A768_1(const void* value, void* buffer, int maxLen);  // @ 0x823FA768 — SWF value to string
+    int32_t swfValueToInteger(const void* value);  // @ 0x823FA5C8
     float util_EF98(void* instance, float* outMin);  // @ 0x823FEF98 — display width, optional minimum
     float swfINSTANCE_F0D8_w(void* instance, float* outMin);  // @ 0x823FF0D8 — display height, optional minimum
     void* util_B188(void* slots, int index);  // @ 0x823FB188
@@ -2011,12 +2012,36 @@ swfSCRIPTARRAY::~swfSCRIPTARRAY() {
 
 
 
-// swfSCRIPTARRAY overrides GetMember/SetMember for array-style access.
-// Both overrides @ 0x823FEB48 / 0x823FEC38 recognise numeric index keys
-// ("0", "1", ...) and "length", falling through to the script-object
-// base for everything else. Pending dedicated lift; base lookup still
-// handles string-named members correctly.
-bool swfSCRIPTARRAY::GetMember(const char* name, void* result) { return swfSCRIPTOBJECT::GetMember(name, result); }
+// @ 0x823FEB48
+bool swfSCRIPTARRAY::GetMember(const char* name, void* result) {
+    // Like the other GetMember overrides, name points at an 8-byte VM value,
+    // despite the historical const char* declaration. String keys are never
+    // parsed as array indices; only "length" is handled here.
+    const auto* key = reinterpret_cast<const uint32_t*>(name);
+    const auto* array = reinterpret_cast<const uint8_t*>(this);
+    auto* output = static_cast<uint32_t*>(result);
+    if (key[1] != 0 && key[1] != 1) {
+        int32_t index = swfValueToInteger(key);
+        if (index >= 0 && index < *reinterpret_cast<const uint16_t*>(array + 20)) {
+            const auto* elements = *reinterpret_cast<const uint32_t* const*>(array + 16);
+            const uint32_t* element = elements + index * 2;
+            output[0] = element[0];
+            output[1] = element[1];
+            return true;
+        }
+    } else {
+        extern void* g_swfStringBuffer;  // @ 0x82604850
+        const char* property = util_A768_1(key, &g_swfStringBuffer, SWF_INTERN_BUFFER_SIZE);
+        if (strcmp(property, "length") == 0) {
+            output[0] = *reinterpret_cast<const uint16_t*>(array + 20);
+            output[1] = 3; // VM integer tag; the old swfValueType enum differs.
+            return true;
+        }
+    }
+    return swfSCRIPTOBJECT::GetMember(name, result);
+}
+
+// The SetMember override still delegates to the base pending its own lift.
 void swfSCRIPTARRAY::SetMember(const char* name, void* value) { swfSCRIPTOBJECT::SetMember(name, value); }
 
 
