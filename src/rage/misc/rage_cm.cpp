@@ -489,18 +489,22 @@ void cmIsValid::RegisterPorts(cmUnaryNode* node) {
 //  SIGNAL PROCESSING NODES
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * cmLerp — linear interpolation between portA and portB by a scalar t.
- * vtable @ 0x82053FEC
- *
- * 3-port node (same layout as cmClamp: portA @+12, portB @+20, t @+28).
- * Methods (deferred):
- *   cmLerp_vfn_2  @ 0x8227BB48  GetVector(out) — vec4 lerp
- *   cmLerp_vfn_4  @ 0x8227BA78  GetFloat(out)  — fmadd (b - a) * t + a
- *   cmLerp_vfn_5  @ 0x8227B988  GetDim(out)    — clamp-to-endpoint int form
- *   cmLerp_vfn_16 @ 0x82262578  RegisterPorts
- * Not yet lifted — no active callers require it in the current tree.
- */
+// cmLerp::GetFloat @ 0x8227BA78
+// Strict epsilon windows select a single endpoint lazily. Outside those
+// windows (including NaN), evaluate B before A and extrapolate using fmadds.
+void cmLerp::GetFloat(float* out) {
+    const float t = cmNode_GetFloat(&factor);
+    if (t < 0.0001f && t > -0.0001f) {
+        *out = cmNode_GetFloat(&portA);
+    } else if (t > 0.9999f && t < 1.0001f) {
+        *out = cmNode_GetFloat(&portB);
+    } else {
+        const float b = cmNode_GetFloat(&portB);
+        const float a = cmNode_GetFloat(&portA);
+        const float difference = b - a;
+        *out = difference * t + a;
+    }
+}
 
 /**
  * cmClamp — clamps portA into the [portB_min, portC_max] range.

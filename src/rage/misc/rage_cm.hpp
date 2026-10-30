@@ -528,14 +528,16 @@ struct cmIsValid : cmUnaryNode {
 };
 
 // ── rage::cmLerp  [vtable @ 0x82053FEC] ──────────────────────────
-struct cmLerp {
-    void**      vtable;           // +0x00
+struct cmLerp : cmNodeBase {
+    cmNodePort factor;           // +0x0C  interpolation factor
+    cmNodePort portA;            // +0x14  first endpoint
+    cmNodePort portB;            // +0x1C  second endpoint
+    int32_t m_nConnected;        // +0x24
 
-    // ── virtual methods ──
-    void vfn_2();  // [2] @ 0x8227bb48
-    void vfn_4();  // [4] @ 0x8227ba78
-    void vfn_5();  // [5] @ 0x8227b988
-    void vfn_16();  // [16] @ 0x82262578
+    void vfn_2();                // [2] @ 0x8227bb48
+    void GetFloat(float* out);    // [4] @ 0x8227ba78
+    void vfn_5();                // [5] @ 0x8227b988
+    void vfn_16();               // [16] @ 0x82262578
 };
 
 // ── rage::cmLessThan  [vtable @ 0x820546CC] ──────────────────────────
