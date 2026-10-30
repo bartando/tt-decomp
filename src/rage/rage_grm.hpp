@@ -273,7 +273,7 @@ struct grmShaderFx {
                           uint32_t callerContext,
                           uint32_t directEntry);     // [6] @ 0x820efa08  size 0xdc
     // [7] Drops the active-shader pointer: zeroes g_grmShaderFx_activeState
-    //     (lbl_825EBA68), runs util_9CF0 on the old g_grmShaderFx_activeInstance
+    //     (lbl_825EBA68), runs grmShaderInstance_Unbind on the old g_grmShaderFx_activeInstance
     //     (lbl_825EBC4C), then zeroes that instance pointer.
     void ClearActive();                       // [7] @ 0x820efae8  size 0x44
     // [8] Binds a shader-constant slot (effect-parameter register): looks

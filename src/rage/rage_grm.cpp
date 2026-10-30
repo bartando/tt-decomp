@@ -560,7 +560,7 @@ uint8_t fragDrawable_41B8(void* pParam1, void* pParam2)
 // under [dcl.link]; all helper symbols live here).
 extern "C" {
     // Collaborator functions already lifted / stubbed elsewhere.
-    void     util_9CF0(uint32_t self);                     // @ 0x82159CF0
+    void     grmShaderInstance_Unbind(uint32_t self);      // @ 0x82159CF0
     void     rage_8C48(uint32_t descriptor, uint32_t data); // @ 0x82158C48
     void     rage_9E70(uint32_t paramDesc);                 // @ 0x82159E70
     void     rage_5BF8(uint32_t effectObj);                 // @ 0x82445BF8
@@ -583,6 +583,66 @@ extern "C" {
     extern uint32_t g_grmShaderFx_flushRequired;    // @ 0x825EBB1C
     extern uint32_t g_grmShaderFx_forceResetFlag;   // @ 0x825EBAB4
     extern uint32_t g_grmShaderFx_frameCounter;     // @ 0x825C9010
+}
+
+// @ 0x82159CF0
+void grmShaderInstance_Unbind(uint32_t instance) {
+    auto* self = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(instance));
+    const uint32_t flags = *reinterpret_cast<uint32_t*>(self + 692);
+    if ((flags & 3) != 0) {
+        auto* device = *reinterpret_cast<uint8_t**>(self + 700);
+
+        // These are inline device dispatch arrays, not a pointer to a vtable.
+        // Mask bit 63 describes entry 0; consume leading zeroes, then a run of ones.
+        if ((flags & 1) != 0) {
+            const auto* table = reinterpret_cast<const uint32_t*>(0x825B1F90u);
+            using SetStateFn = void (*)(void*, uint32_t);
+            for (uint32_t word = 0; word < 2; ++word) {
+                uint64_t mask = *reinterpret_cast<uint64_t*>(self + 320 + word * 8);
+                uint32_t index = word * 64;
+                while (mask != 0) {
+                    const uint32_t skip = __builtin_clzll(mask);
+                    index += skip;
+                    mask <<= skip;
+                    const uint32_t count = mask == UINT64_MAX ? 64 : __builtin_clzll(~mask);
+                    mask = count == 64 ? 0 : mask << count;
+                    const uint32_t end = index + count;
+                    for (; index < end; ++index) {
+                        const uint32_t offset = table[index * 2];
+                        auto method = *reinterpret_cast<SetStateFn*>(device + 96 + offset);
+                        method(device, table[index * 2 + 1]);
+                    }
+                }
+            }
+        }
+
+        // Device callbacks may change the flags; the PPC reloads them here.
+        if ((*reinterpret_cast<uint32_t*>(self + 692) & 2) != 0) {
+            const auto* table = reinterpret_cast<const uint8_t*>(0x825B2248u);
+            using SetSamplerStateFn = void (*)(void*, uint32_t, uint32_t);
+            for (uint32_t samplerPair = 0; samplerPair < 32; samplerPair += 2) {
+                uint64_t mask = *reinterpret_cast<uint64_t*>(self + 384 + (samplerPair / 2) * 8);
+                uint32_t index = 0;
+                while (mask != 0) {
+                    const uint32_t skip = __builtin_clzll(mask);
+                    index += skip;
+                    mask <<= skip;
+                    const uint32_t count = mask == UINT64_MAX ? 64 : __builtin_clzll(~mask);
+                    mask = count == 64 ? 0 : mask << count;
+                    const uint32_t end = index + count;
+                    for (; index < end; ++index) {
+                        const auto* entry = table + (index & 31) * 8;
+                        const uint16_t offset = *reinterpret_cast<const uint16_t*>(entry + 2);
+                        const uint32_t value = *reinterpret_cast<const uint32_t*>(entry + 4);
+                        auto method = *reinterpret_cast<SetSamplerStateFn*>(device + 484 + offset);
+                        method(device, samplerPair + (index >> 5), value);
+                    }
+                }
+            }
+        }
+    }
+    *reinterpret_cast<uint32_t*>(self + 516) = 0;
+    *reinterpret_cast<uint32_t*>(self + 520) = 0;
 }
 
 namespace rage {
@@ -687,13 +747,13 @@ void grmShaderFx::Dispatch(uint32_t passIndex,
  * @ 0x820EFAE8 | size: 0x44 (68 bytes)
  *
  * Drops the active-shader binding.  Zeroes g_grmShaderFx_activeState,
- * hands the old g_grmShaderFx_activeInstance to util_9CF0 (the renderer's
+ * hands the old g_grmShaderFx_activeInstance to grmShaderInstance_Unbind (the renderer's
  * shader-unbind routine), then clears the instance pointer.
  * ═══════════════════════════════════════════════════════════════════════════ */
 void grmShaderFx::ClearActive() {
     g_grmShaderFx_activeState = 0;
     const uint32_t oldInstance = g_grmShaderFx_activeInstance;
-    util_9CF0(oldInstance);
+    grmShaderInstance_Unbind(oldInstance);
     g_grmShaderFx_activeInstance = 0;
 }
 
