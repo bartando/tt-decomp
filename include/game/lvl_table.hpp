@@ -43,3 +43,10 @@ static_assert(offsetof(LvlTableMotionView, motionOffset) == 0x160);
 // position is rounded down to a 16-byte boundary, as with lvx/stvx.
 void lvlTable_7008_2h(const LvlTableMotionView* self, LvlTableVector* position, uint32_t mode,
                       const LvlTableVector& direction, const LvlTableVector& step, const LvlTableVector& origin);
+
+// Original internal ABI: r3=count, r4=points, r5=indices, r6=output,
+// v1=distanceLimitSq, v2=origin. Marshal vectors into the explicit references.
+// For count > 0, indices/output need room for count rounded UP to 32.
+// points is rounded down to 16-byte alignment; output may equal indices.
+uint32_t lvlTable_7D28_2h(int32_t count, const LvlTableVector* points, const uint32_t* indices,
+                        uint32_t* output, const LvlTableVector& distanceLimitSq, const LvlTableVector& origin);
