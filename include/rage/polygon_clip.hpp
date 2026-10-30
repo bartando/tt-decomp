@@ -22,6 +22,11 @@ void clipPolygonToFrustum(void* context, int32_t unusedCount, const float (*vert
                           int32_t* outputCount, float (*output)[4], const float (*planes)[4],
                           const float* referencePoint);
 
+// Clip two vertices successively against six planes; referencePoint may skip planes.
+void clipLineToFrustum(void* context, int32_t unusedCount, const float (*vertices)[4],
+                       int32_t* outputCount, float (*output)[4], const float (*planes)[4],
+                       const float* referencePoint);
+
 // Intersect a world AABB with a camera frustum, then rebuild its world-space AABB.
 // box has three aligned vec4s: center, full size, and auxiliary data. Rejection clears
 // all three; an initially zero size returns false without writing. Success changes

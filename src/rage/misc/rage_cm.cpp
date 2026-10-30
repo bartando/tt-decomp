@@ -1718,3 +1718,26 @@ void cmCond3_RegisterPortsWalk(cmCondNode<3>* self, void* desc) {
 }
 
 } // namespace rage
+
+namespace rage {
+struct cmCachedFloatOperator {
+    void* vtable;
+    uint32_t dimension;
+    uint32_t flags;
+    cmNodePort port;
+    uint32_t reserved14[2];
+    float* value;
+};
+
+// @ 0x82272588
+void cmCachedOperator_GetFloat(cmCachedFloatOperator* node, float* output) {
+    if ((node->flags & 0x30) == 0) {
+        node->flags |= 0x10;
+        cmNode_SetFromPort_Dispatch(node->value, &node->port, 0);
+        *output = *node->value;
+        node->flags = (node->flags | 0x20) & ~0x10u;
+    } else {
+        *output = *node->value;
+    }
+}
+}
