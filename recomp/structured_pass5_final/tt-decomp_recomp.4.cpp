@@ -57066,8 +57066,8 @@ loc_82175D70:
 	return;
 }
 
-__attribute__((alias("__imp__phBoundCapsule_5D88_g"))) PPC_WEAK_FUNC(phBoundCapsule_5D88_g);
-PPC_FUNC_IMPL(__imp__phBoundCapsule_5D88_g) {
+__attribute__((alias("__imp__phMatrix_RotateZ"))) PPC_WEAK_FUNC(phMatrix_RotateZ);
+PPC_FUNC_IMPL(__imp__phMatrix_RotateZ) {
 	PPC_FUNC_PROLOGUE();
 	uint32_t var_r31 = 0;
 	PPCRegister temp{};
@@ -57616,7 +57616,7 @@ PPC_FUNC_IMPL(__imp__phBoundCapsule_5E38_g) {
 		ctx.fpscr.disableFlushMode();
 		ctx.f1.f64 = var_f31;
 		// bl 0x82175d88
-		phBoundCapsule_5D88_g(ctx, base);
+		phMatrix_RotateZ(ctx, base);
 	}
 loc_8217611C:
 	// mr r3,r30

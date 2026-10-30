@@ -55118,7 +55118,7 @@ PPC_FUNC_IMPL(__imp__LocomotionStateAnim_3410_g) {
 		temp.f32 = float(ctx.f13.f64);
 		PPC_STORE_U32(ctx.r1.u32 + 280, temp.u32);
 		// bl 0x820c3f98
-		phBoundCapsule_3F98_g(ctx, base);
+		ph_BuildRotationMatrixY(ctx, base);
 		// addi r8,r1,272
 		ctx.r8.s64 = ctx.r1.s64 + 272;
 		// lfs f12,4(r30)
@@ -55148,7 +55148,7 @@ PPC_FUNC_IMPL(__imp__LocomotionStateAnim_3410_g) {
 		ea = (ctx.r7.u32) & ~0xF;
 		simde_mm_store_si128((simde__m128i*)PPC_RAW_ADDR(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)ctx.v0.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
 		// bl 0x820c3f98
-		phBoundCapsule_3F98_g(ctx, base);
+		ph_BuildRotationMatrixY(ctx, base);
 		// addi r6,r1,176
 		ctx.r6.s64 = ctx.r1.s64 + 176;
 		// addi r5,r1,144
@@ -55301,7 +55301,7 @@ loc_822335A8:
 	temp.u32 = PPC_LOAD_U32(ctx.r1.u32 + 160);
 	ctx.f1.f64 = double(temp.f32);
 	// bl 0x820c3f98
-	phBoundCapsule_3F98_g(ctx, base);
+	ph_BuildRotationMatrixY(ctx, base);
 	// addi r9,r1,176
 	ctx.r9.s64 = ctx.r1.s64 + 176;
 	// addi r10,r25,48
@@ -55456,7 +55456,7 @@ PPC_FUNC_IMPL(__imp__LocomotionStateAnim_35F0_g) {
 		temp.f32 = float(ctx.f13.f64);
 		PPC_STORE_U32(ctx.r1.u32 + 120, temp.u32);
 		// bl 0x820c3f98
-		phBoundCapsule_3F98_g(ctx, base);
+		ph_BuildRotationMatrixY(ctx, base);
 		// addi r11,r1,112
 		ctx.r11.s64 = ctx.r1.s64 + 112;
 		// addi r10,r1,272
@@ -55563,7 +55563,7 @@ loc_82233754:
 	temp.u32 = PPC_LOAD_U32(var_r29 + 0);
 	ctx.f1.f64 = double(temp.f32);
 	// bl 0x820c3f98
-	phBoundCapsule_3F98_g(ctx, base);
+	ph_BuildRotationMatrixY(ctx, base);
 	// addi r6,r29,16
 	ctx.r6.s64 = (int64_t)(int32_t)var_r29 + 16;
 	// addi r5,r1,208
@@ -55740,7 +55740,7 @@ loc_8223382C:
 			temp.f32 = float(ctx.f5.f64);
 			PPC_STORE_U32(ctx.r1.u32 + 120, temp.u32);
 			// bl 0x820c3f98
-			phBoundCapsule_3F98_g(ctx, base);
+			ph_BuildRotationMatrixY(ctx, base);
 			// addi r8,r1,112
 			ctx.r8.s64 = ctx.r1.s64 + 112;
 			// addi r7,r1,336
@@ -56686,7 +56686,7 @@ loc_82233E40:
 		temp.f32 = float(ctx.f13.f64);
 		PPC_STORE_U32(ctx.r1.u32 + 248, temp.u32);
 		// bl 0x820c3f98
-		phBoundCapsule_3F98_g(ctx, base);
+		ph_BuildRotationMatrixY(ctx, base);
 		// addi r3,r1,240
 		ctx.r3.s64 = ctx.r1.s64 + 240;
 		// addi r11,r1,304
@@ -57451,7 +57451,7 @@ PPC_FUNC_IMPL(__imp__game_44B8) {
 	temp.u32 = PPC_LOAD_U32(ctx.r1.u32 + 80);
 	ctx.f1.f64 = double(temp.f32);
 	// bl 0x820c3f98
-	phBoundCapsule_3F98_g(ctx, base);
+	ph_BuildRotationMatrixY(ctx, base);
 	// addi r9,r1,96
 	ctx.r9.s64 = ctx.r1.s64 + 96;
 	// addi r10,r31,48

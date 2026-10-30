@@ -65224,8 +65224,8 @@ PPC_FUNC_IMPL(__imp__phBoundCapsule_vfn_7) {
 	return;
 }
 
-__attribute__((alias("__imp__phBoundTaperedCapsule_vfn_3"))) PPC_WEAK_FUNC(phBoundTaperedCapsule_vfn_3);
-PPC_FUNC_IMPL(__imp__phBoundTaperedCapsule_vfn_3) {
+__attribute__((alias("__imp__phBoundTaperedCapsule_TransformEndpoints"))) PPC_WEAK_FUNC(phBoundTaperedCapsule_TransformEndpoints);
+PPC_FUNC_IMPL(__imp__phBoundTaperedCapsule_TransformEndpoints) {
 	PPC_FUNC_PROLOGUE();
 	uint32_t var_r31 = 0;
 	PPCRegister temp{};

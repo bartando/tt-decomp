@@ -36268,7 +36268,7 @@ loc_82249450:
 			temp.u32 = PPC_LOAD_U32(ctx.r1.u32 + 196);
 			ctx.f1.f64 = double(temp.f32);
 			// bl 0x820c3f98
-			phBoundCapsule_3F98_g(ctx, base);
+			ph_BuildRotationMatrixY(ctx, base);
 			// addi r4,r1,208
 			ctx.r4.s64 = ctx.r1.s64 + 208;
 			// addi r3,r1,112

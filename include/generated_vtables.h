@@ -12503,7 +12503,7 @@ struct phBoundTaperedCapsule_vtable {
     void* vfn_0;  // phBoundTaperedCapsule_vfn_0  // destructor
     void* vfn_1;  // (unnamed)
     void* vfn_2;  // (unnamed)
-    void* vfn_3;  // phBoundTaperedCapsule_vfn_3
+    void* vfn_3;  // phBoundTaperedCapsule_TransformEndpoints
     void* vfn_4;  // (unnamed)
     void* vfn_5;  // (unnamed)
     void* vfn_6;  // (unnamed)

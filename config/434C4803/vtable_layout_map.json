@@ -772,7 +772,7 @@
     },
     "3": {
       "addr": "0x8233ab98",
-      "symbol": "phBoundTaperedCapsule_vfn_3",
+      "symbol": "phBoundTaperedCapsule_TransformEndpoints",
       "slot": 3,
       "source": "vfn_symbol"
     },

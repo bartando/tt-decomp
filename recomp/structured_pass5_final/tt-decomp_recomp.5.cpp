@@ -9775,7 +9775,7 @@ PPC_FUNC_IMPL(__imp__cmSampleCamActions_3220_g) {
 	temp.u32 = PPC_LOAD_U32(ctx.r11.u32 + 0);
 	ctx.f1.f64 = double(temp.f32);
 	// bl 0x820c3f98
-	phBoundCapsule_3F98_g(ctx, base);
+	ph_BuildRotationMatrixY(ctx, base);
 	// addi r4,r1,160
 	ctx.r4.s64 = ctx.r1.s64 + 160;
 	// addi r3,r1,80
@@ -10363,7 +10363,7 @@ PPC_FUNC_IMPL(__imp__cmSampleCamMotorPlant_vfn_5) {
 	ctx.fpscr.disableFlushMode();
 	ctx.f1.f64 = var_f29;
 	// bl 0x820c3f98
-	phBoundCapsule_3F98_g(ctx, base);
+	ph_BuildRotationMatrixY(ctx, base);
 	// addi r4,r1,352
 	ctx.r4.s64 = ctx.r1.s64 + 352;
 	// addi r3,r1,160
@@ -10462,7 +10462,7 @@ PPC_FUNC_IMPL(__imp__cmSampleCamMotorPlant_vfn_5) {
 	temp.u32 = PPC_LOAD_U32(ctx.r11.u32 + 0);
 	ctx.f1.f64 = double(temp.f32);
 	// bl 0x820c3f98
-	phBoundCapsule_3F98_g(ctx, base);
+	ph_BuildRotationMatrixY(ctx, base);
 	// addi r4,r1,352
 	ctx.r4.s64 = ctx.r1.s64 + 352;
 	// addi r3,r1,288
@@ -10612,7 +10612,7 @@ loc_821838CC:
 	temp.u32 = PPC_LOAD_U32(ctx.r1.u32 + 148);
 	ctx.f1.f64 = double(temp.f32);
 	// bl 0x820c3f98
-	phBoundCapsule_3F98_g(ctx, base);
+	ph_BuildRotationMatrixY(ctx, base);
 	// addi r4,r1,352
 	ctx.r4.s64 = ctx.r1.s64 + 352;
 	// addi r3,r1,80

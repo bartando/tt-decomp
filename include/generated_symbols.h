@@ -12209,13 +12209,13 @@ PPC_EXTERN_IMPORT(phBoundBox_2850_v12); // 0x82412850
 // --- phBoundCapsule ---
 PPC_EXTERN_IMPORT(phBoundCapsule_3DA0_g); // 0x820C3DA0
 PPC_EXTERN_IMPORT(phBoundCapsule_3F10_g); // 0x820C3F10
-PPC_EXTERN_IMPORT(phBoundCapsule_3F98_g); // 0x820C3F98
+PPC_EXTERN_IMPORT(ph_BuildRotationMatrixY); // 0x820C3F98
 PPC_EXTERN_IMPORT(phBoundCapsule_4020_g); // 0x820C4020
 PPC_EXTERN_IMPORT(phBoundCapsule_40A8_g); // 0x820C40A8
 PPC_EXTERN_IMPORT(phBoundCapsule_44A0_h); // 0x820C44A0
 PPC_EXTERN_IMPORT(phBoundCapsule_9220_g); // 0x820C9220
 PPC_EXTERN_IMPORT(phBoundCapsule_9CF8_g); // 0x820C9CF8
-PPC_EXTERN_IMPORT(phBoundCapsule_A080_g); // 0x820CA080
+PPC_EXTERN_IMPORT(pongMover_UpdateVelocity); // 0x820CA080
 PPC_EXTERN_IMPORT(phBoundCapsule_A488_g); // 0x820CA488
 PPC_EXTERN_IMPORT(phBoundCapsule_A640_g); // 0x820CA640
 PPC_EXTERN_IMPORT(phBoundCapsule_A790_g); // 0x820CA790
@@ -12286,7 +12286,7 @@ PPC_EXTERN_IMPORT(phBoundCapsule_2C08_g); // 0x82172C08
 PPC_EXTERN_IMPORT(phBoundCapsule_4298); // 0x82174298
 PPC_EXTERN_IMPORT(phBoundCapsule_4D48_fw); // 0x82174D48
 PPC_EXTERN_IMPORT(phBoundCapsule_5008_g); // 0x82175008
-PPC_EXTERN_IMPORT(phBoundCapsule_5D88_g); // 0x82175D88
+PPC_EXTERN_IMPORT(phMatrix_RotateZ); // 0x82175D88
 PPC_EXTERN_IMPORT(phBoundCapsule_5E38_g); // 0x82175E38
 PPC_EXTERN_IMPORT(phBoundCapsule_6360_wrh); // 0x82176360
 PPC_EXTERN_IMPORT(phBoundCapsule_B568_g); // 0x8217B568
@@ -12906,7 +12906,7 @@ PPC_EXTERN_IMPORT(phBoundTaperedCapsule_vfn_12); // 0x8233A8E8
 PPC_EXTERN_IMPORT(phBoundTaperedCapsule_vfn_13); // 0x8233A8F0
 PPC_EXTERN_IMPORT(phBoundTaperedCapsule_A910_wrh); // 0x8233A910
 PPC_EXTERN_IMPORT(phBoundTaperedCapsule_vfn_37); // 0x8233AA00
-PPC_EXTERN_IMPORT(phBoundTaperedCapsule_vfn_3); // 0x8233AB98
+PPC_EXTERN_IMPORT(phBoundTaperedCapsule_TransformEndpoints); // 0x8233AB98
 PPC_EXTERN_IMPORT(phBoundTaperedCapsule_vfn_9); // 0x8233AD38
 PPC_EXTERN_IMPORT(phBoundTaperedCapsule_vfn_33); // 0x8233AD48
 PPC_EXTERN_IMPORT(phBoundTaperedCapsule_vfn_20); // 0x8233ADA8

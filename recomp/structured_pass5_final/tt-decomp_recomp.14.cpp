@@ -38260,7 +38260,7 @@ PPC_FUNC_IMPL(__imp__phBoundCapsule_B398_g) {
 			}
 		loc_822DB89C:
 			// bl 0x82175d88
-			phBoundCapsule_5D88_g(ctx, base);
+			phMatrix_RotateZ(ctx, base);
 			// stfs f31,272(r1)
 			ctx.fpscr.disableFlushMode();
 			temp.f32 = float(var_f31);
@@ -38323,7 +38323,7 @@ PPC_FUNC_IMPL(__imp__phBoundCapsule_B398_g) {
 				} else {
 				loc_822DB900:
 					// bl 0x82175d88
-					phBoundCapsule_5D88_g(ctx, base);
+					phMatrix_RotateZ(ctx, base);
 					// stfs f31,224(r1)
 					ctx.fpscr.disableFlushMode();
 					temp.f32 = float(var_f31);
