@@ -57,4 +57,32 @@ void clipPolygonToPlane(void* /*context*/, int32_t vertexCount, const float (*ve
     }
 }
 
+// @ 0x82147D18
+void clipPolygonToFrustum(void* context, int32_t /*unusedCount*/, const float (*vertices)[4],
+                          int32_t* outputCount, float (*output)[4], const float (*planes)[4],
+                          const float* referencePoint) {
+    alignas(16) float scratch[16][4];
+    __builtin_memcpy(scratch, vertices, 4 * sizeof(scratch[0]));
+    int32_t count = 4;
+    for (int plane = 0; plane < 6; ++plane) {
+        if (referencePoint) {
+            // vmsum3fp128 rounds the dot product to float before subtracting plane.w.
+            float dot = static_cast<float>(static_cast<double>(planes[plane][0]) * referencePoint[0] +
+                                           static_cast<double>(planes[plane][1]) * referencePoint[1] +
+                                           static_cast<double>(planes[plane][2]) * referencePoint[2]);
+            if (dot - planes[plane][3] > 0.0f) {
+                continue;
+            }
+        }
+        clipPolygonToPlane(context, count, scratch, outputCount, output, planes[plane]);
+        count = *outputCount;
+        if (count == 0) {
+            return;
+        }
+        if (count > 0) {
+            __builtin_memcpy(scratch, output, static_cast<unsigned>(count) * sizeof(scratch[0]));
+        }
+    }
+}
+
 } // namespace rage
