@@ -85,6 +85,10 @@ all fail (about 40 s).
   `t.w32(t.sp + 0x54, v)` writes the caller's frame (stack arguments) over the random fill.
   `t.args(v1=[x, y, z, w])` sets a vector register's four float32 lanes in memory
   order (v0..v127), for internal functions whose inputs use VMX registers.
+  A `uint64_t` argument arrives in one GPR on Xenon but in a register pair in the
+  PPC32 lift; point `FUNCTION`/`SOURCE` at a small adapter TU that `#include`s the
+  lift and reshuffles the registers in a naked function
+  (`specs/grc_device_flush_dirty_register_group_adapter.cpp`).
   Unset registers are random; `r1` is a fresh stack, `r13` a zeroed block.
 - `CALLS`, keyed by symbol name, address or fake-function name:
   - `stub(ret=None|int|float|"void"|fn(ctx), out={"r4": size}, args=("r3", "f1"),
