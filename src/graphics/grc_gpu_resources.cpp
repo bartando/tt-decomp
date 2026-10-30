@@ -21,6 +21,16 @@ extern "C" {
 // @ 0x8235EEC0 — takes two addresses (start, end) for a GPU memory region
 extern void rage_EEC0(void* start, void* end);
 
+extern void grcDevice_ApplyShaderState(void* device);  // @ 0x82363500
+// Packet emitters: dirty bits run from the most significant end of the 64-bit mask.
+extern void phBoundBVH_2658_p39(void* device, uint64_t mask, uint32_t firstRegister,
+                               const void* values);  // @ 0x82362658
+extern void phBoundBVH_2718(void* device, uint64_t mask, uint32_t firstRegister,
+                           const void* values);  // @ 0x82362718
+extern void phBoundBVH_2858_p39(void* device, uint64_t mask, uint32_t firstRegister,
+                               const void* values);  // @ 0x82362858
+extern void phBoundBVH_2980_p39(void* device);  // @ 0x82362980 — refresh vertex fetch state
+
 // grc_5ED0 — viewport apply function
 // @ 0x82355ED0 — applies a viewport rectangle to the GPU device
 extern void grc_5ED0(void* device, int32_t* viewportRect);
@@ -271,5 +281,81 @@ void grcDevice_WaitFence(void) {
     // The SDL_GL_SwapWindow call in sdl_PollAndSwap acts as a fence.
 }
 
+
+// Flush cached device state before draw submission, in dependency order.
+// @ 0x82363C00
+void grcDevice_FlushDirtyState(void* device) {
+    auto* data = static_cast<uint8_t*>(device);
+    auto dirty = [&](uint32_t offset) -> uint64_t& {
+        return *reinterpret_cast<uint64_t*>(data + offset);
+    };
+
+    // Helpers can dirty later groups, so reload each mask after every call.
+    if (dirty(0x30) != 0) {
+        if ((dirty(0x30) & 0x400) != 0) {
+            phBoundBVH_2980_p39(device);
+        }
+        if ((dirty(0x30) & 0x1E0) != 0) {
+            grcDevice_ApplyShaderState(device);
+        }
+        uint64_t mask = dirty(0x30) & 0xFFFFFFFFFC000000ULL;
+        if (mask != 0) {
+            phBoundBVH_2658_p39(device, mask, 0x2300, data + 0x2DF8);
+        }
+        if ((dirty(0x30) & 0x03FC0000) != 0) {
+            mask = (dirty(0x30) << 38) & 0xFF00000000000000ULL;
+            phBoundBVH_2658_p39(device, mask, 0x2380, data + 0x2E90);
+        }
+        dirty(0x30) = 0;
+    }
+
+    // Vertex and pixel float constants, 16 dwords per dirty bit.
+    if (dirty(0x10) != 0) {
+        phBoundBVH_2858_p39(device, dirty(0x10), 0x4000, data + 0x780);
+        dirty(0x10) = 0;
+    }
+    if (dirty(0x18) != 0) {
+        phBoundBVH_2858_p39(device, dirty(0x18), 0x4400, data + 0x1780);
+        dirty(0x18) = 0;
+    }
+
+    if (dirty(0x20) != 0) {
+        uint64_t mask = dirty(0x20) & 0xFFFFFFFF00000000ULL;
+        if (mask != 0) {
+            // Six dwords per vertex fetch descriptor.
+            phBoundBVH_2718(device, mask, 0x4800, data + 0x480);
+        }
+        if ((dirty(0x20) & 0x80000000) != 0) {
+            // lis -256 sign-extends on Xenon, including the upper 32 bits.
+            dirty(0x2CB0) = 0xFFFFFFFFFF000000ULL;
+            phBoundBVH_2658_p39(device, 0xFFFFFFFFFF000000ULL, 0x4900, data + 0x2780);
+        }
+        if ((dirty(0x20) & 0x3FFFC000) != 0) {
+            mask = (dirty(0x20) << 34) & 0xFFFF000000000000ULL;
+            phBoundBVH_2658_p39(device, mask, 0x2000, data + 0x2CC0);
+        }
+        dirty(0x20) = 0;
+    }
+
+    if (dirty(0x28) != 0) {
+        uint64_t mask = dirty(0x28) & 0xFFFFF80000000000ULL;
+        if (mask != 0) {
+            phBoundBVH_2658_p39(device, mask, 0x2100, data + 0x2D0C);
+        }
+        if ((dirty(0x28) & 0x000007C000000000ULL) != 0) {
+            mask = (dirty(0x28) << 21) & 0xF800000000000000ULL;
+            phBoundBVH_2658_p39(device, mask, 0x2180, data + 0x2D60);
+        }
+        if ((dirty(0x28) & 0x0000003FFC000000ULL) != 0) {
+            mask = (dirty(0x28) << 26) & 0xFFF0000000000000ULL;
+            phBoundBVH_2658_p39(device, mask, 0x2200, data + 0x2D74);
+        }
+        if ((dirty(0x28) & 0x03FFFFE0) != 0) {
+            mask = (dirty(0x28) << 38) & 0xFFFFF80000000000ULL;
+            phBoundBVH_2658_p39(device, mask, 0x2280, data + 0x2DA4);
+        }
+        dirty(0x28) = 0;
+    }
+}
 
 } // extern "C"
