@@ -4623,7 +4623,7 @@ loc_82434CD8:
 	// li r16,0
 	var_r16 = 0;
 	// bl 0x8243a348
-	fiAsciiTokenizer_A348_g(ctx, base);
+	crtIsLeadByte(ctx, base);
 	// cmpwi r3,0
 	// beq 0x82434d10
 	if (ctx.r3.s32 == 0) goto loc_82434D10;
@@ -12395,7 +12395,7 @@ loc_82437E20:
 	// stb r11,112(r1)
 	PPC_STORE_U8(ctx.r1.u32 + 112, ctx.r11.u8);
 	// bl 0x8243a348
-	fiAsciiTokenizer_A348_g(ctx, base);
+	crtIsLeadByte(ctx, base);
 	// cmpwi r3,0
 	// beq 0x82437e80
 	if (ctx.r3.s32 == 0) goto loc_82437E80;
@@ -13696,7 +13696,7 @@ loc_82438808:
 	// clrlwi r3,r23,24
 	ctx.r3.u64 = var_r23 & 0xFF;
 	// bl 0x8243a348
-	fiAsciiTokenizer_A348_g(ctx, base);
+	crtIsLeadByte(ctx, base);
 	// cmpwi r3,0
 	// beq 0x82438874
 	if (ctx.r3.s32 == 0) goto loc_82438874;
@@ -17593,8 +17593,8 @@ PPC_FUNC_IMPL(__imp__game_A340_h) {
 	return;
 }
 
-__attribute__((alias("__imp__fiAsciiTokenizer_A348_g"))) PPC_WEAK_FUNC(fiAsciiTokenizer_A348_g);
-PPC_FUNC_IMPL(__imp__fiAsciiTokenizer_A348_g) {
+__attribute__((alias("__imp__crtIsLeadByte"))) PPC_WEAK_FUNC(crtIsLeadByte);
+PPC_FUNC_IMPL(__imp__crtIsLeadByte) {
 	PPC_FUNC_PROLOGUE();
 	// lis r11,-32165
 	// rlwinm r10,r3,1,23,30

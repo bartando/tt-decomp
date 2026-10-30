@@ -68309,8 +68309,8 @@ loc_82432854:
 	return;
 }
 
-__attribute__((alias("__imp__fiAsciiTokenizer_2878_g"))) PPC_WEAK_FUNC(fiAsciiTokenizer_2878_g);
-PPC_FUNC_IMPL(__imp__fiAsciiTokenizer_2878_g) {
+__attribute__((alias("__imp__crtVsnprintfLocale"))) PPC_WEAK_FUNC(crtVsnprintfLocale);
+PPC_FUNC_IMPL(__imp__crtVsnprintfLocale) {
 	PPC_FUNC_PROLOGUE();
 	uint32_t var_r31 = 0;
 	uint32_t var_r30 = 0;
@@ -68423,7 +68423,7 @@ PPC_FUNC_IMPL(__imp__game_2958) {
 	// li r6,0
 	ctx.r6.s64 = 0;
 	// b 0x82432878
-	fiAsciiTokenizer_2878_g(ctx, base);
+	crtVsnprintfLocale(ctx, base);
 	return;
 }
 

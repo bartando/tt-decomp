@@ -1152,9 +1152,9 @@ uint32_t grmShaderFx::GetTechniquePass(int32_t passIndex) {
     const uint32_t deviceSlotTable = *reinterpret_cast<const uint32_t*>(
         reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(effectObj)) + 512);
 
-    // passDesc is a 32-bit "(shaderSlotId << 16) | (...)" packed word;
-    // the slot index is bits 16..29 and is byte-scaled (rlwinm r5,r6,16,16,29).
-    const uint32_t slotByteOffset = (passDesc >> 14) & 0xFFFC;
+    // The PPC rotate extracts bits 18..31 of the packed word as a
+    // byte offset into the slot table (rlwinm r5,r6,16,16,29).
+    const uint32_t slotByteOffset = (passDesc >> 16) & 0xFFFC;
     const uint32_t slotEntry = *reinterpret_cast<const uint32_t*>(
         reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(deviceSlotTable)) + slotByteOffset);
 

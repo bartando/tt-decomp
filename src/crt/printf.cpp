@@ -55,6 +55,7 @@ extern "C" {
     extern const unsigned char crtPrintfStates[]; // @ 0x82001D98
     extern const unsigned char* crtNullString; // @ 0x82001D8C
     extern const uint16_t* crtNullWideString; // @ 0x82001D90
+    extern void* crtLocaleData; // @ 0x825B14D8
     extern CrtPrintLocale crtPrintLocale; // @ 0x825B14D8
     extern CrtFloatFormatters crtFloatFormatters; // @ 0x825B14F0
 }
@@ -412,4 +413,30 @@ extern "C" int crtOutput(CrtFile* stream, const char* format, void* /*locale*/,
         }
     }
     return count;
+}
+
+// @ 0x8243A348 | size: 0x1C
+extern "C" int crtIsLeadByte(int ch, CrtPrintLocale*) {
+    auto table = *reinterpret_cast<const uint16_t* const*>(
+        static_cast<const unsigned char*>(crtLocaleData) + 200);
+    return table[static_cast<unsigned>(ch) & 255] & 0x8000;
+}
+
+// @ 0x82432878 | size: 0xE0
+extern "C" int crtVsnprintfLocale(unsigned char* buffer, unsigned size,
+                                  const char* format, void* locale,
+                                  const unsigned char* args) {
+    if (!format || (size && !buffer)) return invalidPrintArgument();
+    CrtFile stream;
+    stream.cursor = buffer;
+    stream.remaining = static_cast<int>(size);
+    stream.base = buffer;
+    stream.flags = 0x42;
+    int result = crtOutput(&stream, format, locale, args);
+    if (buffer) {
+        stream.remaining = static_cast<int>(static_cast<unsigned>(stream.remaining) - 1);
+        if (stream.remaining >= 0) *stream.cursor = 0;
+        else crtFlushChar(0, &stream);
+    }
+    return result;
 }

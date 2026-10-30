@@ -263683,7 +263683,7 @@
       "size": 588
     },
     "0x82432878": {
-      "name": "fiAsciiTokenizer_2878_g",
+      "name": "crtVsnprintfLocale",
       "type": "function",
       "section": ".text",
       "size": 224
@@ -264643,7 +264643,7 @@
       "size": 8
     },
     "0x8243a348": {
-      "name": "fiAsciiTokenizer_A348_g",
+      "name": "crtIsLeadByte",
       "type": "function",
       "section": ".text",
       "size": 28
@@ -358665,7 +358665,7 @@
     "aud_2478": "0x82432478",
     "fiAsciiTokenizer_2558_w": "0x82432558",
     "fiAsciiTokenizer_2628_g": "0x82432628",
-    "fiAsciiTokenizer_2878_g": "0x82432878",
+    "crtVsnprintfLocale": "0x82432878",
     "game_2958": "0x82432958",
     "strcmp": "0x82432970",
     "fiAsciiTokenizer_29B0_g": "0x824329b0",
@@ -358825,7 +358825,7 @@
     "fiAsciiTokenizer_A1F8_g": "0x8243a1f8",
     "fiAsciiTokenizer_A218_g": "0x8243a218",
     "game_A340_h": "0x8243a340",
-    "fiAsciiTokenizer_A348_g": "0x8243a348",
+    "crtIsLeadByte": "0x8243a348",
     "game_A368_h": "0x8243a368",
     "fiAsciiTokenizer_A378_v12": "0x8243a378",
     "fiAsciiTokenizer_A418_2h": "0x8243a418",
