@@ -206,6 +206,7 @@ set(SOURCES
     src/rage/math/polygon_clip.cpp
     src/rage/math/swf_matrix.cpp
     src/rage/math/mat44.cpp
+    src/rage/math/mat33.cpp
     src/game/input/button_edges.cpp
     src/game/player/player_state_queries.cpp
     src/game/misc/ccal_ring_buffer.cpp

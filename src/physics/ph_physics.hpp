@@ -868,7 +868,6 @@ struct phBoundCapsule {
     void InitializeAxisAlignedY(float halfLength, float* outMatrix);
     void InitializeAxisAlignedZ(float halfLength, float* outMatrix);
     void TransformByDirection(float halfLength, const float* direction, float* outMatrix);
-    void InitializeFromDirection(float halfLength, const float* direction, float* outMatrix);
     void SetMaterialIndex(uint32_t index);
     uint32_t GetMaterialIndex() const;
     float GetVolume() const;
