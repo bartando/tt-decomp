@@ -69,6 +69,7 @@ set(SOURCES
     src/rage/audio/audio_control_wrappers.cpp
     src/rage/audio/aud_channel_mixer.cpp
     src/rage/audio/rage_audio.cpp
+    src/rage/audio/xma_source.cpp
     src/rage/core/fsmMachine.c
     src/rage/core/game_loop.c
     src/rage/core/hsm.cpp
