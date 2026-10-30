@@ -10,4 +10,11 @@ namespace rage {
 void clipPolygonToPlane(void* context, int32_t vertexCount, const float (*vertices)[4],
                         int32_t* outputCount, float (*output)[4], const float* plane);
 
+// Clips four input vertices against six planes; referencePoint may skip planes.
+// The output must be disjoint from the input and have room for the clipped polygon.
+// If every plane is skipped, outputCount and output are left untouched.
+void clipPolygonToFrustum(void* context, int32_t unusedCount, const float (*vertices)[4],
+                          int32_t* outputCount, float (*output)[4], const float (*planes)[4],
+                          const float* referencePoint);
+
 } // namespace rage
