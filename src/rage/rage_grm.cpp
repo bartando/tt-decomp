@@ -951,3 +951,36 @@ void grmShaderFx::ReleaseResources() {
 }
 
 } // namespace rage
+
+// The edge-model builder uses this compact array for 16-bit indices.
+struct grmU16Array {
+    uint16_t* data;
+    uint16_t count;
+    uint16_t capacity;
+};
+
+extern "C" void* xe_EC88(uint32_t size);  // @ 0x820DEC88
+extern "C" uint32_t atSingleton_Find_90D0(uint32_t address);  // @ 0x820F90D0
+extern "C" void* g_sda_base;
+
+// @ 0x82378040
+uint16_t* grmU16Array_AppendSlot(grmU16Array* array) {
+    if (array->count == array->capacity) {
+        array->capacity = static_cast<uint16_t>(array->capacity + 16);
+        auto* data = static_cast<uint16_t*>(xe_EC88(static_cast<uint32_t>(array->capacity) * 2));
+        for (uint32_t i = 0; i < array->count; ++i) {
+            data[i] = array->data[i];
+        }
+        uint16_t* old = array->data;
+        if (old != nullptr && (atSingleton_Find_90D0(reinterpret_cast<uintptr_t>(old)) & 0xFF) == 0) {
+            auto* thread = *static_cast<void***>(g_sda_base);
+            void* allocator = thread[1];
+            auto** vtable = *static_cast<void***>(allocator);
+            reinterpret_cast<void (*)(void*, void*)>(vtable[2])(allocator, old);
+        }
+        array->data = data;
+    }
+    uint16_t* slot = array->data + array->count;
+    array->count = static_cast<uint16_t>(array->count + 1);
+    return slot;
+}
