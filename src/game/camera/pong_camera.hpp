@@ -44,11 +44,13 @@ struct grcViewport {
     CamMatrix44 m_cameraMtx;        // +0x040 - camera (world) matrix, copied verbatim
     CamMatrix44 m_transformMtx44;   // +0x080 - first matrix with homogeneous w
     CamMatrix44 m_secondMtx44;      // +0x0C0 - second matrix with homogeneous w
-    uint8_t     _pad_0x100[0x80];   // +0x100..+0x17F (composites rebuilt by 0x82153070)
+    CamMatrix44 m_modelViewMtx;     // +0x100 - transform * view
+    CamMatrix44 m_modelViewProjectionMtx; // +0x140 - model-view * projection
     CamMatrix44 m_cameraMtx44;      // +0x180 - camera matrix with w forced to (0, 0, 0, 1)
     CamMatrix44 m_viewMtx;          // +0x1C0 - inverse of the camera matrix, w forced to (0, 0, 0, 1)
     CamMatrix44 m_viewMtxFlipZ;     // +0x200 - m_viewMtx with its z column negated
-    uint8_t     _pad_0x240[0x80];   // +0x240..+0x2BF
+    CamMatrix44 m_projectionMtx;    // +0x240
+    CamMatrix44 m_modelScreenMtx;   // +0x280 - model-view-projection * screen
     CamMatrix44 m_screenMtx;       // +0x2C0 - pixel scale/translation (third row untouched)
     float       m_normalizedRect[4]; // +0x300 - x, y, width, height
     float       m_screenDepth;     // +0x310
@@ -70,11 +72,16 @@ struct grcViewport {
     uint8_t     _pad_0x361[0x2F];   // +0x361..+0x38F
 
     float GetAspectRatio() const;                 // @ 0x82143E98
+    void RebuildCompositeMatrices();              // @ 0x82153070
     void UpdateScreenMatrix();                    // @ 0x82152EE0
     void SetTransformMatrices(const CamMatrix44& first, const CamMatrix44& second); // @ 0x821538C0
     void SetCameraMtx(const CamMatrix44& cameraMtx);  // @ 0x821539F0
 };
 static_assert(sizeof(grcViewport) == 0x390, "grcViewport is 912 bytes");
+static_assert(offsetof(grcViewport, m_modelViewMtx) == 0x100, "");
+static_assert(offsetof(grcViewport, m_modelViewProjectionMtx) == 0x140, "");
+static_assert(offsetof(grcViewport, m_projectionMtx) == 0x240, "");
+static_assert(offsetof(grcViewport, m_modelScreenMtx) == 0x280, "");
 
 // ── camBaseCS  [vtable @ 0x82036454] ──────────────────────────
 // Base of the camera sources (CMtoCSAdapter, charViewCS); ctor @ 0x8216D9B8.
