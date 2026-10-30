@@ -246,6 +246,16 @@ makes the ball's 0.011 drag look like it applies to every swing type but 8 and 9
 (`lvx128 v10,r0,r8` at 0x82193514 reads `vmaddfp128 v10, v0, v8, v3`), and the recomp's
 comments name those instructions right.
 
+Two of those bugs come from the local restructuring passes, not from ttrecomp (whose
+generated code for these functions matches the asm):
+- `scripts/stage1_relooper.py:326-331` reuses a loop's back-edge condition as its entry
+  guard, so the first test compares the wrong registers. Seen at 0x82455148 (entry
+  compares r31/r26, output tests r27/r26), 0x82448878 and 0x824543A8; a scan finds about
+  22 more candidate loops.
+- `scripts/stage1_pass3.py:481-500` nests sequential branches to one target as if/else,
+  reversing which nodes get cleaned up in 0x82455148.
+- It also drops the f25 temporary in 0x82406778.
+
 ## Disassembly caveat
 
 `disasm/sections/.text.s` mis-decodes some AltiVec loads as `vmaddfp128`; cross-check those
