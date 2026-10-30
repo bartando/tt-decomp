@@ -88,6 +88,8 @@ struct lvlTableTop {
 struct pongControlGroup {
     void**      vtable;           // +0x00
 
+    void Update(uint8_t skipStateChanges); // @ 0x821B7038
+
     // ── virtual methods ──
     virtual void vfn_4();  // [4] @ 0x821b6748
     virtual void vfn_8();  // [8] @ 0x821b6800
