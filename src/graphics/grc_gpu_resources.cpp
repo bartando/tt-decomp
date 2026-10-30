@@ -488,4 +488,40 @@ void grcDevice_ApplyShaderState(void* device) {
     }
 }
 
+// Writes a contiguous register run, flushing the command buffer if needed.
+extern uint32_t* grcDevice_WriteRegisterRunOverflow(void* device, uint32_t* cursor,
+                                                    uint32_t firstRegister, const uint32_t* valuesBeforeRun,
+                                                    uint32_t count, uint32_t stride); // @ 0x823625A0
+
+// Callers supply a nonzero mask; bit 63 corresponds to values[0].
+// @ 0x82362658
+void grcDevice_FlushDirtyRegisterGroup(void* device, uint64_t dirty, uint32_t firstRegister,
+                                       const uint32_t* values) {
+    auto* state = static_cast<uint32_t*>(device);
+    auto* cursor = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(state[0]));
+    uint32_t offset = 0;
+    do {
+        const uint32_t skip = static_cast<uint32_t>(__builtin_clzll(dirty));
+        dirty = skip == 64 ? 0 : dirty << skip;
+        offset += skip;
+        firstRegister += skip;
+        const uint32_t count = dirty == UINT64_MAX ? 64 : static_cast<uint32_t>(__builtin_clzll(~dirty));
+        if (static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor) + count * 4) >= state[1]) {
+            const auto before = reinterpret_cast<const uint32_t*>(
+                reinterpret_cast<uintptr_t>(values) + offset * 4 - 4);
+            cursor = grcDevice_WriteRegisterRunOverflow(device, cursor, firstRegister, before, count, 1);
+            offset += count;
+            dirty = count == 64 ? 0 : dirty << count;
+        } else {
+            *++cursor = ((count - 1) << 16) | firstRegister;
+            for (uint32_t i = 0; i < count; ++i) {
+                *++cursor = values[offset++];
+                dirty <<= 1;
+            }
+        }
+        firstRegister += count;
+    } while (dirty != 0);
+    state[0] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor));
+}
+
 } // extern "C"
