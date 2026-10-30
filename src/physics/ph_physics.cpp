@@ -11653,6 +11653,129 @@ void phBound_TransformPointByMatrixInv(const float* matrix,
     pointOut[3] = 0.0f;
 }
 
+// The 0x8223E648 SAT helper consumes only xyz from each aligned vector.
+struct phQueryVector3 {
+    float xyz[3];
+};
+extern uint8_t phLevelNew_E648_wrh(const phQueryVector3* start,
+                                  const phQueryVector3* end,
+                                  const phQueryVector3* halfExtents); // @ 0x8223E648
+
+// phLevelNew_73E8 @ 0x822C73E8 | size: 0x300
+// Inferred name: query versus a broadphase octree node, not phLevelNew::this.
+// 0x822C6F60 tests the root; 0x822C7008 descends its eight-child, 64-byte nodes.
+uint8_t phLevelNew_QueryOverlapsNode(const phLevelBroadphaseNode* node, const phLevelQuery* query) {
+    // Match VMX DAZ/FTZ and dot3's single rounding; scalar FPU math stays scalar.
+    const auto flush = [](float value) {
+        uint32_t bits;
+        memcpy(&bits, &value, sizeof(bits));
+        if ((bits & 0x7F800000u) == 0) {
+            bits &= 0x80000000u;
+            memcpy(&value, &bits, sizeof(value));
+        }
+        return value;
+    };
+    const auto sub = [&](float a, float b) { return flush(flush(a) - flush(b)); };
+    const auto dot3 = [&](const float* a) {
+        return flush(static_cast<float>(static_cast<double>(flush(a[0])) * flush(a[0])
+                                      + static_cast<double>(flush(a[1])) * flush(a[1])
+                                      + static_cast<double>(flush(a[2])) * flush(a[2])));
+    };
+
+    switch (query->type) {
+    case 0: { // Sphere: circumscribed sphere, then expanded cube; tangencies excluded.
+        const float extent = node->halfWidth + node->padding;
+        const float broadRadius = __builtin_fmaf(extent, 1.7320507764816284f, query->endOrRadius[0]);
+        float offset[3];
+        for (int axis = 0; axis < 3; ++axis) {
+            offset[axis] = sub(query->start[axis], node->centre[axis]);
+        }
+        // The original explicitly continues on unordered (NaN) broad tests.
+        if (dot3(offset) >= broadRadius * broadRadius) {
+            return 0;
+        }
+        const float axisRadius = extent + query->endOrRadius[0];
+        return fabsf(offset[0]) < axisRadius && fabsf(offset[1]) < axisRadius &&
+               fabsf(offset[2]) < axisRadius;
+    }
+    case 1: { // Inline 0x822C4EB8: its start/end inputs use internal v1/v2 ABI.
+        const float extent = node->halfWidth + node->padding;
+        for (int axis = 0; axis < 3; ++axis) {
+            const float start = query->start[axis];
+            const float end = query->endOrRadius[axis];
+            const float difference = start - end;
+            // fsel chooses start/end this way even for NaN and signed zero.
+            const float lower = difference >= 0.0f ? end : start;
+            const float upper = difference >= 0.0f ? start : end;
+            if (lower >= node->centre[axis] + extent || upper <= node->centre[axis] - extent) {
+                return 0;
+            }
+        }
+        float direction[3], offset[3];
+        for (int axis = 0; axis < 3; ++axis) {
+            direction[axis] = sub(query->endOrRadius[axis], query->start[axis]);
+            offset[axis] = sub(query->start[axis], node->centre[axis]);
+        }
+        // Segment/cube SAT cross axes. Products subtracted by fmsubs are fused;
+        // the other product and the sum of absolute directions round first.
+        const float yzProduct = offset[2] * direction[1];
+        const float yz = __builtin_fmaf(offset[1], direction[2], -yzProduct);
+        if (fabsf(yz) > (fabsf(direction[1]) + fabsf(direction[2])) * extent) {
+            return 0;
+        }
+        const float zxProduct = offset[0] * direction[2];
+        const float zx = __builtin_fmaf(direction[0], offset[2], -zxProduct);
+        if (fabsf(zx) > (fabsf(direction[0]) + fabsf(direction[2])) * extent) {
+            return 0;
+        }
+        const float xyProduct = direction[0] * offset[1];
+        const float xy = __builtin_fmaf(offset[0], direction[1], -xyProduct);
+        return !(fabsf(xy) > (fabsf(direction[0]) + fabsf(direction[1])) * extent);
+    }
+    case 2: { // Infinite y cylinder: circumscribed circle, then expanded xz square.
+        const float extent = node->halfWidth + node->padding;
+        const float broadRadius = __builtin_fmaf(extent, 1.4142136573791504f, query->endOrRadius[0]);
+        const float dx = node->centre[0] - query->start[0];
+        const float dz = node->centre[2] - query->start[2];
+        const float dxSq = dx * dx;
+        if (__builtin_fmaf(dz, dz, dxSq) >= broadRadius * broadRadius) {
+            return 0;
+        }
+        const float axisRadius = extent + query->endOrRadius[0];
+        return fabsf(query->start[0] - node->centre[0]) < axisRadius &&
+               fabsf(query->start[2] - node->centre[2]) < axisRadius;
+    }
+    case 3: { // Capsule axis versus a box expanded by the capsule radius.
+        const float extent = node->halfWidth + node->padding;
+        alignas(16) phQueryVector3 fromStart, fromEnd, halfExtents;
+        for (int axis = 0; axis < 3; ++axis) {
+            const float lower = node->centre[axis] - extent;
+            const float upper = node->centre[axis] + extent;
+            // Preserve the original min/max round-trip, including cancellation.
+            const float centre = flush(flush(flush(upper) + flush(lower)) * 0.5f);
+            const float negativeLower = sub(0.0f, lower);
+            const float halfWidth = flush(flush(flush(upper) + negativeLower) * 0.5f);
+            const float step = flush(flush(query->endOrRadius[axis]) * flush(query->length));
+            const float end = flush(step + flush(query->start[axis]));
+            fromStart.xyz[axis] = sub(query->start[axis], centre);
+            fromEnd.xyz[axis] = sub(end, centre);
+            halfExtents.xyz[axis] = halfWidth + query->radius;
+        }
+        return phLevelNew_E648_wrh(&fromStart, &fromEnd, &halfExtents);
+    }
+    case 4: // Inline 0x822C4E30: point in the unpadded cube, lower < p <= upper.
+        for (int axis = 0; axis < 3; ++axis) {
+            if (node->centre[axis] - node->halfWidth >= query->start[axis] ||
+                node->centre[axis] + node->halfWidth < query->start[axis]) {
+                return 0;
+            }
+        }
+        return 1;
+    default:
+        return 1; // Unknown query types do not read the node.
+    }
+}
+
 // phLevelNew_E3D0 @ 0x822DE3D0 | size: 0x3F0
 // Inferred name: broadphase query versus an instance's world-space bound sphere.
 // r3 is a query record, not phLevelNew::this. The archetype's bound is at +0x0C;

@@ -1897,6 +1897,20 @@ static_assert(offsetof(phLevelQuery, type) == 0x30, "phLevelQuery type offset");
 
 uint8_t phLevelNew_QueryOverlapsInstance(const phLevelQuery* query, const phInst* instance); // @ 0x822DE3D0
 
+// 64-byte nodes traversed by 0x822C7008 (eight child indices per internal node).
+struct alignas(16) phLevelBroadphaseNode {
+    float padding;             // +0x00: expansion used by sphere/segment/capsule queries
+    uint8_t metadata[28];       // +0x04: state bits, child indices and leaf metadata
+    float centre[4];           // +0x20
+    float halfWidth;           // +0x30: unexpanded cube half-width (point queries)
+    uint8_t _pad34[12];
+};
+static_assert(sizeof(phLevelBroadphaseNode) == 0x40, "phLevelBroadphaseNode layout");
+static_assert(offsetof(phLevelBroadphaseNode, centre) == 0x20, "broadphase node centre offset");
+static_assert(offsetof(phLevelBroadphaseNode, halfWidth) == 0x30, "broadphase node width offset");
+
+uint8_t phLevelNew_QueryOverlapsNode(const phLevelBroadphaseNode* node, const phLevelQuery* query); // @ 0x822C73E8
+
 // ── rage::phLevelNew  [vtable @ 0x82059894] ──────────────────────────────────
 //
 // Physics world / level. Manages collision pairs, object placement,
