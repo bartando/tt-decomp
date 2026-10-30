@@ -1354,3 +1354,44 @@ void crAnimChannelQuantizeFloat::vfn_5(void* context, float time, float* outValu
 }
 
 } // namespace rage
+
+// Pointer elements use the resource-aware constructor at 0x8224DFC0.
+extern "C" void crAnimPointer_Construct(void* slot); // @ 0x8224DFC0
+extern "C" uint32_t atSingleton_Find_90D0(uint32_t address); // @ 0x820F90D0
+
+namespace rage {
+
+struct crAnimPointerArray {
+    void** data;
+    uint16_t count;
+    uint16_t capacity;
+};
+
+// Returns an unfilled slot; callers store the new animation pointer there.
+// Former auto-name: atSingleton_DE98_g.
+// @ 0x8224DE98
+void** crAnimPointerArray_AppendSlot(crAnimPointerArray* array, uint32_t growth) {
+    if (array->count == array->capacity) {
+        array->capacity = static_cast<uint16_t>(array->capacity + static_cast<uint16_t>(growth));
+        auto* data = static_cast<void**>(xe_Alloc_EC88(uint32_t(array->capacity) * 4));
+        if (data) {
+            for (uint32_t i = 0; i < array->capacity; ++i)
+                crAnimPointer_Construct(data + i);
+        }
+        for (uint32_t i = 0; i < array->count; ++i)
+            data[i] = array->data[i];
+        void** old = array->data;
+        if (old && (atSingleton_Find_90D0(reinterpret_cast<uintptr_t>(old)) & 0xFF) == 0) {
+            void** thread = *reinterpret_cast<void***>(g_sda_base);
+            void* allocator = thread[1];
+            auto** vtable = *static_cast<void***>(allocator);
+            reinterpret_cast<void (*)(void*, void*)>(vtable[2])(allocator, old);
+        }
+        array->data = data;
+    }
+    void** slot = array->data + array->count;
+    array->count = static_cast<uint16_t>(array->count + 1);
+    return slot;
+}
+
+} // namespace rage
