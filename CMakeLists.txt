@@ -90,6 +90,7 @@ set(SOURCES
     src/rage/network/snSessionStates.cpp
     src/rage/core/subsystem_init.c
     src/rage/swf.cpp
+    src/rage/swf_vm.cpp
     src/rage/core/timer.cpp
     src/rage/core/rage_core_utils.cpp
     src/rage/misc/rage_cm.cpp
