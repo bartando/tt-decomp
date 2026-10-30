@@ -271,15 +271,47 @@ void LocomotionStateAnim_88E0_g(void* bundle, void* clipTable, float t, int mode
     (void)bundle; (void)clipTable; (void)t; (void)mode; (void)opts;
 }
 
+extern void LocomotionStateAnim_AD30_g(float* dst, const float* quaternion); // @ 0x8223AD30
+
 /**
- * LocomotionStateAnim_BlendLocomotionAnims — project-internal name for one
- * of two function pointers selected at runtime in pong_player.cpp:324-325.
- * The call-site dispatches between this and TransitionLocomotionState based
- * on the player's current locomotion mode.
+ * Apply a translation (type 0) or quaternion (type 1) animation channel to
+ * the skeleton's indexed 0x50-byte bone record. The original takes the
+ * skeleton in r5; r4 and the weight in f1 are unused.
  */
-void LocomotionStateAnim_BlendLocomotionAnims(uint32_t entry, void* parent, float dt)
+// @ 0x8224C128
+void LocomotionStateAnim_BlendLocomotionAnims(uint32_t entry, void* unusedR4,
+                                            void* skeleton, float weight)
 {
-    (void)entry; (void)parent; (void)dt;
+    (void)unusedR4;
+    (void)weight;
+    auto* channel = reinterpret_cast<uint8_t*>(entry);
+    const uint8_t type = channel[5];
+    if (type > 1) {
+        return;
+    }
+
+    auto* skel = static_cast<uint8_t*>(skeleton);
+    void* data = *reinterpret_cast<void**>(skel + 4);
+    uint16_t index;
+    if (!LocomotionStateAnim_04F0_g(data, *reinterpret_cast<uint16_t*>(channel + 6), &index)) {
+        return;
+    }
+    auto* record = *reinterpret_cast<uint8_t**>(skel + 0xC) + index * 0x50;
+
+    // C1B0 inserts 7 << 1; C254 inserts 3 << 8. Both rlwimi results
+    // are always nonzero, regardless of the record/skeleton flags or ID.
+    using GetVector = const float* (*)(void*);
+    auto* vtable = *reinterpret_cast<GetVector**>(channel);
+    if (type == 1) {
+        const float* quaternion = vtable[15](channel);
+        LocomotionStateAnim_AD30_g(reinterpret_cast<float*>(record), quaternion);
+    } else {
+        const float* translation = vtable[14](channel);
+        // lvx/stvx load the whole vector before storing (including its w lane).
+        uint8_t vector[16];
+        std::memcpy(vector, translation, sizeof(vector));
+        std::memcpy(record + 0x30, vector, sizeof(vector));
+    }
 }
 
 /**
