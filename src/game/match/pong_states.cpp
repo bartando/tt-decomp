@@ -81,7 +81,7 @@ extern void* CreditsRoll_NotifyEntry(void* obj, uint32_t count);       // credit
 extern void  atSingleton_QueryEventData(void* outData, void* table);    // @ 0x82017888 — event query
 extern void* PostStateTransitionRequest(void* hsmCtx, int stateIdx); // @ 0x822228B8
 extern void  FadePageGroup(void* mgr, int type, int mode, float fadeTime, float param2); // UI fade
-extern bool  CheckButtonPressed(void* record);                    // input button state check @ 0x8225FFF8
+extern bool  CheckButtonPressed(void* record);                    // input button state check @ 0x821DFFF8
 extern uint8_t snSession_AcquireLock(void* pg);   // page group button poll
 extern uint8_t Dialog_IsComplete(void* pg);             // @ 0x820C2470 — dialog completion check
 extern void*   PageGroup_LookupText(uint32_t table, const char* key); // @ 0x820C9318 — text lookup

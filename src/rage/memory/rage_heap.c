@@ -33,6 +33,7 @@ extern void* rage_alloc(uint32_t size);                /* @ 0x820DEC88 */
 /* Global allocator context — the value at SDA[r13+0].
  * Dereferencing offset +4 from this yields the active sysMemAllocator*. */
 extern rageAllocator* g_pAllocator;
+extern void* g_sda_base; /* @ 0x82600000 */
 
 
 /* ============================================================================
@@ -81,7 +82,7 @@ void* sysMemAllocator_Allocate(void* ptr, size_t size)
 
 
 /* ============================================================================
- * sysMemAllocator_Free @ 0x82186228 | size: 0x74
+ * sysMemAllocator_FreeAligned @ 0x82186228 | size: 0x74
  *
  * Free a pointer previously returned by sysMemAllocator_Allocate.
  *
@@ -93,13 +94,14 @@ void* sysMemAllocator_Allocate(void* ptr, size_t size)
  * @param ptr  User pointer to free (as returned by sysMemAllocator_Allocate)
  * ============================================================================
  */
-void sysMemAllocator_Free(void* ptr)
+void sysMemAllocator_FreeAligned(void* ptr)
 {
     /* Get the active allocator from the SDA context */
-    struct rageAllocator* allocator = (struct rageAllocator*)g_pAllocator;
+    void** tls = *(void***)g_sda_base;
+    struct rageAllocator* allocator = (struct rageAllocator*)tls[1];
 
     /* Check if the allocator owns this address range (vtable slot 17) */
-    bool isOwned = allocator->vtable->IsAddressOwned(allocator);
+    uint8_t isOwned = (uint8_t)allocator->vtable->IsAddressOwned(allocator);
 
     if (!isOwned) {
         /* Not owned by allocator — check singleton registry */

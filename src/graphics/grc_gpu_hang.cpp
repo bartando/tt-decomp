@@ -50,8 +50,8 @@ extern void rage_DebugBuf_Append(void* pBuf, const char* pText, ...);
 /* printf-style debug console output — sub_82363FE0. */
 extern void rage_DebugPrintf(const char* pFmt, ...);
 
-/* Kernel current-fiber accessor (despite the lift's old name) — sub_82566B78. */
-extern uint32_t sys_GetGpuWatchdogTick(void);
+/* Current thread ID. */
+extern "C" uint32_t xe_GetCurrentThreadId(void);
 
 /* Flushes the accumulated debug buffer to the debug console — sub_823640E8's sink. */
 extern void rage_DebugBuf_Flush(void* pBuf);
@@ -329,7 +329,7 @@ void D3DDeviceXenon_DumpHangGpuState(void* pBuf, uint32_t /*arg1*/, uint32_t /*a
 /* ──────────────────────────────────────────────────────────────────────────── */
 struct D3DDeviceXenon {
     uint8_t     m_pad0000[0x2888];
-    uint32_t    m_gpuFiberId;                /* +0x2888 */
+    uint32_t    m_gpuThreadId;                /* +0x2888 */
     uint32_t    m_pad288C;
     uint32_t*   m_pCommandQueueHead;         /* +0x2890 */
     uint8_t     m_pad2894[0x289C - 0x2894];
@@ -371,9 +371,9 @@ int D3DDeviceXenon_ReportGPUHang(void* pHangState)
         pState->m_lastQueueHead = *pDevice->m_pCommandQueueHead;
     }
 
-    // The accessor returns the current fiber ID, not a watchdog timestamp.
-    uint32_t fiberId = sys_GetGpuWatchdogTick();
-    if (pDevice->m_gpuFiberId == fiberId && pDevice->m_progressGate != 0) {
+    // Compare the recorded GPU thread with the current thread.
+    uint32_t threadId = xe_GetCurrentThreadId();
+    if (pDevice->m_gpuThreadId == threadId && pDevice->m_progressGate != 0) {
         pState->m_lastGpuTick = curTick;
     }
     if (uint32_t(curTick - pState->m_lastGpuTick) < 2000u) {

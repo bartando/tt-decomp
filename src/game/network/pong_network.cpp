@@ -88,7 +88,7 @@ extern void pongNetMessageHolder_vfn_2_1628_1(pongNetMessageHolder* holder);
 extern pongNetMessageHolder* pongNetMessageHolder_FAE0_isl();
 extern void pongNetMessageHolder_5038_w();
 extern void rage_27C0(void* instance);
-extern "C" void sysMemAllocator_Free(void* ptr);  // 0x820C00C0 (the name is also marked 0x82186228 in gd_data.cpp)
+extern "C" void sysMemAllocator_Free(void* ptr);  // 0x820C00C0
 extern void game_5E70(void* gameState);
 extern void pongNetMessageHolder_7668_2hr(void* stateArray);
 

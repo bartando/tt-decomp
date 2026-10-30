@@ -137,14 +137,14 @@ void rage_free(void* p) {
     free(p);
 }
 
-/**
- * sysMemAllocator_Free — Free memory through the system allocator
- *
- * Thin wrapper that routes to rage_free. On Xbox 360, this went through
- * the TLS allocator's vtable slot 2 (Free) after checking thread ownership.
- */
+// The C-linkage retail free dispatches through the thread allocator.
+namespace guest_free {
+extern "C" void rage_free(void* ptr);
+}
+
+/** sysMemAllocator_Free is a host alias for the ordinary free at 0x820C00C0. */
 extern "C" void sysMemAllocator_Free(void* ptr) {
-    rage_free(ptr);
+    guest_free::rage_free(ptr);
 }
 
 // The guest r13 register points at this TLS root on the host port.

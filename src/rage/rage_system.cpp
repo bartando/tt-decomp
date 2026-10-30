@@ -19,7 +19,7 @@ extern "C" {
     void datBase_DestroyElement(void* element);                      // @ 0x820E3A50
     void datBase_DestroyArray8(void* obj);                           // @ 0x820E74B8
     void crAnimFrame_Dtor(void* obj);                                // @ 0x8224AC28
-    void sysMemAllocator_Free(void* ptr, int alignment);             // @ 0x82186228
+    void sysMemAllocator_FreeAligned(void* ptr);                    // @ 0x82186228
     void rage_ReleaseRef(void* ptr);                                 // @ 0x82352EE0
     void datBase_DestroyWithFlag(void* obj, int flags);              // @ 0x82156160
     void rage_UpdateDeviceState(void* devicePtr);                    // @ 0x82357400
@@ -224,7 +224,7 @@ void rage_crAnimFrame_Dtor(void* obj) {
 // Frees multiple render resource pointers from an object, each with a
 // different deallocation strategy:
 //   +8:  rage_free (simple heap free)
-//   +12: sysMemAllocator_Free with 16-byte alignment
+//   +12: sysMemAllocator_FreeAligned
 //   +16: conditional ref release (checks bit 24 flag)
 //   +20: datBase destructor with flag=1
 // Finally frees the object itself.
@@ -239,7 +239,7 @@ void rage_CleanupRenderResources(void* obj) {
     // Free aligned memory at offset +12
     void* alignedMem = *(void**)((uint8_t*)obj + 12);
     if (alignedMem != nullptr) {
-        sysMemAllocator_Free(alignedMem, 16);
+        sysMemAllocator_FreeAligned(alignedMem);
     }
 
     // Conditionally release ref-counted object at offset +16

@@ -964,7 +964,7 @@ void CCalMoviePlayer::SetField216(int value) {  // sub_63_2
  * Clears the fiber state flag at this+10376 with an eieio barrier.
  */
 void CCalMoviePlayer::ClearFiberFlag() {  // EB70
-    m_fiberContext = 0;
+    m_threadId = 0;
     // Original has eieio (enforce in-order I/O) — memory barrier
 }
 
@@ -1044,7 +1044,7 @@ int CCalMoviePlayer::ComputeFrameSize() {  // 3F00_h
 // External helpers used by batch 2+ functions
 extern "C" void pong_EmptyVirtualDestructor(void* obj) __asm__("_util_85C8");            // @ 0x824885C8 - base destructor
 extern "C" void phInst_Release(void* obj);            // @ 0x82460850 - physics instance release
-extern "C" void* _crt_tls_fiber_setup();         // @ 0x82566B78 - fiber context setup
+extern "C" uint32_t xe_GetCurrentThreadId();      // @ 0x82566B78
 extern "C" void _locale_register(void* ptr);     // @ 0x820C02D0 - memory dealloc
 extern "C" void pg_SleepYield(int frames);           // @ 0x82566C80 - wait N frames
 extern "C" void sysIpcHandle_Release(void* ptr) __asm__("_pg_6F48");              // @ 0x82566F48 - release page ref
@@ -1085,16 +1085,14 @@ void CCalMoviePlayer::DtorIntermediate() {
 /**
  * CCalMoviePlayer::SaveAndReplaceFiberContext @ 0x8235EB30 | size: 0x40
  *
- * If a fiber context is already stored at +10376, releases it first.
- * Then creates a new fiber context via _crt_tls_fiber_setup and stores
- * it at +10376. Used to switch video decode onto a dedicated fiber.
+ * Reads the current thread ID twice when the old ID is nonzero, then
+ * stores the final ID at +10376.
  */
 void CCalMoviePlayer::SaveAndReplaceFiberContext() {
-    if (m_fiberContext != 0) {
-        _crt_tls_fiber_setup();  // Release existing context
+    if (m_threadId != 0) {
+        xe_GetCurrentThreadId();
     }
-    void* newCtx = _crt_tls_fiber_setup();
-    m_fiberContext = (uint32_t)(uintptr_t)newCtx;
+    m_threadId = xe_GetCurrentThreadId();
 }
 
 /**
@@ -2297,10 +2295,9 @@ int32_t CCalMoviePlayer::DrainPlaybackBuffer(uint32_t statusC) {
             char* bufObj = (char*)m_pBufferObject;
             uint32_t existingCtx = *(uint32_t*)(bufObj + 10376);
             if (existingCtx != 0) {
-                _crt_tls_fiber_setup();
+                xe_GetCurrentThreadId();
             }
-            void* newCtx = _crt_tls_fiber_setup();
-            *(void**)(bufObj + 10376) = newCtx;
+            *(uint32_t*)(bufObj + 10376) = xe_GetCurrentThreadId();
         }
 
         // Lock

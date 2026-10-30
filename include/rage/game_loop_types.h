@@ -38,7 +38,7 @@ typedef struct gameLoop {
     int32_t     m_nPendingUpdates;  /* +0x1F0 (496) */
     float       m_fTargetFPS;       /* +0x1F4 (500) */
     int32_t     m_nUnknown504;      /* +0x1F8 (504) — set to -1 in ctor */
-    uint32_t    m_fiberHandle;      /* +0x1FC (508) */
+    uint32_t    m_threadId;      /* +0x1FC (508) */
     int32_t     m_nDisplayModeIdx;  /* +0x200 (512) — set to -1 in ctor */
     float       m_fDefaultFPS;      /* +0x204 (516) — copy of target FPS */
     float       m_fRefreshRate;     /* +0x208 (520) — truncated refresh rate as float */

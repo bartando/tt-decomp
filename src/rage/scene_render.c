@@ -391,15 +391,15 @@ void rage_render_scene(rageSceneRenderCtx* pThis)
 // rage_scene_cleanup @ 0x822C07E0 | size: 0xF8 (248 bytes)
 //
 // Post-frame scene cleanup. Flushes streaming buffers, resets profiling
-// brackets, copies a 16-byte matrix from a global, manages the fiber
-// context for the Bink video thread, and clears the "scene active" flag.
+// brackets, copies a 16-byte matrix from a global, records the current
+// thread ID for the Bink player, and clears the "scene active" flag.
 //
 // Called at the end of each frame after rendering completes.
 // ─────────────────────────────────────────────────────────────────────────────
 void rage_scene_cleanup(void* sceneState) {
     extern void pg_6C40_g(void* streamer);           // @ 0x82566C40 — flush streaming buffer
     extern void pgBase_AcquireRef(void* obj, int param);     // @ 0x8242C3B8 — reset profiling bracket
-    extern void* _crt_tls_fiber_setup();             // @ 0x82566B78 — get/create fiber context
+    extern uint32_t xe_GetCurrentThreadId(void);     // @ 0x82566B78
     extern void game_FrameSyncSignal(void* obj, int param);     // @ 0x82227868 — frame sync
     extern void rage_DebugLog(const char* msg, ...);
 
@@ -441,15 +441,14 @@ void rage_scene_cleanup(void* sceneState) {
     destMatrix[2] = g_sceneResetMatrix[2];
     destMatrix[3] = g_sceneResetMatrix[3];
 
-    // Manage Bink video fiber context
+    // Store the current thread ID on the Bink player
     extern void* g_binkVideoPlayer;  // @ 0x825EB988
     void* binkPlayer = g_binkVideoPlayer;
-    void* existingFiber = *(void**)((char*)binkPlayer + 10376);
-    if (existingFiber) {
-        _crt_tls_fiber_setup();  // Release existing
+    uint32_t existingThreadId = *(uint32_t*)((char*)binkPlayer + 10376);
+    if (existingThreadId) {
+        xe_GetCurrentThreadId();
     }
-    void* newFiber = _crt_tls_fiber_setup();
-    *(void**)((char*)binkPlayer + 10376) = newFiber;
+    *(uint32_t*)((char*)binkPlayer + 10376) = xe_GetCurrentThreadId();
 
     // Frame sync notification
     extern void* g_frameSyncObj;  // @ 0x825F64F4 (SDA)

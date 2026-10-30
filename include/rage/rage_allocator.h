@@ -45,7 +45,7 @@ typedef struct rageAllocatorVtable {
     void* reserved14;                                                  /* +0x38 slot 14 */
     void* reserved15;                                                  /* +0x3C slot 15 */
     void* reserved16;                                                  /* +0x40 slot 16 */
-    uint8_t (*IsAddressOwned)(void* self);                             /* +0x44 slot 17 */
+    uint32_t (*IsAddressOwned)(void* self);                             /* +0x44 slot 17 */
 } rageAllocatorVtable;
 
 /* ============================================================================
@@ -69,8 +69,8 @@ void rage_free_alias(void* ptr);
 /** sysMemAllocator_Allocate @ 0x821861A0 | size: 0x84 */
 void* sysMemAllocator_Allocate(void* ptr, size_t size);
 
-/** sysMemAllocator_Free @ 0x82186228 | size: 0x74 */
-void sysMemAllocator_Free(void* ptr);
+/** sysMemAllocator_FreeAligned @ 0x82186228 | size: 0x74 */
+void sysMemAllocator_FreeAligned(void* ptr);
 
 #ifdef __cplusplus
 }

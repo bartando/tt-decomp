@@ -147,7 +147,6 @@ unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, a
 - `fx_effects.hpp`: `fxBallTrail::AddSample` (slot 4) takes r4 and r5, declared with one arg.
 - `pong_ball.cpp`: `pongBallInstance_4980_g` is two no-op overloads; the real one takes six
   args (r3–r8). 0x8227FDB0 has two names (`UpdatePhysicsState`, `pongBallInstance_OnBallMissed`).
-- `CheckButtonPressed` is commented as 0x8225FFF8; it's 0x821DFFF8.
 - `include/game/pong_network_io.hpp` gives `BeginNetworkWrite` as "0x822288AE0" (0x82238AE0).
 - `rage_grm.cpp` declares `rage_free_00C0(uint32_t)` (truncates host pointers).
 - `ClampMovementToCourtBounds` (0x8219D558): the original stores 0 when the positive overshoot
@@ -178,12 +177,9 @@ unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, a
 - `fragDrawable::ProcessGeometry` 0x820F1C00 is really grmModel's draw (its only caller is
   rmcDrawable at 0x8225D9E4).
 - phUpdateObject slot 1 still has a FIXME body.
-- `msgMsgSink_84C0_gen` is fixed but unverified: lift-check can't run `mtmsrd`.
 - `gd_data_strings.hpp`: the `g_str_*` are probably arrays declared as pointers at wrong
   addresses (`g_str_gdTier_unknownNodeType` was; it's the string at 0x82042844).
-- `_crt_tls_fiber_setup` (0x82566B78) is GetCurrentThreadId; legacy callers still treat its ID as a fiber context.
-- `sysMemAllocator_Free` is marked with two addresses (0x82186228, 0x820C00C0);
-  `rage::ReleaseSingleton` resolves to 0x8204E6FC.
+- `rage::ReleaseSingleton` resolves to 0x8204E6FC.
 - `~pongNetMessageHolder` stores no vtables and doesn't free.
 - `globals.c`: `g_drillCleanupParam` (0x825C74FC) is gdDrillSoftShotData's class id.
 - `pong_states.hpp` and `char_view.hpp` both define `pongAttractState`; `pong_camera.hpp` and
