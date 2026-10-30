@@ -4512,7 +4512,27 @@ void pongPlayer_06A0_g(float* outVec,
 // ---------------------------------------------------------------------------
 // External forward declarations for batch 10
 // ---------------------------------------------------------------------------
-extern void* pg_9C00_g(void* inputObj, void* creature);
+extern uint32_t pongMatch_GetCharacterIndex(uint32_t playerSlot); // @ 0x821C9B70
+extern uint32_t g_plrPlayerMgr_state;  // @ 0x82606430 — manager pointer
+extern void* g_gameDataMgr;           // @ 0x8271A2E4
+extern "C" void pongMatch_LogMissingPlayerMgr(const char* message); // @ 0x8240E6D0
+
+// @ 0x821C9C00 | size: 0x5C
+// Read the selected character for a match slot. With no player manager, log
+// and use character zero; the game-data manager and its array are still used.
+void* pongMatch_GetCharacterForSlot(void* /*match*/, uint32_t playerSlot) {
+    uint32_t characterIndex = 0;
+    if (g_plrPlayerMgr_state == 0) {
+        pongMatch_LogMissingPlayerMgr(
+            reinterpret_cast<const char*>(uintptr_t{0x8203CD80u}));
+    } else {
+        characterIndex = pongMatch_GetCharacterIndex(playerSlot);
+    }
+    auto* manager = static_cast<uint8_t*>(g_gameDataMgr);
+    void** characters = *reinterpret_cast<void***>(manager + 0x18);
+    return characters[characterIndex];
+}
+
 extern void phBoundCapsule_0880_g(void* capsule, void* outMatrix, uint32_t param);
 extern float pongPlayer_C7A8_g(pongPlayer* player);
 extern void pongPlayer_B088_2hr(void* timingData, float dir, float power);
@@ -4551,10 +4571,10 @@ void pongPlayer::UpdateOpponentBoundTransform() {  // pongPlayer_4C08_g @ 0x8219
     uint8_t* opponentBytes = reinterpret_cast<uint8_t*>(m_pOpponent);
     uint8_t* characterSub = *reinterpret_cast<uint8_t**>(opponentBytes + 188);
 
-    // Look up creature in the physics system
-    void* creature = *reinterpret_cast<void**>(characterSub + 8);
-    void* lookupResult = pg_9C00_g(
-        reinterpret_cast<void*>(g_pInputArrayTable), creature);
+    // +8 is the match player slot, used to resolve its character data.
+    uint32_t playerSlot = *reinterpret_cast<uint32_t*>(characterSub + 8);
+    void* lookupResult = pongMatch_GetCharacterForSlot(
+        reinterpret_cast<void*>(g_pInputArrayTable), playerSlot);
 
     // Navigate chain: result->+44->+324 to get bound capsule
     uint8_t* chainEntry = *reinterpret_cast<uint8_t**>(

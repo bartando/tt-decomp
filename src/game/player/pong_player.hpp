@@ -98,6 +98,10 @@
 
 #include <stdint.h>
 
+// @ 0x821C9C00 — resolve a match player slot to its gdCharacter data.
+// The incoming match pointer is unused; player selection is global.
+void* pongMatch_GetCharacterForSlot(void* match, uint32_t playerSlot);
+
 // Forward declarations
 struct pcrCreature;
 struct pongTimingState;
