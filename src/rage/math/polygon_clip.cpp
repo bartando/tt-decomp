@@ -169,6 +169,30 @@ void clipPolygonToFrustum(void* context, int32_t /*unusedCount*/, const float (*
     }
 }
 
+// @ 0x82147E18
+void clipLineToFrustum(void* context, int32_t /*unusedCount*/, const float (*vertices)[4],
+                       int32_t* outputCount, float (*output)[4], const float (*planes)[4],
+                       const float* referencePoint) {
+    alignas(16) float scratch[2][4];
+    __builtin_memcpy(scratch, vertices, sizeof(scratch));
+    int32_t count = 2;
+    for (int plane = 0; plane < 6; ++plane) {
+        if (referencePoint) {
+            float dot = static_cast<float>(static_cast<double>(planes[plane][0]) * referencePoint[0] +
+                                           static_cast<double>(planes[plane][1]) * referencePoint[1] +
+                                           static_cast<double>(planes[plane][2]) * referencePoint[2]);
+            if (dot - planes[plane][3] > lbl_8202D110)
+                continue;
+        }
+        clipLineToPlane(context, count, scratch, outputCount, output, planes[plane]);
+        count = *outputCount;
+        if (count == 0)
+            return;
+        if (count > 0)
+            __builtin_memcpy(scratch, output, static_cast<unsigned>(count) * sizeof(scratch[0]));
+    }
+}
+
 // clipAabbToFrustum @ 0x821481D8 | size: 0x42C
 // Inferred name: called by the active-camera wrapper at 0x82148608 and the camera
 // fitting path at 0x82148CD8. The generated name phBoundCapsule_81D8_g is misleading.
