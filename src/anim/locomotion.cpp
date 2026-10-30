@@ -139,6 +139,40 @@ bool LocomotionStateAnim::GetAnimTransform(void* outMatrix)
 
 // ── Free-function helpers (cross-unit externs) ──────────────────────────────
 
+// @ 0x821D04F0
+bool LocomotionStateAnim_04F0_g(void* animData, uint16_t animID, uint16_t* outIndex) {
+    const uint8_t* data = static_cast<const uint8_t*>(animData);
+    const uint32_t flags = *reinterpret_cast<const uint32_t*>(data + 0x14);
+    if ((flags & 2) == 0) {
+        *outIndex = animID;
+        return true;
+    }
+
+    // The Xbox layout has a pointer at +0x18 and a uint16 count at +0x1C.
+    // Each sorted table entry is a pair of uint16 values: animation ID, output index.
+    int low = 0;
+    int high = *reinterpret_cast<const uint16_t*>(data + 0x1C) - 1;
+    if (high < 0) {
+        return false;
+    }
+
+    const uint16_t* entries = *reinterpret_cast<const uint16_t* const*>(data + 0x18);
+    while (low <= high) {
+        int mid = (low + high) / 2;
+        uint16_t entryID = entries[mid * 2];
+        if (animID == entryID) {
+            *outIndex = entries[mid * 2 + 1];
+            return true;
+        }
+        if (animID < entryID) {
+            high = mid - 1;
+        } else {
+            low = mid + 1;
+        }
+    }
+    return false;
+}
+
 extern "C" void LocomotionStateAnim_AccumNode(void* self, void* node) { (void)self; (void)node; }
 extern "C" void LocomotionStateAnim_ApplySpeed(void* self) { (void)self; }
 extern "C" void LocomotionStateAnim_ComputeOffset(void* self, void* out) { (void)self; (void)out; }
