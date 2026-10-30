@@ -12,6 +12,14 @@ extern "C" {
 extern const uint32_t lbl_82619BE0[4]; // @ 0x82619BE0 — xyz mask
 extern const uint32_t lbl_82619BD0[4]; // @ 0x82619BD0 — homogeneous w = 1
 extern const float lbl_82606740[4];    // @ 0x82606740 — zero vector
+extern const float lbl_82606750[4];    // @ 0x82606750 — normalization zero
+extern const float lbl_82619BF0[4];    // @ 0x82619BF0 — positive infinity
+extern const float lbl_825CB7C0[4];    // @ 0x825CB7C0 — (1, 1, 1, 0)
+extern const float lbl_825CB7D0[4];    // @ 0x825CB7D0 — (0.5, 0.5, 0.5, 0)
+extern const float lbl_825CA420[4];    // @ 0x825CA420 — (0.1, 0.1, 0.1, 0)
+extern const float lbl_825C8078;       // @ 0x825C8078 — 0.01
+extern const float lbl_825C5938;       // @ 0x825C5938 — -1
+extern const float lbl_8202D184;       // @ 0x8202D184 — 2
 extern const uint32_t g_boxFaceIndices[24]; // @ 0x825D4A90
 }
 
@@ -20,6 +28,7 @@ namespace rage {
 // These names describe the actual helpers, rather than their capsule/animation auto-names.
 extern void buildBoxCorners(float (*out)[4], const float* center, const float* size); // @ 0x82147EF8
 extern void invertAffineInPlace(float (*matrix)[4]); // @ 0x820D7B30
+extern bool clipAabbToActiveCamera(void* context, float (*box)[4], const float* referencePoint); // @ 0x82148608
 // LTCG leaves the output in r8, with unused integer slots r4..r7.
 extern void buildClipFrustumPlanes(void* context, uint32_t, uint32_t, uint32_t, uint32_t,
                                    float (*planes)[4], float nearClip, float farClip,
@@ -235,6 +244,91 @@ bool clipAabbToFrustum(void* context, float (*box)[4], const float (*cameraToWor
     // The original writes indeterminate stack words to center.w/size.w on success.
     // Preserve those padding lanes; the auxiliary vector is untouched on success.
     return true;
+}
+
+// projectAabbToHorizontalPlane @ 0x821493F8 | size: 0x350
+// Inferred name: the caller at 0x821490A0 projects three scene bounds onto two
+// horizontal planes. The generated name phBoundCapsule_93F8_g is misleading.
+void projectAabbToHorizontalPlane(void* context, const float (*box)[4], const float (*camera)[4],
+                                   float (*output)[4], const float* limits) {
+    bool empty = true;
+    for (unsigned lane = 0; lane < 4; ++lane) {
+        uint32_t bits;
+        __builtin_memcpy(&bits, &box[1][lane], sizeof(bits));
+        bits &= lbl_82619BE0[lane];
+        float extent;
+        __builtin_memcpy(&extent, &bits, sizeof(extent));
+        empty &= flushClipVmx(extent) == 0.0f;
+    }
+    if (!empty) {
+        alignas(16) float center[4];
+        for (unsigned lane = 0; lane < 4; ++lane)
+            center[lane] = flushClipVmx(flushClipVmx(box[0][lane]) + flushClipVmx(box[2][lane]));
+        alignas(16) float corners[8][4];
+        buildBoxCorners(corners, center, box[1]);
+
+        const float planeY = limits[1];
+        const float height = camera[4][1] - planeY;
+        float minimum[3] = {__FLT_MAX__, __FLT_MAX__, __FLT_MAX__};
+        float maximum[3] = {-__FLT_MAX__, -__FLT_MAX__, -__FLT_MAX__};
+        for (unsigned corner = 0; corner < 8; ++corner) {
+            float direction[3];
+            double lengthSum = 0.0;
+            for (unsigned axis = 0; axis < 3; ++axis) {
+                direction[axis] = flushClipVmx(flushClipVmx(corners[corner][axis]) -
+                                               flushClipVmx(camera[4][axis]));
+                lengthSum += static_cast<double>(direction[axis]) * direction[axis];
+            }
+            const float lengthSquared = flushClipVmx(static_cast<float>(lengthSum));
+            // Preserve the VMX reciprocal-square-root refinement and its separate
+            // rounding steps; cancelling normalization changes projected bounds.
+            float inverseLength = flushClipVmx(static_cast<float>(
+                1.0 / __builtin_sqrt(static_cast<double>(lengthSquared))));
+            if (inverseLength == lbl_82619BF0[0]) inverseLength = lbl_82606750[0];
+            const float inverseSquared = flushClipVmx(inverseLength * inverseLength);
+            const float halfInverse = flushClipVmx(lbl_825CB7D0[0] * inverseLength);
+            const float residual = -flushClipVmx(
+                flushClipVmx(lengthSquared * inverseSquared) - lbl_825CB7C0[0]);
+            inverseLength = flushClipVmx(flushClipVmx(residual * halfInverse) + inverseLength);
+            for (unsigned axis = 0; axis < 3; ++axis)
+                direction[axis] = flushClipVmx(direction[axis] * inverseLength);
+
+            const float reciprocalY = lbl_825C5938 / direction[1];
+            const float distance = reciprocalY * height;
+            for (unsigned axis = 0; axis < 3; ++axis) {
+                const float scaled = flushClipVmx(direction[axis] * flushClipVmx(distance));
+                const float projected = axis == 1 ? planeY :
+                    flushClipVmx(scaled + flushClipVmx(camera[4][axis]));
+                // blt/bgt skip updates only on ordered strict comparisons.
+                if (!(minimum[axis] < projected)) minimum[axis] = projected;
+                if (!(maximum[axis] > projected)) maximum[axis] = projected;
+            }
+        }
+        for (unsigned axis = 0; axis < 3; axis += 2) {
+            const float highDelta = maximum[axis] - limits[axis];
+            maximum[axis] = highDelta >= 0.0f ? limits[axis] : maximum[axis];
+            const float lowLimit = -limits[axis];
+            const float lowDelta = minimum[axis] - lowLimit;
+            minimum[axis] = lowDelta >= 0.0f ? minimum[axis] : lowLimit;
+        }
+        if (!(maximum[0] <= minimum[0]) && !(maximum[2] <= minimum[2])) {
+            const float* padding = planeY < lbl_825C8078 ? lbl_825CA420 : lbl_82606740;
+            // VMX computes size before center; w comes from uninitialized stack
+            // words in the original. Preserve the two output padding lanes here.
+            for (unsigned axis = 0; axis < 3; ++axis) {
+                const float hi = flushClipVmx(maximum[axis]);
+                const float lo = flushClipVmx(minimum[axis]);
+                const float difference = flushClipVmx(hi - lo);
+                output[1][axis] = flushClipVmx(difference + flushClipVmx(padding[axis]));
+                const float sum = flushClipVmx(hi + lo);
+                output[0][axis] = flushClipVmx(sum * (1.0f / lbl_8202D184));
+            }
+            clipAabbToActiveCamera(context, output, nullptr);
+            return;
+        }
+    }
+    for (unsigned vector = 0; vector < 3; ++vector)
+        __builtin_memcpy(output[vector], lbl_82606740, sizeof(output[vector]));
 }
 
 } // namespace rage
