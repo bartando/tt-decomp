@@ -6,10 +6,7 @@ cached source bytes, dirty masks and the +0x2CB0 sentinel at each call. They als
 change dirty masks to exercise reloads and dependencies between groups. The
 normal memory diff checks every write, with no ignored bytes or tolerance.
 
-The emitter ABI differs: Xenon uses r3=device, r4=uint64 mask, r5=register,
-r6=values; SysV PPC32 uses r3, r5:r6, r7, r8. Compare r3 normally and explicitly
-decode/compare the remaining arguments in the model; no mask bits are omitted.
-This checks the C++ call's logical values, not Xenon's single-register ABI.
+The checker normalizes emitter arguments to Xenon registers on both sides.
 """
 from liftcheck.spec import *
 
@@ -30,11 +27,7 @@ def boundary(name, source_size=0):
         device = ctx.r(3)
         logical = [name, device, ctx.read(device + 0x10, 40), ctx.read(device + 0x2CB0, 8)]
         if source_size:
-            if ctx.side == "orig":
-                mask, register, values = ctx.rec.gpr64[1], ctx.r(5), ctx.r(6)
-            else:
-                mask = (ctx.r(5) << 32) | ctx.r(6)
-                register, values = ctx.r(7), ctx.r(8)
+            mask, register, values = ctx.r64(4), ctx.r(5), ctx.r(6)
             logical.extend((mask, register, values, ctx.read(values, source_size)))
         if ctx.side == "orig":
             _original_calls.append(logical)
@@ -52,7 +45,7 @@ def boundary(name, source_size=0):
                     mask = ctx.rng.choice((0, ctx.rng.getrandbits(64), 1 << ctx.rng.randrange(64)))
                     ctx.write(device + offset, mask.to_bytes(8, "big"))
 
-    return model(check, args=("r3",))
+    return model(check, args=None if source_size else ("r3",))
 
 
 CALLS = {

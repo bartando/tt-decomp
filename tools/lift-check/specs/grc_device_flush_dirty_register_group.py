@@ -4,13 +4,13 @@ Limits: nonzero masks as guaranteed by callers; aligned, disjoint source and
 command buffers; register numbers in the caller's range. Overflow is modelled:
 the helper's arguments and input data are checked, and it returns a fresh
 cursor, but its own packet emission and buffer management are not exercised.
-The adapter translates Xenon's single-GPR uint64 argument to PPC32's pair.
+The checker translates the single-GPR uint64 argument to PPC32's pair.
 """
 from liftcheck.spec import *
 
-FUNCTION = "liftcheck_dirty_group_adapter"
+FUNCTION = "grcDevice_FlushDirtyRegisterGroup"
 ADDRESS = 0x82362658
-SOURCE = "tools/lift-check/specs/grc_device_flush_dirty_register_group_adapter.cpp"
+SOURCE = "src/graphics/grc_gpu_resources.cpp"
 TRIALS = 500
 RET = None
 

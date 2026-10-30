@@ -125,7 +125,7 @@ class Trial:
 
     # registers and symbols --------------------------------------------------
     def args(self, **regs):
-        """t.args(r3=ptr, r4=7, f1=0.5)"""
+        """Xenon registers: t.args(r3=ptr, r4=uint64_mask, f1=0.5)."""
         self.reg_args.update(regs)
 
     def sym(self, name: str) -> int:
@@ -189,13 +189,19 @@ class CallCtx:
     def r(self, n: int) -> int:
         return self.rec.gpr[n - 3]
 
+    def r64(self, n: int) -> int:
+        """A Xenon single-GPR 64-bit argument, on either side."""
+        return self.rec.gpr64[n - 3]
+
     def f(self, n: int) -> float:
         return self.rec.fpr[n - 1]
 
     def ret(self, r3=None, f1=None):
         if r3 is not None:
-            self.m.set_gpr(3, r3)
-            self.rec.ret["r3"] = r3 & 0xFFFFFFFF
+            from .abi import wide_return
+            wide = wide_return(self.sig)
+            (self.m.set_gpr64 if wide else self.m.set_gpr)(3, r3)
+            self.rec.ret["r3"] = r3 & ((1 << (64 if wide else 32)) - 1)
         if f1 is not None:
             self.m.set_fpr(1, f1)
             self.rec.ret["f1"] = f1
@@ -287,9 +293,13 @@ class run(Policy):
     """Runs the callee's original code (both sides run the same thing). transparent:
     leave it out of the call trace (a helper the lift calls and the original inlines)."""
 
-    def __init__(self, transparent=False):
+    def __init__(self, transparent=False, args=None, deref=None):
         if transparent:
             self.transparent = True
+        if args is not None:
+            self.args = args
+        if deref is not None:
+            self.deref = deref
 
     def handle(self, ctx):
         return "run"

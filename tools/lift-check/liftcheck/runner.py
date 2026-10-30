@@ -11,6 +11,7 @@ from pathlib import Path
 
 from unicorn import ppc_const as _P
 
+from . import abi
 from .build import build_lift
 from .dwarf import arg_registers
 from .machine import (ARENA_BASE, FAKE_BASE, FAKE_SIZE, IMAGE_BASE, STACK_HI, STACK_LO,
@@ -96,6 +97,8 @@ class Checker:
                                externs_override=externs,
                                fp_contract=opts.fp_contract or getattr(self.spec, "FP_CONTRACT", "on"),
                                tag=self.name)
+        for sig in [self.lift.target_sig, *self.lift.signatures.values()]:
+            list(abi.argument_moves(sig))  # reject unsupported stack-spanning uint64 signatures
         rng = self.syms.func_range(self.addr)
         if rng is None:
             raise SystemExit(f"lift-check: 0x{self.addr:08X} isn't a function in the symbol map")
@@ -219,8 +222,13 @@ class Checker:
             target = self.canonical(target)
             if sig is None:
                 sig = lift.signatures.get(target)
-            rec = CallRecord(target, [m.gpr(n) for n in range(3, 11)],
-                             [m.gpr64(n) for n in range(3, 11)],
+            compiled = side == "lift" and not m.run_frames
+            gpr = [0] * 3 + [m.gpr(n) for n in range(3, 11)]
+            gpr64 = [0] * 3 + [m.gpr64(n) for n in range(3, 11)]
+            if compiled:
+                for n, value in abi.to_xenon(sig, gpr, gpr64).items():
+                    gpr[n], gpr64[n] = value & M32, value
+            rec = CallRecord(target, gpr[3:11], gpr64[3:11],
                              [m.fpr(n) for n in range(1, 9)], m.uc.reg_read(_LR) & M32)
             pol = self._policy(target, trial)
             rec.transparent = pol.transparent
@@ -242,11 +250,17 @@ class Checker:
                 if r is None:
                     m.fault = Fault("exception", addr, f"run() policy: no size for 0x{target:08X}")
                     raise Stop()
-                if r not in m.home:
-                    m.home.append(r)
-                    m.prescan(*r)
-                if target != addr:
-                    m.uc.reg_write(_PC, target)
+                if compiled:
+                    for n, value in abi.to_xenon(sig, [0] * 3 + [m.gpr(n) for n in range(3, 11)],
+                                                [0] * 3 + [m.gpr64(n) for n in range(3, 11)]).items():
+                        m.set_gpr64(n, value)
+
+                def on_return():
+                    if abi.wide_return(sig):
+                        value = m.gpr64(3)
+                        m.set_gpr(3, value >> 32)
+                        m.set_gpr(4, value)
+                m.run_callee(r, on_return=on_return if compiled else None)
                 return
             # clobber what the callee may clobber, the same way on both sides: every
             # volatile register, or for a leaf only those it writes (MSVC's LTCG callers
@@ -281,6 +295,10 @@ class Checker:
                 v = f32_rounds(crng.uniform(-1e3, 1e3))
                 if "f1" not in keep:
                     m.set_fpr(1, v)
+            if compiled and abi.wide_return(sig):
+                value = rec.ret.get("r3", m.gpr64(3))
+                m.set_gpr(3, value >> 32)
+                m.set_gpr(4, value)
             m.uc.reg_write(_PC, rec.lr)
 
         return dispatch
@@ -393,6 +411,14 @@ class Checker:
             entry, home = self.addr, [self.orig_range]
         else:
             entry, home = self.lift.target.addr, list(self.lift_home)
+            wide = {n: (v | 0xFFFFFFFF00000000) if v & 0x80000000 else v
+                    for n, v in enumerate(regs["gpr"])}
+            wide.update(regs.get("gpr64", {}))
+            updates = abi.to_lift(self.lift.target_sig, regs["gpr"], wide)
+            if updates:
+                regs = {**regs, "gpr": regs["gpr"][:], "gpr64": dict(regs.get("gpr64", {}))}
+                for n, value in updates.items():
+                    regs["gpr"][n], regs["gpr64"][n] = value & M32, value
         res = m.run(side, entry, home, self._dispatcher(side, t, counts, self.opts.seed, trial_no),
                     regs, vregs)
         final = {}
@@ -663,15 +689,13 @@ class Checker:
                     raise Divergence(f"call #{k + 1} to {name}: {reg} = {a.fpr[n]!r} (original) vs "
                                      f"{b.fpr[n]!r} (lift)", self.call_context(oc, lc, k, t))
                 continue
-            if ":" in reg:
-                hi, lo = (int(x[1:]) - 3 for x in reg.split(":"))
-                av = a.gpr64[hi]
-                bv = (b.gpr[hi] << 32) | b.gpr[lo]
-                if av != bv:
-                    raise Divergence(f"call #{k + 1} to {name}: 64-bit arg 0x{av:X} vs 0x{bv:X}",
-                                     self.call_context(oc, lc, k, t))
-                continue
             n = int(reg[1:]) - 3
+            if ty is not None and ty.kind == "int" and ty.size == 8:
+                av, bv = a.gpr64[n], b.gpr64[n]
+                if av != bv:
+                    raise Divergence(f"call #{k + 1} to {name}: {reg} (64-bit) = 0x{av:016X} "
+                                     f"(original) vs 0x{bv:016X} (lift)", self.call_context(oc, lc, k, t))
+                continue
             size = ty.size if ty is not None and ty.kind == "int" else 4
             mask = (1 << (8 * size)) - 1
             av, bv = a.gpr[n] & mask, b.gpr[n] & mask
@@ -727,6 +751,10 @@ class Checker:
         for reg, ty in arg_registers(sig):
             if reg.startswith("f"):
                 parts.append(f"{reg}={regs['fpr'][int(reg[1:])]!r}")
+            elif ty.kind == "int" and ty.size == 8:
+                n = int(reg[1:])
+                default = g[n] | (0xFFFFFFFF00000000 if g[n] & 0x80000000 else 0)
+                parts.append(f"{reg}=0x{regs.get('gpr64', {}).get(n, default):016X}")
             elif ":" not in reg:
                 parts.append(f"{reg}=0x{g[int(reg[1:])]:08X}")
         return ["inputs: " + " ".join(parts)]

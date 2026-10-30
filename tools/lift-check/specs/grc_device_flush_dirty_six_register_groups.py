@@ -3,14 +3,13 @@
 Limits: the caller supplies a nonzero mask confined to the upper 32 bits;
 source and command buffers are aligned and disjoint. Overflow and rollover
 are modeled, including their arguments and returned cursors, but their own
-buffer management and packet emission are not exercised. The adapter maps
-Xenon's single-GPR uint64 argument to PPC32's register pair.
+buffer management and packet emission are not exercised.
 """
 from liftcheck.spec import *
 
-FUNCTION = "liftcheck_dirty_six_adapter"
+FUNCTION = "grcDevice_FlushDirtySixRegisterGroups"
 ADDRESS = 0x82362718
-SOURCE = "tools/lift-check/specs/grc_device_flush_dirty_six_register_groups_adapter.cpp"
+SOURCE = "src/graphics/grc_gpu_resources.cpp"
 TRIALS = 500
 RET = None
 
