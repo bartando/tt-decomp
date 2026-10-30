@@ -59,6 +59,23 @@ extern "C" {
 
 extern bool CheckButtonPressed(void* record);  // @ 0x821DFFF8
 
+extern int rage_2A78(int primitiveType, int vertexCount);  // @ 0x82152A78
+extern uint32_t g_fxVertexCursor;  // @ 0x825EBA74
+extern uint32_t g_fxCountOnly;     // @ 0x825EBA84
+extern uint32_t g_fxVertexCount;   // @ 0x825EBA88
+extern uint32_t g_fxCurrentColor; // @ 0x825CA604
+extern float g_fxVertexNormalX;   // @ 0x825EBA6C
+extern float g_fxVertexNormalY;   // @ 0x825EBA80
+extern float g_fxVertexNormalZ;   // @ 0x825EBA8C
+extern float g_fxVertexU;         // @ 0x825EBA78
+extern float g_fxVertexV;         // @ 0x825EBA70
+extern const float g_fxVertexDepth; // @ 0x8202D110
+extern const float g_swfAtlasUVScale; // @ 0x820290EC
+extern float g_swfPixelScaleX;    // @ 0x82602824
+extern float g_swfPixelScaleY;    // @ 0x8260283C
+extern void (*g_swfBindFontTexture)(void* texture); // @ 0x82602820
+extern void* g_binkVideoPlayer;   // @ 0x825EB988 — graphics device (legacy global name)
+
 // @ 0x823FA768
 extern "C" const char* util_A768_1(const void* value, void* buffer, int maxLen) {
     // The VM uses an 8-byte {payload, tag} pair, with 32-bit guest pointers.
@@ -119,6 +136,104 @@ extern void* g_swfScriptArrayPool;   // @ SDA offset 19552
 extern const char* g_str_swf_unsupportedMethod;  // @ 0x82075054, defined in pong_strings.cpp
 
 namespace rage {
+
+struct swfAtlasGlyph {
+    float u, v, width, height;  // Atlas texels.
+    float left, top, right, bottom; // Glyph bounds relative to the text pen.
+};
+static_assert(sizeof(swfAtlasGlyph) == 32);
+
+struct swfFontAtlas {
+    void** textures;
+    const swfAtlasGlyph* glyphs;
+    uint32_t reserved;
+    const uint8_t* textureIndices; // Optional per-glyph texture page; otherwise page 0.
+};
+
+struct swfGlyphRenderState {
+    float matrix[6]; // a, b, c, d, tx, ty
+    void* texture;
+};
+extern swfGlyphRenderState g_swfGlyphRenderState; // @ 0x82606120
+
+namespace {
+struct swfGlyphVertex {
+    float position[3];
+    float normal[3];
+    uint32_t color;
+    float uv[2];
+};
+static_assert(sizeof(swfGlyphVertex) == 36);
+}
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("fp-contract=off")
+#endif
+// Formerly pongShadowMap_3970_w. Text renderers at 0x82404340 and 0x82404CF8
+// supply a font atlas, pen coordinates, text scale and a resolved glyph index.
+// @ 0x82403970
+void swfDrawFontGlyph(const swfFontAtlas* atlas, float x, float y, float scale, int glyphIndex) {
+#if defined(__clang__)
+#pragma clang fp contract(off)
+#endif
+    if (!atlas->textures) return;
+    void* texture = atlas->textures[atlas->textureIndices ? atlas->textureIndices[glyphIndex] : 0];
+    if (g_swfGlyphRenderState.texture != texture) {
+        g_swfGlyphRenderState.texture = texture;
+        g_swfBindFontTexture(texture);
+    }
+    const swfAtlasGlyph* glyph = atlas->glyphs + glyphIndex;
+    rage_2A78(4, 4);
+
+    const float depth = g_fxVertexDepth;
+    const float normalX = g_fxVertexNormalX;
+    const float normalY = g_fxVertexNormalY;
+    const float normalZ = g_fxVertexNormalZ;
+    const uint32_t countOnly = g_fxCountOnly;
+    for (unsigned corner = 0; corner < 4; ++corner) {
+        const bool right = corner == 0 || corner == 2;
+        const bool bottom = corner < 2;
+        const float px = ((right ? glyph->right : glyph->left) + x) * scale;
+        const float py = (bottom ? glyph->bottom + y : y + glyph->top) * scale;
+        const float* m = g_swfGlyphRenderState.matrix;
+        // fmuls rounds each x product before fmadds; translation and pixel
+        // scaling also round separately. Do not contract the whole expression.
+        const float xProduct = px * m[0];
+        const float yProduct = px * m[1];
+        const float screenX = (std::fma(py, m[2], xProduct) + m[4]) * g_swfPixelScaleX;
+        const float screenY = (std::fma(py, m[3], yProduct) + m[5]) * g_swfPixelScaleY;
+        const float u = (right ? glyph->u + glyph->width : glyph->u) * g_swfAtlasUVScale;
+        const float v = (bottom ? glyph->height + glyph->v : glyph->v) * g_swfAtlasUVScale;
+        if (corner == 3) {
+            g_fxVertexU = u;
+            g_fxVertexV = v;
+        }
+        if (countOnly == 0 || g_fxVertexCursor != 0) {
+            auto* vertex = reinterpret_cast<swfGlyphVertex*>(static_cast<uintptr_t>(g_fxVertexCursor));
+            g_fxVertexCursor += sizeof(swfGlyphVertex);
+            vertex->position[0] = screenX;
+            vertex->position[1] = screenY;
+            vertex->position[2] = depth;
+            vertex->normal[0] = normalX;
+            vertex->normal[1] = normalY;
+            vertex->normal[2] = normalZ;
+            vertex->color = g_fxCurrentColor;
+            vertex->uv[0] = u;
+            vertex->uv[1] = v;
+        }
+    }
+    g_fxVertexCount += 4;
+    if (g_fxVertexCursor != 0) {
+        g_fxVertexCursor = 0;
+        auto* device = static_cast<uint32_t*>(g_binkVideoPlayer);
+        device[0] = device[13652 / 4];
+    }
+    g_fxCountOnly = 0;
+}
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC pop_options
+#endif
 
 // @ 0x823FB018
 void swfRebuildTransform(void* transform) {
