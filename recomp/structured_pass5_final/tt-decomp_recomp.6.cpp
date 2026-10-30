@@ -73224,7 +73224,7 @@ loc_821D095C:
 	temp.u32 = PPC_LOAD_U32(var_r30 + 40);
 	ctx.f1.f64 = double(temp.f32);
 	// bl 0x82175d88
-	phBoundCapsule_5D88_g(ctx, base);
+	phMatrix_RotateZ(ctx, base);
 	// lfs f0,48(r30)
 	ctx.fpscr.disableFlushMode();
 	temp.u32 = PPC_LOAD_U32(var_r30 + 48);

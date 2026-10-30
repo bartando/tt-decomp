@@ -10,6 +10,7 @@
  */
 
 #include "pong_player.hpp"
+#include "../creature/pong_creature.hpp"
 #include <cstring>   // memset
 #include <cmath>     // fabsf
 #include <cfloat>    // FLT_MAX
@@ -41,7 +42,6 @@ extern void LocomotionStateAnim_TransitionLocomotionState(uint32_t entry, void* 
 // ── External game helpers referenced by pong_player.cpp ───────────────────
 
 namespace rage { void UnbindObject(void* obj, void* arg); }  // @ atSingleton suite
-extern void phBoundCapsule_UpdateTransform(void* bound);  // only r3 used; r4-r6 computed internally
 extern const float g_kSwingRadiusConst;  // constant from .rdata
 extern const vec3  g_kZero_vec3;         // zero vector constant
 extern const float g_kZero;              // zero float constant
@@ -537,7 +537,7 @@ void pongPlayer::ScalarDtor(int flags)
 // Operations, in order:
 //  1. Call vtable slot 3 on m_pPhysicsBody with (body+16) as argument —
 //     updates the physics pose / bounding box for the current frame.
-//  2. Call phBoundCapsule_UpdateTransform on m_pPhysicsBound — updates the capsule.
+//  2. Call pongMover::UpdateVelocity on the mover at +0xA8.
 //  3. If m_pPlayerState->m_pSwingData exists, call its vtable slot 1 with
 //     the capsule radius float (from g_kSwingRadiusConst) — notifies the
 //     swing data object of the current body scale.
@@ -559,8 +559,8 @@ void pongPlayer::UpdatePhysicsAndSwingInput()
                                      static_cast<uint8_t*>(m_pPhysicsBody) + 16);
     }
 
-    // ── 2. Capsule shape update ───────────────────────────────────────────
-    phBoundCapsule_UpdateTransform(m_pPhysicsBound);
+    // ── 2. Movement velocity update ───────────────────────────────────────
+    static_cast<pongMover*>(m_pPhysicsBound)->UpdateVelocity();
 
     // ── 3. Notify swing data of current capsule radius ────────────────────
     pongSwingData* swingData = m_pPlayerState ? m_pPlayerState->m_pSwingData : nullptr;
@@ -5167,7 +5167,6 @@ extern "C" void pongPlayer_StateHandler_91E8(void* /*self*/) {}  // @ 0x821991E8
 
 // ── Externals specific to this batch ─────────────────────────────────────
 extern "C" bool pongPlayer_D598_g(pongPlayer* self);                 // IsRecovering (already lifted at method level)
-extern "C" void phBoundCapsule_A080_g(void* bound);                  // @ 0x820CA080 — rebuild bound pose from body
 extern void pongPlayer_B208_g(void* state, vec3* swingVec,
                               uint8_t suppressFlip);                 // @ 0x820CB208 — apply swing vec (stub above)
 extern "C" void pongPlayer_9CD0_g(void*, int, void*, void*);         // @ 0x821C9CD0 — per-player input poll (stub above)
@@ -5227,8 +5226,8 @@ extern "C" void pongPlayer_5FB8_g(pongPlayer* self) {
         bodyUpdate(body, static_cast<uint8_t*>(body) + 16);
     }
 
-    // Step 2: rebuild collision capsule world transform.
-    phBoundCapsule_A080_g(self->m_pPhysicsBound);
+    // Step 2: update the creature mover's blended velocity.
+    static_cast<pongMover*>(self->m_pPhysicsBound)->UpdateVelocity();
 
     // Step 3: if the inner state exposes a body-anim sub-object, run its
     // vtable slot 1 with the global swing radius constant.

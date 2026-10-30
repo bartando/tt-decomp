@@ -17707,7 +17707,7 @@ PPC_FUNC_IMPL(__imp__phBoundCapsule_7A10_g) {
 		ctx.fpscr.disableFlushMode();
 		ctx.f1.f64 = var_f31;
 		// bl 0x820c3f98
-		phBoundCapsule_3F98_g(ctx, base);
+		ph_BuildRotationMatrixY(ctx, base);
 	}
 loc_823F7AD0:
 	// addi r4,r1,96

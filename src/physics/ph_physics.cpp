@@ -857,7 +857,9 @@ float ph_GetCapsuleRadius(void* capsule) {
     return *(float*)(obj + 28);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+extern double crt_cos(double angle); // @ 0x824302B0
+extern double crt_sin(double angle); // @ 0x824301D8
+
 // Build a padded 3x3 X rotation from one double-precision angle.
 // ph_BuildRotationMatrixX (was phBoundCapsule_3F10_g) @ 0x820C3F10 | size: 0x84
 // The three padding words and any translation row remain untouched.
@@ -875,31 +877,20 @@ void ph_BuildRotationMatrixX(float* matrix, double angle) {
     matrix[10] = cosine;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ph_BuildRotationMatrixY @ 0x820C3F98 | size: 0x84
-//
-// Initializes a capsule structure with computed geometry values.
-// Sets up a horizontal capsule aligned along the X axis.
-// ─────────────────────────────────────────────────────────────────────────────
-void ph_BuildRotationMatrixY(void* capsule, float length, float radius) {
-    uint8_t* obj = (uint8_t*)capsule;
-    
-    float normalizedLength = ph_Cosf(length);
-    float transformedRadius = ph_Sinf(radius);
-    
-    const float one = g_floatOne;  // 1.0f
-    const float zero = g_floatZero;
-    
-    // Initialize capsule geometry
-    *(float*)(obj + 0) = normalizedLength;    // Start cap X
-    *(float*)(obj + 4) = one;                 // Start cap Y
-    *(float*)(obj + 8) = -transformedRadius;  // Start cap Z (negated radius)
-    *(float*)(obj + 16) = one;                // Direction X
-    *(float*)(obj + 20) = zero;               // Direction Y
-    *(float*)(obj + 24) = one;                // Direction Z
-    *(float*)(obj + 32) = transformedRadius;  // End cap offset
-    *(float*)(obj + 36) = one;                // Padding
-    *(float*)(obj + 40) = normalizedLength;   // Total length
+// Padded 3x3 Y rotation; padding and translation remain untouched.
+// ph_BuildRotationMatrixY (was phBoundCapsule_3F98_g) @ 0x820C3F98 | size: 0x84
+void ph_BuildRotationMatrixY(float* matrix, double angle) {
+    const float cosine = static_cast<float>(crt_cos(angle));
+    const float sine = static_cast<float>(crt_sin(angle));
+    matrix[0] = cosine;
+    matrix[1] = 0.0f;
+    matrix[2] = -sine;
+    matrix[4] = 0.0f;
+    matrix[5] = 1.0f;
+    matrix[6] = 0.0f;
+    matrix[8] = sine;
+    matrix[9] = 0.0f;
+    matrix[10] = cosine;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1007,7 +998,7 @@ void phBoundCapsule_InitFromTemplate(void* capsule, void* sourceObj) {
     if (flags == 0) {
         // Apply radius transformation
         const float defaultRadius = g_capsuleRadius;
-        ph_BuildRotationMatrixY(capsule, defaultRadius, 0.0f);
+        ph_BuildRotationMatrixY(static_cast<float*>(capsule), defaultRadius);
     }
     
     // Copy transformation matrix from source object (offset +384, 16 bytes)
@@ -1156,47 +1147,6 @@ float rage::phBoundCapsule::ComputeExtent(float param1, float param2) const {
 
     // General case: compute extent with both parameters
     return ph_Atan2f(param1, param2);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// rage::phBoundCapsule::InitializeAxisAlignedY @ 0x820C3F98 | size: 0x84
-//
-// Initializes a capsule aligned along the Y axis.
-// Sets up a 3x3 orientation matrix with Y-axis alignment.
-//
-// Parameters:
-//   halfLength - Half the length of the capsule along Y axis
-//   outMatrix - Pointer to 44-byte output structure (3x3 matrix + padding)
-// ─────────────────────────────────────────────────────────────────────────────
-void rage::phBoundCapsule::InitializeAxisAlignedY(float halfLength, float* outMatrix) {
-    // Compute capsule parameters
-    float minBound = ph_Cosf(halfLength);
-    float maxBound = ph_Sinf(halfLength);
-    
-    const float* constants = &g_floatOne;  // constant table base
-    const float one = constants[0];   // +0 = 1.0f
-    const float zero = constants[2];  // +8 = 0.0f
-    
-    // Initialize matrix for Y-axis alignment
-    // Row 0: [minBound, 0, 0]
-    outMatrix[0] = minBound;
-    outMatrix[1] = zero;
-    outMatrix[2] = zero;
-    
-    // Row 1: [0, 0, -maxBound]
-    outMatrix[4] = zero;
-    outMatrix[5] = zero;
-    outMatrix[6] = -maxBound;
-    
-    // Row 2: [0, one, 0]
-    outMatrix[8] = zero;
-    outMatrix[9] = one;
-    outMatrix[10] = zero;
-    
-    // Additional fields
-    outMatrix[8] = maxBound;   // +32
-    outMatrix[9] = zero;       // +36
-    outMatrix[10] = minBound;  // +40
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -6254,40 +6204,6 @@ float rage::phBoundCapsule::SumFloatArray(int count) const {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 6. rage::phBoundCapsule::RotateVectorsAlt @ 0x82175D88 | size: 0xB0 (176B)
-//
-// Like mat33RotateX but operates on vectors at offsets +0 and +16
-// instead of +16 and +32. This is the alternate pair of capsule axis vectors.
-//
-// Applies the same 2D rotation:
-//   vec_at_16 = vec_at_16 * cos - vec_at_0 * sin
-//   vec_at_0  = vec_at_0 * cos  + vec_at_16_orig * sin
-// ─────────────────────────────────────────────────────────────────────────────
-void rage::phBoundCapsule::RotateVectorsAlt() {
-    float sinVal, cosVal;
-    rage::cosSin(&sinVal, &cosVal, 0.0);
-
-    // Load vectors
-    float* vec0  = (float*)((char*)this + 0);    // +0x00
-    float* vec16 = (float*)((char*)this + 16);   // +0x10
-
-    float orig_vec16[4], orig_vec0[4];
-    for (int i = 0; i < 4; i++) {
-        orig_vec16[i] = vec16[i];
-        orig_vec0[i] = vec0[i];
-    }
-
-    // new_vec16 = vec16 * cos - vec0 * sin
-    for (int i = 0; i < 4; i++) {
-        vec16[i] = orig_vec16[i] * sinVal - orig_vec0[i] * cosVal;
-    }
-    // new_vec0 = vec0 * cos + vec16_orig * sin
-    for (int i = 0; i < 4; i++) {
-        vec0[i] = orig_vec0[i] * sinVal + orig_vec16[i] * cosVal;
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // 7. rage::phBoundCapsule::NormalizeVector2D @ 0x82199048 | size: 0xB8 (184B)
 //
 // Normalizes a 2D vector (x, y stored at +0 and +4 of this object).
@@ -9020,6 +8936,24 @@ static float phDotVmx(const float* a, const float* b, unsigned count) {
     return phFlushVmx(static_cast<float>(sum));
 }
 
+// Rotate the first two complete vec4 rows; the Z and translation rows are untouched.
+// phMatrix_RotateZ (was phBoundCapsule_5D88_g) @ 0x82175D88 | size: 0xB0
+void phMatrix_RotateZ(float* matrix, double angle) {
+    float cosine, sine;
+    rage::cosSin(&cosine, &sine, angle);
+    float x[4], y[4];
+    memcpy(x, matrix, sizeof(x));
+    memcpy(y, matrix + 4, sizeof(y));
+    for (unsigned lane = 0; lane < 4; ++lane) {
+        const float xc = phFlushVmx(phFlushVmx(x[lane]) * phFlushVmx(cosine));
+        const float yc = phFlushVmx(phFlushVmx(y[lane]) * phFlushVmx(cosine));
+        const float xs = phFlushVmx(phFlushVmx(x[lane]) * phFlushVmx(sine));
+        const float ys = phFlushVmx(phFlushVmx(y[lane]) * phFlushVmx(sine));
+        matrix[4 + lane] = phFlushVmx(-(xs - yc));
+        matrix[lane] = phFlushVmx(xc + ys);
+    }
+}
+
 // In-place A * inverse(B) for orthonormal row-vector transforms.
 // phMatrix_TransposeMultiply3x4 (was ph_81C8) @ 0x821181C8 | size: 0xB0
 // The final vmrghw packs each input row's X bits into its output W lane.
@@ -9192,7 +9126,7 @@ void CPeakMeterEffect_Create(void* config, void* allocator, void** outResult) {
 
 // (BB88, BAF0 already lifted above as CheckValueSign/CheckScaledValueSign)
 
-// (F420, 5D88 already lifted above as GetJointLimitsForAxis/RotateVectorsAlt)
+// (F420 and 5D88 are lifted as GetJointLimitsForAxis and phMatrix_RotateZ)
 
 /**
  * phBoundCapsule_26B8 @ 0x821426B8 | size: 0x84 (132 bytes)
@@ -9528,8 +9462,7 @@ extern const float g_phTaperedCapsuleVolK2;  // @ 0x82079B30 (.rdata) pi
 extern void  ph_1B78(void* dst, void* src, float radius, float halfLen);
 extern void* g_phBoundTaperedCapsuleUpdateImpl; // @ 0x826066E4: object pointer, slot 5 of *its* vtable is called
 // Shared phBound helpers (deferred to ph_math consolidation batch).
-extern void phBound_CalcAABB_Base(void* self, const float* matrix);     // phBound_vfn_3 @ 0x8228D0E8
-extern void phBound_NormalizeTaperedDir(void* self);                    // vrsqrt+vmul helper
+extern void phBound_TransformWorldCentroid(void* self, const float* matrix); // @ 0x8228D0E8
 
 namespace rage {
 
@@ -9663,53 +9596,39 @@ void phBoundTaperedCapsule::RecalcBounds() {
     }
 }
 
-/**
- * phBoundTaperedCapsule::CalcAABB (vfn_3) @ 0x8233AB98 | size: 0x19C
- *
- * Dispatches to the base phBound::CalcAABB to copy the world matrix into
- * the object, then rebuilds the transformed oriented-box volume used by
- * the broadphase.  The fixed constants at lbl_82025418 / lbl_82025428
- * carry the capsule-specific axis masks (unit Y, identity XZ).
- *
- * Layout effects (relative to `this`):
- *   +0x0180 / +0x0190 — cached tapered direction and radii snapshot
- *   +0x0030          — transformed direction vector
- *   +0x00E0          — normalised cap direction used by broadphase sweep
- *
- * The recomp is dominated by PPC vmrghw/vmrglw shuffles producing a
- * matrix-times-extent multiply.  Lifted here to plain vec4 ops.
- */
-void phBoundTaperedCapsule::CalcAABB() {
-    // Early-out when the "dirty" flag at +0x7 is clear.
-    const uint8_t dirty = reinterpret_cast<const uint8_t*>(this)[7];
-    if (dirty == 0) return;
-
-    // Chain to base implementation (phBound_vfn_3 / 0x8228D0E8).
-    extern void phBound_CalcAABB_Base(void* self, const float* matrix);
-    phBound_CalcAABB_Base(this, nullptr);
-
-    float* fthis = reinterpret_cast<float*>(this);
-    const float radB = fthis[36];                  // +0x90
-    const float K    = g_phTaperedCapsuleVolK1;    // ≈ 0.5 tapered mid
-    const float Kneg = -K;                         // paired constant
-
-    // Write tapered snapshot at +0xC0 / +0xD0.
-    fthis[48] = Kneg;           // +0xC0
-    fthis[49] = radB * K;       // +0xC4
-    fthis[50] = Kneg;           // +0xC8
-    fthis[52] = Kneg;           // +0xD0
-    fthis[54] = radB * K;       // +0xD8
-    // Remaining scratch rows mirror the +0xC0 row (capsule symmetry).
-    fthis[53] = Kneg;
-    fthis[55] = Kneg;
-
-    // The SIMD block at 0x8233AC68..0x8233AD00 builds two 4x4 transforms,
-    // multiplies them against the local direction vector, then stores the
-    // rebroadcast result back at +0xC0/+0xD0 and normalises the +0xE0
-    // direction vector.  That matrix math is deferred to the shared
-    // phBound matrix helper introduced alongside phBoundBox::CalcAABB.
-    extern void phBound_NormalizeTaperedDir(void* self);
-    phBound_NormalizeTaperedDir(this);
+// Cache world-space cap centres and their unit direction, when enabled at +7.
+// phBoundTaperedCapsule::TransformEndpoints (vfn_3) @ 0x8233AB98 | size: 0x19C
+void phBoundTaperedCapsule::TransformEndpoints(const float* matrix) {
+    if (reinterpret_cast<const uint8_t*>(this)[7] == 0) return;
+    phBound_TransformWorldCentroid(this, matrix);
+    float* bound = reinterpret_cast<float*>(this);
+    bound[48] = bound[50] = bound[52] = bound[54] = 0.0f;
+    bound[49] = bound[36] * -0.5f;
+    bound[53] = bound[36] * 0.5f;
+    // Preserve each scratch endpoint's preexisting w through the vector addition.
+    for (unsigned lane = 0; lane < 4; ++lane)
+        bound[48 + lane] = phFlushVmx(phFlushVmx(bound[48 + lane]) + phFlushVmx(bound[12 + lane]));
+    for (unsigned lane = 0; lane < 4; ++lane)
+        bound[52 + lane] = phFlushVmx(phFlushVmx(bound[52 + lane]) + phFlushVmx(bound[12 + lane]));
+    for (unsigned endpoint = 48; endpoint <= 52; endpoint += 4) {
+        float point[4], result[4];
+        memcpy(point, bound + endpoint, sizeof(point));
+        point[3] = 1.0f;
+        for (unsigned axis = 0; axis < 3; ++axis) {
+            const float column[4] = {matrix[axis], matrix[4 + axis],
+                                     matrix[8 + axis], matrix[12 + axis]};
+            result[axis] = phDotVmx(point, column, 4);
+        }
+        memcpy(result + 3, point, sizeof(float)); // vmrghw carries point.x into w
+        memcpy(bound + endpoint, result, sizeof(result));
+    }
+    for (unsigned lane = 0; lane < 4; ++lane)
+        bound[56 + lane] = phFlushVmx(phFlushVmx(bound[52 + lane]) - phFlushVmx(bound[48 + lane]));
+    const float length2 = phDotVmx(bound + 56, bound + 56, 3);
+    // VMX reciprocal-square-root estimate, as modeled by lift-check (exact rsqrt).
+    const float inverseLength = phFlushVmx(static_cast<float>(1.0 / __builtin_sqrt(static_cast<double>(length2))));
+    for (unsigned lane = 0; lane < 4; ++lane)
+        bound[56 + lane] = phFlushVmx(phFlushVmx(bound[56 + lane]) * inverseLength);
 }
 
 /**
@@ -10271,18 +10190,6 @@ void phBoundCapsule_5138_g(void* out, const void* a, const void* b) {
         // Zero out +0, +16, +32 (three 16-byte vectors).
         memset(out, 0, 48);
     }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// phBoundCapsule_A080_g @ 0x820CA080 | size: 0x30C
-//   Complex capsule-resolve helper (562 recomp lines).  Loads the capsule's
-//   current world matrix from +96, steps through the bound's colliders,
-//   and applies damping/offsets from .rdata constants.  Full lift deferred;
-//   leave as a scaffold sink so linking succeeds for the subsystems that
-//   invoke it but never assert on output.
-// ─────────────────────────────────────────────────────────────────────────────
-void phBoundCapsule_A080_g(void* capsule) {
-    (void)capsule;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

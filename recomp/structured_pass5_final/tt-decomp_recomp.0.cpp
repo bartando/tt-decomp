@@ -7958,7 +7958,7 @@ PPC_FUNC_IMPL(__imp__LocomotionStateAnim_3D48_g) {
 	temp.u32 = PPC_LOAD_U32(ctx.r11.u32 + -25808);
 	ctx.f1.f64 = double(temp.f32);
 	// bl 0x820c3f98
-	phBoundCapsule_3F98_g(ctx, base);
+	ph_BuildRotationMatrixY(ctx, base);
 	// addi r11,r1,128
 	ctx.r11.s64 = ctx.r1.s64 + 128;
 	// addi r10,r1,128
@@ -8075,7 +8075,7 @@ loc_820C3DF8:
 		}
 	loc_820C3E4C:
 		// bl 0x820c3f98
-		phBoundCapsule_3F98_g(ctx, base);
+		ph_BuildRotationMatrixY(ctx, base);
 		// blr
 		return;
 	}
@@ -8255,8 +8255,8 @@ PPC_FUNC_IMPL(__imp__phBoundCapsule_3F10_g) {
 	return;
 }
 
-__attribute__((alias("__imp__phBoundCapsule_3F98_g"))) PPC_WEAK_FUNC(phBoundCapsule_3F98_g);
-PPC_FUNC_IMPL(__imp__phBoundCapsule_3F98_g) {
+__attribute__((alias("__imp__ph_BuildRotationMatrixY"))) PPC_WEAK_FUNC(ph_BuildRotationMatrixY);
+PPC_FUNC_IMPL(__imp__ph_BuildRotationMatrixY) {
 	PPC_FUNC_PROLOGUE();
 	uint32_t var_r31 = 0;
 	double var_f31 = 0.0;
@@ -11733,7 +11733,7 @@ loc_820C57BC:
 		temp.u32 = PPC_LOAD_U32(ctx.r11.u32 + -25808);
 		ctx.f1.f64 = double(temp.f32);
 		// bl 0x820c3f98
-		phBoundCapsule_3F98_g(ctx, base);
+		ph_BuildRotationMatrixY(ctx, base);
 		// addi r4,r1,144
 		ctx.r4.s64 = ctx.r1.s64 + 144;
 		// addi r3,r1,80
@@ -12791,7 +12791,7 @@ PPC_FUNC_IMPL(__imp__pongPlayer_5FB8_g) {
 	// lwz r3,168(r31)
 	ctx.r3.u64 = PPC_LOAD_U32(var_r31 + 168);
 	// bl 0x820ca080
-	phBoundCapsule_A080_g(ctx, base);
+	pongMover_UpdateVelocity(ctx, base);
 	// lwz r11,188(r31)
 	ctx.r11.u64 = PPC_LOAD_U32(var_r31 + 188);
 	// lis r10,-32163
@@ -21603,8 +21603,8 @@ loc_820C9FC8:
 	return;
 }
 
-__attribute__((alias("__imp__phBoundCapsule_A080_g"))) PPC_WEAK_FUNC(phBoundCapsule_A080_g);
-PPC_FUNC_IMPL(__imp__phBoundCapsule_A080_g) {
+__attribute__((alias("__imp__pongMover_UpdateVelocity"))) PPC_WEAK_FUNC(pongMover_UpdateVelocity);
+PPC_FUNC_IMPL(__imp__pongMover_UpdateVelocity) {
 	PPC_FUNC_PROLOGUE();
 	uint32_t var_r31 = 0;
 	uint32_t var_r27 = 0;
@@ -53691,7 +53691,7 @@ loc_820D8298:
 			temp.u32 = PPC_LOAD_U32(ctx.r11.u32 + -25808);
 			ctx.f1.f64 = double(temp.f32);
 			// bl 0x820c3f98
-			phBoundCapsule_3F98_g(ctx, base);
+			ph_BuildRotationMatrixY(ctx, base);
 			// addi r3,r1,208
 			ctx.r3.s64 = ctx.r1.s64 + 208;
 			// addi r11,r1,208
@@ -56686,7 +56686,7 @@ PPC_FUNC_IMPL(__imp__phBoundCapsule_9730_fw) {
 		temp.u32 = PPC_LOAD_U32(ctx.r11.u32 + -25808);  /* glob:lbl_82079B30 @ 0x82079b30 */
 		ctx.f1.f64 = double(temp.f32);
 		// bl 0x820c3f98
-		phBoundCapsule_3F98_g(ctx, base);
+		ph_BuildRotationMatrixY(ctx, base);
 	}
 loc_820D97B4:
 	// addi r11,r30,384

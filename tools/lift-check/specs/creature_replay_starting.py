@@ -13,9 +13,10 @@ SOURCE = "src/game/creature/pong_creature.cpp"
 
 CALLS = {
     "pongCreature::RequestTeleport": stub(ret="void"),
-    # The rotation about y fills its out-matrix (random, the same on both sides);
-    # running it would record its sin/cos callees with stack pointers that differ.
-    0x820C3F98: stub(ret="void"),
+    # Supply the entire scratch matrix explicitly, as the former struct-pointer
+    # declaration did. The corrected float-pointer signature otherwise infers
+    # only a 4-byte output, leaving unrelated stack padding different.
+    0x820C3F98: stub(ret="void", out={"r3": 64}),
     0x820C3BC8: run(),
 }
 

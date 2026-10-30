@@ -188035,7 +188035,7 @@
       "size": 132
     },
     "0x820c3f98": {
-      "name": "phBoundCapsule_3F98_g",
+      "name": "ph_BuildRotationMatrixY",
       "type": "function",
       "section": ".text",
       "size": 132
@@ -188719,7 +188719,7 @@
       "size": 316
     },
     "0x820ca080": {
-      "name": "phBoundCapsule_A080_g",
+      "name": "pongMover_UpdateVelocity",
       "type": "function",
       "section": ".text",
       "size": 780
@@ -202177,7 +202177,7 @@
       "size": 104
     },
     "0x82175d88": {
-      "name": "phBoundCapsule_5D88_g",
+      "name": "phMatrix_RotateZ",
       "type": "function",
       "section": ".text",
       "size": 176
@@ -237949,7 +237949,7 @@
       "size": 72
     },
     "0x8233ab98": {
-      "name": "phBoundTaperedCapsule_vfn_3",
+      "name": "phBoundTaperedCapsule_TransformEndpoints",
       "type": "function",
       "section": ".text",
       "size": 412
@@ -346065,7 +346065,7 @@
     "LocomotionStateAnim_3D48_g": "0x820c3d48",
     "phBoundCapsule_3DA0_g": "0x820c3da0",
     "phBoundCapsule_3F10_g": "0x820c3f10",
-    "phBoundCapsule_3F98_g": "0x820c3f98",
+    "ph_BuildRotationMatrixY": "0x820c3f98",
     "phBoundCapsule_4020_g": "0x820c4020",
     "phBoundCapsule_40A8_g": "0x820c40a8",
     "phUpdateObject_vfn_2": "0x820c41e8",
@@ -346179,7 +346179,7 @@
     "pongLookAtDriver_vfn_20": "0x820c9ec0",
     "pongMover_vfn_0": "0x820c9ef8",
     "pongMover_Reset": "0x820c9f40",
-    "phBoundCapsule_A080_g": "0x820ca080",
+    "pongMover_UpdateVelocity": "0x820ca080",
     "game_A390": "0x820ca390",
     "phBoundCapsule_A488_g": "0x820ca488",
     "phBoundCapsule_A640_g": "0x820ca640",
@@ -348422,7 +348422,7 @@
     "game_50D0": "0x821750d0",
     "game_5248": "0x82175248",
     "cmNamedValueSet_vfn_0": "0x82175d20",
-    "phBoundCapsule_5D88_g": "0x82175d88",
+    "phMatrix_RotateZ": "0x82175d88",
     "phBoundCapsule_5E38_g": "0x82175e38",
     "geomBoxes_TestSegmentToBox": "0x82176138",
     "phBoundCapsule_6360_wrh": "0x82176360",
@@ -354383,7 +354383,7 @@
     "phBoundTaperedCapsule_vfn_37": "0x8233aa00",
     "phBoundSphere_vfn_6": "0x8233ab08",
     "phBoundCapsule_vfn_7": "0x8233ab50",
-    "phBoundTaperedCapsule_vfn_3": "0x8233ab98",
+    "phBoundTaperedCapsule_TransformEndpoints": "0x8233ab98",
     "phBoundTaperedCapsule_vfn_9": "0x8233ad38",
     "phBoundTaperedCapsule_vfn_33": "0x8233ad48",
     "phBoundTaperedCapsule_vfn_20": "0x8233ada8",

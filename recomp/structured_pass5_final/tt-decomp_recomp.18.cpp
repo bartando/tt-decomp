@@ -22823,7 +22823,7 @@ loc_8237BB40:
 	// frsp f27,f0
 	var_f27 = double(float(ctx.f0.f64));
 	// bl 0x820c3f98
-	phBoundCapsule_3F98_g(ctx, base);
+	ph_BuildRotationMatrixY(ctx, base);
 	// addi r6,r1,624
 	ctx.r6.s64 = ctx.r1.s64 + 624;
 	// stfs f31,236(r1)

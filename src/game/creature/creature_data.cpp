@@ -20,11 +20,17 @@ extern "C" const float g_twoPi = 6.28318548f;
 extern "C" float g_blendCurveOffset = 0.00999999978f;
 TT_DATA_ALIAS("g_kCourtHeightOffset", "g_blendCurveOffset");
 
+// @ 0x825C9D64 (.data) — mover stationary speed/timer threshold
+extern "C" float lbl_825C9D64 = 25.0f;
+
 // @ 0x825C9F3C (.data)
 extern "C" alignas(16) uint32_t lbl_825C9F3C[5] = {0x8202783Cu, 0x0u, 0x0u, 0x0u, 0x0u};
 
 // @ 0x82606325 (.data)
 extern "C" uint8_t lbl_82606325 = 0x0u;
+
+// @ 0x82606326 (.data) — mover velocity adjustment enabled
+extern "C" uint8_t lbl_82606326 = 0;
 
 // @ 0x82606750 (.data)
 extern "C" alignas(16) float lbl_82606750[4] = {0.0f, 0.0f, 0.0f, 0.0f};
