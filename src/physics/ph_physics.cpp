@@ -11617,7 +11617,7 @@ uint8_t phBound_SegmentBoxOverlap(const float* boundCentre,
 // ─────────────────────────────────────────────────────────────────────────────
 void phBound_TransformPointByMatrixInv(const float* matrix,
                                        const float* pointIn,
-                                       float*       pointOut) {
+                                       float*       pointOut) { // @ 0x8228D1D0
     // Matrix rows (world transform): rot0..rot2 and the translate column
     // are laid out as 4 consecutive 16-byte vectors at +0x00..+0x30.
     const float* rotX = matrix + 0;    // basis row 0
@@ -11651,6 +11651,111 @@ void phBound_TransformPointByMatrixInv(const float* matrix,
     pointOut[1] = outY;
     pointOut[2] = outZ;
     pointOut[3] = 0.0f;
+}
+
+// phLevelNew_E3D0 @ 0x822DE3D0 | size: 0x3F0
+// Inferred name: broadphase query versus an instance's world-space bound sphere.
+// r3 is a query record, not phLevelNew::this. The archetype's bound is at +0x0C;
+// 0x8228D1D0 transforms its local centroid using the instance matrix at +0x10.
+uint8_t phLevelNew_QueryOverlapsInstance(const phLevelQuery* query, const phInst* instance) {
+    const auto* inst = reinterpret_cast<const uint8_t*>(instance);
+    const auto* archetype = reinterpret_cast<const uint8_t*>(
+        static_cast<uintptr_t>(*reinterpret_cast<const uint32_t*>(inst + 4)));
+    if ((*reinterpret_cast<const uint32_t*>(archetype + 0x10) & query->typeMask) == 0 ||
+        (*reinterpret_cast<const uint32_t*>(archetype + 0x14) & query->includeMask) == 0) {
+        return 0;
+    }
+    if (query->type < 0 || query->type > 4) {
+        return 1; // Unknown query types apply only the masks, without reading the bound.
+    }
+
+    const auto* bound = reinterpret_cast<const float*>(
+        static_cast<uintptr_t>(*reinterpret_cast<const uint32_t*>(archetype + 0x0C)));
+    alignas(16) float centre[4];
+    phBound_TransformPointByMatrixInv(bound, reinterpret_cast<const float*>(inst + 0x10), centre);
+    const float boundRadius = bound[2];
+
+    // VMX flushes subnormal operands/results. vmsum3fp128 rounds once after
+    // accumulating xyz products; w never contributes. Scalar FPU operations
+    // retain subnormals, and only the explicit fma calls below are fused.
+    const auto flush = [](float value) {
+        uint32_t bits;
+        memcpy(&bits, &value, sizeof(bits));
+        if ((bits & 0x7F800000u) == 0) {
+            bits &= 0x80000000u;
+            memcpy(&value, &bits, sizeof(value));
+        }
+        return value;
+    };
+    const auto sub = [&](float a, float b) { return flush(flush(a) - flush(b)); };
+    const auto dot3 = [&](const float* a, const float* b) {
+        return flush(static_cast<float>(static_cast<double>(flush(a[0])) * flush(b[0])
+                                      + static_cast<double>(flush(a[1])) * flush(b[1])
+                                      + static_cast<double>(flush(a[2])) * flush(b[2])));
+    };
+    float offset[3];
+    for (int axis = 0; axis < 3; ++axis) {
+        offset[axis] = sub(query->start[axis], centre[axis]);
+    }
+
+    switch (query->type) {
+    case 0: { // Sphere: tangency is excluded.
+        const float radius = query->endOrRadius[0] + boundRadius;
+        return dot3(offset, offset) < radius * radius;
+    }
+    case 1: { // Segment: endpoint and interior tangencies are included.
+        float direction[3];
+        for (int axis = 0; axis < 3; ++axis) {
+            direction[axis] = sub(query->endOrRadius[axis], query->start[axis]);
+        }
+        const float projection = dot3(offset, direction);
+        const float radiusSq = boundRadius * boundRadius;
+        if (projection >= 0.0f) {
+            return dot3(offset, offset) <= radiusSq;
+        }
+        const float lengthSq = dot3(direction, direction);
+        if (-projection >= lengthSq) {
+            float fromEnd[3];
+            for (int axis = 0; axis < 3; ++axis) {
+                fromEnd[axis] = sub(query->endOrRadius[axis], centre[axis]);
+            }
+            return dot3(fromEnd, fromEnd) <= radiusSq;
+        }
+        const float projectionSq = projection * projection;
+        const float limit = lengthSq * radiusSq;
+        return __builtin_fmaf(dot3(offset, offset), lengthSq, -projectionSq) <= limit;
+    }
+    case 2: { // Infinite cylinder along y: scalar xz arithmetic (including fmadds).
+        const float dx = query->start[0] - centre[0];
+        const float dz = query->start[2] - centre[2];
+        const float radius = query->endOrRadius[0] + boundRadius;
+        const float dxSq = dx * dx;
+        return __builtin_fmaf(dz, dz, dxSq) < radius * radius;
+    }
+    case 3: { // Capsule: project onto its axis and clamp to [0, length].
+        float fromStart[3];
+        for (int axis = 0; axis < 3; ++axis) {
+            fromStart[axis] = sub(centre[axis], query->start[axis]);
+        }
+        float along = dot3(fromStart, query->endOrRadius);
+        // Ordered comparisons preserve the original bso paths for NaNs.
+        if (along <= 0.0f) {
+            along = 0.0f;
+        } else if (along >= query->length) {
+            along = query->length;
+        }
+        float separation[3];
+        for (int axis = 0; axis < 3; ++axis) {
+            const float step = flush(flush(query->endOrRadius[axis]) * flush(along));
+            const float closest = flush(step + flush(query->start[axis]));
+            separation[axis] = sub(closest, centre[axis]);
+        }
+        const float radius = query->radius + boundRadius;
+        return dot3(separation, separation) < radius * radius;
+    }
+    default: // Point: ignore the query radius.
+        return dot3(offset, offset) < boundRadius * boundRadius;
+    }
 }
 
 } // namespace rage
