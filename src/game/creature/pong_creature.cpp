@@ -1860,7 +1860,7 @@ extern void phRope_ApplyAtSegment(rage::phRope* rope, const float* vec, const fl
 struct RTTITypeDescriptor;
 extern RTTITypeDescriptor g_typeDescriptor_phInstBehavior;  // @ 0x825D4520  ".?AVphInstBehavior@rage@@"
 extern RTTITypeDescriptor g_typeDescriptor_phRope;          // @ 0x825D4544  ".?AVphRope@rage@@"
-// @ 0x82430978 (SinglesNetworkClient_0978_g in the symbol map): MSVC's __RTDynamicCast
+// @ 0x82430978: MSVC's __RTDynamicCast
 extern "C" void* RTDynamicCast(void* object, int32_t vfDelta, RTTITypeDescriptor* sourceType,
                                RTTITypeDescriptor* targetType, int32_t isReference);
 

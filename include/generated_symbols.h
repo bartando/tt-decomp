@@ -2641,7 +2641,7 @@ PPC_EXTERN_IMPORT(SinglesNetworkClient_1330_g); // 0x82421330
 PPC_EXTERN_IMPORT(SinglesNetworkClient_1470_gen); // 0x82421470
 PPC_EXTERN_IMPORT(SinglesNetworkClient_1958_g); // 0x82421958
 PPC_EXTERN_IMPORT(SinglesNetworkClient_4E88_g); // 0x82424E88
-PPC_EXTERN_IMPORT(SinglesNetworkClient_0978_g); // 0x82430978
+PPC_EXTERN_IMPORT(RTDynamicCast); // 0x82430978
 PPC_EXTERN_IMPORT(SinglesNetworkClient_4520_g); // 0x82434520
 PPC_EXTERN_IMPORT(SinglesNetworkClient_1BF8_w); // 0x82481BF8
 PPC_EXTERN_IMPORT(SinglesNetworkClient_1C30_g_1C30_1); // 0x82481C30

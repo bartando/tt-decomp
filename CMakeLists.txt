@@ -44,6 +44,7 @@ set(SOURCES
     src/crt/exit.c
     src/crt/heap.c
     src/crt/memory.c
+    src/crt/rtti.cpp
     src/crt/startup.c
     src/crt/string.c
     src/crt/xe_tls.c

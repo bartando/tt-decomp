@@ -263497,7 +263497,7 @@
       "size": 8
     },
     "0x82430978": {
-      "name": "SinglesNetworkClient_0978_g",
+      "name": "RTDynamicCast",
       "type": "function",
       "section": ".text",
       "size": 460
@@ -358634,7 +358634,7 @@
     "game_05D0": "0x824305d0",
     "game_0768": "0x82430768",
     "except_data_82430978": "0x82430970",
-    "SinglesNetworkClient_0978_g": "0x82430978",
+    "RTDynamicCast": "0x82430978",
     "except_AB5C_2": "0x82430b44",
     "game_0B68_w": "0x82430b68",
     "fiAsciiTokenizer_0BA8_g": "0x82430ba8",

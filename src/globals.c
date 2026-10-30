@@ -805,14 +805,12 @@ const char* g_stateName_charView = "";     // @ 0x8205EF5C
 struct SwipePattern g_swipePatterns[17] = {{0}};  // @ 0x825D09A0
 
 // Network RTTI / type name strings
-const char g_szCreateMachineRTTI[]          = "";  // @ 0x825DEEB0
 const char g_szDataRequestTypeName[]        = "";  // @ 0x8206EA74
 const char g_szDataSendTypeName[]           = "";  // @ 0x8206EA88
 const char g_szDefaultError[]               = "";  // @ 0x82027423
 const char g_szInvalidError[]               = "";  // @ 0x8204EF04
 const char g_szMessageType[]                = "";  // @ 0x8205DFB0
 const char g_szNetworkDebugMsg[]            = "";  // @ 0x8205AE98
-const char g_szRageRTTI[]                   = "";  // @ 0x825DEECC
 const char g_szTopSpin[]                    = "";  // @ 0x8206CB54
 const char g_szTournamentCompleteTypeName[] = "";  // @ 0x8206EC40
 

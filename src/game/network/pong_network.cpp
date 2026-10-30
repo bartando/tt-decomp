@@ -1,3 +1,4 @@
+#include "crt/rtti.h"
 // pong_network.cpp — Network message implementations | Rockstar Presents Table Tennis (Xbox 360, 2006)
 
 /**
@@ -1734,7 +1735,6 @@ bool SinglesNetworkClient::IsStateActive()
 void SinglesNetworkClient::ProcessMessageQueue()
 {
     // External function declarations for message processing pipeline
-    extern void* rlEvent_Init(void* msg, int param1, void* rttiStr1, void* rttiStr2, int param2);
     extern bool  NetworkClient_ValidateMessageSlot(void* queueBase, void* msgBuffer);
     extern int   NetworkClient_GetMessageId(void* msgHandler);
     extern void* NetworkClient_BuildDispatchContext(void* stackBuf, void* client);
@@ -1744,10 +1744,6 @@ void SinglesNetworkClient::ProcessMessageQueue()
     
     // Global network state object
     extern void* g_pNetworkState;  // @ 0x8271A7B0
-    
-    // RTTI strings for message type identification
-    extern const char g_szCreateMachineRTTI[];  // @ 0x825DEEB0 "uestingConfig@snCreateMachine@rage@@"
-    extern const char g_szRageRTTI[];           // @ 0x825DEECC "e@rage@@"
     
     // Step 1: Navigate to the message queue head
     // Path: networkState[60] > 1 ? networkState[56] + 9680 : null
@@ -1790,13 +1786,12 @@ void SinglesNetworkClient::ProcessMessageQueue()
     // Step 3: Process messages in the queue
     // Loop until we've processed all messages
     while (currentMsg != nullptr) {
-        // Allocate/create a message handler object
-        // Parameters: message, 0, rttiStr1, rttiStr2, 0
-        void* msgHandler = rlEvent_Init(
+        // Recover the Gamer base from the queued snGamer object.
+        void* msgHandler = RTDynamicCast(
             currentMsg,
             0,
-            (void*)g_szRageRTTI,
-            (void*)g_szCreateMachineRTTI,
+            &g_typeDescriptor_snGamer,
+            &g_typeDescriptor_Gamer,
             0
         );
         
