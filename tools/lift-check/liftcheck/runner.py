@@ -378,6 +378,9 @@ class Checker:
         image, lift = self.image, self.lift
 
         def byte(a):
+            for base, data in t.mapped.items():
+                if base <= a < base + len(data):
+                    return data[a - base]
             for pa, data in t.image_patches.items():
                 if pa <= a < pa + len(data):
                     return data[a - pa]
@@ -398,6 +401,17 @@ class Checker:
     def run_side(self, side: str, t: Trial, regs, vregs, trial_no: int):
         m = self.machine
         uc = m.uc
+        mapped_pages = {page for lo, hi, _ in uc.mem_regions()
+                        for page in range(lo, hi + 1, 0x1000)} if t.mapped else set()
+        for base, data in t.mapped.items():
+            for page in range(base, base + len(data), 0x1000):
+                if page in mapped_pages and page not in m.fixed_pages:
+                    raise ValueError(f"map() overlaps existing emulator memory at 0x{page:08X}")
+                if page not in mapped_pages:
+                    uc.mem_map(page, 0x1000)
+                    mapped_pages.add(page)
+                    m.fixed_pages.add(page)
+            uc.mem_write(base, bytes(data))
         if t.arena:
             uc.mem_write(ARENA_BASE, bytes(t.arena))
         for a, data in t.image_patches.items():

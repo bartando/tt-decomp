@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from .build import LIFT_BASE
 from .dwarf import Signature, TypeInfo
 from .machine import ARENA_BASE, IMAGE_BASE, STACK_TOP, TLS_BASE, Machine
-from .runner import Checker, Divergence, Options
+from .runner import Checker, Divergence, Options, repo_root
 from .spec import Trial, model, run, stub
 
 
@@ -42,12 +42,14 @@ def _fixture(orig_words, lift_words, callees, policies=None):
                            symbolize=lambda addr: f'caller+0x{addr - LIFT_BASE:X}')
     syms = SimpleNamespace(func_range=ranges.get, name_at=lambda a: '', describe=lambda a: hex(a))
     c = Checker.__new__(Checker)
+    c.repo = repo_root()
     c.lift, c.syms, c.image = lift, syms, bytes(image)
     c.spec = SimpleNamespace(FUNCTION='caller')
     c.opts, c.ftol, c.ignore = Options(), 0, []
     c.policies = policies or {addr: run() for addr in callees}
     c.fake_policies, c._canon, c._leaf, c.host = {}, {}, {}, {}
     c.helpers = []
+    c.disasm_cache = {}
     c.orig_range = ranges[IMAGE_BASE]
     c.addr, c.lift_home = IMAGE_BASE, [(lift.lo, lift.hi)]
     c.machine = Machine(c.image, lift, syms, [])
@@ -175,6 +177,56 @@ def regressions():
         c.compare(t, regs, o, l)
     except Exception as e:
         errors.append(f'run() subclass args/deref policy: {e}')
+    errors.extend(_mapped_memory_regressions())
+    return errors
+
+
+def _mapped_memory_regressions():
+    errors = []
+    # lwz r5,0(r4); addi r5,r5,1; stw r5,0(r4); stw r5,0(r3); blr.
+    words = [0x80a40000, 0x38a50001, 0x90a40000, 0x90a30000, 0x4e800020]
+    for broken in (False, True):
+        lift_words = words[:] if not broken else [words[0], 0x60000000, *words[2:]]
+        c = _fixture(words, lift_words, {})
+        try:
+            for initial in (0x12345678, 0x7fffffff):
+                t = Trial(random.Random(1), c.syms)
+                output = t.alloc(16, "output", fill="zero")
+                t.map(0x7fea1000, 0x1000, "device", fill="zero")
+                t.w32(0x7fea1818, initial)
+                t.stack_fill = bytes(0x9000)
+                regs = {"gpr": [0] * 32, "fpr": [0.] * 32, "ctr": 0, "cr": 0}
+                regs["gpr"][1], regs["gpr"][3], regs["gpr"][4] = STACK_TOP, output, 0x7fea1818
+                results = []
+                for side in ("orig", "lift"):
+                    result = c.run_side(side, t, regs, [[0] * 4 for _ in range(128)], 0)
+                    assert result.fault is None, result.fault
+                    expected = initial + (1 if side == "orig" or not broken else 0)
+                    actual = bytes(result.final[0x7fea1818 + i] for i in range(4))
+                    assert int.from_bytes(actual, "big") == expected
+                    assert c.machine.u32(0x7fea1818) == initial, "mapped writes not restored"
+                    results.append(result)
+                try:
+                    c.compare(t, regs, *results)
+                except Divergence:
+                    assert broken, "equal mapped memory failed comparison"
+                else:
+                    assert not broken, "different mapped writes passed comparison"
+            # Fixed maps must not make arbitrary unmapped reads legal.
+            regs["gpr"][4] = 0x7fea2818
+            result = c.run_side("orig", t, regs, [[0] * 4 for _ in range(128)], 0)
+            assert result.fault and result.fault.kind == "unmapped"
+            # Nor may a spec overwrite code/arena/stack via a map.
+            t = Trial(random.Random(1), c.syms)
+            t.map(IMAGE_BASE, 0x1000, fill="zero")
+            try:
+                c.run_side("orig", t, regs, [[0] * 4 for _ in range(128)], 0)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError("accepted map overlapping image")
+        except Exception as e:
+            errors.append(f"fixed mapped memory broken={broken}: {e}")
     return errors
 
 
