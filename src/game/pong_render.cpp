@@ -6,6 +6,7 @@
  *   pongLightState_CopyLights                      @ 0x8213E110
  *   pongLightState_Apply                           @ 0x82154320
  *   pongRender_ResetState                         @ 0x82225590
+ *   pongDrawBucketLayer::Render                    @ 0x82225D90
  *   pongShadowMap::applyShaderParameters            @ 0x82147228
  *   pongDrawBucketManager::~pongDrawBucketManager  @ 0x822272B0  (vfn_0)
  *   pongDrawBucketManager::Load                    @ 0x82227430
@@ -420,6 +421,105 @@ void pongShadowMap::applyShaderParameters(int32_t pass) {
         uint32_t index = table->entries[(m_draw_430 >> 18) * 2 + 1] & 0xFFFF;
         table->values[index].lane[0] = lbl_825C4890;
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Layer rendering
+// ─────────────────────────────────────────────────────────────────────────────
+extern void util_FFF8(void* callback, int32_t argument);  // @ 0x8225FFF8
+extern void pongLightState_Reset(pongLightState* state, int32_t mask);  // @ 0x82154628
+extern void* pg_C2A0_g(void* root, int32_t key);  // @ 0x821DC2A0
+extern void cmOperatorCtor_0B50_w(void* overrideState);  // @ 0x820F0B50
+extern "C" void* rage_A980(void* device);  // @ 0x8235A980
+extern uint32_t* grc_9B60(void* commands);  // @ 0x82359B60
+extern void rage_C660(void* device);  // @ 0x8235C660
+
+// @ 0x82225D90 | size: 0x328 (was rage_5D90)
+// Inferred name from the layer descriptors consumed by pongDrawBucket_AddEntry.
+// Callbacks run even for disabled layers. Mode 4 with a shader override draws
+// unlit entries first under that override, flushes it, then draws lit entries.
+void pongDrawBucketLayer::Render(int32_t pass) {
+    auto* callbacks = reinterpret_cast<void**>(0x825C58ECu);
+    if (void* callback = callbacks[beforeCallback * 2])
+        util_FFF8(callback, 0);
+
+    if (enabled != 0) {
+        const uint32_t frame = *reinterpret_cast<const uint32_t*>(0x825C4898u);
+        pongRender_ResetState(pass);
+        pongLightState defaults;
+        defaults.count = 3;
+        defaults.field_212 = 3;
+        pongLightState_Reset(&defaults, -1);
+        pongLightState_Reset(&defaults, -1);
+        for (int lane = 0; lane < 4; ++lane)
+            memcpy(&defaults.ambient.bits[lane], &lbl_8202D108, sizeof(float));
+
+        auto* manager = *reinterpret_cast<uint8_t**>(0x826064F4u);
+        auto*& shaderOverride = *reinterpret_cast<void**>(0x825EB1D0u);
+        const bool twoPasses = *reinterpret_cast<void**>(manager + 84) != nullptr && sortMode == 4;
+        auto* loop = *reinterpret_cast<uint8_t**>(0x825EAB30u);
+        void* root = *reinterpret_cast<void**>(0x8271A310u);
+        auto* active = *reinterpret_cast<uint8_t**>(0x82606564u);
+        const int32_t key = loop[576] != 0
+            ? *reinterpret_cast<int32_t*>(static_cast<uint8_t*>(root) + 32)
+            : *reinterpret_cast<int32_t*>(active + 20);
+        auto* lighting = key >= 0 ? static_cast<uint8_t*>(pg_C2A0_g(root, key)) : nullptr;
+        const float threshold = *reinterpret_cast<const float*>(0x8202D110u);
+
+        for (int phase = twoPasses ? 1 : 0; phase >= 0; --phase) {
+            void* savedOverride = nullptr;
+            if (phase == 1) {
+                savedOverride = shaderOverride;
+                shaderOverride = *reinterpret_cast<void**>(manager + 84);
+            }
+            pongLightState_Apply(&defaults);
+            if (counts[frame] > 0) {
+                for (int i = 0; i < counts[frame]; ++i) {
+                    Entry* entry = buffers[frame].entries[order[frame][i]];
+                    const int32_t light = entry->lightIndex;
+                    if (phase == 0 && light >= 0) {
+                        if (lighting != nullptr) {
+                            const float weight = *reinterpret_cast<const float*>(lighting + 5728 + light * 4);
+                            // bgt skips the primary state only for ordered greater;
+                            // equal and NaN both select the primary state.
+                            const uint32_t offset = weight > threshold ? 3552 : 208;
+                            pongLightState_Apply(
+                                reinterpret_cast<const pongLightState*>(lighting + light * 544 + offset));
+                        }
+                        reinterpret_cast<void (*)(Entry*, int32_t)>(entry->vtable[0])(entry, pass);
+                        if (!twoPasses)
+                            pongLightState_Apply(&defaults);
+                    } else if (light < 0 && (phase == 1 || !twoPasses)) {
+                        reinterpret_cast<void (*)(Entry*, int32_t)>(entry->vtable[0])(entry, pass);
+                    }
+                }
+                manager = *reinterpret_cast<uint8_t**>(0x826064F4u);
+            }
+            if (phase == 1) {
+                cmOperatorCtor_0B50_w(*reinterpret_cast<void**>(manager + 84));
+                manager = *reinterpret_cast<uint8_t**>(0x826064F4u);
+                shaderOverride = savedOverride;
+            }
+        }
+
+        if (pass == -1) {
+            auto* device = *reinterpret_cast<uint8_t**>(0x825EB988u);
+            rage_A980(device);
+            auto* cursor = *reinterpret_cast<uint32_t**>(device + 13580);
+            auto* end = *reinterpret_cast<uint32_t**>(device + 13584);
+            if (reinterpret_cast<uintptr_t>(cursor) + 4 > reinterpret_cast<uintptr_t>(end))
+                cursor = grc_9B60(device + 13572);
+            *cursor = 0x84000000u;
+            *reinterpret_cast<uint32_t**>(device + 13580) = cursor + 1;
+            device[10432] = (device[10432] & 0xDDu) | 2u;
+            *reinterpret_cast<uint64_t*>(device + 40) |= 0x20000000ull;
+            if ((device[10432] & 1) != 0)
+                rage_C660(device);
+        }
+    }
+
+    if (void* callback = callbacks[afterCallback * 2])
+        util_FFF8(callback, 0);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
