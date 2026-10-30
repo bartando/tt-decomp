@@ -127,6 +127,8 @@ set(SOURCES
     src/game/camera/pong_camera_helpers.cpp
     src/game/creature/pong_creature.cpp
     src/game/drill/pong_drill.cpp
+    src/game/input/button_edges.cpp
+    src/game/input/input_sequence.cpp
     src/game/misc/cm_operators.cpp
     src/game/misc/pong_misc.cpp
     src/game/network/pong_network.cpp
