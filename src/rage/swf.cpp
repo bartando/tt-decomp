@@ -33,6 +33,60 @@ extern "C" {
     const char* util_A768_1(const void* value, void* buffer, int maxLen);  // @ 0x823FA768 — SWF value to string
     float util_EF98(void* instance, int includeChildren);  // @ 0x823FEF98 — display width
     float swfINSTANCE_F0D8_w(void* instance, int includeChildren);  // @ 0x823FF0D8 — display height
+    int _snprintf(char* buffer, size_t count, const char* format, ...);  // @ 0x820C0B40
+}
+
+// @ 0x823FA768
+extern "C" const char* util_A768_1(const void* value, void* buffer, int maxLen) {
+    // The VM uses an 8-byte {payload, tag} pair, with 32-bit guest pointers.
+    const uint32_t* words = static_cast<const uint32_t*>(value);
+    char* output = static_cast<char*>(buffer);
+    switch (words[1]) {
+    case 0: {
+        const uint8_t* chunk = reinterpret_cast<const uint8_t*>(static_cast<uintptr_t>(words[0]));
+        if (!chunk) return nullptr;
+
+        // Copy all twelve bytes, including embedded NULs. This path ignores maxLen.
+        char* next = output;
+        do {
+            for (int i = 0; i < 12; ++i) {
+                *next++ = chunk[i];
+            }
+            chunk = reinterpret_cast<const uint8_t*>(
+                static_cast<uintptr_t>(*reinterpret_cast<const uint32_t*>(chunk + 12)));
+        } while (chunk);
+        *next = '\0';
+        return output;
+    }
+    case 1:
+        return reinterpret_cast<const char*>(static_cast<uintptr_t>(words[0]));
+    case 2:
+        // The boolean is the first byte, not the whole payload word.
+        return *static_cast<const uint8_t*>(value) ? "true" : "false";
+    case 3:
+        _snprintf(output, static_cast<size_t>(maxLen), "%d", static_cast<int32_t>(words[0]));
+        return output;
+    case 4: {
+        float number;
+        std::memcpy(&number, value, sizeof(number));
+
+        // fctiwz saturates before the int-to-float round trip. In particular,
+        // +2^31 rounds back to itself from INT_MAX and selects the integral format.
+        int32_t integer;
+        if (number >= 2147483648.0f) {
+            integer = 2147483647;
+        } else if (!(number >= -2147483648.0f)) {
+            integer = -2147483647 - 1;
+        } else {
+            integer = static_cast<int32_t>(number);
+        }
+        const char* format = number == static_cast<float>(integer) ? "%0.f" : "%f";
+        _snprintf(output, static_cast<size_t>(maxLen), format, static_cast<double>(number));
+        return output;
+    }
+    default:
+        return nullptr;
+    }
 }
 
 // Global SWF object pools (SDA - Small Data Area)
