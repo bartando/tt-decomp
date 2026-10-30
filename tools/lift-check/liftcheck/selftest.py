@@ -39,6 +39,7 @@ EXPECT = [
     ("sysmem_simple_debug_fill", "PASS", ()),
     ("crt_asin", "PASS", ()),                    # original core on a Xenon caller frame
     ("crt_acos", "PASS", ()),
+    ("crt_memset", "PASS", ()),                  # shared body belongs to EXTRA_RANGES
     ("rage_clip_polygon_to_frustum", "PASS", ()), # repeated run() calls stay in the trace
     ("misc_tristrip_join_strips", "PASS", ()),   # subclass's partial-cache deref survives
     ("player_cancel_swing", "PASS", ()),        # subclass's transparent flag survives
