@@ -390,3 +390,171 @@ int32_t XmaSource_Render(XmaSourceLayout* self, void*, void* output) { // @ 0x82
     xaudioReleaseLock(self->lock);
     return 0;
 }
+
+// Software PCM sibling of XmaSource: the common source prefix ends at +0xb4,
+// where this variant embeds its renderer instead of an XMA decoder pointer.
+struct PcmSourceBuffer {
+    SourceLink link;
+    const void* data;
+    uint32_t frames;
+    uint32_t loopCount;                     // UINT32_MAX means infinite
+    uint32_t loopStart;
+    uint32_t loopFrames;
+    uint8_t pad1c[64];
+    void* context;                          // +0x5c: loop callback payload
+};
+
+struct PcmSourceEvent {
+    void* sourceContext;
+    void* bufferContext;
+    uint32_t reserved;
+};
+
+struct PcmSourceLayout {
+    void** vtable;
+    uint8_t pad04[8];
+    void* context;                          // +0x0c
+    void** sourceVtable;                    // +0x10
+    SourceLink buffers;                     // +0x14
+    uint32_t linkOffset;                    // +0x1c
+    uint8_t pad20[20];
+    uint8_t channels;                       // +0x34
+    uint8_t pad35[55];
+    float gain;                            // +0x6c
+    uint8_t pad70[4];
+    uint32_t position;                      // +0x74: frame within current buffer
+    uint8_t pad78[44];
+    uint32_t samplesPlayed;                 // +0xa4
+    uint8_t flags;                          // +0xa8
+    uint8_t padA9;
+    uint16_t fadeTicks;                     // +0xaa
+    uint8_t padAC[4];
+    void (*loopCallback)(const PcmSourceEvent*); // +0xb0
+    XmaRenderStream stream;                 // +0xb4
+};
+
+#if UINTPTR_MAX == UINT32_MAX
+static_assert(sizeof(PcmSourceBuffer) == 96);
+static_assert(sizeof(PcmSourceEvent) == 12);
+static_assert(offsetof(PcmSourceLayout, channels) == 52);
+static_assert(offsetof(PcmSourceLayout, gain) == 108);
+static_assert(offsetof(PcmSourceLayout, position) == 116);
+static_assert(offsetof(PcmSourceLayout, samplesPlayed) == 164);
+static_assert(offsetof(PcmSourceLayout, loopCallback) == 176);
+static_assert(offsetof(PcmSourceLayout, stream) == 180);
+static_assert(sizeof(PcmSourceLayout) == 268);
+#endif
+
+int32_t PcmFrame_Get(void* owner, AudioFrame* frame); // @ 0x82465D80
+int32_t PcmFrame_Resize(void* owner, const AudioFrame* frame, uint32_t flags); // @ 0x82465EF0
+
+// Descriptive SDK name, not a recovered symbol. Previously ph_vt5B98_36_91C0.
+// Render 256 planar float frames, looping and completing queued PCM buffers.
+// r4 is unused; r5 is an interface at +8 in its buffer owner. Loop/completion
+// callbacks run outside this function's global-lock level and may alter the queue.
+int32_t PcmSource_Render(PcmSourceLayout* self, void*, void* output) { // @ 0x824691C0
+    auto firstBuffer = [self]() -> PcmSourceBuffer* {
+        auto* sentinel = &self->buffers;
+        return sentinel->next == sentinel ? nullptr
+            : reinterpret_cast<PcmSourceBuffer*>(
+                reinterpret_cast<uint8_t*>(sentinel->next) - self->linkOffset);
+    };
+    auto setFlags = [self](uint32_t mask, uint32_t value) {
+        using Fn = void (*)(void*, uint32_t, uint32_t);
+        reinterpret_cast<Fn>(self->sourceVtable[17])(&self->sourceVtable, mask, value);
+    };
+    auto stop = [self]() {
+        using Fn = void (*)(void*, uint32_t);
+        reinterpret_cast<Fn>(self->vtable[11])(self, 1);
+    };
+    auto silence = [self]() {
+        auto& stream = self->stream;
+        uint32_t remaining = stream.outputFrames - stream.outputOffset;
+        if (remaining) {
+            for (uint32_t channel = 0; channel < stream.channels; ++channel) {
+                std::memset(stream.output + stream.outputOffset + channel * 256,
+                            0, remaining * sizeof(float));
+            }
+        }
+    };
+
+    void* owner = output ? static_cast<uint8_t*>(output) - 8 : nullptr;
+    xaudioAcquireLock(g_xaudioSourceLock);
+    AudioFrame frame;
+    int32_t result = PcmFrame_Get(owner, &frame);
+    if (result >= 0) {
+        frame.channels = self->channels;
+        result = PcmFrame_Resize(owner, &frame, 1);
+    }
+    if (result < 0) {
+        xaudioReleaseLock(g_xaudioSourceLock);
+        return result;
+    }
+    auto& stream = self->stream;
+    stream.output = frame.samples;
+    stream.outputFrames = 256;
+    stream.outputOffset = 0;
+    if (!(self->flags & 1) || (self->flags & 16)) {
+        silence();
+        xaudioReleaseLock(g_xaudioSourceLock);
+        return 1;
+    }
+    if (self->flags & 2) {
+        stream.gain = self->gain;
+        stream.previousGain = stream.gain;
+        for (auto& value : stream.filterHistory) value = 0;
+        stream.filterGain = 0.0f;
+        setFlags(2, 0);
+    }
+    if (self->flags & 4) {
+        --self->fadeTicks; // wrapping uint16, including 0 -> 65535
+        stream.gain = self->fadeTicks ? stream.gain * g_xmaFadeScale : 0.0f;
+    }
+    xaudioReleaseLock(g_xaudioSourceLock);
+
+    PcmSourceBuffer* buffer = nullptr;
+    for (;;) {
+        if (buffer && stream.inputFrames == stream.inputOffset) {
+            if (buffer->loopCount) {
+                if (buffer->loopCount != UINT32_MAX) --buffer->loopCount;
+                self->position = buffer->loopStart;
+                if (self->loopCallback) {
+                    PcmSourceEvent event{self->context, buffer->context, 0};
+                    self->loopCallback(&event);
+                }
+            } else {
+                using Fn = void (*)(void*, void*, uint32_t);
+                reinterpret_cast<Fn>(self->sourceVtable[19])(&self->sourceVtable, buffer, 0);
+                buffer = nullptr; // callback may have unlinked/freed this buffer
+            }
+        }
+        if (stream.outputFrames == stream.outputOffset) break;
+        if (!buffer) {
+            xaudioAcquireLock(g_xaudioSourceLock);
+            buffer = firstBuffer();
+            xaudioReleaseLock(g_xaudioSourceLock);
+        }
+        if (!buffer) break;
+        uint32_t end = buffer->loopCount ? buffer->loopStart + buffer->loopFrames : buffer->frames;
+        stream.input = buffer->data;
+        stream.inputFrames = end;
+        stream.inputOffset = self->position < end ? self->position : end;
+        uint32_t processed = XmaRenderStream_Process(&stream);
+        self->position += processed;
+        self->samplesPlayed += processed;
+    }
+
+    xaudioAcquireLock(g_xaudioSourceLock);
+    stream.previousGain = stream.gain;
+    if (stream.outputFrames != stream.outputOffset) {
+        silence();
+        if (!(self->flags & 8)) {
+            if (!firstBuffer()) setFlags(16, 16);
+        } else {
+            stop();
+        }
+    }
+    if ((self->flags & 4) && (self->fadeTicks == 0 || (self->flags & 16))) stop();
+    xaudioReleaseLock(g_xaudioSourceLock);
+    return 0;
+}
