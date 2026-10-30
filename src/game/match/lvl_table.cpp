@@ -3,7 +3,7 @@
 #include <cmath>
 #include <cstring>
 
-// VMX multiply/add instructions round the product before adding/subtracting.
+// Keep separate arithmetic steps from contracting; fused lifts use __builtin_fmaf.
 #pragma clang fp contract(off)
 
 extern "C" {
@@ -151,4 +151,66 @@ uint32_t lvlTable_7D28_2h(int32_t count, const LvlTableVector* points, const uin
         }
     }
     return accepted;
+}
+
+// @ 0x823D85B8
+void lvlTable_85B8_2hr(const LvlTableConstraintView* self, uint32_t constraint,
+                       LvlTableVector* positions, const LvlTableVector& anchor) {
+    const auto aligned = [](const LvlTableVector* base) {
+        return reinterpret_cast<const LvlTableVector*>(reinterpret_cast<uintptr_t>(base) & ~uintptr_t(15));
+    };
+    // slwi wraps in 32 bits; the particle lookup retains two more index bits
+    // than the vector-array accesses do.
+    const uint32_t particle = self->particleIndices[constraint & 0x3FFFFFFFu];
+    const uint32_t slot = constraint & 0x0FFFFFFFu;
+    auto* output = const_cast<LvlTableVector*>(aligned(positions)) + (particle & 0x0FFFFFFFu);
+    const LvlTableVector original = *output;
+    const LvlTableVector rest = aligned(self->restLength)[slot];
+    const LvlTableVector base = aligned(self->responseBase)[slot];
+    const LvlTableVector scale = aligned(self->responseScale)[slot];
+    const LvlTableVector origin = anchor;
+
+    LvlTableVector delta;
+    for (int lane = 0; lane < 4; ++lane)
+        delta.lane[lane] = flushVmx(flushVmx(original.lane[lane]) - flushVmx(origin.lane[lane]));
+    const float distanceSq = flushVmx(dot(delta, delta, 3));
+    // Approximate vrsqrtefp with one float rounding after reciprocal sqrt.
+    const float estimate = flushVmx(static_cast<float>(1.0 / std::sqrt(static_cast<double>(distanceSq))));
+    LvlTableVector residual;
+    bool keepOriginal[4];
+    for (int lane = 0; lane < 4; ++lane) {
+        const float zero = lbl_82606750[lane];
+        const float one = lbl_825CB7C0[lane];
+        const float length = flushVmx(rest.lane[lane]);
+        const float lengthSq = flushVmx(length * length);
+        const float excess = flushVmx(distanceSq - lengthSq);
+        const float threshold = maskLane(zero, lbl_82619BE0[lane], lbl_82619BD0[lane]);
+        keepOriginal[lane] = flushVmx(threshold) > flushVmx(maskLane(excess, lbl_82619BE0[lane]));
+
+        // Replace the infinite zero-length estimate before Newton refinement.
+        const float y = estimate == lbl_82619BF0[lane] ? zero : estimate;
+        const float square = flushVmx(y * y);
+        const float halfY = flushVmx(lbl_825CB7D0[lane] * y);
+        const float error = flushVmx(-flushVmx(flushVmx(distanceSq * square) - one));
+        const float inverseLength = flushVmx(__builtin_fmaf(error, halfY, y));
+        const float direction = flushVmx(delta.lane[lane] * inverseLength);
+        const float target = flushVmx(__builtin_fmaf(direction, length, flushVmx(origin.lane[lane])));
+        residual.lane[lane] = flushVmx(flushVmx(original.lane[lane]) - target);
+    }
+
+    // This second estimate has no zero-length sentinel replacement.
+    const float correctionSq = flushVmx(dot(residual, residual, 3));
+    const float inverseCorrection = flushVmx(static_cast<float>(1.0 / std::sqrt(static_cast<double>(correctionSq))));
+    for (int lane = 0; lane < 4; ++lane) {
+        const float one = lbl_825CB7C0[lane];
+        const float response = flushVmx(__builtin_fmaf(inverseCorrection, flushVmx(scale.lane[lane]),
+                                                       flushVmx(base.lane[lane])));
+        const float limit = maskLane(one, lbl_82619BE0[lane], lbl_82619BD0[lane]);
+        // Negative responses survive; unordered comparisons select one.
+        const float weight = flushVmx(limit) > flushVmx(maskLane(response, lbl_82619BE0[lane]))
+                                 ? response : one;
+        const float product = flushVmx(residual.lane[lane] * weight);
+        const float corrected = flushVmx(-flushVmx(product - flushVmx(original.lane[lane])));
+        output->lane[lane] = keepOriginal[lane] ? original.lane[lane] : corrected;
+    }
 }
