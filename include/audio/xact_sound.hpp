@@ -1,4 +1,5 @@
 #pragma once
 
-// Descriptive name for the statically linked XACT runtime's sound worker.
+// Descriptive names for the statically linked XACT runtime's workers.
 void xactSound_Update(void* sound); // @ 0x82455148
+void xactWave_Update(void* wave); // @ 0x8244AAE8
