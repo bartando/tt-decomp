@@ -47,6 +47,62 @@ float flushVmx(float value) {
 
 } // namespace
 
+// @ 0x82340900 | size: 0x4B8 | formerly pongCreatureInst_0900
+// Called from cloth simulation at 0x82341600 and 0x82341A50, after the sibling
+// positional/attachment pass at 0x82340DB8. This is an inferred descriptive name.
+void clothSolveDistanceConstraints(int32_t count, LvlTableVector* positions,
+                                   const ClothDistanceConstraint* constraints, float relaxation) {
+    if (count <= 0)
+        return;
+
+    auto* points = reinterpret_cast<LvlTableVector*>(reinterpret_cast<uintptr_t>(positions) & ~uintptr_t(15));
+    const float strength = flushVmx(relaxation);
+    for (uint32_t batch = 0; batch < static_cast<uint32_t>(count); batch += 8) {
+        ClothDistanceConstraint records[8];
+        LvlTableVector first[8], second[8];
+        // The VMX loop snapshots all eight pairs, including duplicate endpoints.
+        // Stores then run first/second, in record order; the last duplicate wins.
+        for (uint32_t i = 0; i < 8; ++i) {
+            records[i] = constraints[batch + i];
+            first[i] = points[records[i].firstParticle];
+            second[i] = points[records[i].secondParticle];
+        }
+        for (uint32_t i = 0; i < 8; ++i) {
+            const ClothDistanceConstraint& record = records[i];
+            LvlTableVector delta{};
+            for (int lane = 0; lane < 3; ++lane)
+                delta.lane[lane] = flushVmx(flushVmx(first[i].lane[lane]) - flushVmx(second[i].lane[lane]));
+
+            const float distanceSq = flushVmx(dot(delta, delta, 3));
+            const float restSq = flushVmx(record.restLengthSq);
+            const float weight = flushVmx(record.firstWeight);
+            const float firstStrength = flushVmx(weight * strength);
+            const float secondStrength = flushVmx(flushVmx(1.0f - weight) * strength);
+            const float compression = flushVmx(record.compressionScale);
+            const float scale = restSq > distanceSq ? compression : 1.0f;
+            const float negativeFirst = flushVmx(0.0f - flushVmx(firstStrength * scale));
+            const float positiveSecond = flushVmx(secondStrength * scale);
+            // vrefp has no scalar Newton refinement here. Division represents
+            // its estimate; exact Xenon estimate bits remain unverified.
+            const float inverseSum = flushVmx(1.0f / flushVmx(restSq + distanceSq));
+            const float twiceRest = flushVmx(restSq + restSq);
+            const float ratio = flushVmx(inverseSum * twiceRest);
+            const float error = flushVmx(1.0f - ratio);
+            const float firstCorrection = flushVmx(error * negativeFirst);
+            const float secondCorrection = flushVmx(error * positiveSecond);
+            LvlTableVector newFirst = first[i], newSecond = second[i];
+            for (int lane = 0; lane < 3; ++lane) {
+                const float firstStep = flushVmx(delta.lane[lane] * firstCorrection);
+                const float secondStep = flushVmx(delta.lane[lane] * secondCorrection);
+                newFirst.lane[lane] = flushVmx(firstStep + flushVmx(first[i].lane[lane]));
+                newSecond.lane[lane] = flushVmx(secondStep + flushVmx(second[i].lane[lane]));
+            }
+            points[record.firstParticle] = newFirst;
+            points[record.secondParticle] = newSecond;
+        }
+    }
+}
+
 // @ 0x82337008
 void lvlTable_7008_2h(const LvlTableMotionView* self, LvlTableVector* position, uint32_t mode,
                       const LvlTableVector& direction, const LvlTableVector& step, const LvlTableVector& origin) {
