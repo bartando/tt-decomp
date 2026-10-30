@@ -5,8 +5,6 @@ FUNCTION = "phUpdateObject::ReleaseFrame"
 ADDRESS = 0x8227DA08
 SOURCE = "src/physics/ph_update_object.cpp"
 
-EXTERNS = {"g_phFrameIndex": 0x825C4898}
-
 CALLS = {
     "obj.vfn_6": stub(ret="void", args=("r3", "r4", "r5")),
 }

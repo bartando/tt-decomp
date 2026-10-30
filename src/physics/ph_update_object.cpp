@@ -12,7 +12,7 @@
  *
  * Functions:
  *   ~phUpdateObject           @ 0x8227DA08 (size: 0x30)  — delegating destructor
- *   ScalarDtor                @ 0x8227D960 (size: 0xA8)  — commit transform + free
+ *   CommitTransform           @ 0x8227D960 (size: 0xA8)  — copy and scale transform
  *   Destroy                   @ 0x820C41E8 (size: 0x5C)  — deleting destructor chain
  *   Reset                     @ 0x8227D5B0 (size: 0x1B4) — world sync / initialize
  *   AddToRenderBucket         @ 0x8227D768 (size: 0x12C) — visibility test + enqueue
@@ -30,9 +30,9 @@
 
 // ── Global Declarations ─────────────────────────────────────────────────────
 
-// Global frame-index counter used to index the double-buffered frame array.
-// Located at 0x825C4898 (.data, 16 bytes — first word is the active index).
-extern uint32_t g_phFrameIndex;  // @ 0x825C4898
+// Rendering and rollback use distinct frame cursors.
+extern uint32_t g_phFrameCounter; // @ 0x825C4898
+extern uint32_t g_phFrameIndex;   // @ 0x826065DC
 
 // Render world / scene manager global used for LOD/visibility tests
 extern void* g_renderWorld;   // @ 0x8260641C (SDA offset 25628)
@@ -70,7 +70,7 @@ extern void pongDrawBucket_AddEntry(void* bucket, void* renderable,
 
 // Submits a shadow-casting object to the shadow map system
 extern void pongShadowMap_F010_g(void* shadowMap, void* drawable,
-    void* transform); // @ 0x8213F010
+    const void* transform, void* context); // @ 0x8213F010
 
 // Applies a locomotion/skinning matrix transform to a 4×4 matrix
 // Multiplies the input matrix by a 4×3 transform to apply skeletal animation
@@ -90,44 +90,48 @@ void phUpdateObject::ReleaseFrame(uint32_t flags)
     if (!m_pData)
         return;
 
-    void* frameData = static_cast<uint8_t*>(m_pFrameBuffer) + g_phFrameIndex * 64;
+    void* frameData = static_cast<uint8_t*>(m_pFrameBuffer) + g_phFrameCounter * 64;
     typedef void (*UpdateDrawableFn)(phUpdateObject*, void*, uint32_t);
     reinterpret_cast<UpdateDrawableFn>(vtable[6])(this, frameData, flags);
 }
 
-/**
- * phUpdateObject::CommitTransform() — vtable slot 1
- * @ 0x8227D960 | size: 0xA8
- *
- * FIXME: the lift below is incorrect — the slot-1 scaffold is NOT a
- *        destructor despite the auto-labeled "scalar_destructor" tag.  The
- *        real function (see recomp phUpdateObject_vfn_1) copies a 4-row
- *        matrix from `m_pData ? m_pData : &this->inlineTransform+16` into
- *        the double-buffered slot at `m_pFrameBuffer + frameIdx*64`, then
- *        post-multiplies three row vectors of that dst matrix by the
- *        parent transform at `this+112`.  It never frees `this` and takes
- *        no `flags` arg.  This stub preserves the existing signature until
- *        the lift is replaced (unverified).
- */
+namespace {
+// Xenon VMX arithmetic flushes subnormal inputs/results, keeping signed zero.
+float flushTransformVmx(float value)
+{
+    uint32_t bits;
+    __builtin_memcpy(&bits, &value, sizeof(bits));
+    if ((bits & 0x7F800000u) == 0) {
+        bits &= 0x80000000u;
+        __builtin_memcpy(&value, &bits, sizeof(value));
+    }
+    return value;
+}
+}
+
+// Copy a pose into the rollback frame, then multiply its first three rows
+// componentwise by the object's four-lane scale at +112. Keep row-wise copy
+// order: a source overlapping the destination is observable in the original.
+// @ 0x8227D960 | size: 0xA8
 void phUpdateObject::CommitTransform()
 {
-    // Determine source: use external data pointer if valid, else inline transform
-    void* src;
-    if (m_pFrameBuffer == nullptr) {
-        // No frame buffer — use inline transform at offset +16 from m_pData
-        src = static_cast<uint8_t*>(m_pData) + 16;
-    } else {
-        src = static_cast<uint8_t*>(m_pData) + 16;
+    const auto* src = m_pTransformSrc
+        ? static_cast<const uint8_t*>(m_pTransformSrc)
+        : static_cast<const uint8_t*>(m_pData) + 16;
+    auto* dst = static_cast<uint8_t*>(m_pFrameBuffer) + g_phFrameIndex * 64;
+    for (int row = 0; row < 4; ++row) {
+        uint8_t snapshot[16];
+        __builtin_memcpy(snapshot, src + row * 16, 16);
+        __builtin_memcpy(dst + row * 16, snapshot, 16);
     }
-
-    // Compute destination in double-buffered array
-    uint32_t frameOffset = g_phFrameIndex * 64;
-    void* dst = static_cast<uint8_t*>(m_pFrameBuffer) + frameOffset;
-
-    // Copy 64-byte transform block (4x 16-byte AltiVec stores in original).
-    // Upstream also multiplies dst rows 1..3 by the parent transform at
-    // this+112 — not implemented here, see FIXME above.
-    __builtin_memcpy(dst, src, 64);
+    for (int row = 0; row < 3; ++row) {
+        float scale[4], values[4];
+        __builtin_memcpy(scale, m_scale, 16);
+        __builtin_memcpy(values, dst + row * 16, 16);
+        for (int lane = 0; lane < 4; ++lane)
+            values[lane] = flushTransformVmx(flushTransformVmx(values[lane]) * flushTransformVmx(scale[lane]));
+        __builtin_memcpy(dst + row * 16, values, 16);
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -331,51 +335,22 @@ void phUpdateObject::AddToRenderBucket(bool skipVisTest) {
     pongDrawBucket_AddEntry(g_drawBucket, this, drawPriority);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// phUpdateObject::RenderShadow(float shadowScale) [vtable slot 5 @ 0x8227D898]
-// Renders this object's shadow by reading the current frame transform,
-// scaling the rotation/basis rows by shadowScale, and submitting to
-// the shadow map system.
-// ─────────────────────────────────────────────────────────────────────────────
-/**
- * phUpdateObject::RenderShadow @ 0x8227D898 | size: 0xC8
- *
- * Shadow rendering pass. Reads the current frame transform from the
- * double-buffered frame array (m_pFrameBuffer + g_phFrameIndex * 64),
- * copies it to a local buffer, scales the 3×3 rotation/basis portion
- * (rows 0-2, 48 bytes) by shadowScale using SIMD multiply, and then
- * calls pongShadowMap_F010_g to cast the shadow.
- *
- * The translation row (row 3, bytes 48-63) is NOT scaled, preserving
- * the world-space position of the shadow.
- *
- * Parameters:
- *   shadowScale — uniform scale factor applied to the basis vectors.
- *                 Controls shadow size relative to object geometry.
- */
-void phUpdateObject::RenderShadow(float shadowScale) {
+// Scale the basis rows of the render frame; preserve translation and forward
+// the caller's context to shadow submission in r6.
+// @ 0x8227D898 | size: 0xC8
+void phUpdateObject::RenderShadow(void* context, float shadowScale)
+{
     if (!m_pDrawable)
         return;
 
-    // Read the current frame transform from the double-buffered array
-    uint32_t frameOffset = g_phFrameIndex * 64;
-    uint8_t* frameSrc = static_cast<uint8_t*>(m_pFrameBuffer) + frameOffset;
-
-    // Copy the full 64-byte 4×4 matrix to a local buffer
-    float localMatrix[16]; // 64 bytes
-    __builtin_memcpy(localMatrix, frameSrc, 64);
-
-    // Scale the 3×3 rotation/basis portion (rows 0-2) by shadowScale
-    // Row 0: localMatrix[0..3]
-    // Row 1: localMatrix[4..7]
-    // Row 2: localMatrix[8..11]
-    // Row 3 (translation): localMatrix[12..15] — left unchanged
-    for (int i = 0; i < 12; i++) {
-        localMatrix[i] *= shadowScale;
-    }
-
-    // Submit to shadow map rendering system
-    pongShadowMap_F010_g(g_phShadowState, m_pDrawable, localMatrix);
+    const auto* src = static_cast<const uint8_t*>(m_pFrameBuffer) + g_phFrameCounter * 64;
+    alignas(16) float localMatrix[16];
+    __builtin_memcpy(localMatrix, src, sizeof(localMatrix));
+    volatile float storedScale = shadowScale;  // original stfs/lvx rounds f1 first
+    const float scale = storedScale;
+    for (int i = 0; i < 12; ++i)
+        localMatrix[i] = flushTransformVmx(flushTransformVmx(localMatrix[i]) * flushTransformVmx(scale));
+    pongShadowMap_F010_g(g_phShadowState, m_pDrawable, localMatrix, context);
 }
 
 // phUpdateObject::UpdateDrawable @ 0x8227DA40 | size: 0x138

@@ -13042,11 +13042,11 @@ struct phSpringAninmatedAttachment_vtable {
 // phUpdateObject vtable (7 named slots, max slot 6)
 struct phUpdateObject_vtable {
     void* vfn_0;  // phUpdateObject_vfn_0  // destructor
-    void* vfn_1;  // phUpdateObject_vfn_1  // scalar_destructor
+    void* vfn_1;  // phUpdateObject_CommitTransform  // copy and scale rollback transform
     void* vfn_2;  // phUpdateObject_vfn_2
     void* vfn_3;  // phUpdateObject_vfn_3
     void* vfn_4;  // phUpdateObject_vfn_4
-    void* vfn_5;  // phUpdateObject_vfn_5
+    void* vfn_5;  // phUpdateObject_RenderShadow
     void* vfn_6;  // phUpdateObject_vfn_6
 };
 

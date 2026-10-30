@@ -149,6 +149,7 @@ set(SOURCES
     src/game/network/xonline_strings.cpp
     src/game/player/pong_player.cpp
     src/game/player/player_animation_state.cpp
+    src/game/player/pong_gameplay_queries.cpp
     src/game/pong_render.cpp
     src/game/match/hsm_log_strings.cpp
     src/game/match/pong_match.cpp
