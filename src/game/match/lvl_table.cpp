@@ -34,6 +34,16 @@ float dot(const LvlTableVector& a, const LvlTableVector& b, int count) {
     return static_cast<float>(sum);
 }
 
+float flushVmx(float value) {
+    uint32_t bits;
+    std::memcpy(&bits, &value, sizeof(bits));
+    if ((bits & 0x7F800000u) == 0) {
+        bits &= 0x80000000u;
+        std::memcpy(&value, &bits, sizeof(value));
+    }
+    return value;
+}
+
 } // namespace
 
 // @ 0x82337008
@@ -101,4 +111,44 @@ void lvlTable_7008_2h(const LvlTableMotionView* self, LvlTableVector* position, 
     }
 
     *alignedPosition = result;
+}
+
+// @ 0x82337D28
+uint32_t lvlTable_7D28_2h(int32_t count, const LvlTableVector* points, const uint32_t* indices,
+                        uint32_t* output, const LvlTableVector& distanceLimitSq, const LvlTableVector& origin) {
+    if (count <= 0)
+        return 0;
+
+    const auto* alignedPoints = reinterpret_cast<const LvlTableVector*>(
+        reinterpret_cast<uintptr_t>(points) & ~uintptr_t(15));
+    LvlTableVector center{}, limits;
+    for (int lane = 0; lane < 3; ++lane)
+        center.lane[lane] = flushVmx(origin.lane[lane]);
+    for (int lane = 0; lane < 4; ++lane)
+        limits.lane[lane] = flushVmx(distanceLimitSq.lane[lane]);
+    uint32_t accepted = 0;
+    // The original unrolls 32 candidates without a remainder path. Callers
+    // supply whole batches; a positive partial batch still consumes 32.
+    for (uint32_t batch = 0; batch < static_cast<uint32_t>(count); batch += 32) {
+        for (uint32_t i = 0; i < 32; ++i) {
+            const uint32_t index = indices[batch + i];
+            // rlwinm discards the high four index bits before the vector load.
+            const LvlTableVector& point = alignedPoints[index & 0x0FFFFFFFu];
+            LvlTableVector delta{};
+            for (int lane = 0; lane < 3; ++lane)
+                delta.lane[lane] = flushVmx(flushVmx(point.lane[lane]) - center.lane[lane]);
+            const float distanceSq = flushVmx(dot(delta, delta, 3));
+            // CR6's all-true bit requires all four limits to be strictly greater
+            // than the replicated xyz dot. Unordered comparisons reject.
+            bool inside = true;
+            for (int lane = 0; lane < 4; ++lane)
+                inside &= limits.lane[lane] > distanceSq;
+
+            // stwx is unconditional: a rejected candidate overwrites this slot,
+            // including the slot just past the accepted prefix at return.
+            output[accepted] = index;
+            accepted += inside;
+        }
+    }
+    return accepted;
 }
