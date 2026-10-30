@@ -220,6 +220,28 @@ struct cmAdd : cmBinaryNode {
     static void RegisterPorts(cmBinaryNode* node);  // [16] @ 0x822622A8
 };
 
+/** cmMultiply — portA * portB. vtable @ 0x82053B1C */
+struct cmMultiply : cmBinaryNode {
+    void GetFloat(float* out);  // [4] @ 0x8227B2F0
+    void vfn_5();               // [5] @ 0x8227B2B8
+    void vfn_16();              // [16] @ 0x822624F8
+};
+
+/** cmChanged — compare a typed input with its previous value. */
+struct cmChanged : cmNodeBase {
+    cmNodePort port;         // +0x0C {data pointer, type}
+    int32_t m_nConnected;    // +0x14
+    uint8_t* m_pChanged;     // +0x18 one-byte result buffer
+    void* m_pOtherValue;     // +0x1C managed by Reset
+    void* m_pPrevious;       // +0x20 saved input (byte or word)
+    uint8_t m_suppress;      // +0x24 suppress first comparison after reset
+
+    void vfn_6();   // [6] @ 0x82278018
+    void Tick();    // [10] @ 0x82277EF0
+    void vfn_16();  // [16] @ 0x822778B8
+    void vfn_17();  // [17] @ 0x82278168
+};
+
 /** cmSubtract — portA - portB. vtable @ 0x82053AC4 */
 struct cmSubtract : cmBinaryNode {
     void GetVector(float* out);                     // [2]  @ 0x8227B250

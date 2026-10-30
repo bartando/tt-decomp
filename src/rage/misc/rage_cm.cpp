@@ -365,6 +365,13 @@ void cmSubtract::GetVector(float* out) {
 // Note: cmSubtract shares RegisterPorts (same descriptor set as cmAdd):
 //   {VEC4,VEC4,0,VEC4}, {FLOAT,FLOAT,0,FLOAT}
 
+// cmMultiply::GetFloat @ 0x8227B2F0
+void cmMultiply::GetFloat(float* out) {
+    float a = cmNode_GetFloat(&portA);
+    float b = cmNode_GetFloat(&portB);
+    *out = a * b;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  UNARY MATH NODES
 // ─────────────────────────────────────────────────────────────────────────────
@@ -713,6 +720,34 @@ void cmMemory::RegisterPorts(cmBinaryNode* node) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+// cmChanged::Tick @ 0x82277EF0
+void cmChanged::Tick() {
+    // Retail dimension tags here are 1/3/5, independently of cmDimType.
+    switch (cmNode_GetPortDim(&port)) {
+    case 1: {
+        int32_t value = cmNode_GetDim(&port);
+        *m_pChanged = !m_suppress && value != *static_cast<int32_t*>(m_pPrevious);
+        *static_cast<int32_t*>(m_pPrevious) = value;
+        break;
+    }
+    case 3: {
+        uint8_t value = cmNode_GetBool(&port);
+        *m_pChanged = !m_suppress && value != *static_cast<uint8_t*>(m_pPrevious);
+        *static_cast<uint8_t*>(m_pPrevious) = value;
+        break;
+    }
+    case 5: {
+        int32_t value = cmNode_GetInt(&port);
+        *m_pChanged = !m_suppress && value != *static_cast<int32_t*>(m_pPrevious);
+        *static_cast<int32_t*>(m_pPrevious) = value;
+        break;
+    }
+    default:
+        break;
+    }
+    m_suppress = 0;
+}
+
 /**
  * cmIntegrate — numerically integrates (accumulates) its input over time.
  * vtable @ 0x82054934
@@ -981,7 +1016,6 @@ float rage_sinf_approx(float angle) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // cmSubtract::GetDim    @ 0x8227B1C0  (vfn_5 — scaffolded, not yet lifted)
-// cmMultiply::GetFloat  @ 0x8227B2F0  (vfn_4)
 // cmMultiply::GetDim    @ 0x8227B2B8  (vfn_5)
 // cmMultiply::RegisterPorts @ 0x822624F8 (vfn_16)
 // cmDivide::GetFloat    @ 0x8227B398  (vfn_4)
@@ -996,7 +1030,6 @@ float rage_sinf_approx(float angle) {
 // cmApproach2::Tick                   @ 0x82279428 (vfn_10)
 // cmCapture::RegisterPorts            @ 0x822779C8 (vfn_16)
 // cmCapture::Reset                    @ 0x822787F8 (vfn_17)
-// cmChanged::Tick                     @ 0x82277EF0 (vfn_10)
 // cmChanged::Reset                    @ 0x82278168 (vfn_17)
 // cmDifferentiate::Tick               @ 0x822782D0 (vfn_10)
 
