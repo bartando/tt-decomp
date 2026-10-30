@@ -128,70 +128,123 @@ void* memmove(void* dst, const void* src, size_t count)
 /**
  * memcpy @ 0x82434100 | size: 0x420
  *
- * Copy `count` non-overlapping bytes from `src` to `dst`.
+ * Forward copy with 8-byte destination alignment, then 128-byte cache-line
+ * alignment for large transfers. Source alignment selects doubleword, word,
+ * or byte-gathered word copies. Cache hints have no observable memory effect.
  *
- * Optimized for the Xbox 360 Xenon CPU:
- *  - Uses dcbt prefetch for large copies (>= 128 bytes)
- *  - Aligns destination to 8 bytes before bulk copy
- *  - 128-byte unrolled inner loop using 64-bit doubleword loads/stores
- *    when both src and dst are 8-byte aligned
- *  - Falls back to 4-byte word copies otherwise
- *  - Byte tail for remainder
- *
- * NOTE: The original implementation has a subtle cache prefetch
- * management section and a loop-tail edge case around CR1 tracking
- * a trailing dcbtst. Faithfully reconstructed to match behavior.
+ * Keep the original load/store order: memmove calls this for dst < src, and
+ * callers using dst > src overlap observe the original's chunk propagation.
+ * In particular the bulk doubleword loop reads two doublewords ahead, the
+ * word loop reads three words before its first store, and the unaligned path
+ * gathers four bytes before storing any of them. This is not memmove.
  */
 void* memcpy(void* dst, const void* src, size_t count)
 {
     unsigned char*       d = (unsigned char*)dst;
     const unsigned char* s = (const unsigned char*)src;
 
-    if (count == 0)
-        return dst;
-
-    /* Align dst to 8-byte boundary by copying leading bytes */
     size_t headBytes = (8 - ((uintptr_t)d & 7)) & 7;
-    if (headBytes && count > headBytes) {
-        count -= headBytes;
-        while (headBytes--)
+    if (count <= headBytes) {
+        while (count--)
             *d++ = *s++;
+        return dst;
     }
+    count -= headBytes;
+    while (headBytes--)
+        *d++ = *s++;
 
-    if (count >= 128 && (((uintptr_t)s & 7) == 0)) {
-        /* Large aligned copy: 128-byte unrolled loop with dcbt prefetch */
-        size_t blocks = count >> 7;
-        count        &= 127;
-
-        /* Prefetch ahead */
-        while (blocks--) {
-            uint64_t* dq = (uint64_t*)d;
-            const uint64_t* sq = (const uint64_t*)s;
-            dq[0]  = sq[0];  dq[1]  = sq[1];  dq[2]  = sq[2];  dq[3]  = sq[3];
-            dq[4]  = sq[4];  dq[5]  = sq[5];  dq[6]  = sq[6];  dq[7]  = sq[7];
-            dq[8]  = sq[8];  dq[9]  = sq[9];  dq[10] = sq[10]; dq[11] = sq[11];
-            dq[12] = sq[12]; dq[13] = sq[13]; dq[14] = sq[14]; dq[15] = sq[15];
-            d += 128;
-            s += 128;
+    size_t sourceAlignment = (uintptr_t)s & 7;
+    if (sourceAlignment == 0) {
+        if (count >= 128) {
+            size_t cacheHead = (128 - ((uintptr_t)d & 127)) & 127;
+            count -= cacheHead;
+            while (cacheHead) {
+                *(uint64_t*)d = *(const uint64_t*)s;
+                d += 8;
+                s += 8;
+                cacheHead -= 8;
+            }
+            while (count >= 128) {
+                uint64_t*       dq = (uint64_t*)d;
+                const uint64_t* sq = (const uint64_t*)s;
+                uint64_t a = sq[0];
+                uint64_t b = sq[1];
+                for (size_t i = 0; i < 14; ++i) {
+                    uint64_t c = sq[i + 2];
+                    dq[i] = a;
+                    a = b;
+                    b = c;
+                }
+                dq[14] = a;
+                dq[15] = b;
+                d += 128;
+                s += 128;
+                count -= 128;
+            }
+        }
+        while (count >= 8) {
+            *(uint64_t*)d = *(const uint64_t*)s;
+            d += 8;
+            s += 8;
+            count -= 8;
+        }
+    } else if (sourceAlignment == 4) {
+        if (count >= 128) {
+            size_t cacheHead = (128 - ((uintptr_t)d & 127)) & 127;
+            count -= cacheHead;
+            while (cacheHead) {
+                *(uint32_t*)d = *(const uint32_t*)s;
+                d += 4;
+                s += 4;
+                cacheHead -= 4;
+            }
+            while (count >= 128) {
+                for (size_t i = 0; i < 8; ++i) {
+                    uint32_t*       dw = (uint32_t*)d;
+                    const uint32_t* sw = (const uint32_t*)s;
+                    uint32_t a = sw[0];
+                    uint32_t b = sw[1];
+                    uint32_t c = sw[2];
+                    dw[0] = a;
+                    uint32_t last = sw[3];
+                    dw[1] = b;
+                    dw[2] = c;
+                    dw[3] = last;
+                    d += 16;
+                    s += 16;
+                }
+                count -= 128;
+            }
+        }
+        while (count >= 4) {
+            *(uint32_t*)d = *(const uint32_t*)s;
+            d += 4;
+            s += 4;
+            count -= 4;
+        }
+    } else if (count >= 128) {
+        size_t cacheHead = (128 - ((uintptr_t)d & 127)) & 127;
+        count -= cacheHead;
+        while (cacheHead--)
+            *d++ = *s++;
+        while (count >= 128) {
+            for (size_t i = 0; i < 32; ++i) {
+                // The union preserves byte order on both Xenon and the host.
+                union { uint32_t word; unsigned char bytes[4]; } gathered;
+                gathered.bytes[3] = s[3];
+                gathered.bytes[2] = s[2];
+                gathered.bytes[1] = s[1];
+                gathered.bytes[0] = s[0];
+                *(uint32_t*)d = gathered.word;
+                d += 4;
+                s += 4;
+            }
+            count -= 128;
         }
     }
 
-    /* 8-byte word copies for remaining aligned data */
-    if (count >= 8 && (((uintptr_t)s & 7) == 0)) {
-        size_t qwords = count >> 3;
-        count        &= 7;
-        uint64_t*       dq = (uint64_t*)d;
-        const uint64_t* sq = (const uint64_t*)s;
-        while (qwords--)
-            *dq++ = *sq++;
-        d = (unsigned char*)dq;
-        s = (const unsigned char*)sq;
-    }
-
-    /* Byte tail */
     while (count--)
         *d++ = *s++;
-
     return dst;
 }
 

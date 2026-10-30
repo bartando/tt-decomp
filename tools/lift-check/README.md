@@ -75,7 +75,8 @@ on a made-up TU, the example specs, and mutated lifts that must all fail.
 
 ### Spec reference
 
-- `inputs(t)`: `t.alloc(size, name, fill="random"|"zero"|bytes, ctype="Struct")` reserves
+- `inputs(t)`: `t.index` is the zero-based trial number (stable with `--only`);
+  `t.alloc(size, name, fill="random"|"zero"|bytes, ctype="Struct")` reserves
   input memory and returns its address (`ctype` makes that struct's float members compare
   with tolerance and names fields in reports); `t.w8/w16/w32/w64/wf32/wf64(addr, v)`;
   `t.floats(addr, n, lo, hi)`; `t.args(r3=..., f1=...)`; `t.vtable("name")` returns a table
