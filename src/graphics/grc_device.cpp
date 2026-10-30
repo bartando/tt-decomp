@@ -728,20 +728,13 @@ extern "C" void grcDevice_SetRenderTarget(void* device, uint32_t slot, void* sur
         return *reinterpret_cast<uint32_t*>(state + offset);
     };
     auto* previous = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(field(12536 + slot * 4u)));
-    constexpr uint32_t kReference = 0x80000;
-    if (previous != nullptr) {
-        const uint32_t references = previous[0] - kReference;
-        previous[1] = field(10396);
-        previous[0] = references;
-        if ((references & 0x00F800FFu) == 0) {
-            grcTexture_ReleaseResource(previous);
-        }
-    }
+    // Unlike the stream and index binds, the old reference goes first.
+    dropDeviceReference(state, previous);
     field(12536 + slot * 4u) = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(surface));
 
     if (surface != nullptr) {
         auto* header = static_cast<uint32_t*>(surface);
-        header[0] += kReference;
+        header[0] += kDeviceReference;
         // RB_COLOR0_INFO is followed by another register before COLOR1..3_INFO.
         const uint32_t colorRegister = slot == 0 ? 0 : slot + 1u;
         const uint32_t colorOffset = (2865u + colorRegister) * 4u;

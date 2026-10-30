@@ -14,13 +14,12 @@ from liftcheck.runner import Checker, Options
 
 
 MUTATIONS = (
-    ("omit previous last-use fence", "previous[1] = field(10396);", ""),
-    ("subtract the wrong reference unit", "previous[0] - kReference", "previous[0] - 1u"),
-    ("skip resource release", "grcTexture_ReleaseResource(previous);", ""),
-    ("acquire before releasing the same surface", "    if (previous != nullptr) {",
-     "    if (surface != nullptr) static_cast<uint32_t*>(surface)[0] += kReference;\n"
-     "    if (previous != nullptr) {"),
-    ("omit the new reference", "header[0] += kReference;", ""),
+    # The fence stamp, reference unit and release test live in the shared
+    # dropDeviceReference; grc_device_set_indices mutates those.
+    ("acquire before releasing the same surface", "    dropDeviceReference(state, previous);",
+     "    if (surface != nullptr) static_cast<uint32_t*>(surface)[0] += kDeviceReference;\n"
+     "    dropDeviceReference(state, previous);"),
+    ("omit the new reference", "header[0] += kDeviceReference;", ""),
     ("collapse the colour register gap", "slot == 0 ? 0 : slot + 1u", "slot"),
     ("copy the wrong surface word", "field(colorOffset) = header[13];",
      "field(colorOffset) = header[12];"),
@@ -56,7 +55,7 @@ def main():
         assert old in function, f"mutation anchor changed: {name}"
         mutant = function.replace(old, new)
         if name == "acquire before releasing the same surface":
-            mutant = mutant.replace("        header[0] += kReference;", "")
+            mutant = mutant.replace("        header[0] += kDeviceReference;", "")
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             rc = Checker(spec, Options(seed=1, patches=((function, mutant),))).run()
