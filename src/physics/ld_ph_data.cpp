@@ -118,3 +118,6 @@ extern "C" char g_mainThreadXtfStorage[256] = {};
 
 // @ 0x8271B1D8 (.data) — runtime-initialised by 0x820C0038 (bit 0 = XTF block set up)
 extern "C" uint32_t g_allocInitFlag = 0;
+
+// @ 0x82079C54 (.rdata) — minimum segment/triangle determinant
+extern "C" const float g_segmentTriangleMinArea = 0.00000762939453125f;
