@@ -129,3 +129,20 @@ extern "C" alignas(16) float lbl_82619BF0[4] = {};
 // @ 0x8271A2E8 (.data) — the match clock block (+0x30 = now, seconds)
 extern "C" void* g_pongMatchTiming = nullptr;
 TT_DATA_ALIAS("g_atSingleton_2940_ptr", "g_pongMatchTiming");
+
+// Ambient cube shader parameters interned by pongLighting_ApplyAmbientCube.
+extern "C" uint32_t g_ambientCubeXPosHandle = 0;  // @ 0x82606380
+extern "C" uint32_t g_ambientCubeXNegHandle = 0;  // @ 0x82606384
+extern "C" uint32_t g_ambientCubeYPosHandle = 0;  // @ 0x82606388
+extern "C" uint32_t g_ambientCubeYNegHandle = 0;  // @ 0x8260638C
+extern "C" uint32_t g_ambientCubeZPosHandle = 0;  // @ 0x82606390
+extern "C" uint32_t g_ambientCubeZNegHandle = 0;  // @ 0x82606394
+extern "C" uint32_t g_ambientCubeYFallHandle = 0; // @ 0x82606398
+extern "C" const char g_ambientCubeParameterNames[57] = // @ 0x82030048
+    "ambXPos\0ambXNeg\0ambYPos\0ambYNeg\0ambZPos\0ambZNeg\0ambYFall";
+// Four consecutive dirty bits at each possible starting bit (big-endian pairs).
+extern "C" const uint8_t g_shaderParameterFourDirtyMasks[16] = { // @ 0x825D4C88
+    0xF0, 0, 0x78, 0, 0x3C, 0, 0x1E, 0, 0x0F, 0, 0x07, 0x80, 0x03, 0xC0, 0x01, 0xE0
+};
+
+extern "C" const float g_ambientCubeFalloff = 0.2f; // @ 0x825C8084

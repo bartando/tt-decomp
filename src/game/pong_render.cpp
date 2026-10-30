@@ -17,7 +17,8 @@
 
 #include "pong_render.hpp"
 #include "camera/pong_camera.hpp"
-#include <string.h>
+#include <cstring>
+#include "rage/shader_parameters.hpp"
 
 // pongLightState_CopyLights @ 0x8213E110 | size: 0x30C (was game_E110)
 // Copies all eight slots, regardless of count. game_E0A8 (0x8213E0A8)
@@ -36,19 +37,6 @@ pongLightState* pongLightState_CopyLights(pongLightState* dst, const pongLightSt
     }
     return dst;
 }
-
-struct ShaderVector {
-    float lane[4];
-};
-
-// Shader handles pack the dirty-bit index in bits 1..17 and the entry index
-// in bits 18..31. The entry's low 16 bits select a 16-byte value slot.
-struct ShaderTable {
-    uint8_t dirtyBits[0x100];
-    uint32_t* entries;             // +0x100
-    uint32_t _104;
-    ShaderVector* values;     // +0x108
-};
 
 namespace {
 float flushLightVmx(float value) {
@@ -78,7 +66,6 @@ extern "C" uint32_t g_grmShaderFx_boundContext;      // @ 0x825EBC54  shader-glo
 extern void game_E0A8(pongLightState* dst, const pongLightState* src);  // @ 0x8213E0A8
 extern uint32_t game_A2F8(const char* name, int create);              // @ 0x8215A2F8
 extern void game_A670(uint32_t handle, const ShaderVector* values, int count);  // @ 0x8215A670
-extern void game_9908(ShaderTable* table, uint32_t handle, const float* values, int count);  // @ 0x82159908
 
 // @ 0x82154320 | size: 0x308 (game_4320)
 // Inferred name: upload the light state to Diffuse/Position/LightCount/LightType/Ambient.
@@ -144,7 +131,7 @@ void pongLightState_Apply(const pongLightState* state) {
     uint32_t slot = table->entries[(countHandle >> 18) * 2 + 1] & 0xFFFF;
     table->values[slot].lane[0] = static_cast<float>(count);
 
-    game_9908(lbl_825EBC40, typeHandle, type, count);
+    grmShaderParameter_SetFloatArray(lbl_825EBC40, typeHandle, type, count);
 
     table = lbl_825EBC40;
     bit = (ambientHandle >> 1) & 0x1FFFF;
@@ -1338,3 +1325,89 @@ void util_03C0(void* context, uint32_t* colorPtr) {
     // No-op until HUD flash rendering system is implemented.
 }
 
+
+extern void* g_loop_obj_ptr;                     // @ 0x825EAB30
+extern void* lbl_8271A310;                       // @ 0x8271A310 — lighting registry
+extern void* lbl_82606564;                       // @ 0x82606564 — active scene
+extern uint32_t g_ambientCubeXPosHandle;         // @ 0x82606380
+extern uint32_t g_ambientCubeXNegHandle;         // @ 0x82606384
+extern uint32_t g_ambientCubeYPosHandle;         // @ 0x82606388
+extern uint32_t g_ambientCubeYNegHandle;         // @ 0x8260638C
+extern uint32_t g_ambientCubeZPosHandle;         // @ 0x82606390
+extern uint32_t g_ambientCubeZNegHandle;         // @ 0x82606394
+extern uint32_t g_ambientCubeYFallHandle;        // @ 0x82606398
+extern const char g_ambientCubeParameterNames[57]; // @ 0x82030048
+extern "C" const float kFastTurnMul;              // @ 0x8202D184 — 2.0
+extern "C" const float g_ambientCubeFalloff;      // @ 0x825C8084 — 0.2
+
+// @ 0x820FFF78 | size: 0x6C4 (was game_FF78)
+// Select scene lighting, lazily intern seven amb* handles, then upload the six
+// weighted cube faces and the Y falloff pair. No stream gate or virtual call.
+void pongLighting_ApplyAmbientCube(uint32_t lightIndex) {
+    uint8_t* lighting = nullptr;
+    auto* loop = static_cast<uint8_t*>(g_loop_obj_ptr);
+    if (*reinterpret_cast<int32_t*>(loop + 12) != 8) {
+        void* root = lbl_8271A310;
+        const int32_t key = loop[0x240] != 0
+            ? *reinterpret_cast<int32_t*>(static_cast<uint8_t*>(root) + 32)
+            : *reinterpret_cast<int32_t*>(static_cast<uint8_t*>(lbl_82606564) + 20);
+        if (key > -1)
+            lighting = static_cast<uint8_t*>(pg_C2A0_g(root, key));
+    }
+    uint32_t handles[7];
+    handles[0] = g_ambientCubeXPosHandle;
+    if (handles[0] == 0) {
+        g_ambientCubeXPosHandle = handles[0] = game_A2F8(g_ambientCubeParameterNames, 1);
+        g_ambientCubeXNegHandle = handles[1] = game_A2F8(g_ambientCubeParameterNames + 8, 1);
+        g_ambientCubeYPosHandle = handles[2] = game_A2F8(g_ambientCubeParameterNames + 16, 1);
+        g_ambientCubeYNegHandle = handles[3] = game_A2F8(g_ambientCubeParameterNames + 24, 1);
+        g_ambientCubeZPosHandle = handles[4] = game_A2F8(g_ambientCubeParameterNames + 32, 1);
+        g_ambientCubeZNegHandle = handles[5] = game_A2F8(g_ambientCubeParameterNames + 40, 1);
+        g_ambientCubeYFallHandle = handles[6] = game_A2F8(g_ambientCubeParameterNames + 48, 1);
+    } else {
+        handles[1] = g_ambientCubeXNegHandle;
+        handles[2] = g_ambientCubeYPosHandle;
+        handles[3] = g_ambientCubeYNegHandle;
+        handles[4] = g_ambientCubeZPosHandle;
+        handles[5] = g_ambientCubeZNegHandle;
+        handles[6] = g_ambientCubeYFallHandle;
+    }
+    if (lighting == nullptr)
+        return;
+
+    const float one = lbl_8202D108;
+    // The original reuses the +0x70 staging vector for X+ and Y falloff.
+    // Without X+, its last two falloff words are uninitialized stack bytes.
+    uint32_t falloff[4] = {};
+    for (unsigned face = 0; face < 6; ++face) {
+        const uint32_t handle = handles[face];
+        if (handle == 0)
+            continue;
+        const float weight = *reinterpret_cast<float*>(lighting + 0x1660 + lightIndex * 4);
+        const float scale = __builtin_fmaf(weight, *reinterpret_cast<float*>(lighting + 0x1674), one);
+        const auto* color = reinterpret_cast<const float*>(lighting + lightIndex * 0x120 + 0xA10 + face * 16);
+        alignas(16) float vector[4] = {color[0] * scale, color[1] * scale, color[2] * scale, color[3]};
+        if (face == 0)
+            std::memcpy(falloff, vector, 16);
+        ShaderTable* table = lbl_825EBC40;
+        ++g_grmShaderFx_boundContext;
+        const uint32_t bit = (handle >> 1) & 0x1FFFFu;
+        table->dirtyBits[bit >> 3] |= g_shaderParameterDirtyMasks[bit & 7];
+        const uint32_t slot = table->entries[(handle >> 18) * 2 + 1] & 0xFFFFu;
+        std::memcpy(table->values[slot].lane, vector, 16);
+    }
+    const uint32_t fallHandle = handles[6];
+    if (fallHandle != 0) {
+        ShaderTable* table = lbl_825EBC40;
+        ++g_grmShaderFx_boundContext;
+        const uint32_t* entry = table->entries + (fallHandle >> 18) * 2;
+        // lvlx loads all four staging words. The subsequent shift/OR leaves
+        // them intact, regardless of the descriptor's component-count field.
+        std::memcpy(&falloff[0], &kFastTurnMul, 4);
+        std::memcpy(&falloff[1], &g_ambientCubeFalloff, 4);
+        const uint32_t bit = (fallHandle >> 1) & 0x1FFFFu;
+        table->dirtyBits[bit >> 3] |= g_shaderParameterDirtyMasks[bit & 7];
+        const uint32_t slot = entry[1] & 0xFFFFu;
+        std::memcpy(table->values[slot].lane, falloff, 16);
+    }
+}
