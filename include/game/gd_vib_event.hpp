@@ -59,7 +59,8 @@ namespace rage { void ReleaseSingleton(void* obj); }
 
 // Global controller state arrays
 extern void* g_controllerArray;      // @ 0x8271A3A8 (glob:lbl_8271A3A8)
-extern void* g_playerStateArray;     // @ 0x8271A31C (glob:lbl_8271A31C)
+extern void* g_playerStateArray;     // @ 0x825EAB28 (shared input state)
+extern void* g_controllerPointerArray; // @ 0x8271A31C (controller indices)
 
 // Global vibration state
 extern uint8_t* g_vibrationStateArray;  // @ 0x8271A364

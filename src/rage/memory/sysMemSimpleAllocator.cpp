@@ -46,7 +46,7 @@ extern "C" void rage_debugLog(const char* format, ...);
 
 /* ── Global: active logging allocator ref count ───────────────────────── */
 // lbl_825EBD20 @ 0x825EBD20  (.data, 4 bytes)
-uint32_t g_activeLoggingAllocatorCount = 0;
+extern uint32_t g_activeLoggingAllocatorCount;  // @ 0x825EBD20
 
 namespace rage {
 
@@ -367,11 +367,11 @@ extern "C" void rage_free_00C0(void* ptr);
 
 // Guarded-init lock shared across rage singletons (process-wide).
 // @ 0x825EBCF8  [.data]
-uint32_t g_sysMemAllocatorInitLock = 0;
+extern uint32_t g_sysMemAllocatorInitLock;  // @ 0x825EBCF8
 
 // Debug fill flag for rage_stricmp_6358 (actually a memset-variant).
-// @ 0x82606315  [.data]
-extern "C" uint8_t g_sysMemDebugFillFlag = 0;
+// @ 0x8260642D  [.data]
+extern "C" uint8_t g_sysMemDebugFillFlag;  // @ 0x8260642D
 
 // Forward declaration — defined below.
 extern "C" void sysMemSimpleAllocator_SpinAcquire(uint32_t* lock);

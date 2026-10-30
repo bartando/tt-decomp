@@ -21,6 +21,7 @@
 // @ 0x8202D108 (.rdata) — ph_ClampAndSin's upper clamp
 extern "C" const float g_phClampMax = 1.0f;
 TT_DATA_ALIAS("_ZN4rage26g_phBoundSurfaceOriginBiasE", "g_phClampMax");
+TT_DATA_ALIAS("_ZN4rage32g_phSimulatorInitialWeakestScoreE", "g_phClampMax");
 
 // @ 0x8202D10C (.rdata) — the code calls it g_phTwo, but it is 0.5
 extern "C" const float g_phTwo = 0.5f;

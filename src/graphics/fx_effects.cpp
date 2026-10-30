@@ -984,16 +984,17 @@ extern void  sub_82388758(void* self, int a, int b);                   // flush 
 // Globals referenced by these methods.
 // lbl_825CB800 — 64-byte scratch buffer for shadow/env bind       (vfn LoadAndApply)
 // glob @ 0x825CBAA0 — streaming heap pointer                      (vfn LoadAndApply)
-// glob @ 0x825EB1A4 — "current stream slot" cap (read by 2B00_h)  (RequestStreamSlot)
-// glob @ 0x825EBA58 — "currently mapped slot" (read by 2B00_h)    (RequestStreamSlot)
+// glob @ 0x825C8F54 — "current stream slot" cap (read by 2B00_h)  (RequestStreamSlot)
+// glob @ 0x825EBB84 — "currently mapped slot" (read by 2B00_h)    (RequestStreamSlot)
 // glob @ 0x825EBB1C — stream-state bitfield (bit 1 = slot-mismatch)(RequestStreamSlot)
 // glob @ 0x82606671 — boolean: whether ApplyBoneOverrides patches lbl_825C2CDA
 // glob @ 0x825D0EF4 — "pending flush" counter tested at end of ApplyBoneOverrides
 extern uint32_t  lbl_825CB800[16];
 // g_ambientStreamingHeap hoisted to top of file (shared with fxSpecialFx::Tick).
-extern uint32_t  g_ambientStreamSlotCap;   // 0x825EB1A4 (r11:-32163 - 28844)
-extern uint32_t  g_ambientCurSlot;         // 0x825EBA58 (r11:-32161 - 17540 +4)
-extern uint32_t  g_ambientStreamFlags;     // 0x825EBB1C
+extern uint32_t  g_ambientStreamSlotCap;   // @ 0x825C8F54
+extern uint32_t  g_ambientCurSlot;         // @ 0x825EBBDC
+extern uint32_t  g_ambientMappedSlot;      // @ 0x825EBB84
+extern uint32_t  g_ambientStreamFlags;     // @ 0x825EBB1C
 extern uint8_t   g_ambientBoneOverride;    // 0x82606671
 extern uint8_t   lbl_825C2CDA;
 extern uint32_t  g_ambientFlushPending;    // 0x825D0EF4
@@ -1156,39 +1157,19 @@ void fxAmbient_vfn_7(void* thisPtr, void* bundle) {
 }
 
 /**
- * fxAmbient::RequestStreamSlot (non-virtual) @ 0x82112B00 | size: 0x54
- * Writes a desired stream-slot id into g_ambientCurSlot (clamped to cap)
- * and OR's bit 1 of g_ambientStreamFlags when the requested slot differs
- * from the currently mapped slot, or clears bit 1 when they match.
- *
- *  - if (req > cap) req = cap
- *  - g_ambientCurSlot = req
- *  - if (req != g_currentlyMappedSlot) flags |=  2
- *    else                              flags &= ~2   (rlwinm mask ends 29)
- *
- * The rlwinm end-bit-29 form (rlwinm r,r,0,0,29) encodes a 30-bit-high mask
- * = 0xFFFFFFFC, not 0xFFFFFFFD. Re-reading the scaffold: the same instruction
- * clears *two* low bits here, but the code-path distinguishes bit 1 vs bit 0
- * via a prior or; the net effect on bit 1 is the 0xFFFFFFFD equivalent.
- * We emit the direct ~0x2u clear which is correct for this caller.
+ * fxAmbient::RequestStreamSlot @ 0x82112B00 | size: 0x54
+ * Clamp the requested slot and compare it with the live mapped slot.
+ * The helper takes its request in r3, without an instance argument.
  */
 void fxAmbient::RequestStreamSlot(int requestedSlot) {
     int cap = (int)g_ambientStreamSlotCap;
     int req = (requestedSlot > cap) ? cap : requestedSlot;
     g_ambientCurSlot = (uint32_t)req;
-
-    // Note: the original lift tests `req` against the *previously mapped*
-    // slot, not the value just written. The mapped-slot mirror lives one
-    // word further into g_ambientStreamFlags' module block (offset -8 in
-    // pass5). Since we now own g_ambientCurSlot, we snapshot the prior
-    // value first, then compare after write.
-    static uint32_t prevMappedSlot = 0;
-    if ((uint32_t)req == prevMappedSlot) {
+    if ((uint32_t)req == g_ambientMappedSlot) {
         g_ambientStreamFlags &= ~0x2u;
     } else {
         g_ambientStreamFlags |= 0x2u;
     }
-    prevMappedSlot = (uint32_t)req;
 }
 
 /**

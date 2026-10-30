@@ -265,14 +265,14 @@ extern void sub_821A9420(void* obj);                                   // @ 0x82
 extern void rage_free(void* ptr);                                 // @ 0x820C00C0  RAGE heap free
 
 // Serialisation context pointer stored in the SDA (r13-relative), runtime-init
-static void** g_serCtx = nullptr;   // @ 0x825CAF90
+extern void** g_serCtx;   // @ 0x825CAF90
 
 // Per-class supported-version globals (runtime-init)
-static uint32_t g_assetVersions_verA     = 0;  // @ 0x825C5864
-static uint32_t g_assetVersionsChar_verA = 0;  // @ 0x825C5868
-static uint32_t g_assetVersionsCS_verA   = 0;  // @ 0x825C586C
-static uint32_t g_assetVersions_verB     = 0;  // @ 0x825C803C  shared across all three
-static uint32_t g_assetVersions_verC     = 0;  // @ 0x825C8038  shared across all three
+extern uint32_t g_assetVersions_verA;  // @ 0x825C5864
+extern uint32_t g_assetVersionsChar_verA;  // @ 0x825C5868
+extern uint32_t g_assetVersionsCS_verA;  // @ 0x825C586C
+extern uint32_t g_assetVersions_verB;  // @ 0x825C803C  shared across all three
+extern uint32_t g_assetVersions_verC;  // @ 0x825C8038  shared across all three
 
 // ── assetVersions ────────────────────────────────────────────────────────────
 

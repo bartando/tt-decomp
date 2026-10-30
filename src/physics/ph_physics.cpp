@@ -10533,10 +10533,8 @@ phInst* phSimulator::FindWeakestInst(uint32_t* breakableArray,
                                      uint32_t /*unused_r8*/,
                                      uint32_t* outSwapA,
                                      uint32_t* outSwapB) {
-    // Seed the running "best score" with the rdata fallback constant at
-    // lbl_822059710 - 12024 (the recomp pulls a negative fp constant used
-    // as "-infinity" for score comparisons).
-    extern const float g_phSimulatorInitialWeakestScore;
+    // The original seeds from the shared float at lis -32253, -12024.
+    extern const float g_phSimulatorInitialWeakestScore;  // @ 0x8202D108
     *outScore = g_phSimulatorInitialWeakestScore;
 
     phInst* weakest = nullptr;
@@ -10636,10 +10634,6 @@ phInst* phSimulator::FindWeakestInst(uint32_t* breakableArray,
     return weakest;
 }
 
-// Initial "weakest" score constant — sits in .rdata as a negative float
-// seed (the recomp loads it at offset -12024 from lis -32253).  The exact
-// value is typically -FLT_MAX sentinel; fall back to a large negative.
-const float g_phSimulatorInitialWeakestScore = -3.4028234663852886e+38f;
 
 } // namespace rage
 

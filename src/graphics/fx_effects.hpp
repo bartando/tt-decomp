@@ -42,7 +42,7 @@ struct fxAmbient {
     virtual void PlayAlias(void* bundle);              // [7] @ 0x82387C08 — alias of vfn_6
 
     // ── non-virtual helpers from pass5 ──
-    void  RequestStreamSlot(int requestedSlot);  // @ 0x82112B00 (fxAmbient_2B00_h)
+    static void RequestStreamSlot(int requestedSlot);  // @ 0x82112B00 (fxAmbient_2B00_h)
     void  LoadAndApply(void* param);             // @ 0x82387E74 (fxAmbient_rtti_B0BC_0)
     void  ApplyBoneOverrides();                  // @ 0x82387E40 (fxAmbient_rtti_B0BC_1)
 };

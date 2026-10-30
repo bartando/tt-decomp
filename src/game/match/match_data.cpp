@@ -55,6 +55,7 @@ extern "C" void* g_pReplayStateData = nullptr;
 TT_DATA_ALIAS("g_cameraDataBasePtr", "g_pReplayStateData");
 TT_DATA_ALIAS("g_cameraDataPtr", "g_pReplayStateData");
 TT_DATA_ALIAS("lbl_8271A2EC", "g_pReplayStateData");
+TT_DATA_ALIAS("g_pLerpQueue", "g_pReplayStateData");
 
 // @ 0x8271A2FC (.data)
 extern "C" void* g_pActiveMatchContext = nullptr;

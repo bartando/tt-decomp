@@ -10,6 +10,7 @@
  */
 
 #include <cstdint>
+#include "xam/static_init.h"
 #include "link/tt_alias.h"
 
 
@@ -75,3 +76,19 @@ extern "C" void* const vtable_gdCSActionCharVisibleData[26] = {};
 
 // @ 0x8260637C (.data)
 extern "C" void* g_large_buffer_ptr = nullptr;
+
+TT_DATA_ALIAS("g_grcDevicePtr", "g_large_buffer_ptr");  // @ 0x8260637C
+
+extern "C" uint32_t g_xam_init_flag = 0;  // @ 0x8271B2A0
+extern "C" xam_init_singleton g_xam_singleton = {};  // @ 0x8271A860
+extern "C" xam_init_node g_xam_node_1770 = {};  // @ 0x825D1698
+extern "C" xam_init_node g_xam_node_F628 = {};  // @ 0x825D0FF0
+extern "C" xam_init_node g_xam_node_F6A0 = {};  // @ 0x825D1008
+extern "C" xam_init_node g_xam_node_F718 = {};  // @ 0x825D1020
+extern "C" xam_init_node g_xam_node_F790 = {};  // @ 0x825D1038
+extern "C" xam_init_node g_xam_node_F808 = {};  // @ 0x825D1050
+extern "C" xam_init_node g_xam_node_F880 = {};  // @ 0x825D1068
+extern "C" xam_init_node g_xam_node_F8F8 = {};  // @ 0x825D1080
+extern "C" xam_init_node g_xam_node_F970 = {};  // @ 0x825D1098
+extern "C" xam_init_node g_xam_node_F9E8 = {};  // @ 0x825D10B0
+extern "C" xam_init_node g_xam_node_0FF0 = {};  // @ 0x825D1518

@@ -18,7 +18,7 @@ extern void *g_allocator_ptr;
 void datArray_DestroyGeneric(uint8_t *arrayData);
 
 // Global data
-uint32_t g_grcDevicePtr = 0; // @ 0x8260637C (SDA +25468)
+extern uint32_t g_grcDevicePtr; // @ 0x8260637C (SDA +25468)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // rage_Alloc()  @ 0x824ADC30 | size: 0xC

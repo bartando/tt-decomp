@@ -21,3 +21,5 @@ extern "C" void* const g_pcrAnimObserverHash_vtable[2] = {};
 
 // @ 0x8203A928 (.rdata) — 13 slots of PPC code addresses in the image, null in the port
 extern "C" void* const g_xmlTree_vtable[13] = {};
+
+uint32_t g_eventType_Default = 0x825C9C60u;  // @ 0x825C9C60

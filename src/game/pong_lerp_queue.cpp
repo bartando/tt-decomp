@@ -11,7 +11,7 @@ extern "C" {
 }
 
 // Global singleton pointer
-pongLerpQueue* g_pLerpQueue = nullptr;
+extern pongLerpQueue* g_pLerpQueue;  // @ 0x8271A2EC
 
 // Constants
 static const float FLOAT_ONE = 1.0f;

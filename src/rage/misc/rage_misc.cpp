@@ -8,17 +8,11 @@
 #include "rage_misc.hpp"
 #include <cstdint>
 
-namespace {
-    // Global miniheap state structure @ 0x82402808
-    struct MiniheapState {
-        uint32_t start;    // +0x00 @ 0x82402808 - heap start address
-        uint32_t current;  // +0x04 @ 0x8240280C - current allocation pointer
-        uint32_t end;      // +0x08 @ 0x82402810 - heap end address
-    };
-    
-    // Global miniheap instance — defined here (was extern-only before)
-    MiniheapState g_miniheap = {};
-}
+// The original miniheap has three adjacent words (lis -32160, +10248).
+// Keep them external so a lifted TU uses the live image state.
+extern "C" uint32_t g_miniheapStart;    // @ 0x82602808
+extern "C" uint32_t g_miniheapEnd;      // @ 0x8260280C
+extern "C" uint32_t g_miniheapCurrent;  // @ 0x82602810
 
 namespace rage {
 
@@ -38,14 +32,14 @@ void* miniheapAllocator::Allocate(uint32_t size, uint32_t alignment) {
     }
     
     // Align current pointer
-    uint32_t aligned = (g_miniheap.current + alignMask) & ~alignMask;
+    uint32_t aligned = (g_miniheapCurrent + alignMask) & ~alignMask;
     
     // Update current pointer
     uint32_t newCurrent = aligned + size;
-    g_miniheap.current = newCurrent;
+    g_miniheapCurrent = newCurrent;
     
     // Check for overflow
-    if (newCurrent > g_miniheap.end) {
+    if (newCurrent > g_miniheapEnd) {
         // Call error handler (nop in current implementation)
         // Original: calls function @ 0x8240E6D0 with string @ 0x82074BB4
     }
@@ -58,7 +52,7 @@ void* miniheapAllocator::Allocate(uint32_t size, uint32_t alignment) {
 // Returns current - start (bytes allocated from the miniheap)
 // ─────────────────────────────────────────────────────────────────────────────
 uint32_t miniheapAllocator::GetUsedSize() const {
-    return g_miniheap.current - g_miniheap.start;
+    return g_miniheapCurrent - g_miniheapStart;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -66,15 +60,15 @@ uint32_t miniheapAllocator::GetUsedSize() const {
 // Returns end - current (bytes remaining in the miniheap)
 // ─────────────────────────────────────────────────────────────────────────────
 uint32_t miniheapAllocator::GetFreeSize() const {
-    return g_miniheap.end - g_miniheap.current;
+    return g_miniheapEnd - g_miniheapCurrent;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // miniheapAllocator::IsInRange [vtable slot 20 @ 0x823F8988]
-// Returns true if address falls within [start, end)
+// Returns true if address falls within the allocated range [start, current)
 // ─────────────────────────────────────────────────────────────────────────────
 bool miniheapAllocator::IsInRange(uint32_t address) const {
-    return (address >= g_miniheap.start) && (address < g_miniheap.end);
+    return (address >= g_miniheapStart) && (address < g_miniheapCurrent);
 }
 
 } // namespace rage

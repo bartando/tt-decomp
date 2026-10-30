@@ -94,3 +94,6 @@ extern "C" void* lbl_8271A310 = nullptr;
 
 // @ 0x8271A7F8 (.data)
 extern "C" void* lbl_8271A7F8 = nullptr;
+
+// Serialization descriptors share the same image slot.
+TT_DATA_ALIAS("g_serCtx", "g_intFieldType");  // @ 0x825CAF90

@@ -131,9 +131,9 @@ public:
 };
 
 // Event type constants (inferred from MatchesType checks)
-extern uint32_t g_eventType_Default;      // @ 0x8271B0D4 (glob:lbl_8271B0D4)
-extern uint32_t g_eventType_FootAudio;    // @ 0x8271B0D8 (glob:lbl_8271B0D8)
-extern uint32_t g_eventType_Message;      // @ 0x8271B0DC (glob:lbl_8271B0DC)
+extern uint32_t g_eventType_Default;      // @ 0x825C9C60 (glob:lbl_825C9C60)
+extern uint32_t g_eventType_FootAudio;    // @ 0x825C803C (glob:lbl_825C803C)
+extern uint32_t g_eventType_Message;      // @ 0x825C8038 (glob:lbl_825C8038)
 
 // Utility functions
 void util_E690();  // @ 0x820DE690 - Event cleanup utility

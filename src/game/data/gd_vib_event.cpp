@@ -17,8 +17,9 @@ extern "C" void rage_DebugLog(const char* msg, ...);
 extern "C" void RegisterSerializedField(void*, const char*, void*, void*, int);
 
 // Global arrays
-void* g_controllerArray = nullptr;
-void* g_playerStateArray = nullptr;
+extern void* g_controllerArray;  // @ 0x8271A3A8
+extern void* g_playerStateArray;  // @ 0x825EAB28
+extern void* g_controllerPointerArray;  // @ 0x8271A31C
 
 // Global state pointers
 extern uint8_t* g_vibrationStateArray;  // @ 0x8271A364
@@ -247,51 +248,16 @@ void gdVibEvent::TriggerVibration(void* playerContext) {
         return;
     }
     
-    // Get player ID from context
-    // playerContext is passed as r4, we need to get player ID
-    uint32_t playerID;
-    GetPlayerID(playerContext, 1);
-    
-    // playerID is returned in r3
-    // Calculate array index: playerID + 14
-    uint32_t arrayIndex = playerID + 14;
-    uint32_t offset = arrayIndex * 4;  // 4 bytes per entry
-    
-    // Load player state array base
-    uint32_t** playerStateBase = reinterpret_cast<uint32_t**>(
-        reinterpret_cast<uintptr_t>(&g_playerStateArray) - 21720
-    );
-    
-    // Check if player is local (state == 1)
-    uint32_t* playerStates = *playerStateBase;
-    uint32_t playerState = playerStates[arrayIndex];
-    
-    if (playerState != 1) {
-        return;  // Not a local player
+    uint32_t playerID = GetPlayerID(playerContext, 1);
+    const uint32_t* playerStates = static_cast<const uint32_t*>(g_playerStateArray);
+    if (playerStates[playerID + 14] != 1) {
+        return;
     }
-    
-    // Get controller for this player
-    // Controller index = playerID + 1
-    uint32_t controllerIndex = playerID + 1;
-    uint32_t controllerOffset = controllerIndex * 4;
-    
-    // Load controller array base
-    uint32_t** controllerBase = reinterpret_cast<uint32_t**>(
-        reinterpret_cast<uintptr_t>(&g_controllerArray) - 23640
-    );
-    uint32_t* controllers = *controllerBase;
-    
-    // Get controller pointer array base
-    uint32_t** controllerPtrBase = reinterpret_cast<uint32_t**>(
-        reinterpret_cast<uintptr_t>(&g_controllerArray) - 23780
-    );
-    uint32_t* controllerPtrs = *controllerPtrBase;
-    
-    // Get controller pointer
-    void* controller = reinterpret_cast<void*>(controllerPtrs[controllerIndex]);
-    
-    // Trigger vibration
-    ApplyControllerVibration(reinterpret_cast<void**>(controllers), controllerIndex, reinterpret_cast<void*>(m_vibrationPattern));
+
+    const uint32_t* controllerIndices = static_cast<const uint32_t*>(g_controllerPointerArray);
+    ApplyControllerVibration(static_cast<void**>(g_controllerArray),
+                             controllerIndices[playerID + 1],
+                             reinterpret_cast<void*>(uintptr_t(m_vibrationPattern)));
 }
 
 /**

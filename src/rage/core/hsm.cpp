@@ -49,7 +49,7 @@
 // NOTE: The asm-alias `_hsmContext_SetNextState_2800` below is what every
 // downstream caller uses; keep the signatures bit-identical.
 
-void hsmContext_SetNextState(void* context, int state) {
+void hsmContext_SetNextState(void* context, int state) {  // @ 0x82222800
     if (!context) {
         return;
     }
@@ -86,42 +86,19 @@ extern "C" void _c_hsmContext_SetNextState_plain(void* ctx, int state) {
 }
 
 // ─── hsmContext helpers @ 0x821C5B40 / 0x821C5BC8 / 0x821C5C20 ────────────────
-//
-// These three siblings share a common body:
-//   * Load the context struct at global SDA slot (sda_r10 + -22588) — the
-//     mode byte determines branch direction.
-//   * Load the HSM singleton at (sda_r10 + -22592); the base struct starts
-//     at offset +4996 (0x1384) relative to that object.
-//   * Stash (a) the mode byte at +60, (b) a flag at +64 (or +5304 for the
-//     "fw" variants), (c) invoke the name via strncpy, (d) transition to
-//     the hard-coded state index, (e) commit a final one-hot at +10220.
-//
-// The differences between the three:
-//   5B40_w  — state 1; flag = (mode==4 ? 3 : 1); copies name via strncpy(43B).
-//   5BC8_fw — state 2; flag1 = mode byte; flag2 = 0.
-//   5C20    — state 2; flag1 = mode byte; flag2 = (mode==4 ? 1024 : 16384).
+// These are shared image pointer slots, not private sentinel pointers.
+extern "C" void* g_hsmHelperContext;     // @ 0x8271A7C0
+extern "C" void* g_hsmHelperNameSource;  // @ 0x8271A7C4
 
 namespace {
-
-// SDA slots used by the 5B40/5BC8/5C20 trio.
-//   sda_r10 + -22588 → pointer to the mode/context record (4-byte mode @ +532).
-//   sda_r10 + -22592 → HSM singleton base (struct starts at +4996).
-//   sda_r10 + 15784  → float 0.0f (constant pool) — unused here.
-//
-// File-scope placeholders — the real SDA bindings live in the generated
-// globals table which is not yet lifted in this partition. Leaving them
-// zero-initialized keeps the codepath reachable; the null-checks below
-// short-circuit before any dereference if the pool hasn't been wired yet.
-void* lbl_821FA840_a = nullptr;
-void* lbl_821FA840_b = nullptr;
 
 // Shape of the HSM singleton accessed by these helpers.
 struct HsmScratch {
     uint8_t  _pad_0[60];   // +0x00..+0x3B
     uint32_t mode_copy;    // +0x3C  (60)
     uint32_t flag_1;       // +0x40  (64)
-    // +0x44 .. +0x1388  — reserved; not touched here
-    uint8_t  _pad_44[0x1388 - 0x44];
+    // +0x44 .. +0x14B8  — reserved; not touched here
+    uint8_t  _pad_44[0x14B8 - 0x44];
     uint32_t flag_2;       // +0x14B8 (5304)
 };
 
@@ -132,54 +109,52 @@ constexpr unsigned kNameBufferStride = 43u;
 
 // hsmContext_5B40_w @ 0x821C5B40 ---------------------------------------------
 void hsmContext_5B40_w(void* obj) {
-    if (!obj || !lbl_821FA840_a || !lbl_821FA840_b) {
+    if (!obj || !g_hsmHelperNameSource || !g_hsmHelperContext) {
         return;
     }
 
-    uint8_t* modeRec = reinterpret_cast<uint8_t*>(lbl_821FA840_a);
+    uint8_t* modeRec = reinterpret_cast<uint8_t*>(obj);
     uint32_t mode    = *reinterpret_cast<uint32_t*>(modeRec + 532);
     uint32_t flag    = (mode == 4u) ? 3u : 1u;
 
-    auto* hsm = reinterpret_cast<HsmScratch*>(
-        reinterpret_cast<uint8_t*>(lbl_821FA840_b) + 4996);
+    auto* hsm = reinterpret_cast<HsmScratch*>(g_hsmHelperContext);
     hsm->mode_copy = mode;
     hsm->flag_1    = flag;
 
-    // strncpy(name-buffer, src, 43) — preserves the original terminator.
-    char* nameDst = reinterpret_cast<char*>(hsm) + 45;  // +0x2D
-    std::strncpy(nameDst, "", kNameBufferStride);
+    char* nameDst = reinterpret_cast<char*>(hsm) + 4996;
+    const char* nameSrc = reinterpret_cast<const char*>(g_hsmHelperNameSource) + 45;
+    std::strncpy(nameDst, nameSrc, kNameBufferStride);
 
     hsmContext_SetNextState(hsm, 1);
 
-    // Final one-hot marker at byte (1<<16)|10220 = 0x0000_27EC from `obj`.
-    constexpr uint32_t kOneHotOffset = 0x27ECu;
+    // Final one-hot marker at byte (1<<16)|10220 = 0x127EC from `obj`.
+    constexpr uint32_t kOneHotOffset = 0x127ECu;
     *reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(obj) + kOneHotOffset) = 1u;
 }
 
 // hsmContext_5BC8_fw @ 0x821C5BC8 --------------------------------------------
 void hsmContext_5BC8_fw(void* obj) {
-    if (!obj || !lbl_821FA840_b) {
+    if (!obj || !g_hsmHelperContext) {
         return;
     }
 
     uint8_t* modeRec = reinterpret_cast<uint8_t*>(obj);  // arg is ctx in this variant
     uint32_t mode    = *reinterpret_cast<uint32_t*>(modeRec + 532);
 
-    auto* hsm = reinterpret_cast<HsmScratch*>(
-        reinterpret_cast<uint8_t*>(lbl_821FA840_b) + 4996);
+    auto* hsm = reinterpret_cast<HsmScratch*>(g_hsmHelperContext);
     hsm->mode_copy = mode;
     hsm->flag_2    = 0u;
 
     hsmContext_SetNextState(hsm, 2);
 
-    constexpr uint32_t kOneHotOffset = 0x27ECu;
+    constexpr uint32_t kOneHotOffset = 0x127ECu;
     *reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(obj) + kOneHotOffset) = 2u;
 }
 
 // jumptable_5C20 @ 0x821C5C20 ------------------------------------------------
 // (State-machine free function — owned by the HSM partition per recomp alias.)
 void jumptable_5C20(void* obj) {
-    if (!obj || !lbl_821FA840_b) {
+    if (!obj || !g_hsmHelperContext) {
         return;
     }
 
@@ -187,14 +162,13 @@ void jumptable_5C20(void* obj) {
         reinterpret_cast<uint8_t*>(obj) + 532);
     uint32_t flag2 = (mode == 4u) ? 1024u : 16384u;
 
-    auto* hsm = reinterpret_cast<HsmScratch*>(
-        reinterpret_cast<uint8_t*>(lbl_821FA840_b) + 4996);
+    auto* hsm = reinterpret_cast<HsmScratch*>(g_hsmHelperContext);
     hsm->mode_copy = mode;
     hsm->flag_2    = flag2;
 
     hsmContext_SetNextState(hsm, 2);
 
-    constexpr uint32_t kOneHotOffset = 0x27ECu;
+    constexpr uint32_t kOneHotOffset = 0x127ECu;
     *reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(obj) + kOneHotOffset) = 3u;
 }
 

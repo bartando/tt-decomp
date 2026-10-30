@@ -69,3 +69,30 @@ extern "C" void* const datParserRecord_vtable[3] = {};
 // @ 0x825F5AA8 (.data) — the TLS slot of the resource being placed (0 until
 // datResource_PointerFixup first allocates it)
 extern "C" uint32_t g_datResourceTlsSlot = 0x0u;
+
+// Shared image state: definitions belong here, never in a lifted code TU.
+// @ 0x82602808 / 0x8260280C / 0x82602810 — start, end, current (in that order)
+extern "C" uint32_t g_miniheapStart = 0;    // @ 0x82602808
+extern "C" uint32_t g_miniheapEnd = 0;      // @ 0x8260280C
+extern "C" uint32_t g_miniheapCurrent = 0;  // @ 0x82602810
+
+uint32_t g_activeLoggingAllocatorCount = 0;  // @ 0x825EBD20
+extern "C" uint8_t g_sysMemDebugFillFlag = 0;  // @ 0x8260642D
+
+namespace rage {
+uint32_t g_sysMemAllocatorInitLock = 0;  // @ 0x825EBCF8
+void* g_swfGlobalObject = nullptr;      // @ 0x82602818
+void* g_currentSwfContext = nullptr;    // @ 0x8260281C
+void* g_swfRootObject = nullptr;        // @ 0x82602828
+void* g_swfGlobalScope = nullptr;       // @ 0x8260282C
+void* g_swfSlotObject = nullptr;        // @ 0x82604848
+// Code takes these objects' addresses, rather than loading pointer slots.
+alignas(16) uint8_t g_swfStringBuffer[1024] = {};  // @ 0x82604850
+void* g_vtable_swfSCRIPTOBJECT[17] = {};          // @ 0x82074D14
+uint32_t g_swfCallDepth = 0;                     // @ 0x82604D1C
+float g_swfFrameScale = 0.0009765625f;           // @ 0x82079B90
+}
+TT_DATA_ALIAS("g_ambientStreamFlags", "g_grmShaderFx_flushRequired");  // @ 0x825EBB1C
+
+extern "C" void* g_hsmHelperContext = nullptr;     // @ 0x8271A7C0
+extern "C" void* g_hsmHelperNameSource = nullptr;  // @ 0x8271A7C4
