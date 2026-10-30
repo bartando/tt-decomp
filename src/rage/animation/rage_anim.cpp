@@ -15,6 +15,51 @@ extern double crt_sqrt(double value); // @ 0x824301D0
 
 namespace rage {
 
+// Merge-walk the frames' sorted DOF lists; each source entry is consumed once,
+// including when a filter rejects a match. Neither list is modified here.
+// Former auto-name: LocomotionStateAnim_B800_g_B800_1 (552 bytes).
+// @ 0x8224B800
+void crAnimFrame_ApplyMatchingDofs(crAnimFrame* dst, const crAnimFrame* src,
+                                 void* context, crAnimDofFilter filter, void* userData,
+                                 float weight, void* /*unusedR8*/, crAnimDofOperation operation) {
+    const unsigned dstCount = dst->m_dofCount;
+    const unsigned srcCount = src->m_dofCount;
+    unsigned srcIndex = 0;
+    for (unsigned dstIndex = 0; dstIndex < dstCount; ++dstIndex) {
+        void* dstDof = dst->m_dofs[dstIndex];
+        if (srcIndex >= srcCount) {
+            continue;
+        }
+
+        const auto* dstBytes = static_cast<const uint8_t*>(dstDof);
+        const uint32_t type = dstBytes[5];
+        const uint32_t id = *reinterpret_cast<const uint16_t*>(dstBytes + 6);
+        const uint32_t dstKey = (type << 16) | id;
+        while (srcIndex < srcCount) {
+            void* srcDof = src->m_dofs[srcIndex];
+            const auto* srcBytes = static_cast<const uint8_t*>(srcDof);
+            const uint32_t srcKey = (uint32_t(srcBytes[5]) << 16)
+                | *reinterpret_cast<const uint16_t*>(srcBytes + 6);
+            if (srcKey > dstKey) {
+                break;
+            }
+            if (srcKey == dstKey) {
+                if (filter) {
+                    float channelWeight = 1.0f;
+                    if ((filter(context, type, id, userData, &channelWeight) & 0xFF) != 0) {
+                        operation(dstDof, srcDof, channelWeight * weight, 0, 0);
+                    }
+                } else {
+                    operation(dstDof, srcDof, weight, 0, 0);
+                }
+                ++srcIndex;
+                break;
+            }
+            ++srcIndex;
+        }
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // crAnimDofFloat::Blend()  [vtable slot 7 @ 0x8216EC30]
 // 
