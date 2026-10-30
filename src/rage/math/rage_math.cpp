@@ -35,6 +35,14 @@ static void* rage_HeapAlloc(uint32_t size, uint32_t alignment) {
 
 namespace rage {
 
+// @ 0x82231EA0 | size: 0xF0
+// Accumulate a weighted 30-component control point, in component order.
+void vector30AddScaled(float* destination, const float* source, float weight) {
+    for (unsigned i = 0; i < 30; ++i) {
+        destination[i] = __builtin_fmaf(source[i], weight, destination[i]);
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // VectorNI — N-dimensional integer vector
 // ─────────────────────────────────────────────────────────────────────────────

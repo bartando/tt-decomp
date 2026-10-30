@@ -15,6 +15,8 @@
 
 namespace rage {
 
+void vector30AddScaled(float* destination, const float* source, float weight); // @ 0x82231EA0
+
 // ── rage::VectorNI  [vtable @ 0x82078F48] ───────────────────────────
 /**
  * N-dimensional integer vector. Elements are int32_t, heap-allocated.
