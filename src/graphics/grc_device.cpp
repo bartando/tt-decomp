@@ -406,3 +406,149 @@ extern "C" uint32_t grcDevice_ReserveCommandSpace(void* /*unused*/, void* device
     *size = static_cast<uint32_t>((static_cast<int32_t>(end - base) >> 2) << 2);
     return base;
 }
+
+extern "C" {
+    // The older shader lifts call these masks flushRequired / forceResetFlag.
+    extern uint32_t g_grmShaderFx_flushRequired;       // @ 0x825EBB1C
+    extern uint32_t g_grmShaderFx_forceResetFlag;      // @ 0x825EBAB4
+    extern uint32_t g_grmShaderFx_variantTable[];      // @ 0x825EBBD8 — pending render state
+    extern uint32_t g_grcAppliedRenderState[22];      // @ 0x825EBB80
+    extern uint32_t g_grcPendingTextureState[24];     // @ 0x825EBB20 — eight 12-byte entries
+    extern uint32_t g_grcAppliedTextureState[24];     // @ 0x825EBAB8
+    extern uint8_t g_grcUsePendingTexture;            // @ 0x825C89E5
+    extern uint32_t g_grcTextureParameter;            // @ 0x825EB980
+    extern void* g_grcDefaultTexture;                 // @ 0x825EBA20
+    extern uint32_t g_grcFormatId;                    // @ 0x825C9030
+    extern const uint32_t g_grcCullModeTable[3];       // @ 0x825D4CC4
+    extern const uint32_t g_grcColorWriteMaskTable[16]; // @ 0x825D4CD0
+    extern const uint32_t g_grcCompareFuncTable[8];    // @ 0x825D4D10
+    extern const uint32_t g_grcFillModeTable[3];       // @ 0x825D4D30
+    extern const uint32_t g_grcFormatCompareTable[8];  // @ 0x825D4D3C
+    void hudFlashBase_A830_g(void* context, uint32_t parameter, void* texture); // @ 0x8215A830
+}
+
+// Publish dirty texture/render state before drawing. Device callbacks are stored
+// directly in the device, at the byte offsets below (there is no vtable indirection).
+// Xenon ABI: no arguments or return value. All state words and texture handles
+// retain their original 32-bit layout. Reload globals across callbacks, as PPC does.
+// @ 0x8215B138
+extern "C" void grcDevice_FlushRenderState() {
+    uint32_t textureDirty = g_grmShaderFx_forceResetFlag;
+    for (uint32_t slot = 0; slot < 8; ++slot) {
+        if ((textureDirty & (1u << (slot * 4))) != 0) {
+            uint32_t texture = g_grcPendingTextureState[slot * 3];
+            g_grcAppliedTextureState[slot * 3] = texture;
+            if (g_grcUsePendingTexture == 0) {
+                texture = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(g_grcDefaultTexture));
+            }
+            if (slot == 0) {
+                hudFlashBase_A830_g(g_grcRenderObjects, g_grcTextureParameter,
+                                   reinterpret_cast<void*>(static_cast<uintptr_t>(texture)));
+                textureDirty = g_grmShaderFx_forceResetFlag;
+            }
+        }
+    }
+
+    auto* pending = g_grmShaderFx_variantTable;
+    auto* applied = g_grcAppliedRenderState;
+    const auto setState = [](uint32_t offset, uint32_t value) {
+        void* device = g_pGrcDeviceObj;
+        using SetStateFn = void (*)(void*, uint32_t);
+        auto fn = *reinterpret_cast<SetStateFn*>(static_cast<uint8_t*>(device) + offset);
+        fn(device, value);
+    };
+
+    if ((g_grmShaderFx_flushRequired & 0x40000u) != 0) {
+        const uint32_t firstUnused = pending[18];
+        applied[18] = firstUnused;
+        if (static_cast<int32_t>(firstUnused) < 8) {
+            uint32_t offset = (firstUnused + 3176u) * 4u;
+            do {
+                auto* device = static_cast<uint8_t*>(g_pGrcDeviceObj);
+                auto* binding = reinterpret_cast<uint32_t*>(device + offset);
+                auto* texture = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(*binding));
+                *binding = 0;
+                if (texture != nullptr) {
+                    const uint32_t references = texture[0] - 0x80000u;
+                    texture[1] = *reinterpret_cast<uint32_t*>(device + 10396);
+                    texture[0] = references;
+                    if ((references & 0x00F800FFu) == 0) {
+                        grcTexture_ReleaseResource(texture);
+                    }
+                }
+                offset += 4;
+            } while (static_cast<int32_t>(offset) < 12736);
+        }
+    }
+    if ((g_grmShaderFx_flushRequired & 0x8100u) != 0) {
+        applied[8] = pending[8];
+        applied[15] = pending[15];
+    }
+    if ((g_grmShaderFx_flushRequired & 1u) != 0) {
+        applied[0] = pending[0];
+        setState(152, g_grcCullModeTable[pending[0]]);
+    }
+    if ((g_grmShaderFx_flushRequired & 0x200u) != 0) {
+        applied[9] = pending[9];
+        setState(308, g_grcColorWriteMaskTable[pending[9]]);
+    }
+    if ((g_grmShaderFx_flushRequired & 0x1000u) != 0) {
+        applied[12] = pending[12];
+        setState(408, pending[12]);
+        applied[12] = pending[12];
+        setState(156, pending[12]);
+    }
+    if ((g_grmShaderFx_flushRequired & 0x400u) != 0) {
+        applied[10] = pending[10];
+        setState(192, pending[10]);
+    }
+    if ((g_grmShaderFx_flushRequired & 8u) != 0) {
+        setState(176, 0);
+        const uint32_t blend = pending[3];
+        applied[3] = blend;
+        if ((blend & 0x4000u) != 0) {
+            const uint32_t factors = blend & ~0x4000u;
+            setState(168, factors & 0xFFFFu);
+            setState(172, factors >> 16);
+        } else if (blend <= 11) {
+            static const uint8_t sourceBlend[12] = {6, 1, 1, 7, 10, 1, 10, 6, 1, 1, 1, 6};
+            static const uint8_t destBlend[12] = {7, 1, 1, 6, 1, 0, 11, 1, 1, 1, 1, 1};
+            setState(168, sourceBlend[blend]);
+            setState(172, destBlend[blend]);
+            switch (blend) {
+            case 2: setState(176, 1); break;
+            case 8: case 11: setState(176, 4); break;
+            case 9: setState(176, 2); break;
+            case 10: setState(176, 3); break;
+            }
+        }
+    }
+    if ((g_grmShaderFx_flushRequired & 0x10u) != 0) {
+        applied[4] = pending[4];
+        setState(200, g_grcCompareFuncTable[pending[4]]);
+    }
+    if ((g_grmShaderFx_flushRequired & 0x10000u) != 0) {
+        applied[16] = pending[16];
+        setState(148, g_grcFillModeTable[pending[16]]);
+    }
+    if ((g_grmShaderFx_flushRequired & 0x20u) != 0) {
+        applied[5] = pending[5];
+        setState(196, pending[5]);
+    }
+    if ((g_grmShaderFx_flushRequired & 0x40u) != 0) {
+        const uint32_t value = pending[6];
+        applied[6] = value;
+        setState(140, g_grcFormatId == 0x1A220197u ? g_grcFormatCompareTable[value]
+                                                : g_grcCompareFuncTable[value]);
+    }
+    if ((g_grmShaderFx_flushRequired & 0x80000u) != 0) {
+        applied[19] = pending[19];
+        setState(136, pending[19]);
+    }
+    if ((g_grmShaderFx_flushRequired & 0x80u) != 0) {
+        applied[7] = pending[7];
+        setState(144, pending[7]);
+    }
+    g_grmShaderFx_flushRequired = 0;
+    g_grmShaderFx_forceResetFlag = 0;
+}
