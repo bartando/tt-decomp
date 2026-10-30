@@ -58,3 +58,30 @@ void datResource_PointerFixup(uint32_t* field) {
     const uint32_t page = (value - rsc->m_imageBase) / rsc->m_pageSize;
     *field = reinterpret_cast<const uint32_t*>(rsc)[page + 2] + value;
 }
+
+// @ 0x8224DFC0 — relocate an owned pointer and invoke its resource placer.
+// The slot must itself belong to the current resource image. This is the
+// placement constructor used for pointer elements in animation arrays.
+void datResource_PlacePointer(uint32_t* field) {
+    datResourceContextView* rsc = CurrentResource();
+    if (!rsc || !*field) {
+        *field = 0;
+        return;
+    }
+    rsc = CurrentResource();
+    const uint32_t at = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(field));
+    if (at < rsc->m_base || at > rsc->m_base + rsc->m_size) {
+        *field = 0;
+        return;
+    }
+    rsc = CurrentResource();
+    const uint32_t value = *field;
+    if (value) {
+        const uint32_t page = (value - rsc->m_imageBase) / rsc->m_pageSize;
+        *field = reinterpret_cast<const uint32_t*>(rsc)[page + 2] + value;
+    }
+    rsc = CurrentResource();
+    auto* object = reinterpret_cast<void*>(static_cast<uintptr_t>(*field));
+    auto** vtable = *static_cast<void***>(object);
+    reinterpret_cast<void (*)(void*, void*)>(vtable[1])(object, rsc);
+}
