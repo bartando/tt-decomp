@@ -151,6 +151,7 @@ set(SOURCES
     src/graphics/grc_device.cpp
     src/graphics/grc_render.cpp
     src/graphics/texture_reference.cpp
+    src/graphics/grc_viewport_cull.cpp
     
     # Scene Graph
     src/scene/sg_node.cpp
