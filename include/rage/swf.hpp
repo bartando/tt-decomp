@@ -45,6 +45,10 @@ void swfSetTransformMatrix(void* transform, const float* matrix);
 // Compose inherited render state, traverse children, and draw leaf definitions.
 void swfRenderInstanceTree(void* instance, const void* parentTransform);
 
+struct swfFontAtlas;
+// Draw one atlas glyph at the text pen position using the current SWF transform.
+void swfDrawFontGlyph(const swfFontAtlas* atlas, float x, float y, float scale, int glyphIndex);
+
 /**
  * swfValueType — ActionScript value type constants
  *
