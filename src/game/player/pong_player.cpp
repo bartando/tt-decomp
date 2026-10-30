@@ -32,7 +32,8 @@ extern void pongPlayer_UpdateLocomotionState(pongPlayer* state);  // @ 0x820CC67
 
 // LocomotionStateAnim helpers — update animation list entries.
 // C128 = standard transition, C288 = alternate (flag-gated) transition.
-extern void LocomotionStateAnim_BlendLocomotionAnims(uint32_t entry, void* parent, float dt);
+extern void LocomotionStateAnim_BlendLocomotionAnims(uint32_t entry, void* unusedR4,
+                                                   void* skeleton, float weight);
 extern void LocomotionStateAnim_TransitionLocomotionState(uint32_t entry, void* parent, float dt);
 
 
@@ -335,10 +336,7 @@ void pongPlayer::UpdateAnimationState() {
     }
 
     // Select update function.
-    using AnimUpdateFn = void(*)(uint32_t, void*, float);
-    AnimUpdateFn updateFn = (inRange && !useAltAnim)
-        ? LocomotionStateAnim_BlendLocomotionAnims
-        : LocomotionStateAnim_TransitionLocomotionState;
+    const bool useBlend = inRange && !useAltAnim;
 
     // Step 4: iterate animation list.
     // In-range: use m_pGameState (+0x50); out-of-range: use m_pLocoState2 (+0x30).
@@ -353,7 +351,13 @@ void pongPlayer::UpdateAnimationState() {
     uint16_t  count     = static_cast<uint16_t>(listWords[3]);        // +12
 
     for (int i = 0; i < (int)count; ++i) {
-        updateFn(entries[i], m_pParent, g_recoveryTimerThreshold);
+        if (useBlend) {
+            LocomotionStateAnim_BlendLocomotionAnims(entries[i], nullptr, m_pParent,
+                                                   g_recoveryTimerThreshold);
+        } else {
+            LocomotionStateAnim_TransitionLocomotionState(entries[i], m_pParent,
+                                                        g_recoveryTimerThreshold);
+        }
     }
 }
 
