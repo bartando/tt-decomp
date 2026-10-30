@@ -890,16 +890,16 @@ namespace {
 // Source: util_42D8 @ 0x820C42D8
 // ─────────────────────────────────────────────────────────────────────────────
 void NormalizeQuaternion(float* quat) {
-    float magSquared = quat[0] * quat[0] + quat[1] * quat[1] +
-                       quat[2] * quat[2] + quat[3] * quat[3];
+    float magSquared = quat[1] * quat[1];
+    magSquared = __builtin_fmaf(quat[0], quat[0], magSquared);
+    magSquared = __builtin_fmaf(quat[2], quat[2], magSquared);
+    magSquared = __builtin_fmaf(quat[3], quat[3], magSquared);
 
-    if (magSquared != 0.0f) {
-        float invMag = 1.0f / std::sqrt(magSquared);
-        quat[0] *= invMag;
-        quat[1] *= invMag;
-        quat[2] *= invMag;
-        quat[3] *= invMag;
-    }
+    float invMag = magSquared != 0.0f ? 1.0f / std::sqrt(magSquared) : 0.0f;
+    quat[0] *= invMag;
+    quat[1] *= invMag;
+    quat[2] *= invMag;
+    quat[3] *= invMag;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
