@@ -538,8 +538,8 @@ void LocomotionState::ValidateAnimationTiming(uint32_t& animSetIndex, uint32_t& 
     }
 }
 
-// 0x820DEDC0 — no pseudocode available; defined as a no-op further down.
-void pongCreatureInst_EDC0_g(void* a, void* b, void* c);
+// 0x820DEDC0 — compose a bone transform with its parent matrix.
+void pongCreatureInst_EDC0_g(void* dst, void* bone, void* parent);
 
 // What 0x8214C8F8 reads from `this`. Its callers (pongCreature::UpdateReplay
 // and UpdateAnimation, through LocomotionStateAnim_C8F8_g) pass a skeleton,
@@ -3434,9 +3434,32 @@ void pongCreature_UpdateReplay(void* a) { (void)a; }
 // pongCreatureInst helpers — synthetic linker bridges (no binary symbol)
 void pongCreatureInst_RegisterPhysics(void* a, void* b) { (void)a; (void)b; }
 
-// pongCreatureInst_EDC0_g @ 0x820DEDC0 | size: 0x104 — no pseudocode available
-void pongCreatureInst_EDC0_g(void* a, void* b, void* c) {
-    (void)a; (void)b; (void)c;
+// pongCreatureInst_EDC0_g @ 0x820DEDC0 | size: 0x104
+// Matrix helper, not an instance method: basis rows use vmsum3fp128;
+// translation uses vmsum4fp128 with (bone.translation.xyz, 1).
+void pongCreatureInst_EDC0_g(void* dst, void* bone, void* parent) {
+    float* out = static_cast<float*>(dst);
+    const float* local = static_cast<const float*>(bone);
+    const float* world = static_cast<const float*>(parent);
+    float result[16];
+
+    for (int row = 0; row < 4; ++row) {
+        for (int axis = 0; axis < 3; ++axis) {
+            // Accumulate before rounding to float, as the VMX dot products do.
+            double value = 0.0;
+            for (int component = 0; component < 3; ++component)
+                value += static_cast<double>(local[4 * row + component])
+                       * static_cast<double>(world[4 * component + axis]);
+            if (row == 3)
+                value += world[12 + axis];
+            result[4 * row + axis] = static_cast<float>(value);
+        }
+        // The final vmrghw merges leave the OLD destination row's x in w.
+        result[4 * row + 3] = out[4 * row];
+    }
+
+    // The original loads every input before its first store, allowing aliases.
+    memcpy(out, result, sizeof(result));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
