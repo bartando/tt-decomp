@@ -1,4 +1,4 @@
-#include "template_registry.hpp"
+#include "game/template_registry.hpp"
 
 /**
  * game_94F0 @ 0x820F94F0 | size: 0xA4

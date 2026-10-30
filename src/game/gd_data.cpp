@@ -9,7 +9,7 @@
 #include "game/pong_strings.hpp"
 
 #include "gd_data.hpp"
-#include "template_registry.hpp"
+#include "game/template_registry.hpp"
 #include "globals.h"
 
 // External function declarations
