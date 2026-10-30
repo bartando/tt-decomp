@@ -3,7 +3,9 @@
 #include <cmath>
 #include <cstdint>
 
-extern "C" void game_EA10(const float* matrix, const float* point, float* out); // @ 0x8214EA10
+namespace rage {
+void mat44TransformPoint(const float* matrix, const float* point, float* out); // @ 0x8214EA10
+}
 double crt_sqrt(double value); // @ 0x824301D0
 
 // Viewport layout used here: +0x100 world-to-view matrix (16-byte aligned rows),
@@ -19,7 +21,7 @@ extern "C" int grcViewport_ClassifySphere(const void* viewport, const float* sph
 
     alignas(16) float center[4] = {sphere[0], sphere[1], sphere[2], 1.0f};
     alignas(16) float view[4];
-    game_EA10(matrix, center, view);
+    rage::mat44TransformPoint(matrix, center, view);
 
     // vmsum4fp128 of the first matrix row with itself: the squared x scale.
     const auto* row = reinterpret_cast<const float*>(reinterpret_cast<uintptr_t>(matrix) & ~uintptr_t(15));

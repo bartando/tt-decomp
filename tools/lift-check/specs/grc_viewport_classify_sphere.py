@@ -1,6 +1,6 @@
 """Viewport sphere classification: outside / crossing / inside.
 
-Runs the original transform (game_EA10) and sqrt. Matrices are near-orthonormal
+Runs the original transform (mat44TransformPoint) and sqrt. Matrices are near-orthonormal
 (scale exactly 1, inside and just outside the +-1e-5 window) or random; spheres
 land inside, on and outside each plane, with special values in a few slots.
 vmsum4fp128 is the emulator's model (double accumulation, one rounding).
@@ -11,7 +11,7 @@ FUNCTION = "grcViewport_ClassifySphere"
 ADDRESS = 0x82153D18
 SOURCE = "src/graphics/grc_viewport_cull.cpp"
 FP_CONTRACT = "off"
-CALLS = {"game_EA10": run(), "crt_sqrt": run()}
+CALLS = {0x8214EA10: run(), "crt_sqrt": run()}
 
 SPECIAL = [0, 0x80000000, 0x7F800000, 0xFF800000, 0x7FC00000]
 
