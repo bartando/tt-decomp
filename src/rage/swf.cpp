@@ -402,7 +402,7 @@ int swfSCRIPTOBJECT::VisitMembers() {
  * Falls back to SYMTAB lookup on the local member table, then the global
  * object table, then the global scope chain.
  *
- * @param name   Interned property name to look up
+ * @param name   SWF value containing the property name
  * @param result Output: {value, type} pair written on success
  * @return       true if found, false otherwise
  */
@@ -410,8 +410,8 @@ bool swfSCRIPTOBJECT::GetMember(const char* name, void* result) {
     extern void* g_swfStringBuffer;       // @ 0x82604850
     extern void* g_swfGlobalObject;       // @ 0x82602818
     extern void* g_swfGlobalScope;        // @ 0x8260282C
-    // Intern the property name
-    const char* interned = swfInternString(name, &g_swfStringBuffer, SWF_INTERN_BUFFER_SIZE);
+    // Convert the SWF value to a property name
+    const char* interned = util_A768_1(name, &g_swfStringBuffer, SWF_INTERN_BUFFER_SIZE);
 
     // Special case: "this" — return self as object
     if (strcmp(interned, "this") == 0) {
@@ -431,7 +431,7 @@ bool swfSCRIPTOBJECT::GetMember(const char* name, void* result) {
             uint16_t count = *(uint16_t*)((char*)pool + 6);
             void* next = *(void**)freeObj;
 
-            *(uint16_t*)((char*)pool + 6) = count + 1;
+            *(uint16_t*)((char*)pool + 6) = count - 1;
             *(void**)((char*)pool + 12) = next;
 
             if (freeObj) {
