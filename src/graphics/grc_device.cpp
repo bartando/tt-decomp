@@ -6,6 +6,7 @@
  *   - grcDevice_shutdown    @ 0x8214FA58 — Primary shutdown sequence
  *   - grcDevice_shutdownAlt @ 0x821540D0 — Alternate shutdown path
  *   - grcDevice_setSamplerMinFilter @ 0x82355418 — Xenos texture fetch state
+ *   - grcDevice_setSamplerMagFilter @ 0x823555A8 — Xenos texture fetch state
  *
  * Note: grcDevice_beginScene lives in grc_render.cpp alongside grcDevice_clear.
  */
@@ -217,6 +218,37 @@ void grcDevice_setSamplerMinFilter(void* device, uint32_t sampler, uint32_t filt
 
     // srd uses the low seven shift bits and yields zero for shifts 64..127.
     // Guard the C++ shift so that those inputs never invoke undefined behavior.
+    uint32_t shift = sampler & 127u;
+    uint64_t dirtyBit = shift < 64u ? (UINT64_C(0x8000000000000000) >> shift) : 0;
+    uint64_t* dirtySamplers = reinterpret_cast<uint64_t*>(state + 32);
+    *dirtySamplers |= dirtyBit;
+}
+
+// @ 0x823555A8
+void grcDevice_setSamplerMagFilter(void* device, uint32_t sampler, uint32_t filter) {
+    uint8_t* state = static_cast<uint8_t*>(device);
+    uint32_t* fetch = reinterpret_cast<uint32_t*>(state + (sampler + 48u) * 24u);
+    uint32_t word3 = fetch[3];
+    uint32_t word4 = fetch[4];
+    uint32_t anisotropic = filter >> 2;
+
+    // The shared anisotropy field also depends on the previous min_aniso_walk.
+    uint32_t anisoMask = (((word4 >> 11) & 1u) | anisotropic) - 1u;
+    uint32_t anisoFilter = g_grcAnisoFilterTable[state[12020u + sampler]] & ~anisoMask;
+    word4 = (word4 & ~0x400u) | ((anisotropic << 10) & 0x400u);
+    fetch[4] = word4;
+
+    uint32_t packedFilter = (anisoFilter << 6) | anisotropic | filter;
+    word3 = (word3 & ~0x0E180000u) | ((packedFilter << 19) & 0x0E180000u);
+    fetch[3] = word3;
+
+    uint32_t volumeFilters = ((word3 >> 19) & 1u) | ((word3 >> 20) & 2u);
+    uint32_t volumeOverride = state[12098u + sampler];
+    uint32_t volumeMask = (volumeOverride >> 2) - 1u;
+    uint32_t volume = (volumeFilters & volumeMask) + (volumeOverride & ~volumeMask);
+    fetch[4] = (word4 & ~3u) | (volume & 3u);
+
+    // srd uses seven shift bits and returns zero for shifts 64..127.
     uint32_t shift = sampler & 127u;
     uint64_t dirtyBit = shift < 64u ? (UINT64_C(0x8000000000000000) >> shift) : 0;
     uint64_t* dirtySamplers = reinterpret_cast<uint64_t*>(state + 32);
