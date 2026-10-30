@@ -16441,7 +16441,7 @@ loc_82378C64:
 	temp.f32 = float(ctx.f12.f64);
 	PPC_STORE_U32(ctx.r1.u32 + 124, temp.u32);
 	// bl 0x8223f840
-	util_F840(ctx, base);
+	PackClampedColorARGB8(ctx, base);
 	// lis r11,-32160
 	// mr r8,r3
 	ctx.r8.u64 = ctx.r3.u64;
@@ -27015,7 +27015,7 @@ loc_8237D83C:
 				temp.f32 = float(ctx.f10.f64);
 				PPC_STORE_U32(ctx.r1.u32 + 104, temp.u32);
 				// bl 0x8223f840
-				util_F840(ctx, base);
+				PackClampedColorARGB8(ctx, base);
 				// mr r11,r3
 				ctx.r11.u64 = ctx.r3.u64;
 				// lfs f6,48(r31)
@@ -35768,7 +35768,7 @@ PPC_FUNC_IMPL(__imp__hudFlashBase_1868_g) {
 		temp.f32 = float(ctx.f12.f64);
 		PPC_STORE_U32(ctx.r1.u32 + 156, temp.u32);
 		// bl 0x8223f840
-		util_F840(ctx, base);
+		PackClampedColorARGB8(ctx, base);
 		// lwz r10,0(r3)
 		ctx.r10.u64 = PPC_LOAD_U32(ctx.r3.u32 + 0);
 		// cmpwi cr6,r31,0
@@ -36203,7 +36203,7 @@ loc_82381DE0:
 		temp.f32 = float(ctx.f11.f64);
 		PPC_STORE_U32(ctx.r1.u32 + 332, temp.u32);
 		// bl 0x8223f840
-		util_F840(ctx, base);
+		PackClampedColorARGB8(ctx, base);
 		// lwz r8,15400(r30)
 		ctx.r8.u64 = PPC_LOAD_U32(var_r30 + 15400);
 		// add r9,r28,r31
@@ -52375,7 +52375,7 @@ PPC_FUNC_IMPL(__imp__fxBallSpinTex_vfn_0) {
 			ea = (ctx.r5.u32) & ~0xF;
 			simde_mm_store_si128((simde__m128i*)PPC_RAW_ADDR(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)ctx.v3.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
 			// bl 0x8223f840
-			util_F840(ctx, base);
+			PackClampedColorARGB8(ctx, base);
 			// mr r11,r3
 			ctx.r11.u64 = ctx.r3.u64;
 			// fmr f6,f2
@@ -52720,7 +52720,7 @@ loc_823898A8:
 	// fmadds f2,f8,f28,f27
 	ctx.f2.f64 = double(float(ctx.f8.f64 * var_f28 + var_f27));
 	// bl 0x8223f840
-	util_F840(ctx, base);
+	PackClampedColorARGB8(ctx, base);
 	// mr r11,r3
 	ctx.r11.u64 = ctx.r3.u64;
 	// fmr f6,f2
@@ -54897,7 +54897,7 @@ PPC_FUNC_IMPL(__imp__fxBallSplash2D_rtti_71A8_0) {
 			temp.f32 = float(ctx.f10.f64);
 			PPC_STORE_U32(ctx.r1.u32 + 152, temp.u32);
 			// bl 0x8223f840
-			util_F840(ctx, base);
+			PackClampedColorARGB8(ctx, base);
 			// cmplwi cr6,r28,1
 			// blt cr6,0x8238a804
 			if (var_r28 >= 1) {

@@ -256,10 +256,7 @@ void crAnimDofVector3::Blend(void* animContext, float blendFactor, float* outVec
 // ─────────────────────────────────────────────────────────────────────────────
 void crAnimDofVector3::CopyFrom(void* sourceAnimDof) {
     // Get the vector from source via virtual call to slot 14
-    void** vtable = *reinterpret_cast<void***>(sourceAnimDof);
-    typedef float* (*GetVectorFunc)(void*);
-    GetVectorFunc getVectorFn = reinterpret_cast<GetVectorFunc>(vtable[14]);
-    float* sourceVec = getVectorFn(sourceAnimDof);
+    float* sourceVec = static_cast<crAnimDofVector3*>(sourceAnimDof)->GetVector();
     
     // The VMX load/store copies all four lanes without float arithmetic.
     // Snapshot before writing, including when the source is our own value.
@@ -280,9 +277,7 @@ void crAnimDofVector3::BlendFrom(void* sourceAnimDof, float blendFactor) {
         return;
     }
 
-    void** vtable = *reinterpret_cast<void***>(sourceAnimDof);
-    typedef float* (*GetVectorFunc)(void*);
-    float* sourceVec = reinterpret_cast<GetVectorFunc>(vtable[14])(sourceAnimDof);
+    float* sourceVec = static_cast<crAnimDofVector3*>(sourceAnimDof)->GetVector();
     float* currentVec = reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(this) + 16);
 
     if (blendFactor < 0.999f) {
@@ -321,10 +316,7 @@ void crAnimDofVector3::ScaleFrom(void* sourceAnimDof, float scaleFactor) {
     
     if (scaleSquared > epsilon) {
         // Get source vector via virtual call to slot 14
-        void** vtable = *reinterpret_cast<void***>(sourceAnimDof);
-        typedef float* (*GetVectorFunc)(void*);
-        GetVectorFunc getVectorFn = reinterpret_cast<GetVectorFunc>(vtable[14]);
-        float* sourceVec = getVectorFn(sourceAnimDof);
+        float* sourceVec = static_cast<crAnimDofVector3*>(sourceAnimDof)->GetVector();
         
         // Get current vector
         float* currentVec = reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(this) + 16);
@@ -356,10 +348,7 @@ void crAnimDofVector3::ThresholdFrom(void* sourceAnimDof, float threshold) {
     
     if (magSquared > thresholdSquared) {
         // Get normalized vector from source via virtual call to slot 14
-        void** vtable = *reinterpret_cast<void***>(sourceAnimDof);
-        typedef float* (*GetVectorFunc)(void*);
-        GetVectorFunc getVectorFn = reinterpret_cast<GetVectorFunc>(vtable[14]);
-        float* sourceVec = getVectorFn(sourceAnimDof);
+        float* sourceVec = static_cast<crAnimDofVector3*>(sourceAnimDof)->GetVector();
         
         // Replace with normalized vector
         currentVec[0] = sourceVec[0];
@@ -407,18 +396,13 @@ void crAnimDofVector3::Reset() {
 // ─────────────────────────────────────────────────────────────────────────────
 void crAnimDofVector3::TransformBy(void* transformAnimDof) {
     // Get transform vector via virtual call to slot 14
-    void** vtable = *reinterpret_cast<void***>(transformAnimDof);
-    typedef float* (*GetVectorFunc)(void*);
-    GetVectorFunc getVectorFn = reinterpret_cast<GetVectorFunc>(vtable[14]);
-    float* transformVec = getVectorFn(transformAnimDof);
+    float* transformVec = static_cast<crAnimDofVector3*>(transformAnimDof)->GetVector();
     
     // Get pointer to our vector
     float* currentVec = reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(this) + 16);
     
     // Apply transform via virtual call to slot 17
-    typedef void (*TransformFunc)(void*, float*);
-    TransformFunc transformFn = reinterpret_cast<TransformFunc>(vtable[17]);
-    transformFn(transformAnimDof, currentVec);
+    static_cast<crAnimDofVector3*>(transformAnimDof)->SetValue(currentVec);
     
     // Store transformed result back
     currentVec[0] = transformVec[0];
@@ -439,6 +423,12 @@ void crAnimDofVector3::Normalize() {
     currentVec[0] = 0.0f;
     currentVec[1] = 0.0f;
     currentVec[2] = 0.0f;
+}
+
+// Returns the embedded SIMD value without reading or changing any lanes.
+// @ 0x823D8CD0
+float* crAnimDofVector3::GetVector() {
+    return reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(this) + 16);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -4987,7 +4987,7 @@ struct crAnimDofVector3_vtable {
     void* vfn_11;  // crAnimDofVector3_vfn_11
     void* vfn_12;  // crAnimDofVector3_vfn_12
     void* vfn_13;  // crAnimDofVector3_vfn_13
-    void* vfn_14;  // crAnimDofVector3_vfn_14
+    void* vfn_14;  // crAnimDofVector3_GetVector
     void* vfn_15;  // (unnamed)
     void* vfn_16;  // (unnamed)
     void* vfn_17;  // crAnimDofVector3_vfn_17

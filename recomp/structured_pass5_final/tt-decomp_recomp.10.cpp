@@ -15637,8 +15637,8 @@ loc_8223F7D8:
 	return;
 }
 
-__attribute__((alias("__imp__util_F840"))) PPC_WEAK_FUNC(util_F840);
-PPC_FUNC_IMPL(__imp__util_F840) {
+__attribute__((alias("__imp__PackClampedColorARGB8"))) PPC_WEAK_FUNC(PackClampedColorARGB8);
+PPC_FUNC_IMPL(__imp__PackClampedColorARGB8) {
 	PPC_FUNC_PROLOGUE();
 	PPCRegister temp{};
 	// lis r11,-32253

@@ -36,3 +36,7 @@ extern "C" void* g_grcRenderObjects[2] = {};
 uint32_t g_ambientStreamSlotCap = 0;  // @ 0x825C8F54
 uint32_t g_ambientMappedSlot = 0;     // @ 0x825EBB84
 uint32_t g_ambientCurSlot = 0;        // @ 0x825EBBDC
+
+// Shared normalized color clamp bounds from the image.
+extern const float g_colorClampMin = 0.0f; // @ 0x8202D110
+extern const float g_colorClampMax = 1.0f; // @ 0x8202D108

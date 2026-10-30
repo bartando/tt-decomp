@@ -13,6 +13,9 @@
 #pragma once
 #include <stdint.h>
 
+struct fxVector4;
+uint32_t* PackClampedColorARGB8(uint32_t* out, const fxVector4* color); // @ 0x8223F840
+
 void fxDrawBillboardQuad(uint32_t uvIndex, float angle, float x, float y, float z,
                          float halfWidth, float halfHeight, uint32_t color);
 

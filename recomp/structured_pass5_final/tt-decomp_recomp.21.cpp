@@ -40412,8 +40412,8 @@ loc_823D8CB8:
 	return;
 }
 
-__attribute__((alias("__imp__crAnimDofVector3_vfn_14"))) PPC_WEAK_FUNC(crAnimDofVector3_vfn_14);
-PPC_FUNC_IMPL(__imp__crAnimDofVector3_vfn_14) {
+__attribute__((alias("__imp__crAnimDofVector3_GetVector"))) PPC_WEAK_FUNC(crAnimDofVector3_GetVector);
+PPC_FUNC_IMPL(__imp__crAnimDofVector3_GetVector) {
 	PPC_FUNC_PROLOGUE();
 	// addi r3,r3,16
 	ctx.r3.s64 = ctx.r3.s64 + 16;

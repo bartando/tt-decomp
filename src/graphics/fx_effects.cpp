@@ -22,6 +22,32 @@ struct fxVector4 {
     }
 };
 
+extern const float g_colorClampMin; // @ 0x8202D110
+extern const float g_colorClampMax; // @ 0x8202D108
+extern "C" const float g_alphaMultiplier; // @ 0x82079BE0
+
+// Clamp normalized RGBA, truncate each scaled channel, and pack 0xAARRGGBB.
+// Unordered comparisons preserve NaNs in the original; fctiwz produces an
+// integer with a zero low byte. Mapping NaNs to zero gives the same packed
+// result without an undefined C++ float-to-int conversion. Snapshot all lanes
+// before storing so out may overlap any component of color.
+// @ 0x8223F840
+uint32_t* PackClampedColorARGB8(uint32_t* out, const fxVector4* color) {
+    const float low = g_colorClampMin;
+    const float high = g_colorClampMax;
+    const float scale = g_alphaMultiplier;
+    const float r = !(color->x >= low) ? low : (color->x <= high ? color->x : high);
+    const float g = !(color->y >= low) ? low : (color->y <= high ? color->y : high);
+    const float b = !(color->z >= low) ? low : (color->z <= high ? color->z : high);
+    const float a = !(color->w >= low) ? low : (color->w <= high ? color->w : high);
+    const uint32_t red = static_cast<uint32_t>(static_cast<int32_t>(r * scale)) & 255;
+    const uint32_t green = static_cast<uint32_t>(static_cast<int32_t>(g * scale)) & 255;
+    const uint32_t blue = static_cast<uint32_t>(static_cast<int32_t>(b * scale)) & 255;
+    const uint32_t alpha = static_cast<uint32_t>(static_cast<int32_t>(a * scale)) & 255;
+    *out = (alpha << 24) | (red << 16) | (green << 8) | blue;
+    return out;
+}
+
 // Global effect parameter table @ 0x8271A394
 extern uint32_t* g_fxParameterTable;
 
@@ -37,7 +63,6 @@ extern void rage_5908(void*);
 // ── Forward declarations of helpers referenced in implementations ──
 extern void util_C880(void* meshPtr);                 // mesh/resource releaser @ 0x8214C880
 extern int  rage_2A78(int primitiveType, int vertexCount); // begin immediate batch @ 0x82152A78
-extern uint32_t* util_F840(uint32_t* out, const fxVector4* color); // @ 0x8223F840
 extern uint32_t g_fxVertexCursor;                    // @ 0x825EBA74
 extern uint32_t g_fxCountOnly;                       // @ 0x825EBA84
 extern void* g_binkVideoPlayer;                      // @ 0x825EB988
@@ -906,7 +931,7 @@ void fxBallSpinTex::DrawSpinTrail(const fxMatrix44& xform,
         if (position[2] < height)
             sampleColor.w *= 0.0f;
         uint32_t packed;
-        const uint32_t* packedColor = util_F840(&packed, &sampleColor);
+        const uint32_t* packedColor = PackClampedColorARGB8(&packed, &sampleColor);
         const float taper = 1.0f - __builtin_fabsf(t);
         const float extent = static_cast<float>(static_cast<double>(taper) *
                                                 0.007999999448657036f +
