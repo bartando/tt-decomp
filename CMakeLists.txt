@@ -190,6 +190,7 @@ set(SOURCES
     src/xam/kernel_import_thunks.c
     src/rage/math/ph_math.cpp
     src/rage/math/polygon_clip.cpp
+    src/rage/math/swf_matrix.cpp
     src/game/input/button_edges.cpp
     src/game/player/player_state_queries.cpp
     src/game/misc/ccal_ring_buffer.cpp
