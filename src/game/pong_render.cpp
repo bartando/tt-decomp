@@ -13,6 +13,24 @@
 #include "pong_render.hpp"
 #include <string.h>
 
+// pongLightState_CopyLights @ 0x8213E110 | size: 0x30C (was game_E110)
+// Copies all eight slots, regardless of count. game_E0A8 (0x8213E0A8)
+// wraps this to also copy ambient and the two halfwords; those are untouched here.
+// The original returns dst in r3 and leaves each light's tail padding alone.
+pongLightState* pongLightState_CopyLights(pongLightState* dst, const pongLightState* src) {
+    for (int i = 0; i < 8; ++i) {
+        for (int v = 0; v < 3; ++v) {
+            dst->lights[i].vectors[v] = src->lights[i].vectors[v];
+        }
+        dst->lights[i].scalars[0] = src->lights[i].scalars[0];
+        dst->lights[i].scalars[1] = src->lights[i].scalars[1];
+        for (int f = 0; f < 4; ++f) {
+            dst->lights[i].flags[f] = src->lights[i].flags[f];
+        }
+    }
+    return dst;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Globals
 // ─────────────────────────────────────────────────────────────────────────────
