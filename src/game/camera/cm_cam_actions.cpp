@@ -125,11 +125,14 @@ typedef void* (*GetSlotFn)(void*, int);
  * out[i] = mat_row_i . pt + translation_i
  */
 extern "C" void TransformPoint3x4(float* out, const float* pt, const float* mat) {
-    float x = pt[0], y = pt[1], z = pt[2];
-
-    out[0] = mat[4] * y + mat[8] * z + x * mat[0] + mat[12];
-    out[1] = mat[9] * z + mat[1] * x + mat[5] * y + mat[13];
-    out[2] = mat[10] * z + mat[2] * x + mat[6] * y + mat[14];
+    // Preserve the PPC's lane-specific FMA order and reload after each store:
+    // overlapping output observes earlier writes. The fourth lane is untouched.
+    out[0] = __builtin_fmaf(pt[0], mat[0],
+                 __builtin_fmaf(mat[8], pt[2], mat[4] * pt[1])) + mat[12];
+    out[1] = __builtin_fmaf(mat[5], pt[1],
+                 __builtin_fmaf(mat[1], pt[0], mat[9] * pt[2])) + mat[13];
+    out[2] = __builtin_fmaf(mat[6], pt[1],
+                 __builtin_fmaf(mat[2], pt[0], mat[10] * pt[2])) + mat[14];
 }
 
 /**
