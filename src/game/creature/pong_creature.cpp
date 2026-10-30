@@ -3099,41 +3099,28 @@ float LocomotionStateAnim_6DD8_w(void* self, float maxWeight, float frameTime) {
 }
 
 /**
- * GetAnimWeightByMode @ 0x82248250 | size: 0xB4
+ * LocomotionStateAnim_GetMappedWeight (was LocomotionStateAnim_8250_fw)
+ * @ 0x82248250 | size: 0xB4
  *
- * Similar to GetAnimWeight but with an additional mode parameter.
- * For modes 0 and 1, looks up the anim by index and reads weight
- * from the weight array. For mode >= 2, reads the weight directly
- * from a second array at animPair[3] (offset +12).
+ * Modes 0/1 resolve an animation ID, map it to a signed slot through
+ * animPair[1], then read animPair[3][slot]. A miss, negative slot or other
+ * mode leaves outWeight untouched. A resolved weight is always stored,
+ * and only a strictly positive value returns true (NaN returns false).
  */
-// LocomotionStateAnim_8250_fw @ 0x82248250
-bool LocomotionStateAnim_8250_fw(void* self, uint8_t mode, uint16_t animID, void** animPair, float* outWeight) {
-    if (mode == 0 || mode == 1) {
-        // Look up animation index via 04F0_g
-        uint16_t index;
-        bool found = LocomotionStateAnim_04F0_g(animPair[0], animID, &index);
-
-        if (!found) {
-            return false;
-        }
-
-        // Read weight from animPair base, offset by index
-        uint32_t arrayOffset = (uint32_t)index << 2;
-        float weight = *(float*)((char*)animPair[1] + arrayOffset);
-
-        // Scaffold falls through without storing — returns false
-        (void)weight;
+bool LocomotionStateAnim_GetMappedWeight(void* self, uint8_t mode, uint16_t animID,
+                                        void** animPair, float* outWeight) {
+    (void)self;
+    if (mode > 1)
         return false;
-    } else if ((int32_t)mode >= 2) {
-        // Direct weight lookup from animPair[3] (offset +12)
-        float* weightArray = (float*)animPair[3];
-        float weight = weightArray[mode];
-
-        *outWeight = weight;
-        return weight > 0.0f;
-    }
-
-    return false;
+    uint16_t index;
+    if (!LocomotionStateAnim_04F0_g(animPair[0], animID, &index))
+        return false;
+    const int32_t slot = static_cast<const int32_t*>(animPair[1])[index];
+    if (slot < 0)
+        return false;
+    const float weight = static_cast<const float*>(animPair[3])[slot];
+    *outWeight = weight;
+    return weight > 0.0f;
 }
 
 /**
