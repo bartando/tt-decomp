@@ -673,6 +673,47 @@ void grmShaderInstance_Unbind(uint32_t instance) {
     *reinterpret_cast<uint32_t*>(self + 520) = 0;
 }
 
+// @ 0x8215AE90
+void grmShaderInstance_Select(uint32_t /* context */, uint32_t entryId) {
+    auto* context = reinterpret_cast<uint32_t*>(0x82617E60u);
+    auto& activeEntry = *reinterpret_cast<uint32_t*>(0x825EBC48u);
+    const uint32_t previous = g_grmShaderInstance_previous;
+    if (previous != 0) {
+        if (previous == context[0] && entryId == activeEntry) {
+            const bool changed = context[4] != g_grmShaderFx_boundContext;
+            if (changed)
+                context[4] = g_grmShaderFx_boundContext;
+            if (changed || g_grmShaderFx_boundParam != previous) {
+                g_grmShaderFx_boundParam = previous;
+                grmShaderInstance_FilterAndUploadParameters(previous);
+            }
+            return;
+        }
+        auto* old = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(previous));
+        *reinterpret_cast<uint32_t*>(old + 540) = *reinterpret_cast<uint32_t*>(old + 532);
+        *reinterpret_cast<uint32_t*>(old + 532) = 0;
+        grmShaderInstance_Unbind(previous);
+    }
+    if (entryId == 0) {
+        g_grmShaderInstance_previous = 0;
+        return;
+    }
+    const uint32_t selected = context[0];
+    activeEntry = entryId;
+    g_grmShaderInstance_previous = selected;
+    auto* instance = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(selected));
+    const auto* entries = *reinterpret_cast<uint32_t**>(instance + 512);
+    const uint32_t descriptor = entries[(entryId >> 18) & 0x3FFF];
+    *reinterpret_cast<uint32_t*>(instance + 692) = 0;
+    *reinterpret_cast<uint32_t*>(instance + 540) = 0;
+    *reinterpret_cast<uint32_t*>(instance + 520) = entryId;
+    *reinterpret_cast<uint32_t*>(instance + 516) = descriptor;
+    rage_8C48(selected, *reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(descriptor + 12)));
+    const uint32_t active = g_grmShaderInstance_previous;
+    g_grmShaderFx_boundParam = active;
+    grmShaderInstance_FilterAndUploadParameters(active);
+}
+
 // @ 0x8215AF90
 uint32_t grmShaderInstance_Bind(uint32_t effectSlot, uint32_t entryId, uint32_t flags) {
     auto* slot = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(effectSlot));
