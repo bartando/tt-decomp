@@ -254,7 +254,12 @@ generated code for these functions matches the asm):
   22 more candidate loops.
 - `scripts/stage1_pass3.py:481-500` nests sequential branches to one target as if/else,
   reversing which nodes get cleaned up in 0x82455148.
-- It also drops the f25 temporary in 0x82406778.
+- `scripts/stage2_cleanup.py` Phase E renames FPR `.f64`/`.f32` uses to `var_fN` but not
+  their `.u64`/`.s64` aliases, so values written through those read as 0 (f25/f24 in
+  0x82406778). Phase D also moves `fcmpu` past a later write to the compared register.
+- A census of the final scaffold finds about 230 affected functions (~1.4%): 190 with
+  mixed FPR storage, 40 with wrong loop guards. The cause is the text-level cleanup
+  passes, not the PPC decoder.
 
 ## Disassembly caveat
 
