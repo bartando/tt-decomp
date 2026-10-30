@@ -1,5 +1,5 @@
 /**
- * ph_math.cpp — the C runtime's sin, cos, atan2 and sqrt
+ * ph_math.cpp — the C runtime's trigonometry and sqrt
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
  *
  * The statically linked CRT's double-precision math (0x824301D0..0x8243110C;
@@ -14,6 +14,17 @@
  */
 
 #include <cstdint>
+
+// The mixed FP/integer Xenon interfaces leave GPR slots for FP arguments.
+// Explicit unused slots keep these declarations callable under ppc32 SysV too.
+uint32_t _fp_set_fpscr_bits(uint32_t desired, uint32_t mask);  // @ 0x82436530
+int crt_fp_classify(double value);  // @ 0x824357A8
+double crt_fp_adjust_exponent(uint32_t unused, int delta, double value);  // @ 0x82435770
+double crt_fp_sqrt(double value);  // @ 0x82436528
+double crt_fp_quiet_nan(int operation, uint32_t unused, uint32_t control, double value);  // @ 0x82436260
+// flags in r3, operation in r4, saved control in r7; value/result in f1/f2.
+double crt_fp_exception(uint32_t flags, int operation, uint32_t unused5, uint32_t unused6,
+                        uint32_t control, double value, double result);  // @ 0x82436368
 
 namespace {
 
@@ -75,6 +86,22 @@ const crtAtan2Constants kAtan2 = {
     {0.0, 0x1.0c152382d7366p-1, 0x1.921fb54442d18p+0, 0x1.0c152382d7366p+0},
     0x1.0000000000000p-1022,
     0.0f, 0.5f, 1.0f,
+};
+
+struct crtAsinAcosConstants {      // @ 0x82001510
+    double offset[4];             // 0, pi/4, pi/2, pi/4
+    double tiny;
+    double num[5];
+    double den[5];
+};
+
+const crtAsinAcosConstants kAsinAcos = {
+    {0.0, 0x1.921fb54442d18p-1, 0x1.921fb54442d18p+0, 0x1.921fb54442d18p-1},
+    0x1.6a09e667f3bcdp-27,
+    {-0x1.b5e55a83a0a62p+4, 0x1.c9aa7360ad48ap+5, -0x1.3d82ca9a6da9fp+5,
+     0x1.44e1764ec3927p+3, -0x1.64bbdb5e61e65p-1},
+    {-0x1.486c03e2b87ccp+7, 0x1.a124f101eb843p+8, -0x1.7ddcefc56a848p+8,
+     0x1.2de7c96591c70p+7, -0x1.7d2e86ef9861fp+4},
 };
 
 // Fused multiply-add and square root as instructions (fmadd, fsqrt): the
@@ -228,6 +255,96 @@ double crt_atan2(double y, double x) {
 // @ 0x824301D0 — sqrt (phBoundCapsule_01D0_g): fsqrt
 double crt_sqrt(double x) {
     return Sqrt(x);
+}
+
+// @ 0x82430BA8
+// Shared CRT asin/acos core (formerly fiAsciiTokenizer_0BA8_g), size 0x2DC.
+// f1 = x, r4 = selector (0 asin, 1 acos), return in f1. r3 is unused;
+// retain its slot explicitly because SysV does not reserve it for x.
+// The only entry thunks, 0x82430E88/0x82430E90, supply selectors 0/1.
+double crt_asin_acos(double x, uint32_t /*unused*/, int acosMode) {
+    constexpr uint32_t CONTROL_MASK = 0xC007FEFFu;
+    const uint32_t control = _fp_set_fpscr_bits(0xF8, CONTROL_MASK);
+    const int operation = acosMode != 0 ? 13 : 14;
+
+    if ((Bits(x) & 0x7FF0000000000000ull) == 0x7FF0000000000000ull) {
+        const int kind = crt_fp_classify(x);
+        if (kind == 3) {
+            return crt_fp_quiet_nan(operation, 0, control, x);
+        }
+        const double result = kind > 0 && kind <= 2 ? kTrigNaN : x + 1.0;
+        return crt_fp_exception(8, operation, 0, 0, control, x, result);
+    }
+
+    double result;
+    if (x == 0.0 && acosMode == 0) {
+        result = x;  // preserve asin(-0)
+    } else {
+        double reduced = x < 0.0 ? -x : x;
+        int region = acosMode;
+        if (reduced < kAsinAcos.tiny) {
+            result = reduced;
+            if ((Bits(reduced) & 0x7FF0000000000000ull) == 0 && reduced != 0.0) {
+                // The CRT exponent helper changes the field directly; this
+                // is deliberately not ldexp (subnormals are not normalized).
+                result = crt_fp_adjust_exponent(0, 1536, x);
+                return crt_fp_exception(18, operation, 0, 0, control, x, result);
+            }
+        } else {
+            double z;
+            if (reduced > 0.5) {
+                region = 1 - acosMode;
+                if (reduced > 1.0) {
+                    return crt_fp_exception(8, operation, 0, 0, control, x, kTrigNaN);
+                }
+                if (reduced == 1.0) {
+                    if (acosMode != 0 && x >= 0.0) {
+                        _fp_set_fpscr_bits(control, CONTROL_MASK);
+                        return 0.0;
+                    }
+                    reduced = 0.0;
+                    z = 0.0;
+                } else {
+                    z = crt_fp_adjust_exponent(0, -1, 1.0 - reduced);
+                    reduced = crt_fp_adjust_exponent(0, 1, -crt_fp_sqrt(z));
+                }
+            } else {
+                z = reduced * reduced;
+            }
+
+            // Keep the binary's individual fmadd/fmsub/fnmsub roundings.
+            double p = -Fma(z, -kAsinAcos.num[4], -kAsinAcos.num[3]);
+            double q = z + kAsinAcos.den[4];
+            p = Fma(p, z, kAsinAcos.num[2]);
+            q = Fma(q, z, kAsinAcos.den[3]);
+            p = Fma(p, z, kAsinAcos.num[1]);
+            q = Fma(q, z, kAsinAcos.den[2]);
+            p = Fma(p, z, kAsinAcos.num[0]);
+            q = Fma(q, z, kAsinAcos.den[1]);
+            q = Fma(q, z, kAsinAcos.den[0]);
+            result = ((p * z) * reduced) / q + reduced;
+        }
+
+        if (acosMode == 0) {
+            if (region != 0) {
+                const double offset = kAsinAcos.offset[region];
+                result = (offset + result) + offset;
+            }
+            if (x < 0.0) {
+                result = -result;
+            }
+        } else {
+            const double offset = kAsinAcos.offset[x < 0.0 ? region + 2 : region];
+            result = (x < 0.0 ? offset + result : offset - result) + offset;
+        }
+
+        if ((control & 8) == 0) {
+            return crt_fp_exception(16, operation, 0, 0, control, x, result);
+        }
+    }
+
+    _fp_set_fpscr_bits(control, CONTROL_MASK);
+    return result;
 }
 
 // ph_physics.cpp's names. Its callers pass and keep floats.
