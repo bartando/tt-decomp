@@ -39,6 +39,9 @@ namespace rage {
 
 namespace rage {
 
+// The transform begins at swfINSTANCE + 8; matrix is {a, b, c, d, tx, ty}.
+void swfSetTransformMatrix(void* transform, const float* matrix);
+
 /**
  * swfValueType — ActionScript value type constants
  *
