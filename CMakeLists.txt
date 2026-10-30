@@ -91,6 +91,7 @@ set(SOURCES
     src/rage/core/subsystem_init.c
     src/rage/swf.cpp
     src/rage/swf_vm.cpp
+    src/rage/swf_clip_events.cpp
     src/rage/core/timer.cpp
     src/rage/core/rage_core_utils.cpp
     src/rage/misc/rage_cm.cpp
