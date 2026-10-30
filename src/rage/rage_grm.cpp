@@ -4,6 +4,7 @@
  */
 #include "rage_grm.hpp"
 #include "animation/rage_anim.hpp"   // rage::datResource
+#include <cstring>
 
 // Forward declarations for external functions
 extern "C" void fragDrawable_0AA0_2h(void* state, void* geom, void* drawable, int index, void* param); // @ 0x820F0AA0
@@ -313,6 +314,182 @@ void grmSetup::vfn_2() {
 }
 
 } // namespace rage
+
+namespace {
+
+// Partial shader-upload layouts. Embedded addresses retain the Xbox 360's
+// 32-bit width even when this TU is compiled on a 64-bit host.
+struct GrmParameterUploadState {
+    uint64_t dirty[16];                   // +0x000: first bank (cleared by dcbzl)
+    uint8_t pad080[0x80];
+    uint32_t secondDirtyAddress;           // +0x100
+    uint32_t pad104;
+    uint32_t metadataAddress;              // +0x108: 8-byte value descriptors
+    uint32_t secondMetadataHeaderAddress;  // +0x10C: points to descriptor array address
+    uint8_t pad110[0x10];
+    uint32_t wordCount;                    // +0x120: 64 parameters per dirty word
+    uint32_t secondWordCount;              // +0x124
+    uint32_t valuesAddress;                // +0x128
+    uint32_t secondValuesHeaderAddress;    // +0x12C: points to value array address
+    uint8_t pad130[0xE8];
+    uint32_t layoutAddress;                // +0x218
+    uint8_t pad21C[0x9C];
+    uint32_t useOverride;                  // +0x2B8
+    uint32_t deviceAddress;                // +0x2BC
+};
+
+struct GrmParameterUploadLayout {
+    uint32_t masksAddress[16];             // eight categories for each bank
+    uint32_t bindingsAddress[2];           // +0x40 / +0x44: 16-byte bindings
+    uint8_t pad48[8];
+    uint32_t defaultsAddress;              // +0x50: vector merge table
+};
+
+struct GrmParameterUploadBinding {
+    uint32_t value;                        // high 14 bits select an 8-byte descriptor
+    uint32_t vertex;
+    uint32_t pixel;
+    uint8_t pixelDefault;
+    uint8_t vertexDefault;
+    uint8_t pixelBoolRegister;
+    uint8_t vertexBoolRegister;
+};
+
+static_assert(offsetof(GrmParameterUploadState, layoutAddress) == 0x218);
+static_assert(offsetof(GrmParameterUploadState, deviceAddress) == 0x2BC);
+static_assert(offsetof(GrmParameterUploadLayout, defaultsAddress) == 0x50);
+static_assert(sizeof(GrmParameterUploadBinding) == 16);
+
+} // namespace
+
+extern "C" {
+    void rage_6BA0_h(void* device, uint32_t reg, const uint32_t* values, uint32_t count); // @ 0x82356BA0
+    void rage_6BF8_h(void* device, uint32_t reg, const uint32_t* values, uint32_t count); // @ 0x82356BF8
+    void rage_6C50_h(void* device, uint32_t reg, const uint32_t* values, uint32_t count); // @ 0x82356C50
+    void rage_6CA0_h(void* device, uint32_t reg, const uint32_t* values, uint32_t count); // @ 0x82356CA0
+    void rage_9940(void* device, uint32_t reg, uint32_t texture); // @ 0x82359940
+    extern uint32_t g_grmUploadOverrideEnabled; // @ 0x825B1F70
+    extern uint32_t g_grmUploadOverrideLayout;  // @ 0x825E784C
+}
+
+// @ 0x82446370
+extern "C" void rage_6370(void* parameterState) {
+    auto* state = static_cast<GrmParameterUploadState*>(parameterState);
+    const auto address = [](uint32_t value) {
+        return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(value));
+    };
+    auto* layout = reinterpret_cast<GrmParameterUploadLayout*>(address(state->layoutAddress));
+    auto* device = address(state->deviceAddress);
+    auto* secondDirty = reinterpret_cast<uint64_t*>(address(state->secondDirtyAddress));
+    const uint32_t secondMetadata = *reinterpret_cast<uint32_t*>(address(state->secondMetadataHeaderAddress));
+    const uint32_t secondValues = *reinterpret_cast<uint32_t*>(address(state->secondValuesHeaderAddress));
+    const uint32_t metadata = state->metadataAddress;
+    const uint32_t values = state->valuesAddress;
+
+    // The original processes a whole category before the next one: float VS/PS,
+    // packed integer VS/PS, boolean VS/PS, then texture VS/PS. Preserve call order.
+    for (uint32_t bank = 0; bank < 2; ++bank) {
+        if (bank == 1 && state->useOverride != 0 && g_grmUploadOverrideEnabled != 0) {
+            layout = reinterpret_cast<GrmParameterUploadLayout*>(address(g_grmUploadOverrideLayout));
+        }
+        const uint32_t table = bank == 0 ? metadata : secondMetadata;
+        const uint32_t data = bank == 0 ? values : secondValues;
+        uint64_t* dirty = bank == 0 ? state->dirty : secondDirty;
+
+        for (uint32_t category = 0; category < 8; ++category) {
+            for (uint32_t word = 0; word < (bank == 0 ? state->wordCount : state->secondWordCount); ++word) {
+                auto* masks = reinterpret_cast<uint64_t*>(address(layout->masksAddress[bank * 8 + category]));
+                auto* bindings = reinterpret_cast<GrmParameterUploadBinding*>(address(layout->bindingsAddress[bank]));
+                uint64_t remaining = dirty[word] & masks[word];
+                while (remaining != 0) {
+                    // PPC bit zero is the MSB. Keep all 64 bits, including bit 63.
+                    const uint32_t bit = static_cast<uint32_t>(__builtin_clzll(remaining));
+                    remaining &= ~(uint64_t(1) << (63 - bit));
+                    auto& binding = bindings[word * 64 + bit];
+                    const uint32_t descriptor = *reinterpret_cast<uint32_t*>(
+                        address(table + (binding.value >> 18) * 8 + 4));
+                    const uint32_t source = data + (descriptor & 0xFFFF) * 16;
+                    const bool pixel = (category & 1) != 0;
+                    const uint32_t flags = pixel ? binding.pixel : binding.vertex;
+
+                    if (category < 2) {
+                        const uint32_t first = flags & 0x3FF;
+                        const uint32_t destination = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(device)) +
+                            ((pixel ? 376 : 120) + first) * 16;
+                        uint32_t vector = 0;
+                        do {
+                            // lvx/stvx round down, and load the entire vector before
+                            // storing it (including when the two regions overlap).
+                            uint32_t copy[4];
+                            std::memcpy(copy, address((source + vector * 16) & ~15u), sizeof(copy));
+                            std::memcpy(address((destination + vector * 16) & ~15u), copy, sizeof(copy));
+                            ++vector;
+                        } while (vector <= (((pixel ? binding.pixel : binding.vertex) >> 10) & 3));
+                        const uint32_t last = pixel ? binding.pixel : binding.vertex;
+                        const uint32_t start = (last & 0x3FF) / 4;
+                        const uint32_t span = ((last & 0x3FF) + ((last >> 10) & 3)) / 4 - start;
+                        // srad of INT64_MIN forms an inclusive, MSB-first dirty range;
+                        // srd uses the low seven shift bits; bit 6 selects zero.
+                        const uint64_t mask = UINT64_MAX << (63 - span);
+                        uint8_t* deviceDirty = device + (pixel ? 24 : 16);
+                        uint64_t deviceMask;
+                        std::memcpy(&deviceMask, deviceDirty, sizeof(deviceMask));
+                        deviceMask |= (start & 64) == 0 ? mask >> (start & 63) : 0;
+                        std::memcpy(deviceDirty, &deviceMask, sizeof(deviceMask));
+                    } else if (category < 6) {
+                        // The packed-integer path reserves four vectors but writes
+                        // only the first, even when its encoded count exceeds one.
+                        alignas(16) uint32_t converted[16];
+                        float input[4];
+                        std::memcpy(input, address(source & ~15u), sizeof(input));
+                        if (category < 4) {
+                            // vctsxs saturates, truncates toward zero, and maps NaN to
+                            // INT32_MIN. vrlimi(mask=7) replaces Y/Z/W with defaults.
+                            const float x = input[0];
+                            converted[0] = !(x >= -2147483648.0f) ? 0x80000000u :
+                                x >= 2147483648.0f ? 0x7FFFFFFFu : static_cast<uint32_t>(static_cast<int32_t>(x));
+                            const uint32_t index = pixel ? binding.pixelDefault : binding.vertexDefault;
+                            uint32_t defaults[4];
+                            std::memcpy(defaults, address((layout->defaultsAddress + index * 16) & ~15u),
+                                        sizeof(defaults));
+                            std::memcpy(converted + 1, defaults + 1, 12);
+                            const uint32_t reg = (flags >> 12) & 0xFF;
+                            const uint32_t count = ((flags >> 20) & 3) + 1;
+                            if (pixel) {
+                                rage_6CA0_h(device, reg, converted, count);
+                            } else {
+                                rage_6C50_h(device, reg, converted, count);
+                            }
+                        } else {
+                            // vctuxs: NaN/negative -> 0, positive overflow -> UINT_MAX.
+                            for (uint32_t lane = 0; lane < 4; ++lane) {
+                                const float x = input[lane];
+                                converted[lane] = !(x > 0.0f) ? 0 : x >= 4294967296.0f ? UINT32_MAX :
+                                    static_cast<uint32_t>(x);
+                            }
+                            const uint32_t reg = pixel ? binding.pixelBoolRegister : binding.vertexBoolRegister;
+                            const uint32_t count = ((flags >> 30) & 3) + 1;
+                            if (pixel) {
+                                rage_6BF8_h(device, reg, converted, count);
+                            } else {
+                                rage_6BA0_h(device, reg, converted, count);
+                            }
+                        }
+                    } else {
+                        uint32_t texture;
+                        std::memcpy(&texture, address(source), sizeof(texture));
+                        rage_9940(device, (flags >> 22) & 0xFF, texture);
+                    }
+                }
+            }
+        }
+    }
+
+    // dcbzl zeros the containing 128-byte cache line, not just the used words.
+    std::memset(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(state) & ~uintptr_t(127)), 0, 128);
+    secondDirty = reinterpret_cast<uint64_t*>(address(state->secondDirtyAddress));
+    std::memset(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(secondDirty) & ~uintptr_t(127)), 0, 128);
+}
 
 namespace rage {
 
