@@ -11,6 +11,7 @@
  *   - grcDevice_setSamplerMaxAnisotropy @ 0x82355828 — Xenos texture fetch state
  *   - grcDevice_setSamplerMipFilter     @ 0x82355738 — Xenos texture fetch state
  *   - grcDevice_setSamplerAddressU/V/W  @ 0x82355B58/BA8/BF8 — Xenos texture fetch state
+ *   - grcDevice_setSamplerTrilinearThreshold @ 0x82355C48 — Xenos texture fetch state
  *   - grcDevice_setSamplerLodBias       @ 0x82355948 — Xenos texture fetch state
  *   - grcDevice_SetViewport         @ 0x82355ED0 — clip and load the viewport transform
  *   - grcDevice_SetStreamSource     @ 0x82356118 — bind a vertex buffer to a stream
@@ -362,43 +363,45 @@ void grcDevice_setSamplerMaxAnisotropy(void* device, uint32_t sampler, uint32_t 
     state[12020u + sampler] = static_cast<uint8_t>(anisotropy);
 }
 
-// Fetch dword 3's mip_filter field, next to the min/mag filters.
-// @ 0x82355738
-void grcDevice_setSamplerMipFilter(void* device, uint32_t sampler, uint32_t filter) {
+// Insert a field into one dword of a sampler's fetch constant and mark the
+// sampler dirty. srd uses seven shift bits, so samplers 64..127 set no bit.
+static void setSamplerFetchField(void* device, uint32_t sampler, uint32_t dword,
+                                 uint32_t value, uint32_t shift, uint32_t width) {
     uint8_t* state = static_cast<uint8_t*>(device);
     uint32_t* fetch = reinterpret_cast<uint32_t*>(state + (sampler + 48u) * 24u);
-    fetch[3] = (fetch[3] & ~0x01800000u) | ((filter << 23) & 0x01800000u);
-
-    uint32_t shift = sampler & 127u;
-    uint64_t dirtyBit = shift < 64u ? (UINT64_C(0x8000000000000000) >> shift) : 0;
-    *reinterpret_cast<uint64_t*>(state + 32) |= dirtyBit;
-}
-
-// Fetch dword 0's clamp_x/y/z fields, three bits each.
-static void setSamplerAddressMode(void* device, uint32_t sampler, uint32_t mode, uint32_t shift) {
-    uint8_t* state = static_cast<uint8_t*>(device);
-    uint32_t* fetch = reinterpret_cast<uint32_t*>(state + (sampler + 48u) * 24u);
-    uint32_t mask = 7u << shift;
-    fetch[0] = (fetch[0] & ~mask) | ((mode << shift) & mask);
+    uint32_t mask = ((1u << width) - 1u) << shift;
+    fetch[dword] = (fetch[dword] & ~mask) | ((value << shift) & mask);
 
     uint32_t bit = sampler & 127u;
     uint64_t dirtyBit = bit < 64u ? (UINT64_C(0x8000000000000000) >> bit) : 0;
     *reinterpret_cast<uint64_t*>(state + 32) |= dirtyBit;
 }
 
+// @ 0x82355738
+void grcDevice_setSamplerMipFilter(void* device, uint32_t sampler, uint32_t filter) {
+    setSamplerFetchField(device, sampler, 3, filter, 23, 2);
+}
+
+// Address modes are dword 0's clamp_x/y/z.
 // @ 0x82355B58
 void grcDevice_setSamplerAddressU(void* device, uint32_t sampler, uint32_t mode) {
-    setSamplerAddressMode(device, sampler, mode, 10);
+    setSamplerFetchField(device, sampler, 0, mode, 10, 3);
 }
 
 // @ 0x82355BA8
 void grcDevice_setSamplerAddressV(void* device, uint32_t sampler, uint32_t mode) {
-    setSamplerAddressMode(device, sampler, mode, 13);
+    setSamplerFetchField(device, sampler, 0, mode, 13, 3);
 }
 
 // @ 0x82355BF8
 void grcDevice_setSamplerAddressW(void* device, uint32_t sampler, uint32_t mode) {
-    setSamplerAddressMode(device, sampler, mode, 16);
+    setSamplerFetchField(device, sampler, 0, mode, 16, 3);
+}
+
+// Dword 5's tri_clamp.
+// @ 0x82355C48
+void grcDevice_setSamplerTrilinearThreshold(void* device, uint32_t sampler, uint32_t threshold) {
+    setSamplerFetchField(device, sampler, 5, threshold, 3, 2);
 }
 
 // The bias arrives as raw float bits (a D3D-style sampler state DWORD) and is
