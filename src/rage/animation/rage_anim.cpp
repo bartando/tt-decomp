@@ -444,7 +444,7 @@ void crAnimDofVector3::Normalize() {
 // ─────────────────────────────────────────────────────────────────────────────
 // crAnimDofVector3::SetValue()  [vtable slot 17 @ 0x820C4B10]
 // 
-// Copies a vector from an external source into this DOF's vector storage.
+// Copies all four words of the aligned vector, including its padding lane.
 // ─────────────────────────────────────────────────────────────────────────────
 void crAnimDofVector3::SetValue(const float* sourceVec) {
     // Get current vector
@@ -454,6 +454,7 @@ void crAnimDofVector3::SetValue(const float* sourceVec) {
     currentVec[0] = sourceVec[0];
     currentVec[1] = sourceVec[1];
     currentVec[2] = sourceVec[2];
+    currentVec[3] = sourceVec[3];
 }
 
 // Channel data is passed as this: flags at +1, channel array pointer at +4.
