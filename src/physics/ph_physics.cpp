@@ -4375,22 +4375,6 @@ void rage::phBoundCapsule::GetSupportPoint(void* direction, void* outPoint) {
 }
 
 // ---------------------------------------------------------------------------
-// 6. ph_TokenizerReadInt @ 0x82430E88 | size: 0x8
-//    Calls fiAsciiTokenizer_ReadToken with mode=0 (read mode).
-// ---------------------------------------------------------------------------
-void ph_TokenizerReadInt(void* tokenizer) {
-    fiAsciiTokenizer_ReadToken(tokenizer, 0);
-}
-
-// ---------------------------------------------------------------------------
-// 7. ph_TokenizerReadFloat @ 0x82430E90 | size: 0x8
-//    Calls fiAsciiTokenizer_ReadToken with mode=1 (write mode).
-// ---------------------------------------------------------------------------
-void ph_TokenizerReadFloat(void* tokenizer) {
-    fiAsciiTokenizer_ReadToken(tokenizer, 1);
-}
-
-// ---------------------------------------------------------------------------
 // 8. phBoundCapsule_InitCapsuleResult @ 0x823FDAD8 | size: 0x14
 //    Initializes a result pair: sets type=3 (capsule) and value=0.
 //    r6 = output struct pointer.
@@ -7889,7 +7873,7 @@ int32_t rage::phBoundCapsule::TestPointContainment(const float* point) {
 //    Sets half-height and radius vectors, computes total extent,
 //    zeros center offset, then calls vfn_37 to update derived data.
 // ---------------------------------------------------------------------------
-extern float ph_TokenizerReadInt(float value);
+double crt_asin(double x); // @ 0x82430E88
 void rage::phBoundCapsule::InitializeCapsule(float halfHeight, float radius) {
 
     // Splat halfHeight into vector at m_pVertices region (+0x70)
@@ -8141,7 +8125,7 @@ void phBoundCapsule_DecomposeMatrixToEuler(const float* matrix, float* outEuler)
 
     // Compute roll from the Z-axis component
     float rollInput = -localMatrix[9];  // -row2[1]
-    float roll = (float)ph_TokenizerReadInt(rollInput);
+    float roll = (float)crt_asin(rollInput);
 
     // Store Euler angles
     outEuler[1] = (float)yaw;

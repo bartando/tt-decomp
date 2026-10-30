@@ -347,6 +347,17 @@ double crt_asin_acos(double x, uint32_t /*unused*/, int acosMode) {
     return result;
 }
 
+// The core's two entry thunks: `li r4, 0|1` then a branch, r3 passed through.
+// @ 0x82430E88
+double crt_asin(double x) {
+    return crt_asin_acos(x, 0, 0);
+}
+
+// @ 0x82430E90
+double crt_acos(double x) {
+    return crt_asin_acos(x, 0, 1);
+}
+
 // ph_physics.cpp's names. Its callers pass and keep floats.
 float ph_Sinf(float x) { return static_cast<float>(crt_sin(x)); }
 float ph_Cosf(float x) { return static_cast<float>(crt_cos(x)); }
