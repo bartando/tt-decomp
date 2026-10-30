@@ -229,3 +229,67 @@ static_assert(offsetof(ClothMeshCollisionView, cachedFaces) == 0x2C);
 // loads round their address down to 16 bytes, including unaligned array bases.
 void clothCollideMesh(const ClothMeshCollisionView* self, const ClothMeshBoundView* bound,
                       const LvlTableVector* reduction, const LvlTableVector* expansion, uint32_t mode);
+
+// Edge-collision views inferred from 0x82338D28. A type-9 composite supplies
+// type-1 capsule and type-13 tapered-capsule children through this pointer chain.
+struct ClothEdgeBound {
+    uint8_t _pad00[4];
+    uint8_t type;                           // +0x04
+    uint8_t _pad05[0x6B];
+    const ClothEdgeBound* const* children;   // +0x70, composite only
+};
+
+struct ClothEdgeBoundOwner {
+    uint8_t _pad00[0xC];
+    const ClothEdgeBound* bound;             // +0x0C
+};
+
+struct ClothEdgeBoundInstance {
+    uint8_t _pad00[4];
+    const ClothEdgeBoundOwner* owner;        // +0x04
+};
+
+struct ClothEdge {
+    uint32_t firstParticle;
+    uint32_t secondParticle;
+};
+
+struct ClothEdgeCollisionRange {
+    uint32_t boundIndex;
+    int32_t firstEdge;
+    int32_t endEdge;                         // exclusive, signed comparison
+};
+
+struct ClothEdgeCollisionView {
+    const ClothEdgeBoundInstance* instance;  // +0x00
+    uint8_t _pad04[8];
+    const ClothEdge* edges;                  // +0x0C
+    uint8_t _pad10[0xC];
+    LvlTableVector* positions;               // +0x1C
+    uint8_t _pad20[0x60];
+    float margin;                           // +0x80, splatted to all four lanes
+    uint8_t _pad84[0x8C];
+    const ClothEdgeCollisionRange* ranges;   // +0x110
+    uint16_t rangeWordCount;                 // +0x114, rounded UP to triplets
+    uint8_t _pad116[2];
+    const uint32_t* edgeIndices;             // +0x118
+};
+
+static_assert(sizeof(ClothEdge) == 8);
+static_assert(sizeof(ClothEdgeCollisionRange) == 12);
+#if UINTPTR_MAX == UINT32_MAX
+static_assert(offsetof(ClothEdgeBound, children) == 0x70);
+static_assert(offsetof(ClothEdgeBoundOwner, bound) == 0x0C);
+static_assert(offsetof(ClothEdgeBoundInstance, owner) == 4);
+static_assert(offsetof(ClothEdgeCollisionView, edges) == 0x0C);
+static_assert(offsetof(ClothEdgeCollisionView, positions) == 0x1C);
+static_assert(offsetof(ClothEdgeCollisionView, margin) == 0x80);
+static_assert(offsetof(ClothEdgeCollisionView, ranges) == 0x110);
+static_assert(offsetof(ClothEdgeCollisionView, rangeWordCount) == 0x114);
+static_assert(offsetof(ClothEdgeCollisionView, edgeIndices) == 0x118);
+#endif
+
+// Ordinary r3=self ABI. Vector addresses round down as with lvx/stvx. Nonempty
+// ranges need a capsule child, or values retained from a preceding capsule range;
+// other first-child types read uninitialized scratch in the original.
+void clothCollideEdges(const ClothEdgeCollisionView* self); // @ 0x82338D28
