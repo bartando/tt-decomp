@@ -331,55 +331,24 @@ void crAnimDofVector3::SetValue(const float* sourceVec) {
     currentVec[2] = sourceVec[2];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// crAnimDofVector3::EvaluateChannels() - Helper function
-// 
-// Evaluates animation channels to compute the vector value at a given time.
-// This is a complex function that handles different channel types.
-// ─────────────────────────────────────────────────────────────────────────────
+// Channel data is passed as this: flags at +1, channel array pointer at +4.
+// Mode 0 evaluates one vector channel; mode 0x10 evaluates three scalar channels.
+// @ 0x820C43D0
 void crAnimDofVector3::EvaluateChannels(void* animContext, float time, float* outVector) {
-    // Get channel configuration from offset +1
-    uint8_t* thisPtr = reinterpret_cast<uint8_t*>(this);
-    uint8_t channelConfig = thisPtr[1] & 0xF0;
-    
-    if (channelConfig == 0) {
-        // Single channel mode - evaluate one channel for all components
-        void** channels = reinterpret_cast<void**>(thisPtr + 4);
-        void* channel = channels[0];
-        
-        if (channel) {
-            void** vtable = *reinterpret_cast<void***>(channel);
-            typedef void (*EvalFunc)(void*, float, float*);
-            EvalFunc evalFn = reinterpret_cast<EvalFunc>(vtable[3]);
-            evalFn(channel, time, outVector);
-        }
-    } else if (channelConfig == 0x10) {
-        // Three channel mode - separate channels for X, Y, Z
-        void** channels = reinterpret_cast<void**>(thisPtr + 4);
-        
-        // Evaluate X channel
-        if (channels[0]) {
-            void** vtable = *reinterpret_cast<void***>(channels[0]);
-            typedef void (*EvalFunc)(void*, float, float*);
-            EvalFunc evalFn = reinterpret_cast<EvalFunc>(vtable[5]);
-            evalFn(channels[0], time, outVector);
-        }
-        
-        // Evaluate Y channel
-        if (channels[1]) {
-            void** vtable = *reinterpret_cast<void***>(channels[1]);
-            typedef void (*EvalFunc)(void*, float, float*);
-            EvalFunc evalFn = reinterpret_cast<EvalFunc>(vtable[5]);
-            evalFn(channels[1], time, outVector + 1);
-        }
-        
-        // Evaluate Z channel
-        if (channels[2]) {
-            void** vtable = *reinterpret_cast<void***>(channels[2]);
-            typedef void (*EvalFunc)(void*, float, float*);
-            EvalFunc evalFn = reinterpret_cast<EvalFunc>(vtable[5]);
-            evalFn(channels[2], time, outVector + 2);
-        }
+    auto* data = reinterpret_cast<uint8_t*>(this);
+    const uint8_t config = data[1] & 0xF0;
+    if (config != 0 && config != 0x10)
+        return;
+
+    using EvalFunc = void (*)(void*, void*, float, float*);
+    const int count = config == 0 ? 1 : 3;
+    for (int i = 0; i < count; ++i) {
+        // A callback can replace the array; the original reloads it each time.
+        void** channels = *reinterpret_cast<void***>(data + 4);
+        void* channel = channels[i];
+        void** vtable = *reinterpret_cast<void***>(channel);
+        auto evaluate = reinterpret_cast<EvalFunc>(vtable[config == 0 ? 3 : 5]);
+        evaluate(channel, animContext, time, outVector + i);
     }
 }
 
