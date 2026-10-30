@@ -970,9 +970,9 @@ extern void  LocomotionStateAnim_FAB0_w(void* ctxObj, void* flags,
                                         void* embeddedBlock);          // @ 0x8237FAB0 — tail-call tick entry
 extern void  LocomotionStateAnim_88E0_g(void* ctx, void* arg,
                                         void* cb0, int one, int zero); // @ 0x822488E0 — bundle prime
-extern void  LocomotionStateAnim_C128_g(void* entry, void* anim,
+extern void  LocomotionStateAnim_C128_g(void* entry, void* unusedR4, void* skeleton,
                                         float weight);                 // @ 0x8224C128 — base apply
-extern void  LocomotionStateAnim_C288_g(void* entry, void* anim,
+extern void  LocomotionStateAnim_C288_g(void* entry, void* unusedR4, void* skeleton,
                                         float weight);                 // @ 0x8224C288 — "full weight" apply variant
 extern void  LocomotionStateAnim_C8F8_g(void* anim);                   // @ 0x8214C8F8 — post-apply release
 extern void  pongShadowMap_38C0_g(void* heap, void* a, void* b);       // @ 0x821538C0 — tex/shadow bind
@@ -1110,7 +1110,7 @@ void* fxAmbient_vfn_5(void* thisPtr, void* unused, void* ctx) {
  *  - Select per-frame applier: C128_g by default, C288_g when the low
  *    bit of (bundle->+4->+20) is set.
  *  - Iterate animList = (this+116)->+36->+4; for each `count` entries
- *    (halfword at +12), call applier(list[+8+i*4], this+28, 2.0f).
+ *    (halfword at +12), call applier(list[+8+i*4], unused r4, this+28, 2.0f).
  *  - Finally LocomotionStateAnim_C8F8_g((this+28)) to release.
  *
  * Chain decoded:
@@ -1133,7 +1133,7 @@ void fxAmbient_vfn_6(void* thisPtr, void* bundle) {
 
     void* descriptor = *(void**)((char*)primeCtx + 4);
     uint32_t flag = *(uint32_t*)((char*)descriptor + 20);
-    typedef void (*applier_t)(void* entry, void* anim, float weight);
+    typedef void (*applier_t)(void* entry, void* unusedR4, void* skeleton, float weight);
     applier_t apply = (flag & 1) ? (applier_t)LocomotionStateAnim_C288_g
                                  : (applier_t)LocomotionStateAnim_C128_g;
 
@@ -1141,7 +1141,7 @@ void fxAmbient_vfn_6(void* thisPtr, void* bundle) {
     int count = *(int16_t*)((char*)listHolder + 12);
     void** list = *(void***)((char*)listHolder + 8);
     for (int i = 0; i < count; ++i) {
-        apply(list[i], ownerAnim, 2.0f);
+        apply(list[i], nullptr, ownerAnim, 2.0f);
     }
 
     LocomotionStateAnim_C8F8_g(ownerAnim);

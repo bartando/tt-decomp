@@ -376,12 +376,41 @@ void LocomotionStateAnim_C8F8_g(void* animNode)
 }
 
 /**
- * LocomotionStateAnim_TransitionLocomotionState — project-internal name;
- * sibling of BlendLocomotionAnims (see above).
+ * Apply a rotation channel by skeleton ID, or a root translation (ID zero).
+ * Unlike C128, non-root translation channels are skipped without a lookup.
  */
-void LocomotionStateAnim_TransitionLocomotionState(uint32_t entry, void* parent, float dt)
+// @ 0x8224C288
+void LocomotionStateAnim_TransitionLocomotionState(uint32_t entry, void* unusedR4,
+                                                 void* skeleton, float weight)
 {
-    (void)entry; (void)parent; (void)dt;
+    (void)unusedR4;
+    (void)weight;
+    auto* channel = reinterpret_cast<uint8_t*>(entry);
+    const uint8_t type = channel[5];
+    if (type > 1) {
+        return;
+    }
+
+    auto* skel = static_cast<uint8_t*>(skeleton);
+    using GetVector = const float* (*)(void*);
+    if (type == 1) {
+        uint16_t index;
+        void* data = *reinterpret_cast<void**>(skel + 4);
+        if (!LocomotionStateAnim_04F0_g(data, *reinterpret_cast<uint16_t*>(channel + 6), &index)) {
+            return;
+        }
+        auto* record = *reinterpret_cast<uint8_t**>(skel + 0xC) + index * 0x50;
+        auto* vtable = *reinterpret_cast<GetVector**>(channel);
+        const float* quaternion = vtable[15](channel);
+        LocomotionStateAnim_AD30_g(reinterpret_cast<float*>(record), quaternion);
+    } else if (*reinterpret_cast<uint16_t*>(channel + 6) == 0) {
+        auto* records = *reinterpret_cast<uint8_t**>(skel + 0xC);
+        auto* vtable = *reinterpret_cast<GetVector**>(channel);
+        const float* translation = vtable[14](channel);
+        uint8_t vector[16];
+        std::memcpy(vector, translation, sizeof(vector));
+        std::memcpy(records + 0x30, vector, sizeof(vector));
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
