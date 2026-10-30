@@ -27,6 +27,7 @@ extern "C" {
     void swfSymtab_Enumerate(void* symtab);     // @ 0x823FED10 — enumerate symtab members
     const char* swfInternString(const char* name, void* buffer, int maxLen);  // string interning
     void* swfSymtab_Lookup(void* symtab, const char* key);   // symtab key lookup
+    void* swfInstanceConstruct(void* storage);  // @ 0x823FB570
     void rage_DebugLog(const char* msg, ...);    // debug log stub (no-op)
     void swfSymtab_Insert(void* symtab, const char* key, void* value);  // symtab insert
     void swfSymtab_Delete(void* symtab, const char* key);   // symtab key delete
@@ -1772,9 +1773,43 @@ extern void* g_swfStringBuffer;        // @ 0x82604850 — address of the 1024-b
 extern void* g_vtable_swfSCRIPTOBJECT; // @ 0x82074D14 — address of the table
 
 // ── swfINSTANCE::FindOrCreateChildByDepth @ 0x823FC908 size:0x144 ──
-// Looks up a child instance by 16-bit depth key (+164/+166/+168/+176/+184).
-// Allocates from g_swfInstancePool when missing. Pending full decomp.
-void swfINSTANCE::FindOrCreateChildByDepth() {}
+swfINSTANCE* swfINSTANCE::FindOrCreateChildByDepth(uint32_t depth, uint32_t character, void* definition) {
+    const uint16_t key = static_cast<uint16_t>(depth);
+    char* parent = reinterpret_cast<char*>(this);
+    char** link = reinterpret_cast<char**>(parent + 180);
+    char* child = *link;
+    while (child && *reinterpret_cast<uint16_t*>(child + 166) < key) {
+        link = reinterpret_cast<char**>(child + 184);
+        child = *link;
+    }
+    if (!child || *reinterpret_cast<uint16_t*>(child + 166) != key) {
+        char* pool = static_cast<char*>(g_swfInstancePool);
+        char* storage = *reinterpret_cast<char**>(pool + 12);
+        char* next = *reinterpret_cast<char**>(storage);
+        --*reinterpret_cast<uint16_t*>(pool + 6);
+        *reinterpret_cast<char**>(pool + 12) = next;
+        child = storage ? static_cast<char*>(swfInstanceConstruct(storage)) : nullptr;
+        *reinterpret_cast<char**>(child + 176) = parent;
+        *reinterpret_cast<uint16_t*>(child + 166) = key;
+        *reinterpret_cast<uint16_t*>(child + 168) = static_cast<uint16_t>(character);
+        *reinterpret_cast<char**>(child + 184) = *link;
+        *link = child;
+    }
+    *reinterpret_cast<void**>(child + 4) = definition;
+    if (definition) {
+        char* def = static_cast<char*>(definition);
+        const uint8_t type = *reinterpret_cast<uint8_t*>(def + 4);
+        if (type == 0 || type == 2) {
+            const uint16_t frames = *reinterpret_cast<uint16_t*>(def + 8);
+            if (frames && *reinterpret_cast<uint16_t*>(child + 164) >= frames) {
+                rage_DebugLog(reinterpret_cast<const char*>(0x82074DE8),
+                              *reinterpret_cast<uint16_t*>(child + 164), frames);
+                *reinterpret_cast<uint16_t*>(child + 164) = 0;
+            }
+        }
+    }
+    return reinterpret_cast<swfINSTANCE*>(child);
+}
 
 } // namespace rage
 
