@@ -88,6 +88,9 @@ void* g_currentSwfContext = nullptr;    // @ 0x8260281C
 void* g_swfRootObject = nullptr;        // @ 0x82602828
 void* g_swfGlobalScope = nullptr;       // @ 0x8260282C
 void* g_swfSlotObject = nullptr;        // @ 0x82604848
+int32_t g_swfContextStackCount = 0;     // @ 0x8260484C
+int32_t g_swfContextStackFocusIndex = 0; // @ 0x82604C64
+void* g_swfContextStack[32] = {};       // @ 0x82604C68
 // Code takes these objects' addresses, rather than loading pointer slots.
 alignas(16) uint8_t g_swfStringBuffer[1024] = {};  // @ 0x82604850
 void* g_vtable_swfSCRIPTOBJECT[17] = {};          // @ 0x82074D14
