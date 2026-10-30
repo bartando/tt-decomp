@@ -41,6 +41,17 @@ extern "C" {
     uint8_t util_0068(void* record);  // @ 0x821E0068 — button released this frame
     int _snprintf(char* buffer, size_t count, const char* format, ...);  // @ 0x820C0B40
     extern void* g_sda_6404;  // @ 0x82606404 — shared texture lookup owner
+    void hudFlashBase_76F8_g(int stage, int slot, void* texture);  // @ 0x820F76F8
+    void hudFlashBase_B138_g();  // @ 0x8215B138
+    void hudFlashBase_AE98_wrh(uint8_t* out, const uint8_t* local, const uint8_t* parent,
+                              uint32_t rgb, uint32_t alpha);  // @ 0x823FAE98
+    void sysCallback_Invoke(void* callback, void* argument);  // @ 0x8225FFF8
+    void grcDevice_Present(uint32_t flags, int color, int clearDepth, float depth,
+                           bool clearStencil, int stencil);  // @ 0x8214F088
+    extern uint32_t g_grmShaderFx_flushRequired;  // @ 0x825EBB1C
+    extern uint32_t g_grmShaderFx_forceResetFlag;  // @ 0x825EBAB4
+    extern uint32_t g_swfAppliedRenderState[22];  // @ 0x825EBB80
+    extern uint32_t g_grmShaderFx_variantTable[23];  // @ 0x825EBBD8
 }
 
 extern bool CheckButtonPressed(void* record);  // @ 0x821DFFF8
@@ -1667,6 +1678,130 @@ bool swfContext_IsGlobalSlot13AltMode() {
     // XOR the bytes and check if result > 127
     uint8_t xorResult = byte0 ^ byte3;
     return (xorResult > 127);
+}
+
+// The old hudFlashBase_D450_g label belongs to the SWF instance renderer.
+// instance +8 and parentTransform use the embedded transform layout (local
+// matrix +0, world matrix +24, local colour +48, world colour +56, flag +140).
+// @ 0x823FD450
+void swfRenderInstanceTree(void* instance, const void* parentTransform) {
+    extern void swfConcatMatrix(float* out, const float* child, const float* parent);  // @ 0x823FA1E0
+    extern void* g_currentSwfContext;  // @ 0x8260281C
+    extern void* g_swfRenderCallbackOwner;  // @ 0x82602814
+    extern uint16_t g_swfMaskEndDepth;  // @ 0x826066CC
+
+    auto* node = static_cast<uint8_t*>(instance);
+    const auto* parent = static_cast<const uint8_t*>(parentTransform);
+    if (node[0xAF] == 0) return;
+
+    float* world = reinterpret_cast<float*>(node + 0x20);
+    const float oldX = world[4];
+    const float oldY = world[5];
+    if (node[0x95] != 0) swfRebuildTransform(node + 8);
+    swfConcatMatrix(world, reinterpret_cast<const float*>(node + 8),
+                    reinterpret_cast<const float*>(parent + 24));
+    node[0x94] = parent[140];
+    const uint32_t rgb = (uint32_t(parent[68]) << 16) | (uint32_t(parent[69]) << 8) | parent[70];
+    hudFlashBase_AE98_wrh(node + 0x40, node + 0x38, parent + 56, rgb, parent[71]);
+    if (node[0x43] == 0) return;
+
+    uint32_t flags;
+    void* texture = *reinterpret_cast<void**>(node + 0x90);
+    if (texture) {
+        hudFlashBase_76F8_g(0, 0, texture);
+        if (g_grmShaderFx_flushRequired != 0 || g_grmShaderFx_forceResetFlag != 0) {
+            hudFlashBase_B138_g();
+        }
+        node[0x94] = 1;
+    }
+    flags = g_grmShaderFx_flushRequired;
+    uint32_t appliedMode;
+    if (*reinterpret_cast<uint16_t*>(node + 0xA8) != 0) {
+        grcDevice_Present(0, 0, 1, 1.0f, false, 0);
+        g_grmShaderFx_variantTable[9] = 0;
+        flags = g_grmShaderFx_flushRequired;
+        flags = g_swfAppliedRenderState[9] == 0 ? flags & ~0x200u : flags | 0x200u;
+        appliedMode = g_swfAppliedRenderState[6];
+        g_grmShaderFx_variantTable[6] = 3;
+        flags = appliedMode == 3 ? flags & ~0x40u : flags | 0x40u;
+        g_grmShaderFx_flushRequired = flags;
+
+        // Depth is accumulated modulo 65536, including each ancestor.
+        uint16_t depth = *reinterpret_cast<uint16_t*>(node + 0xA6);
+        auto* ancestor = *reinterpret_cast<uint8_t**>(node + 0xB0);
+        while (ancestor) {
+            depth = static_cast<uint16_t>(depth + *reinterpret_cast<uint16_t*>(ancestor + 0xA6));
+            ancestor = *reinterpret_cast<uint8_t**>(ancestor + 0xB0);
+        }
+        g_swfMaskEndDepth = static_cast<uint16_t>(depth + *reinterpret_cast<uint16_t*>(node + 0xA8));
+    } else {
+        appliedMode = g_swfAppliedRenderState[6];
+    }
+
+    if (*reinterpret_cast<int32_t*>(node + 0x98) >= 0) {
+        auto* owner = static_cast<uint8_t*>(g_swfRenderCallbackOwner);
+        if (*reinterpret_cast<int32_t*>(owner + 16) != 0) {
+            sysCallback_Invoke(owner + 4, node + 0x98);
+            flags = g_grmShaderFx_flushRequired;
+            appliedMode = g_swfAppliedRenderState[6];
+        }
+    }
+
+    const uint32_t savedMode = g_grmShaderFx_variantTable[6];
+    if (node[0x9C] != 0) {
+        g_grmShaderFx_variantTable[6] = 2;
+        flags = appliedMode == 2 ? flags & ~0x40u : flags | 0x40u;
+        g_grmShaderFx_flushRequired = flags;
+    }
+
+    auto* child = *reinterpret_cast<uint8_t**>(node + 0xB4);
+    if (child) {
+        do {
+            swfRenderInstanceTree(child, node + 8);
+            child = *reinterpret_cast<uint8_t**>(child + 0xB8);
+        } while (child);
+        flags = g_grmShaderFx_flushRequired;
+    } else {
+        if (g_swfMaskEndDepth != 0) {
+            uint16_t depth = *reinterpret_cast<uint16_t*>(node + 0xA6);
+            auto* ancestor = *reinterpret_cast<uint8_t**>(node + 0xB0);
+            while (ancestor) {
+                depth = static_cast<uint16_t>(depth + *reinterpret_cast<uint16_t*>(ancestor + 0xA6));
+                ancestor = *reinterpret_cast<uint8_t**>(ancestor + 0xB0);
+            }
+            if (depth > g_swfMaskEndDepth) {
+                g_grmShaderFx_variantTable[6] = 3;
+                flags = appliedMode == 3 ? flags & ~0x40u : flags | 0x40u;
+                g_grmShaderFx_flushRequired = flags;
+                g_swfMaskEndDepth = 0;
+            }
+        }
+        if (node[0x43] != 0) {
+            const int mode = g_currentSwfContext == instance ? (swfContext_IsGlobalSlot13AltMode() ? 3 : 2) : 1;
+            void* definition = *reinterpret_cast<void**>(node + 4);
+            void** vtable = *static_cast<void***>(definition);
+            using DrawFn = void (*)(void*, void*, int);
+            reinterpret_cast<DrawFn>(vtable[1])(definition, node + 8, mode);
+            flags = g_grmShaderFx_flushRequired;
+        }
+        // fcmpu/bne considers NaNs changed; signed zeros compare equal.
+        const bool moved = oldX != world[4] || oldY != world[5];
+        node[0xAD] = node[0x43] == 64 && !moved;
+    }
+
+    appliedMode = g_swfAppliedRenderState[6];
+    if (node[0x9C] != 0) {
+        g_grmShaderFx_variantTable[6] = savedMode;
+        flags = savedMode == appliedMode ? flags & ~0x40u : flags | 0x40u;
+        g_grmShaderFx_flushRequired = flags;
+    }
+    if (*reinterpret_cast<uint16_t*>(node + 0xA8) != 0) {
+        g_grmShaderFx_variantTable[9] = 15;
+        flags = g_swfAppliedRenderState[9] == 15 ? flags & ~0x200u : flags | 0x200u;
+        g_grmShaderFx_variantTable[6] = 5;
+        flags = appliedMode == 5 ? flags & ~0x40u : flags | 0x40u;
+        g_grmShaderFx_flushRequired = flags;
+    }
 }
 
 
