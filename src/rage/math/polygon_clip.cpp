@@ -1,5 +1,5 @@
 #include "rage/polygon_clip.hpp"
-#include "game/camera/pong_camera.hpp"
+#include "../../game/camera/pong_camera.hpp"
 
 // The VMX interpolation rounds its multiply before adding the previous vertex.
 #if defined(__clang__)
