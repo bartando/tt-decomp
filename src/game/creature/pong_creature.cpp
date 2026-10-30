@@ -2600,9 +2600,9 @@ extern void LocomotionStateAnim_C358_g(void* animList, int p1, int p2, int p3, f
  * QuaternionToMatrix3x3 @ 0x8223AD30 | size: 0xAC
  *
  * Converts a unit quaternion (x, y, z, w) stored at src into a
- * 3x3 rotation matrix written row-major to dst (11 floats).
- * The quaternion components are first doubled (scaled by 2.0), then
- * the standard quat-to-matrix formula is applied.
+ * 3x3 rotation matrix written in three four-float rows to dst.
+ * Each component is first scaled by the float32 approximation of sqrt(2);
+ * the products are then rounded before the additions and subtractions.
  *
  * @param dst  Output 3x3 matrix (at least 44 bytes)
  * @param src  Input quaternion as 4 floats (x, y, z, w)
@@ -2614,8 +2614,8 @@ void LocomotionStateAnim_AD30_g(float* dst, const float* src) {
     float qz = src[2];
     float qw = src[3];
 
-    // Scale by 2.0 (constant at lbl_82029B7C)
-    float s = 2.0f;
+    // Float32 constant at 0x82079B3C.
+    float s = 0x1.6a09e6p+0f;
     float x2 = qx * s;
     float y2 = qy * s;
     float z2 = qz * s;
@@ -2639,11 +2639,10 @@ void LocomotionStateAnim_AD30_g(float* dst, const float* src) {
     dst[6]  = wx + zy;
     dst[9]  = zy - wx;
 
-    // Diagonal elements: 0.5 - (sum of two squared terms)
-    float half = 0.5f;
-    dst[0]  = half - (yy + zz);
-    dst[5]  = half - (xx + zz);
-    dst[10] = half - (xx + yy);
+    // Diagonal elements.
+    dst[0]  = 1.0f - (zz + yy);
+    dst[5]  = 1.0f - (zz + xx);
+    dst[10] = 1.0f - (yy + xx);
 }
 
 /**
