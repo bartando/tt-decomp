@@ -40,9 +40,11 @@ struct CamMatrix44 {
 // "current viewport" global (0x825EBAA0) that 0x82153070 re-uploads when this
 // viewport is current. pongCameraMgr owns three of them.
 struct grcViewport {
-    uint8_t     _pad_0x000[0x40];   // +0x000..+0x03F
+    CamMatrix44 m_transformMtx;     // +0x000 - first matrix, copied verbatim
     CamMatrix44 m_cameraMtx;        // +0x040 - camera (world) matrix, copied verbatim
-    uint8_t     _pad_0x080[0x100];  // +0x080..+0x17F (composites rebuilt by 0x82153070)
+    CamMatrix44 m_transformMtx44;   // +0x080 - first matrix with homogeneous w
+    CamMatrix44 m_secondMtx44;      // +0x0C0 - second matrix with homogeneous w
+    uint8_t     _pad_0x100[0x80];   // +0x100..+0x17F (composites rebuilt by 0x82153070)
     CamMatrix44 m_cameraMtx44;      // +0x180 - camera matrix with w forced to (0, 0, 0, 1)
     CamMatrix44 m_viewMtx;          // +0x1C0 - inverse of the camera matrix, w forced to (0, 0, 0, 1)
     CamMatrix44 m_viewMtxFlipZ;     // +0x200 - m_viewMtx with its z column negated
@@ -58,6 +60,7 @@ struct grcViewport {
     uint8_t     m_isPerspective;    // +0x360
     uint8_t     _pad_0x361[0x2F];   // +0x361..+0x38F
 
+    void SetTransformMatrices(const CamMatrix44& first, const CamMatrix44& second); // @ 0x821538C0
     void SetCameraMtx(const CamMatrix44& cameraMtx);  // @ 0x821539F0
 };
 static_assert(sizeof(grcViewport) == 0x390, "grcViewport is 912 bytes");

@@ -1888,6 +1888,21 @@ void pongCameraMgr::Update() {
     pongCameraMgr_6280_g(this);
 }
 
+// 0x821538C0: keep the first matrix verbatim and build homogeneous copies of
+// both inputs before rebuilding the viewport composites.
+void grcViewport::SetTransformMatrices(const CamMatrix44& first, const CamMatrix44& second) {
+    m_transformMtx = first;
+    m_transformMtx44.a = { m_transformMtx.a.x, m_transformMtx.a.y, m_transformMtx.a.z, 0.0f };
+    m_transformMtx44.b = { m_transformMtx.b.x, m_transformMtx.b.y, m_transformMtx.b.z, 0.0f };
+    m_transformMtx44.c = { m_transformMtx.c.x, m_transformMtx.c.y, m_transformMtx.c.z, 0.0f };
+    m_transformMtx44.d = { m_transformMtx.d.x, m_transformMtx.d.y, m_transformMtx.d.z, 1.0f };
+    m_secondMtx44.a = { second.a.x, second.a.y, second.a.z, 0.0f };
+    m_secondMtx44.b = { second.b.x, second.b.y, second.b.z, 0.0f };
+    m_secondMtx44.c = { second.c.x, second.c.y, second.c.z, 0.0f };
+    m_secondMtx44.d = { second.d.x, second.d.y, second.d.z, 1.0f };
+    game_3070(this);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // grcViewport::SetCameraMtx  @ 0x821539F0 | size: 0x204
 // Takes a new camera matrix: stores it raw and with w forced to (0,0,0,1),
