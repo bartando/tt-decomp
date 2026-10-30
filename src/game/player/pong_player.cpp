@@ -175,8 +175,8 @@ extern void*       g_pPlayerSlotLookup;       // @ 0x8271A32C — player slot lo
 // Forward declarations for functions implemented at end of file
 void pongPlayer_E640_g(void* gridSubObj);  // ClearSwingSlotGrid @ 0x8219E640
 void pongPlayer_3628_g(pongPlayer* p, uint8_t flip);  // SetServeSideFlip @ 0x82193628
-void pongPlayer_E590_g(float* lerpFactors, uint8_t flip, float* outPos,
-                       float* boundsA, float* boundsB, float* offset);  // InterpolateGridPosition @ 0x8219E590
+void pongPlayer_InterpolateCourtGridPosition(float* lerpFactors, uint32_t flip, float* outPos,
+                       float* boundsA, float* boundsB, float* offset);  // InterpolateCourtGridPosition @ 0x8219E590
 bool pongPlayer_6050_p46(int32_t swingType);  // IsSwingType @ 0x821D6050
 void pongPlayer_0F10_g(void* stateObj, float* outSign, float deadZone);  // GetCourtSideSign @ 0x821A0F10
 void pongPlayer_76E8_g(void* swingHistory);  // InitSwingHistorySlots @ 0x821A76E8
@@ -3639,7 +3639,7 @@ void pongPlayer::FindRegisteredListener(void* unused, void* target) {
 // Court bounds + interpolation (called by pongPlayer_E7B0_g)
 extern void  pongPlayer_FD20_g(void* a, int b, void* c, void* d,
                                int e, void* f, void* g, unsigned char h); // @ 0x821EFD20
-// pongPlayer_E590_g — forward declared at top of file with correct 6-param signature
+// pongPlayer_InterpolateCourtGridPosition — forward declared at top of file with correct 6-param signature
 // Clock/config query — returns timing/state data from match config
 extern void* pongPlayer_7CC0_g(void* matchConfig);                     // @ 0x821E7CC0
 // Player record entry setup — configures a slot in the player data table
@@ -3706,7 +3706,7 @@ extern "C" void pongPlayer_9C60_g(void* base, int index, uint32_t value) {
  *
  * Steps:
  *  1. Calls pongPlayer_FD20_g to resolve two court boundary vectors.
- *  2. Packs (posX, posY) into a temp and calls pongPlayer_E590_g
+ *  2. Packs (posX, posY) into a temp and calls pongPlayer_InterpolateCourtGridPosition
  *     to interpolate a position within those bounds.
  *  3. Returns pointer to the result vec3 at input+16.
  */
@@ -3728,10 +3728,11 @@ extern "C" void* pongPlayer_E7B0_g(void* inputStruct) {
 
     // Interpolate within bounds → write result at input+16
     void* result = input + 16;
-    pongPlayer_E590_g(
+    pongPlayer_InterpolateCourtGridPosition(
         tempPos,
         courtType,
-        reinterpret_cast<float*>(result), &boundsA.x, &boundsB.x, nullptr);
+        reinterpret_cast<float*>(result), &boundsA.x, &boundsB.x,
+        reinterpret_cast<float*>(g_mirrorBuffer));
 
     return result;
 }
@@ -4098,7 +4099,7 @@ void pongPlayer_E640_g(void* gridSubObj) {  // ClearSwingSlotGrid @ 0x8219E640
 
 
 // ===========================================================================
-// InterpolateGridPosition  @ 0x8219E590 | size: 0xB0 (176 bytes)
+// InterpolateCourtGridPosition  @ 0x8219E590 | size: 0xB0 (176 bytes)
 // ===========================================================================
 /**
  * Computes an interpolated court grid position.
@@ -4107,15 +4108,15 @@ void pongPlayer_E640_g(void* gridSubObj) {  // ClearSwingSlotGrid @ 0x8219E640
  * sets Y from the court geometry singleton, and adds an offset vector.
  *
  * @param lerpFactors  2 floats: X lerp at [0], Z lerp at [1]
- * @param flip         0 = lerp A->B, nonzero = lerp B->A
- * @param outPos       Output vec3 (writes X at +0, Y at +4, Z at +8)
+ * @param flip         Low byte: 0 = lerp A->B, nonzero = lerp B->A
+ * @param outPos       Output aligned vec4 (interpolates xyz, adds offset to all four lanes)
  * @param boundsA      Corner A (reads X at +0, Z at +8)
  * @param boundsB      Corner B (reads X at +0, Z at +8)
- * @param offset       Offset vec3 (added to final result)
+ * @param offset       Aligned offset vec4 (added to final result)
  */
-void pongPlayer_E590_g(float* lerpFactors, uint8_t flip, float* outPos,
+void pongPlayer_InterpolateCourtGridPosition(float* lerpFactors, uint32_t flip, float* outPos,
                        float* boundsA, float* boundsB,
-                       float* offset) {  // InterpolateGridPosition @ 0x8219E590
+                       float* offset) {  // InterpolateCourtGridPosition @ 0x8219E590
     // Load court height from global singleton (+20 bytes from base)
     float* courtSingleton = static_cast<float*>(g_pCourtGeomSingleton);
     float courtHeight = courtSingleton[5];
@@ -4123,7 +4124,7 @@ void pongPlayer_E590_g(float* lerpFactors, uint8_t flip, float* outPos,
     // Y = court height + offset constant
     outPos[1] = courtHeight + g_kCourtHeightOffset;
 
-    if (flip) {
+    if (static_cast<uint8_t>(flip)) {
         // Lerp from boundsB toward boundsA
         float rangeX = boundsA[0] - boundsB[0];
         outPos[0] = boundsB[0] + lerpFactors[0] * rangeX;
@@ -4139,10 +4140,18 @@ void pongPlayer_E590_g(float* lerpFactors, uint8_t flip, float* outPos,
         outPos[2] = boundsA[2] + lerpFactors[1] * rangeZ;
     }
 
-    // Add offset vector (PPC vaddfp: component-wise float add)
-    outPos[0] += offset[0];
-    outPos[1] += offset[1];
-    outPos[2] += offset[2];
+    // vaddfp flushes subnormal operands and results, preserving the zero sign.
+    auto flushVmx = [](float value) {
+        uint32_t bits;
+        __builtin_memcpy(&bits, &value, sizeof(bits));
+        if ((bits & 0x7F800000u) == 0) {
+            bits &= 0x80000000u;
+            __builtin_memcpy(&value, &bits, sizeof(value));
+        }
+        return value;
+    };
+    for (int lane = 0; lane < 4; ++lane)
+        outPos[lane] = flushVmx(flushVmx(outPos[lane]) + flushVmx(offset[lane]));
 }
 
 
