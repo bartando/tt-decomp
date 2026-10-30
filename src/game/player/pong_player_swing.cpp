@@ -8,7 +8,7 @@
  * - Swing strength and target calculation
  * - Player position prediction
  * - Swing input processing
- * - Creature bone matrix retrieval
+ * - Court-bound position prediction
  *
  * All functions have been decompiled from PowerPC assembly and reconstructed
  * to match the original Rockstar implementation intent.
@@ -16,6 +16,7 @@
 
 #include "pong_player.hpp"
 #include <cmath>
+#include "pong_gameplay_queries.hpp"
 
 // Forward declarations for external dependencies
 extern void* g_input_obj_ptr;
@@ -31,66 +32,6 @@ extern int io_Input_poll_9D68(void* inputObj);
 extern bool pongPlayer_C3C8_g(pongPlayerState* state);  // CanAcceptSwingInput
 extern void pg_C7A0_g(float value);
 extern void game_AF18(void* output, void* physBound, vec3* velocity, vec3* position);
-
-/**
- * IsPlayerReadyToSwing @ 0x820D6AA0 | size: 0xEC
- *
- * Checks if the player is in a valid state to execute a swing action.
- * This function performs multiple condition checks including animation progress,
- * state flags, position validation, and locomotion readiness.
- *
- * @param locoState Pointer to player's locomotion state structure
- * @return true if all swing readiness conditions are met, false otherwise
- *
- * Conditions checked:
- * 1. Animation progress (float at +128) must exceed threshold
- * 2. State flag bit 0 at +312 must be set
- * 3. Position value (float at +288) must be non-negative
- * 4. Both state bytes at +138 and +136 must be non-zero
- * 5. State flag at +312 must have either bit 2 or bit 3 clear
- */
-bool IsPlayerReadyToSwing(void* locoState) {
-    if (!locoState) return false;
-    
-    uint8_t* stateBytes = (uint8_t*)locoState;
-    float* stateFloats = (float*)locoState;
-    
-    // Check animation progress threshold
-    float animProgress = stateFloats[128 / 4];  // +128 bytes = +32 floats
-    if (animProgress <= g_swingStrengthMin) {
-        return false;
-    }
-    
-    // Check primary state flag (bit 0)
-    uint8_t stateFlags = stateBytes[312];
-    if ((stateFlags & 0x01) == 0) {
-        return false;
-    }
-    
-    // Check position validity
-    float positionValue = stateFloats[288 / 4];  // +288 bytes = +72 floats
-    if (positionValue < 0.0f) {
-        return false;
-    }
-    
-    // Check both state bytes are active
-    uint8_t stateByte138 = stateBytes[138];
-    uint8_t stateByte136 = stateBytes[136];
-    if (stateByte138 == 0 || stateByte136 == 0) {
-        return false;
-    }
-    
-    // Check that either bit 2 or bit 3 is clear (not both set)
-    bool bit2Set = (stateFlags & 0x04) != 0;
-    bool bit3Set = (stateFlags & 0x08) != 0;
-    
-    // If both bits are set, player is not ready
-    if (bit2Set && bit3Set) {
-        return false;
-    }
-    
-    return true;
-}
 
 /**
  * CalculateSwingStrengthAndTarget @ 0x820D42E0 | size: 0x14C
@@ -278,64 +219,6 @@ extern "C" void pongPlayer_42E0_g(void* swingData, vec3* outStrength, vec3* outT
     outStrength->x = strength;
 }
 
-// Alias for backward compatibility
-extern "C" bool pongPlayer_6AA0_g(void* locoState) {
-    return IsPlayerReadyToSwing(locoState);
-}
-
-/**
- * GetCreatureBoneMatrix @ 0x821C9CD0 | size: 0x94
- *
- * Retrieves transformation matrices for a creature's bone at a specific index.
- * Calculates two output matrices based on creature height, position, and side.
- *
- * @param creatureData Pointer to creature data structure
- * @param boneIndex Index of the bone to retrieve (added to base creature pointer)
- * @param outMatrix1 First output transformation matrix (vec3)
- * @param outMatrix2 Second output transformation matrix (vec3)
- */
-void GetCreatureBoneMatrix(void* creatureData, int boneIndex, vec3* outMatrix1, vec3* outMatrix2) {
-    if (!creatureData || !outMatrix1 || !outMatrix2) return;
-    
-    float* creatureFloats = (float*)creatureData;
-    uint8_t* creatureBytes = (uint8_t*)creatureData;
-    
-    // Set Y components to default value
-    outMatrix1->y = g_swingStrengthMax;
-    outMatrix2->y = g_swingStrengthMax;
-    
-    // Get creature height from +128
-    float creatureHeight = creatureFloats[128 / 4];
-    
-    // Calculate X components with height scaling
-    outMatrix1->x = creatureHeight * g_heightScaleFactor;
-    outMatrix2->x = creatureHeight * g_depthScaleFactor;
-    
-    // Get global table height offset
-    extern void* g_pGlobalTableData;
-    float* tableData = (float*)g_pGlobalTableData;
-    float tableHeight = tableData[24 / 4];
-    float heightOffset = tableHeight * g_depthScaleFactor;
-    
-    // Check creature side flag at +64 (relative to boneIndex offset)
-    uint8_t* boneData = creatureBytes + boneIndex;
-    bool isRightSide = (boneData[64] != 0);
-    
-    // Get creature position offsets
-    float posY1 = creatureFloats[136 / 4];
-    float posY2 = creatureFloats[132 / 4];
-    
-    if (isRightSide) {
-        // Right side: add height offset
-        outMatrix1->z = posY1 + heightOffset;
-        outMatrix2->z = posY2 + heightOffset;
-    } else {
-        // Left side: subtract height offset
-        outMatrix2->z = -heightOffset - posY1;
-        outMatrix1->z = outMatrix2->z - posY2;
-    }
-}
-
 /**
  * PredictPlayerPosition @ 0x820CAB48 | size: 0x130
  *
@@ -425,7 +308,7 @@ void PredictPlayerPosition(vec3* outPosition, void* physicsBound) {
     // Get creature index and apply bone matrix transformation
     int creatureIndex = (int)boundWords[68 / 4];
     vec3 boneMatrix1, boneMatrix2;
-    GetCreatureBoneMatrix(g_input_obj_ptr, creatureIndex, &boneMatrix1, &boneMatrix2);
+    pongMatchSettings_GetCourtBounds(g_input_obj_ptr, creatureIndex, &boneMatrix1, &boneMatrix2);
     
     // Clamp position to valid bounds
     float minX = g_swingStrengthMin;
@@ -449,10 +332,6 @@ void PredictPlayerPosition(vec3* outPosition, void* physicsBound) {
 }
 
 // Backward compatibility aliases
-extern "C" void pongPlayer_9CD0_g(void* creatureData, int index, void* outMatrix1, void* outMatrix2) {
-    GetCreatureBoneMatrix(creatureData, index, (vec3*)outMatrix1, (vec3*)outMatrix2);
-}
-
 extern "C" void pongPlayer_AB48_g(vec3* out, void* physBound) {
     PredictPlayerPosition(out, physBound);
 }

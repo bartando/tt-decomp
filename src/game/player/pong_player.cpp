@@ -9,6 +9,7 @@
  * Struct field names come from offset-frequency clustering and debug strings.
  */
 
+#include "pong_gameplay_queries.hpp"
 #include "pong_player.hpp"
 #include <cstring>   // memset
 #include <cmath>     // fabsf
@@ -64,8 +65,6 @@ extern void pongPlayer_ProcessSwingInput(pongPlayer* p, float f);
 extern void pongPlayer_ComputeSwingStrength(void* swingData, vec3* outStrength, vec3* outTarget, float alpha);
 extern void game_D468(void* obj, vec3* v);               // geometry helper
 extern bool pongPlayer_IsLocoStateReady(void* locoState);          // loco check
-// @ 0x820D6AA0 (pong_player_swing.cpp) — takes the clip embedded at pongTimingSubState+0x20.
-extern "C" bool pongPlayer_6AA0_g(void* clip);
 extern int  io_Input_poll_9D68(void* inputObj);           // 0=active input
 extern void pongLerpQueue_Update(void* queue);            // lerp queue update
 
@@ -1410,7 +1409,7 @@ bool pongPlayerState::IsInReturnPosition() const
         return false;
     if (flags & 0x4)
         return false;
-    if (pongPlayer_6AA0_g(clip->m_clip))
+    if (pongAnimClip_IsPlaybackReady(clip->m_clip))
         return false;
 
     float currentTime = timing->m_currentTime;
@@ -2563,7 +2562,7 @@ bool pongPlayer::IsLocomotionReady() const {  // pongPlayer_2578_g @ 0x82192578
     //       "set once at init"). The deep chain is opponent->+188->+120:
     //       opponent's m_pPlayerState (+0xBC = 188) holds a locomotion
     //       sub-object whose +120 (+0x78) slot contains the loco state we
-    //       pass to pongPlayer_6AA0_g (IsLocoStateReady) offset by +32.
+    //       pass to pongAnimClip_IsPlaybackReady (IsLocoStateReady) offset by +32.
     uint8_t* sub1 = reinterpret_cast<uint8_t*>(this->m_pOpponent);
     void* sub2 = *reinterpret_cast<void**>(sub1 + 188);
     void* locoObj = *reinterpret_cast<void**>(
@@ -4048,9 +4047,8 @@ extern "C" bool pongPlayer_5800_h(pongPlayer* self) {
     return self->m_pOpponent->m_pPlayerState->IsBeforeSwingPeak();
 }
 
-// NOTE: pongPlayer_9CD0_g @ 0x821C9CD0 (0x94 bytes) is already
-// implemented in src/game/player/pong_player_swing.cpp as
-// GetCreatureBoneMatrix(), with an extern "C" wrapper.
+// NOTE: pongMatchSettings_GetCourtBounds @ 0x821C9CD0 (0x94 bytes) is already
+// implemented in src/game/player/pong_gameplay_queries.cpp.
 
 
 // ===========================================================================
@@ -4532,7 +4530,6 @@ extern void ServeStartedMessage_CFE8_2h(void* msgObj, void* targetData, int para
 extern void PlayerMovementMessage_D258_2hr(void* msgObj, float posX, float posZ);
 extern void pongPlayer_B208_g(void* state, vec3* swingVec, uint8_t suppressFlip);
 extern void pg_E6E0_msg(int messageId, int flags, int count, void* data);
-extern "C" void pongPlayer_9CD0_g(void*, int, void*, void*);
 
 extern uint32_t g_rngState[2];              // RNG state (lo, hi) @ 0x825CA2C8
 extern const float g_kFloatConst_79E68;     // random scale factor @ 0x82079E68
@@ -4682,9 +4679,9 @@ void pongPlayer::ResetButtonSlotTrackingData(
 void pongPlayer_ComputeClampedPositions(int creatureIndex,
                                         float* outA,
                                         float* outB) {  // pongPlayer_29F8_fw @ 0x821729F8
-    // Get creature bone matrices
+    // Get court bounds
     vec3 bonePos1, bonePos2;
-    pongPlayer_9CD0_g(reinterpret_cast<void*>(g_pInputArrayTable),
+    pongMatchSettings_GetCourtBounds(reinterpret_cast<void*>(g_pInputArrayTable),
                       creatureIndex, &bonePos1, &bonePos2);
 
     // Check mirror flag at inputTable base + creatureIndex + 64
@@ -5235,10 +5232,9 @@ extern "C" void pongPlayer_9EC8_g(void* /*this*/);
  * SIMD (vmx128) vector-math helper.  Reads a v3 at (arg1+0x70)+0xA4+148
  * through two vtable indirections, falls through to a scalar fallback that
  * calls game_AF18 (court-bounds sample), then blends the two via
- * pongPlayer_9CD0_g and clamps the output into out[0..3].
+ * pongMatchSettings_GetCourtBounds and clamps the output into out[0..3].
  *
- * TODO(researched): game_AF18 and 9CD0_g remain unlifted (suggest_unimplemented
- *       flags them as SIMD leaves). A proper vec4 typedef is already partially
+ * TODO(researched): game_AF18 still needs validation. A proper vec4 typedef is already partially
  *       in place (the `vec3` struct with _pad float), but the multi-precision
  *       SIMD refinement steps need a dedicated AltiVec lift. Deferred.
  */
@@ -5389,7 +5385,6 @@ extern "C" bool pongPlayer_D598_g(pongPlayer* self);                 // IsRecove
 extern "C" void phBoundCapsule_A080_g(void* bound);                  // @ 0x820CA080 — rebuild bound pose from body
 extern void pongPlayer_B208_g(void* state, vec3* swingVec,
                               uint8_t suppressFlip);                 // @ 0x820CB208 — apply swing vec (stub above)
-extern "C" void pongPlayer_9CD0_g(void*, int, void*, void*);         // @ 0x821C9CD0 — per-player input poll (stub above)
 
 // g_kSwingRadiusConst is declared near the top of the file at +8 of a 0x60
 // table; reuse that symbol.  The 5FB8 scaffold pulls radius from the same
@@ -5732,7 +5727,7 @@ extern "C" void pongPlayer_7358_g(pongPlayer* dst, const pongPlayer* src) {
 // velocity @ r6), a source transform block at r4 (which lays out three
 // 3-vectors at +0/+16/+32 plus a translation at +48 — i.e. a 3×4 matrix-like
 // layout), and the player at r3.  After zero-initialising the output vecs,
-// it calls pongPlayer_9CD0_g (the input poller) with the player's context
+// it calls pongMatchSettings_GetCourtBounds (court bounds) with the player's context
 // pointer at +400, then folds the poll result into the vectors via an
 // affine transform of the form:
 //
@@ -5756,7 +5751,7 @@ extern "C" void pongPlayer_8B90_fw(pongPlayer* self, void* srcTransform,
 
     // Poll input for this player's context pointer at +400.
     void* inputCtx = *reinterpret_cast<void**>(base + 400);
-    pongPlayer_9CD0_g(reinterpret_cast<void*>(&g_inputScoreByPlayer[0]),
+    pongMatchSettings_GetCourtBounds(reinterpret_cast<void*>(&g_inputScoreByPlayer[0]),
                       0, inputCtx, nullptr);
 
     // Floats now populated in outPos (components at +0/+4/+8) and outVel.
