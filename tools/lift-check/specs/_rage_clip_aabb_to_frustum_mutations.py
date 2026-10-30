@@ -47,11 +47,19 @@ def main():
     # A broken baseline must never make every mutation look successfully caught.
     if Checker(spec, Options(trials=200, seed=1)).run() != 0:
         return 1
+    # projectAabbToHorizontalPlane shares some lines with clipAabbToFrustum; patch
+    # those inside clipAabbToFrustum only. Unique anchors (helpers too) patch as is.
+    start = source.index("bool clipAabbToFrustum(")
+    function = source[start:source.index("\n}\n", start) + 3]
     for name, old, new in MUTATIONS:
-        assert source.count(old) == 1, f"mutation anchor changed: {name}"
+        if source.count(old) == 1:
+            patch = (old, new)
+        else:
+            assert function.count(old) == 1, f"mutation anchor changed: {name}"
+            patch = (function, function.replace(old, new, 1))
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
-            rc = Checker(spec, Options(trials=200, seed=1, patches=((old, new),))).run()
+            rc = Checker(spec, Options(trials=200, seed=1, patches=(patch,))).run()
         first = output.getvalue().splitlines()[0]
         print(f"{'CAUGHT' if rc == 1 else 'MISSED'} {name}: {first}", flush=True)
         if rc != 1:
