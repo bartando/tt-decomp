@@ -1229,9 +1229,29 @@ pcrAnimObserver* PlaceAnimObserver(pcrAnimObserver* observer, datResource& rsc) 
 
 namespace rage {
 
-// The original calls these helpers; their implementations live at the game addresses.
+// The original calls this helper; its implementation lives at the game address.
 double AnimFloor(double value); // @ 0x82431910
-float DecodeQuantizedFloat(crAnimChannelQuantizeFloat* channel, int index); // @ 0x82244CB8
+
+// Sample `index` (clamped to the channel) as scale * sample * ~1/65535 + bias.
+// Layout: +0x08 uint16 sample table (32-bit address), +0x0C sample count,
+// +0x10 scale, +0x14 bias.
+// @ 0x82244CB8
+float DecodeQuantizedFloat(crAnimChannelQuantizeFloat* channel, int index) {
+    const auto* data = reinterpret_cast<const uint8_t*>(channel);
+    const int last = *reinterpret_cast<const uint16_t*>(data + 0x0C) - 1;
+    if (index < 0) {
+        index = 0;
+    } else if (index > last) {
+        index = last;
+    }
+    const auto* samples = reinterpret_cast<const uint16_t*>(
+        static_cast<uintptr_t>(*reinterpret_cast<const uint32_t*>(data + 0x08)));
+    const float scale = *reinterpret_cast<const float*>(data + 0x10);
+    const float bias = *reinterpret_cast<const float*>(data + 0x14);
+    // The game's constant (0x82079C4C) is a hair above 1/65535.
+    constexpr float kSampleScale = 0x1.002406p-16f;
+    return __builtin_fmaf(scale * static_cast<float>(samples[index]), kSampleScale, bias);
+}
 
 // @ 0x822478E0
 void crAnimChannelQuantizeFloat::vfn_5(void* context, float time, float* outValue) {
