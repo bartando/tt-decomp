@@ -1060,9 +1060,9 @@ void pongScrnTransSwipe::Reset() {
 // that allows taking screenshots or rendering UI elements to textures.
 //
 // The function performs a render state sandwich pattern:
-//   1. Save current render state (game_2EE0 + game_2E80 + grc_EB10)
+//   1. Save current render state (game_2EE0 + game_2E80 + grcSetNormalizedViewport)
 //   2. Render Flash HUD element with specific parameters
-//   3. Restore previous render state (game_2EE0 + game_2E80 + grc_EB10)
+//   3. Restore previous render state (game_2EE0 + game_2E80 + grcSetNormalizedViewport)
 //
 // Globals accessed:
 //   0x821EBA9C (pongPlayer_BA20_g + 0x7C) - previous render state pointer
@@ -1074,7 +1074,7 @@ void pongScrnTransSwipe::Reset() {
 // External function references:
 //   game_2EE0 @ 0x82152EE0 - Save/restore render context (part 1)
 //   game_2E80 @ 0x82152E80 - Save/restore render context (part 2)
-//   grc_EB10 @ 0x8214EB10 - Graphics device state save/restore
+//   grcSetNormalizedViewport @ 0x8214EB10 - Graphics device state save/restore
 //   hudFlashBase_0F08_g @ 0x82140F08 - Render Flash HUD element
 //
 // Parameters:
@@ -1094,7 +1094,7 @@ extern struct hudFlashBase* g_hudFlashBase;  // @ 0x821FE3D4 (HUD Flash system o
 // External function declarations
 extern void game_2EE0(void* renderState);
 extern void game_2E80(void* renderState);
-extern void grc_EB10(void* deviceState);
+extern "C" void grcSetNormalizedViewport(const float* viewport);
 extern void hudFlashBase_0F08_g(void* hudObj, int modeIndex, float param1, float param2,
                                  int param3, int param4, int param5);
 
@@ -1113,7 +1113,7 @@ void pongScreenCapture_rtti_B0EC_0(pongScreenCapture* this_ptr) {
         
         // Save graphics device state at offset +768 (0x300)
         // This offset points to a grcDevice or grcContext member within the render state
-        grc_EB10((void*)((uint8_t*)currentState + 768));
+        grcSetNormalizedViewport((const float*)((uint8_t*)currentState + 768));
     }
     
     // Render the Flash HUD element
@@ -1135,7 +1135,7 @@ void pongScreenCapture_rtti_B0EC_0(pongScreenCapture* this_ptr) {
         game_2E80(previousState);
         
         // Restore graphics device state
-        grc_EB10((void*)((uint8_t*)previousState + 768));
+        grcSetNormalizedViewport((const float*)((uint8_t*)previousState + 768));
     }
 }
 
