@@ -10,6 +10,7 @@
  *   - grcDevice_setSamplerMaxAnisotropy @ 0x82355828 — Xenos texture fetch state
  *   - grcDevice_setSamplerLodBias       @ 0x82355948 — Xenos texture fetch state
  *   - grcDevice_SetStreamSource     @ 0x82356118 — bind a vertex buffer to a stream
+ *   - grcGpuResource_Release        @ 0x82356DA8 — drop a reference, free on the last
  *   - grcDevice_SetTexture          @ 0x82359940 — bind a texture to a fetch slot
  *   - grcDevice_ReserveCommandSpace @ 0x82359E80 — carve space out of the command ring
  *
@@ -305,6 +306,44 @@ void grcDevice_setSamplerLodBias(void* device, uint32_t sampler, uint32_t biasBi
 }
 
 extern "C" void grcTexture_ReleaseResource(void* texture); // @ 0x82352708
+
+extern "C" uint32_t KeGetCurrentProcessType();   // @ 0x82585E9C
+extern "C" uint32_t xe_GetCurrentThreadId();     // @ 0x82566B78
+extern "C" void rage_AA78(void* gpuDevice, uint32_t* handle);  // @ 0x8235AA78
+extern const uint32_t __imp_VdGlobalDevice;      // @ 0x82000730
+extern const uint32_t __imp_VdGlobalXamDevice;   // @ 0x82000734
+
+// Drop a reference to a GPU resource. On the last one, hand its handle (+0x08)
+// back to the kernel video device (the title's or, in a system process, XAM's)
+// and free its data block and itself if it owns them. Returns the references
+// left.
+// @ 0x82356DA8
+extern "C" uint32_t grcGpuResource_Release(void* resource) {
+    uint32_t* words = static_cast<uint32_t*>(resource);
+    const uint32_t references = --words[1];
+    if (references != 0) {
+        return references;
+    }
+    if (words[10] != 0) {
+        const uint32_t slot = KeGetCurrentProcessType() == 2 ? __imp_VdGlobalXamDevice : __imp_VdGlobalDevice;
+        void* gpuDevice = reinterpret_cast<void*>(static_cast<uintptr_t>(
+            *reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(slot))));
+        if (gpuDevice != nullptr) {
+            uint32_t handle = words[2];
+            xe_GetCurrentThreadId();
+            if (handle != 0) {
+                rage_AA78(gpuDevice, &handle);
+            }
+        }
+        if (words[0x24C / 4] & 0x20000000u) {
+            _locale_register(reinterpret_cast<void*>(static_cast<uintptr_t>(words[10])), 0xA1800000);
+        }
+    }
+    if (words[0x24C / 4] & 0x40000000u) {
+        _locale_register(resource, 0x24800000);
+    }
+    return 0;
+}
 
 // Bind `buffer` to vertex stream `stream` at `offset` with `stride` bytes per
 // vertex. Same reference swap as grcDevice_SetTexture; a non-null bind also
