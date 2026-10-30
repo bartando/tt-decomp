@@ -439,7 +439,7 @@ void swfSCRIPTOBJECT::Invoke(const char* methodName, void* args, int argCount, v
         // defined there); virtual dispatch picks the right derived override.
         swfACTIONFUNC* callableObj = (swfACTIONFUNC*)(uintptr_t)lookupResult.data;
 
-        extern uint32_t g_swfCallDepth;  // @ 0x826064EC
+        extern uint32_t g_swfCallDepth;  // @ 0x82604D1C
         uint32_t prevDepth = g_swfCallDepth;
 
         callableObj->Execute(args, argCount, this, 0);
@@ -1390,10 +1390,10 @@ swfSPRITE::~swfSPRITE() {}
 bool swfContext_IsGlobalSlot13AltMode() {
     // External declarations
     extern void* swfGlobalObject_GetSlotValuePtr(void* obj, int slotIndex);  // @ 0x823FB188
-    extern void* g_swfGlobalObject;  // @ 0x82604848 (SDA offset 18504)
+    extern void* g_swfSlotObject;  // @ 0x82604848 (SDA offset 18504)
     
     // Get slot 13 value from the global SWF object
-    uint8_t* result = (uint8_t*)swfGlobalObject_GetSlotValuePtr(g_swfGlobalObject, 13);
+    uint8_t* result = (uint8_t*)swfGlobalObject_GetSlotValuePtr(g_swfSlotObject, 13);
     
     // Load bytes at offsets +0 and +3
     uint8_t byte0 = result[0];
@@ -1494,13 +1494,12 @@ void swfCONTEXT_ProcessContextTree(swfCONTEXT* ctx) {
 }
 
 // ============================================================================
-// SWF namespace-rage globals (moved from stubs.cpp)
-// These are the canonical definitions used across the UI/SWF subsystem.
+// SWF image globals. Native storage lives in rage_data.cpp.
 // ============================================================================
-void*    g_currentSwfContext = nullptr;
-uint32_t g_swfCallDepth = 0;
-float    g_swfFrameScale = 1.0f;
-void*    g_swfGlobalObject = nullptr;
+extern void* g_currentSwfContext;  // @ 0x8260281C
+extern uint32_t g_swfCallDepth;    // @ 0x82604D1C
+extern float g_swfFrameScale;      // @ 0x82079B90
+extern void* g_swfGlobalObject;    // @ 0x82602818
 extern void* g_swfGlobalScope;         // @ 0x8260282C
 extern void* g_swfStringBuffer;        // @ 0x82604850 — address of the 1024-byte buffer
 extern void* g_vtable_swfSCRIPTOBJECT; // @ 0x82074D14 — address of the table

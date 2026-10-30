@@ -21,19 +21,10 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "crt/startup_globals.h"
 
 typedef int (*CrtInitResultFn)(void);
 typedef void (*CrtInitVoidFn)(void);
-
-typedef struct CrtListEntry {
-    struct CrtListEntry* m_pNext;
-    struct CrtListEntry* m_pPrev;
-} CrtListEntry;
-
-typedef struct CrtInitCallbackNode {
-    CrtListEntry m_links;
-    void (*m_callback)(int initFlag);
-} CrtInitCallbackNode;
 
 typedef struct CrtFiberContext {
     uint32_t m_tlsFiberValue;
@@ -43,13 +34,6 @@ typedef struct CrtFiberContext {
     uint8_t m_pad1[68];
     void* m_tlsBackingStore;
 } CrtFiberContext;
-
-typedef struct CrtTlsDispatch {
-    int (*m_tlsAlloc)(void* destructorThunk);
-    void* (*m_tlsGetValue)(uint32_t tlsIndex);
-    int (*m_tlsSetValue)(uint32_t tlsIndex, void* value);
-    int (*m_tlsFree)(uint32_t tlsIndex);
-} CrtTlsDispatch;
 
 /* _initterm table ranges in .data */
 static const uintptr_t kInittermStart = 0x825B0000u;
@@ -64,17 +48,6 @@ static const uintptr_t kImpKeDebugMonitorData = 0x820008F4u;
 
 /* _cinit_setup constants resolved from lis/addi */
 static const uintptr_t kCrtFiberTemplate = 0x825B1090u;
-
-/* Globals mirrored from binary data area */
-void (*g_single_init_fn)(void) = NULL;                     /* @ 0x825B1298 */
-int g_cinit_retval = -1;                                   /* @ 0x825B0A74 */
-static uint8_t g_crt_init_critical_section[8];             /* @ 0x825B0A30 */
-static CrtListEntry g_crt_init_callback_list = {           /* @ 0x825B0A4C */
-    &g_crt_init_callback_list,
-    &g_crt_init_callback_list
-};
-static CrtInitCallbackNode g_cinit_list_node;              /* @ 0x825E6E78 */
-static CrtTlsDispatch g_tls_dispatch;                      /* @ 0x825E6E84 */
 
 /* External functions (resolved by import hooks/runtime) */
 int _heap_init_impl(void);                                 /* @ 0x8242C1E8 */

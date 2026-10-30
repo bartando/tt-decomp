@@ -27,3 +27,7 @@ extern "C" void* g_pGrcTextureFactoryString = nullptr;
 
 // @ 0x82617E60 (.data)
 extern "C" void* g_grcRenderObjects[2] = {};
+
+uint32_t g_ambientStreamSlotCap = 0;  // @ 0x825C8F54
+uint32_t g_ambientMappedSlot = 0;     // @ 0x825EBB84
+uint32_t g_ambientCurSlot = 0;        // @ 0x825EBBDC

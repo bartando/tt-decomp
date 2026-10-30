@@ -37,7 +37,7 @@
  *   +0x30  const char* m_stringParam ← extra string; fixed up if non-null
  */
 
-#include "../game/pong_creature.hpp"
+#include "../game/creature/pong_creature.hpp"
 #include <cstdint>
 #include <cstdlib>  // atexit
 
@@ -47,7 +47,7 @@
 
 // RAGE base class destructor called at the end of pcrAnimEvent's own dtor.
 // rage::ReleaseSingleton tears down the atSingleton base in the vtable chain.
-extern void rage::ReleaseSingleton(void* obj);
+namespace rage { void ReleaseSingleton(void* obj); }
 
 // Heap allocator / deallocator (RAGE custom).
 extern void rage_free(void* ptr);
@@ -94,9 +94,9 @@ extern const char kTypeName_Msg_s[];
 // Event type ID globals (populated at first process time via RegisterSerializationField).
 // @ 0x825C9C60, 0x825C803C, 0x825C8038
 // ─────────────────────────────────────────────────────────────────────────────
-uint32_t g_eventType_Default   = 0;   // @ 0x825C9C60
-uint32_t g_eventType_FootAudio = 0;   // @ 0x825C803C
-uint32_t g_eventType_Message   = 0;   // @ 0x825C8038
+extern uint32_t g_eventType_Default;   // @ 0x825C9C60
+extern uint32_t g_eventType_FootAudio;   // @ 0x825C803C
+extern uint32_t g_eventType_Message;   // @ 0x825C8038
 
 // ─────────────────────────────────────────────────────────────────────────────
 // pcrAnimEvent — non-virtual destructor body

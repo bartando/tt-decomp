@@ -10,7 +10,8 @@
 extern "C" void atFreeList_Alloc(void* queue, uint32_t size);
 
 // Global event state
-uint32_t g_messageEventType = 0;
+extern uint32_t g_messageEventType;  // @ 0x825C5800
+extern uint32_t g_messageHandlerType; // @ 0x825C495C
 // g_eventQueue* are defined in globals.c (as the message-sink registry).
 
 /**
@@ -70,7 +71,9 @@ void msgEventHandler::Stub22() {
  * Check if this handler matches the given event type.
  */
 bool msgEventHandler::MatchesType(uint32_t eventType) {
-    return eventType == g_messageEventType;
+    return eventType == g_messageHandlerType
+        || eventType == g_eventType_FootAudio
+        || eventType == g_eventType_Message;
 }
 
 /**

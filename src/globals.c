@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "globals.h"
+#include "crt/startup_globals.h"
 #include "link/tt_alias.h"
 
 // ============================================================================
@@ -380,7 +381,7 @@ void* g_swfScriptObjectPool = NULL;
 
 void* g_pClockObj = NULL;
 void* g_pGmLogic = NULL;
-void* g_pLerpQueue = NULL;
+// g_pLerpQueue aliases the shared 0x8271A2EC slot in match_data.cpp.
 void* g_pPostEffects = NULL;
 void* g_geomSingleton = NULL;
 void* g_objFactory = NULL;
@@ -941,3 +942,23 @@ TT_DATA_ALIAS("_ZN4rage13g_phCallback4E", "g_phCallback4");
 TT_DATA_ALIAS("_ZN4rage13g_phCallback5E", "g_phCallback5");
 /* swf.cpp declares the script object pool inside namespace rage */
 TT_DATA_ALIAS("_ZN4rage21g_swfScriptObjectPoolE", "g_swfScriptObjectPool");
+
+/* The version/event dispatchers read these same shared base-type slots. */
+TT_DATA_ALIAS("g_assetVersions_verB", "g_aiTypeId_2");  /* @ 0x825C803C */
+TT_DATA_ALIAS("g_assetVersions_verC", "g_aiTypeId_3");  /* @ 0x825C8038 */
+TT_DATA_ALIAS("g_eventType_FootAudio", "g_aiTypeId_2"); /* @ 0x825C803C */
+TT_DATA_ALIAS("g_eventType_Message", "g_aiTypeId_3");   /* @ 0x825C8038 */
+
+/* Shared CRT startup objects: the lifted startup TU only declares them. */
+void (*g_single_init_fn)(void) = NULL;  /* @ 0x825B1298 */
+int g_cinit_retval = -1;                /* @ 0x825B0A74 */
+uint8_t g_crt_init_critical_section[8]; /* @ 0x825B0A30 */
+CrtListEntry g_crt_init_callback_list = {  /* @ 0x825B0A4C */
+    &g_crt_init_callback_list, &g_crt_init_callback_list
+};
+CrtInitCallbackNode g_cinit_list_node;  /* @ 0x825E6E78 */
+CrtTlsDispatch g_tls_dispatch;         /* @ 0x825E6E84 */
+
+TT_DATA_ALIAS("g_controllerArray", "g_vibrationMgr");  /* @ 0x8271A3A8 */
+TT_DATA_ALIAS("g_playerStateArray", "g_input_obj_ptr"); /* @ 0x825EAB28 */
+TT_DATA_ALIAS("g_messageEventType", "g_gdEventBase_typeId"); /* @ 0x825C5800 */

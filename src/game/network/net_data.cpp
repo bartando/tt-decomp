@@ -123,3 +123,5 @@ extern "C" alignas(16) uint8_t g_netMessageHolderBuffer[256] = {};
 
 // @ 0x8271A2CC (.data) — a 24-byte object in the image (zero); room for host pointer widths
 extern "C" alignas(16) uint8_t g_networkSentinel[48] = {};
+
+uint32_t g_messageHandlerType = 0x825C495Cu;  // @ 0x825C495C

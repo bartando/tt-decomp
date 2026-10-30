@@ -193,4 +193,4 @@ void InitiateConnection(void* context);
  * 
  * Original symbol: SinglesNetworkClient_GetPlayerID_E408
  */
-void GetPlayerID(void* client, uint32_t param);
+uint32_t GetPlayerID(void* client, uint32_t param);

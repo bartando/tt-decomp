@@ -57,7 +57,8 @@ protected:
 extern "C" void atFreeList_Alloc(void* queue, uint32_t size);
 
 // Global event type
-extern uint32_t g_messageEventType;  // @ 0x8271B800 (glob:lbl_8271B800)
+extern uint32_t g_messageEventType;  // @ 0x825C5800 (event filter)
+extern uint32_t g_messageHandlerType; // @ 0x825C495C (handler type)
 
 // Global event queue state
 extern uint32_t g_eventQueueIndex;      // @ 0x825F3864

@@ -31,7 +31,8 @@ struct io;
 // We reuse the already-exported `g_input_obj_ptr` symbol from pong_misc —
 // it aliases the same SDA cell.
 
-extern "C" void* g_input_obj_ptr;
+extern "C" void* g_input_obj_ptr;  // @ 0x825EAB28
+extern "C" void* g_loop_obj_ptr;   // @ 0x825EAB30 — input gate owner
 
 // Additional SDA-proximate scratch (sda_r11 + -21712 → +576/+578 bytes of
 // boolean state). The original binary bundles both bytes into a single
@@ -43,10 +44,6 @@ struct IoInputGate {
     uint8_t _pad1[1];
     uint8_t readyFlag;      // +0x242 (578) — nonzero enables deep poll
 };
-// File-scope placeholder — the real SDA-backed gate pointer will be wired
-// in when the globals pool lift lands. Callers hit the null guard below
-// and return the suppressed-state result (1) until then.
-IoInputGate* g_io_input_gate = nullptr;
 }  // namespace
 
 // ─── io_Input_poll_9D68 @ 0x821C9D68 ──────────────────────────────────────────
@@ -92,7 +89,7 @@ int io_Input_poll_9D68(void* inputObj) {
 uint8_t io_ExecuteStateAction(io* self) {
     (void)self;
 
-    IoInputGate* gate = g_io_input_gate;
+    IoInputGate* gate = reinterpret_cast<IoInputGate*>(g_loop_obj_ptr);
     if (!gate) {
         // Matches the SDA-null branch: the hardware gate hasn't been bound
         // yet, so treat the action as suppressed.

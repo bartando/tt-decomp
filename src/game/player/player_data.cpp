@@ -151,3 +151,5 @@ TT_DATA_ALIAS("g_pCourtGeomSingleton", "g_pTableDims");
 
 // @ 0x8271A31C (.data)
 extern "C" void* g_pPlayerRecords = nullptr;
+
+TT_DATA_ALIAS("g_controllerPointerArray", "g_pPlayerRecords");  // @ 0x8271A31C

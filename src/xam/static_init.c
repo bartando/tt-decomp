@@ -15,13 +15,13 @@
 //=============================================================================
 
 // Global initialization flag (lbl_8271B2A0 @ 0x8271B2A0)
-static uint32_t g_xam_init_flag = 0;
+extern uint32_t g_xam_init_flag;  // @ 0x8271B2A0
 
 // Global singleton instance (lbl_8271A860 @ 0x8271A860, size: 0x18)
-static xam_init_singleton g_xam_singleton = {0};
+extern xam_init_singleton g_xam_singleton;  // @ 0x8271A860
 
 // Static node for xam_static_init_1770 (lbl_825D1698 @ 0x825D1698, size: 0xC)
-static xam_init_node g_xam_node_1770 = {0};
+extern xam_init_node g_xam_node_1770;  // @ 0x825D1698
 
 //=============================================================================
 // Cleanup Handler
@@ -31,7 +31,7 @@ static xam_init_node g_xam_node_1770 = {0};
  * Cleanup handler registered with atexit.
  * Called when the program exits to clean up the singleton.
  */
-static void xam_singleton_cleanup(void) {
+static void xam_singleton_cleanup(void) {  // @ 0x82583E68
     // Reset the singleton state
     memset(&g_xam_singleton, 0, sizeof(xam_init_singleton));
     g_xam_init_flag = 0;
@@ -52,7 +52,7 @@ static void xam_singleton_cleanup(void) {
  *     - Registers atexit handler
  *   - Returns pointer to singleton
  */
-xam_init_singleton* xam_GetInitSingleton(void) {
+xam_init_singleton* xam_GetInitSingleton(void) {  // @ 0x82238D60
     // Check if already initialized (bit 0 of flag)
     if ((g_xam_init_flag & 0x1) == 0) {
         // Set initialized flag
@@ -102,16 +102,16 @@ void xam_static_init_1770(void) {
 }
 
 // Static nodes for batch of 10 initialization functions
-static xam_init_node g_xam_node_F628 = {0};  // @ 0x825D0FF0
-static xam_init_node g_xam_node_F6A0 = {0};  // @ 0x825D1008
-static xam_init_node g_xam_node_F718 = {0};  // @ 0x825D1020
-static xam_init_node g_xam_node_F790 = {0};  // @ 0x825D1038
-static xam_init_node g_xam_node_F808 = {0};  // @ 0x825D1050
-static xam_init_node g_xam_node_F880 = {0};  // @ 0x825D1068
-static xam_init_node g_xam_node_F8F8 = {0};  // @ 0x825D1080
-static xam_init_node g_xam_node_F970 = {0};  // @ 0x825D1098
-static xam_init_node g_xam_node_F9E8 = {0};  // @ 0x825D10B0
-static xam_init_node g_xam_node_0FF0 = {0};  // @ 0x825D1518
+extern xam_init_node g_xam_node_F628;  // @ 0x825D0FF0
+extern xam_init_node g_xam_node_F6A0;  // @ 0x825D1008
+extern xam_init_node g_xam_node_F718;  // @ 0x825D1020
+extern xam_init_node g_xam_node_F790;  // @ 0x825D1038
+extern xam_init_node g_xam_node_F808;  // @ 0x825D1050
+extern xam_init_node g_xam_node_F880;  // @ 0x825D1068
+extern xam_init_node g_xam_node_F8F8;  // @ 0x825D1080
+extern xam_init_node g_xam_node_F970;  // @ 0x825D1098
+extern xam_init_node g_xam_node_F9E8;  // @ 0x825D10B0
+extern xam_init_node g_xam_node_0FF0;  // @ 0x825D1518
 
 // ─────────────────────────────────────────────────────────────────────────────
 // xam_static_init_F628 @ 0x8257F628 | size: 0x40

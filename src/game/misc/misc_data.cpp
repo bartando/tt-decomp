@@ -186,3 +186,8 @@ extern "C" void* g_sda_6404 = nullptr;
 
 // @ 0x8260660D (.data)
 extern "C" uint8_t g_sda_660D = 0x0u;
+
+// Type tokens used by the assetVersions IsSupported dispatchers.
+uint32_t g_assetVersions_verA = 0x825C5864u;      // @ 0x825C5864
+uint32_t g_assetVersionsChar_verA = 0x825C5868u;  // @ 0x825C5868
+uint32_t g_assetVersionsCS_verA = 0x825C586Cu;    // @ 0x825C586C
