@@ -4,7 +4,7 @@ FUNCTION = "rage::crAnimChannelQuantizeFloat::vfn_5"
 ADDRESS = 0x822478E0
 SOURCE = "src/rage/animation/rage_anim.cpp"
 FP_CONTRACT = "off"  # the original fuses explicitly (fmadds); nothing else may be
-CALLS = {"rage::AnimFloor": run(), "rage::DecodeQuantizedFloat": run()}
+CALLS = {"crt_floor": run(), "rage::DecodeQuantizedFloat": run()}
 RET = None
 
 # Finite, representable animation times and nonempty sample arrays; exceptional

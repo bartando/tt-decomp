@@ -150,7 +150,7 @@ unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, a
 - `pong_strings.hpp`: `g_str_pongDrill_tooManySuccesses` is at 0x82031970, not 0x82033970.
 - `network.cpp`: 0x822FA818/0x822FA878/0x822FA8F0 are hudTrainingHUD setters ("completed",
   "time_low", "arrow_direction"), not SinglesNetworkClient; 0x822FA8F0 has two names.
-- `ph_physics`: 0x82431910 `RoundToNearestInt` is floor; 0x824321F0 is ceil.
+- `ph_physics`: 0x824321F0 is ceil.
 - `pong_player_swing.cpp`: 0x821C9CD0 "GetCreatureBoneMatrix" returns one side's play-area
   bounds (leaf, keeps r3).
 - `pong_match.hpp`: gmPracticeTarget +0x17 (`field_17`) is a keep-on-table clamp flag.
