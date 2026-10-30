@@ -35,6 +35,8 @@ EXPECT = [
     ("lc_drill_strings", "PASS", ()),             # const char* by content, any length
     ("lc_world_bound_static_init", "PASS", ()),   # the static initializers have run
     ("sysmem_simple_allocator_free", "PASS", ()),
+    ("sysmem_simple_spin_acquire", "PASS", ()),
+    ("sysmem_simple_debug_fill", "PASS", ()),
     ("crt_asin", "PASS", ()),                    # original core on a Xenon caller frame
     ("crt_acos", "PASS", ()),
     ("rage_clip_polygon_to_frustum", "PASS", ()), # repeated run() calls stay in the trace
@@ -47,6 +49,20 @@ EXPECT = [
 ]
 
 MUTATIONS = [
+    ("sysmem_simple_spin_acquire", "do not acquire the unlocked lock",
+     [("__sync_val_compare_and_swap(lock, 0u, 1u)", "__sync_val_compare_and_swap(lock, 0u, 0u)")]),
+    ("sysmem_simple_spin_acquire", "write the wrong acquired value",
+     [("__sync_val_compare_and_swap(lock, 0u, 1u)", "__sync_val_compare_and_swap(lock, 0u, 2u)")]),
+    ("sysmem_simple_spin_acquire", "overwrite nonzero lock values",
+     [("if (previous != 1) {", "if (previous != 1) { *lock = 1;")]),
+    ("sysmem_simple_debug_fill", "fill with the first address byte",
+     [("reinterpret_cast<uintptr_t>(buf + i)", "reinterpret_cast<uintptr_t>(buf)")]),
+    ("sysmem_simple_debug_fill", "use the wrong word pattern",
+     [("0xCDCDCDCDu;", "0xCCCCCCCCu;")]),
+    ("sysmem_simple_debug_fill", "leave the final byte untouched",
+     [("while (remaining != 0) {", "while (remaining > 1) {")]),
+    ("sysmem_simple_debug_fill", "invert the mode flag",
+     [("if (g_sysMemDebugFillFlag != 0) {", "if (g_sysMemDebugFillFlag == 0) {")]),
     ("ph_segment_triangle_intersect", "reject a start on the plane",
      [("if (*startDistance < g_phZeroFloat) return 2;", "if (*startDistance <= g_phZeroFloat) return 2;")]),
     ("ph_segment_triangle_intersect", "omit end-distance output",

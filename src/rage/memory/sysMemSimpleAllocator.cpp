@@ -698,13 +698,15 @@ void sysMemSimpleAllocator::Free(void* ptr) {
 //
 // MSVC guarded-init spinlock with exponential backoff. CAS 0->1, else
 // busy-wait `delay` iterations (starting at 8, doubling up to 16384),
-// then retry. The original uses lwarx/stwcx + MSR guards; we use host
+// then retry. Values other than 0 or 1 return unchanged. The original uses
+// lwarx/stwcx + MSR guards; we use host
 // atomics which provide equivalent ordering.
 // ═══════════════════════════════════════════════════════════════════════
 extern "C" void sysMemSimpleAllocator_SpinAcquire(uint32_t* lock) {
     uint32_t delay = 8;
     for (;;) {
-        if (__sync_bool_compare_and_swap(lock, 0u, 1u)) {
+        uint32_t previous = __sync_val_compare_and_swap(lock, 0u, 1u);
+        if (previous != 1) {
             __sync_synchronize();  // lwsync after acquire
             return;
         }
@@ -723,7 +725,7 @@ extern "C" void sysMemSimpleAllocator_SpinAcquire(uint32_t* lock) {
 // (Symbol prefix "sysMemSimpleAllocator_62A0_p46" is the pass5 alias.)
 //
 // Debug memset variant. Dispatches on global flag:
-//   - g_sysMemDebugFillFlag != 0 : self-fill with buf[0] (poison seed)
+//   - g_sysMemDebugFillFlag != 0 : fill each byte with its address low byte
 //   - otherwise                  : fill with 0xCDCDCDCD ("heap garbage"
 //                                  pattern), 4 bytes at a time, per-byte
 //                                  tail.
@@ -731,10 +733,8 @@ extern "C" void sysMemSimpleAllocator_SpinAcquire(uint32_t* lock) {
 // ═══════════════════════════════════════════════════════════════════════
 extern "C" void rage_stricmp_6358(uint8_t* buf, uint32_t count) {
     if (g_sysMemDebugFillFlag != 0) {
-        if (count == 0) return;
-        uint8_t seed = buf[0];
         for (uint32_t i = 0; i < count; ++i) {
-            buf[i] = seed;
+            buf[i] = static_cast<uint8_t>(reinterpret_cast<uintptr_t>(buf + i));
         }
         return;
     }
