@@ -6,6 +6,7 @@
  *   pongLightState_CopyLights                      @ 0x8213E110
  *   pongLightState_Apply                           @ 0x82154320
  *   pongRender_ResetState                         @ 0x82225590
+ *   pongShadowMap::applyShaderParameters            @ 0x82147228
  *   pongDrawBucketManager::~pongDrawBucketManager  @ 0x822272B0  (vfn_0)
  *   pongDrawBucketManager::Load                    @ 0x82227430
  *   pongDrawBucket_AddEntry                        @ 0x822278D8
@@ -34,17 +35,17 @@ pongLightState* pongLightState_CopyLights(pongLightState* dst, const pongLightSt
     return dst;
 }
 
-struct LightShaderVector {
+struct ShaderVector {
     float lane[4];
 };
 
 // Shader handles pack the dirty-bit index in bits 1..17 and the entry index
 // in bits 18..31. The entry's low 16 bits select a 16-byte value slot.
-struct LightShaderTable {
+struct ShaderTable {
     uint8_t dirtyBits[0x100];
     uint32_t* entries;             // +0x100
     uint32_t _104;
-    LightShaderVector* values;     // +0x108
+    ShaderVector* values;     // +0x108
 };
 
 namespace {
@@ -65,7 +66,7 @@ extern uint32_t lbl_825EBAAC;                   // @ 0x825EBAAC  Position handle
 extern uint32_t lbl_825EBC30;                   // @ 0x825EBC30  LightCount handle
 extern uint32_t lbl_825EBAB0;                   // @ 0x825EBAB0  LightType handle
 extern uint32_t lbl_825EBC34;                   // @ 0x825EBC34  Ambient handle
-extern LightShaderTable* lbl_825EBC40;          // @ 0x825EBC40
+extern ShaderTable* lbl_825EBC40;          // @ 0x825EBC40
 extern "C" const uint8_t g_shaderParameterDirtyMasks[8];           // @ 0x825D4C80  MSB-first dirty-bit masks
 extern const float lbl_825C5938;               // @ 0x825C5938  -1.0f
 extern const float lbl_8202D108;               // @ 0x8202D108  1.0f
@@ -74,8 +75,8 @@ extern "C" uint32_t g_grmShaderFx_boundContext;      // @ 0x825EBC54  shader-glo
 
 extern void game_E0A8(pongLightState* dst, const pongLightState* src);  // @ 0x8213E0A8
 extern uint32_t game_A2F8(const char* name, int create);              // @ 0x8215A2F8
-extern void game_A670(uint32_t handle, const LightShaderVector* values, int count);  // @ 0x8215A670
-extern void game_9908(LightShaderTable* table, uint32_t handle, const float* values, int count);  // @ 0x82159908
+extern void game_A670(uint32_t handle, const ShaderVector* values, int count);  // @ 0x8215A670
+extern void game_9908(ShaderTable* table, uint32_t handle, const float* values, int count);  // @ 0x82159908
 
 // @ 0x82154320 | size: 0x308 (game_4320)
 // Inferred name: upload the light state to Diffuse/Position/LightCount/LightType/Ambient.
@@ -83,8 +84,8 @@ void pongLightState_Apply(const pongLightState* state) {
     game_E0A8(&lbl_825CA610, state);
 
     const int count = state->count;
-    alignas(16) LightShaderVector diffuse[8];
-    alignas(16) LightShaderVector position[8];
+    alignas(16) ShaderVector diffuse[8];
+    alignas(16) ShaderVector position[8];
     float type[8];
     const uint32_t mode = g_grmShaderFx_variantTable[1];
     for (int i = 0; i < count; ++i) {
@@ -135,7 +136,7 @@ void pongLightState_Apply(const pongLightState* state) {
     game_A670(diffuseHandle, diffuse, count);
     game_A670(positionHandle, position, count);
 
-    LightShaderTable* table = lbl_825EBC40;
+    ShaderTable* table = lbl_825EBC40;
     uint32_t bit = (countHandle >> 1) & 0x1FFFF;
     table->dirtyBits[bit >> 3] |= g_shaderParameterDirtyMasks[bit & 7];
     uint32_t slot = table->entries[(countHandle >> 18) * 2 + 1] & 0xFFFF;
@@ -273,6 +274,152 @@ void pongRender_ResetState(int32_t pass) {
     setSamplerDefault(8, 0);
     setSamplerDefault(28, lodBits);
     setSamplerDefault(56, 3);
+}
+
+// A slot starts at config+0x110 and repeats every 0xE0 bytes. Seven slots:
+// three map slots, then two player pairs (the second pair is at indices 5/6).
+struct pongShadowSlot {
+    uint8_t enabled;                  // +0x00
+    uint8_t _001[0x4F];
+    ShaderVector matrix[4];            // +0x50
+    ShaderVector weight;               // +0x90 (w scales xyz)
+    uint8_t _0A0[0x30];
+    float softness;                    // +0xD0
+    int32_t pass;                      // +0xD4
+    uint8_t _0D8[8];
+};
+static_assert(sizeof(pongShadowSlot) == 0xE0, "shadow slot stride");
+
+struct pongShadowConfig {
+    uint8_t _000[0x100];
+    int32_t slotCount;                 // +0x100
+    uint8_t _104[0x0C];
+    pongShadowSlot slots[7];           // +0x110
+    uint8_t _730[0xC0];
+    float mapSampleScale;              // +0x7F0
+    float playerSampleScale;           // +0x7F4
+};
+static_assert(__builtin_offsetof(pongShadowConfig, mapSampleScale) == 2032, "map sampling scale");
+#if UINTPTR_MAX == 0xFFFFFFFFu
+static_assert(__builtin_offsetof(pongShadowMap, m_config) == 8, "shadow config pointer");
+static_assert(__builtin_offsetof(pongShadowMap, m_draw_430) == 1072, "last shader handle");
+#endif
+
+extern void* lbl_825EBA20;                       // @ 0x825EBA20  fallback texture
+extern ShaderVector lbl_82617DF0;               // @ 0x82617DF0  softness upload scratch
+extern const float lbl_825CA430[2];             // @ 0x825CA430  half-texel offsets
+extern const ShaderVector lbl_825CA4A8[4];       // @ 0x825CA4A8  paired sampling taps
+extern const float lbl_825C4890;                // @ 0x825C4890  shadow blend (0.3)
+extern void* game_53C8(pongShadowMap* map, int32_t player, int32_t layer); // @ 0x821453C8
+extern void pongShadowMap_A5C8_g(uint32_t handle, void* texture);         // @ 0x8215A5C8
+extern void game_9AA0(ShaderTable* table, uint32_t handle, const ShaderVector* matrices,
+                      int32_t count);                                  // @ 0x82159AA0
+
+namespace {
+int32_t shadowTextureDimension(void* texture, int slot) {
+    using DimensionFn = int32_t (*)(void*);
+    return reinterpret_cast<DimensionFn>((*static_cast<void***>(texture))[slot])(texture);
+}
+} // namespace
+
+// @ 0x82147228 | size: 0x600 (was pongShadowMap_7228_g)
+void pongShadowMap::applyShaderParameters(int32_t pass) {
+    alignas(16) ShaderVector weights[3];
+    alignas(16) ShaderVector matrices[3 * 4];
+    int selected = 0;
+    const int32_t slotCount = m_config->slotCount;
+    for (int32_t i = 0; i < slotCount; ++i) {
+        const pongShadowSlot& slot = m_config->slots[i];
+        if (slot.pass != pass)
+            continue;
+        for (int lane = 0; lane < 3; ++lane)
+            weights[selected].lane[lane] = slot.weight.lane[lane] * slot.weight.lane[3];
+        weights[selected].lane[3] = lbl_8202D108;
+        if (pass > 0) {
+            memcpy(&matrices[selected * 4], slot.matrix, sizeof(slot.matrix));
+            if (slot.enabled == 0 || (i == 5 && m_draw_448 != 0) || (i == 6 && m_draw_448 != 1))
+                weights[selected].lane[0] = 0.0f;
+        }
+        ++selected;
+    }
+    if (m_draw_420 != 0)
+        game_A670(m_draw_420, weights, 3);
+
+    if (m_draw_41c != 0) {
+        ++g_grmShaderFx_boundContext;
+        lbl_82617DF0.lane[2] = m_config->slots[pass].softness;
+        ShaderTable* table = lbl_825EBC40;
+        uint32_t dirtyBit = (m_draw_41c >> 1) & 0x1FFFF;
+        table->dirtyBits[dirtyBit >> 3] |= g_shaderParameterDirtyMasks[dirtyBit & 7];
+        uint32_t index = table->entries[(m_draw_41c >> 18) * 2 + 1] & 0xFFFF;
+        memcpy(table->values[index].lane, lbl_82617DF0.lane, 16);
+    }
+    if (m_draw_424 != 0) {
+        ++g_grmShaderFx_boundContext;
+        game_9AA0(lbl_825EBC40, m_draw_424, matrices, pass > 0 ? 2 : 1);
+    }
+
+    float scaleX, scaleY, offsetX, offsetY;
+    if (pass == 0) {
+        void* texture = reinterpret_cast<void*>(static_cast<uintptr_t>(m_draw_3d0));
+        int32_t height = shadowTextureDimension(texture, 9);
+        int32_t width = shadowTextureDimension(texture, 8);
+        float radius = m_config->mapSampleScale * 0.5f;
+        scaleY = radius / static_cast<float>(height);
+        scaleX = radius / static_cast<float>(width);
+        offsetX = offsetY = 0.0f;
+    } else if (m_draw_408 != 0 && m_draw_410 != 0) {
+        const int32_t player = pass - 1;
+        void* texture = game_53C8(this, player, 0);
+        pongShadowMap_A5C8_g(m_draw_408, texture);
+        pongShadowMap_A5C8_g(m_draw_410, texture);
+        void* second = lbl_825EBA20;
+        if (m_config->slots[player + 5].enabled != 0 && player == static_cast<int32_t>(m_draw_448))
+            second = reinterpret_cast<void*>(static_cast<uintptr_t>(
+                static_cast<int32_t>(m_draw_444) < 2 ? m_draw_3fc : m_draw_3f4));
+        pongShadowMap_A5C8_g(m_draw_40c, second);
+        pongShadowMap_A5C8_g(m_draw_414, second);
+        if (texture == lbl_825EBA20)
+            texture = second;
+
+        int32_t width = shadowTextureDimension(texture, 8);
+        void* reference = reinterpret_cast<void*>(static_cast<uintptr_t>(m_draw_3f0));
+        int32_t referenceWidth = shadowTextureDimension(reference, 8);
+        float scaledWidth = m_config->playerSampleScale * static_cast<float>(width);
+        scaleX = scaledWidth / static_cast<float>(referenceWidth);
+        int32_t height = shadowTextureDimension(texture, 9);
+        int32_t referenceHeight = shadowTextureDimension(reference, 9);
+        float scaledHeight = m_config->playerSampleScale * static_cast<float>(height);
+        scaleY = scaledHeight / static_cast<float>(referenceHeight);
+        height = shadowTextureDimension(texture, 9);
+        width = shadowTextureDimension(texture, 8);
+        scaleY /= static_cast<float>(height);
+        scaleX /= static_cast<float>(width);
+        height = shadowTextureDimension(texture, 9);
+        width = shadowTextureDimension(texture, 8);
+        offsetY = lbl_825CA430[1] / static_cast<float>(height);
+        offsetX = lbl_825CA430[0] / static_cast<float>(width);
+    }
+    // Missing player texture bindings leave the original's scratch floats
+    // uninitialized. The caller must disable this upload in that state.
+    if (static_cast<int32_t>(m_draw_42c) >= 0) {
+        alignas(16) ShaderVector taps[4];
+        for (int i = 0; i < 4; ++i) {
+            taps[i].lane[0] = __builtin_fmaf(lbl_825CA4A8[i].lane[0], scaleX, offsetX);
+            taps[i].lane[1] = __builtin_fmaf(lbl_825CA4A8[i].lane[1], scaleY, offsetY);
+            taps[i].lane[2] = __builtin_fmaf(lbl_825CA4A8[i].lane[2], scaleX, offsetX);
+            taps[i].lane[3] = __builtin_fmaf(lbl_825CA4A8[i].lane[3], scaleY, offsetY);
+        }
+        game_A670(m_draw_42c, taps, 4);
+    }
+    if (m_draw_430 != 0) {
+        ++g_grmShaderFx_boundContext;
+        ShaderTable* table = lbl_825EBC40;
+        uint32_t dirtyBit = (m_draw_430 >> 1) & 0x1FFFF;
+        table->dirtyBits[dirtyBit >> 3] |= g_shaderParameterDirtyMasks[dirtyBit & 7];
+        uint32_t index = table->entries[(m_draw_430 >> 18) * 2 + 1] & 0xFFFF;
+        table->values[index].lane[0] = lbl_825C4890;
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
