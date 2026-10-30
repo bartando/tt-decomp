@@ -74,4 +74,16 @@ void mat44TransformPoint(const float* matrix, const float* point, float* out) {
     }
 }
 
+// out = point * matrix. Stores happen between lanes, so overlapping buffers
+// affect later loads. Each lane starts with y, then accumulates w and x/z.
+// mat44TransformVector @ 0x8223ECB0 | size: 0xD4
+void mat44TransformVector(float* out, const float* point, const float* m) {
+    out[0] = __builtin_fmaf(point[0], m[0], __builtin_fmaf(m[8], point[2],
+             __builtin_fmaf(m[12], point[3], m[4] * point[1])));
+    for (unsigned c = 1; c < 4; ++c) {
+        out[c] = __builtin_fmaf(m[8 + c], point[2], __builtin_fmaf(m[c], point[0],
+                 __builtin_fmaf(m[12 + c], point[3], m[4 + c] * point[1])));
+    }
+}
+
 } // namespace rage
