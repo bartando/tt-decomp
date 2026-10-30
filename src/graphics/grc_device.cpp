@@ -7,6 +7,7 @@
  *   - grcDevice_shutdownAlt @ 0x821540D0 — Alternate shutdown path
  *   - grcDevice_setSamplerMinFilter @ 0x82355418 — Xenos texture fetch state
  *   - grcDevice_setSamplerMagFilter @ 0x823555A8 — Xenos texture fetch state
+ *   - grcDevice_SetTexture          @ 0x82359940 — bind a texture to a fetch slot
  *
  * Note: grcDevice_beginScene lives in grc_render.cpp alongside grcDevice_clear.
  */
@@ -253,4 +254,59 @@ void grcDevice_setSamplerMagFilter(void* device, uint32_t sampler, uint32_t filt
     uint64_t dirtyBit = shift < 64u ? (UINT64_C(0x8000000000000000) >> shift) : 0;
     uint64_t* dirtySamplers = reinterpret_cast<uint64_t*>(state + 32);
     *dirtySamplers |= dirtyBit;
+}
+
+extern "C" void grcTexture_ReleaseResource(void* texture); // @ 0x82352708
+
+// Bind `texture` (its header holds a fetch constant at +0x10..+0x24) to fetch
+// slot `slot`: copy it into the device's fetch constant, keeping the device's
+// own clamp/filter bits, clamp the mip range to the slot's limits and mark the
+// slot dirty. The previously bound texture drops a reference (and its last-use
+// fence) and is released when nothing else holds it.
+// @ 0x82359940
+extern "C" void grcDevice_SetTexture(void* device, uint32_t slot, void* texture) {
+    uint8_t* state = static_cast<uint8_t*>(device);
+    auto** bound = reinterpret_cast<uint32_t**>(state + (slot + 3176u) * 4u);
+    auto* previous = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(*reinterpret_cast<uint32_t*>(bound)));
+    constexpr uint32_t kReference = 0x80000;
+    // Physical addresses at or above 0x1E00000 sit in the 4KB-offset aperture.
+    const auto physical = [](uint32_t address) { return address + (((address >> 20) + 0x200) & 0x1000); };
+
+    if (texture != nullptr) {
+        auto* header = static_cast<uint32_t*>(texture);
+        uint32_t* fetch = reinterpret_cast<uint32_t*>(state + (slot + 48u) * 24u);
+        header[0] += kReference;
+        const uint32_t old1 = fetch[1], old3 = fetch[3], old4 = fetch[4], old5 = fetch[5];
+        fetch[0] = (header[4] & ~0x003FFC00u) | (fetch[0] & 0x003FFC00u);
+        fetch[1] = (physical(header[5]) & ~0xE0000800u) | (old1 & 0xE0000800u);
+        fetch[2] = header[6];
+        fetch[4] = old4;
+        fetch[3] = (header[7] & ~0x7FF80000u) | (old3 & 0x7FF80000u);
+        fetch[5] = (physical(header[9]) & ~0xE00001FFu) | (old5 & 0xE00001FFu);
+        uint32_t minMip = (header[8] >> 2) & 0xF;
+        const uint32_t slotMin = state[12046 + slot];
+        if (minMip <= slotMin) {
+            minMip = slotMin;
+        }
+        uint32_t word4 = (fetch[4] & ~0x3Cu) | (minMip << 2);
+        fetch[4] = word4;
+        uint32_t maxMip = (header[8] >> 6) & 0xF;
+        const uint32_t slotMax = state[12072 + slot];
+        if (maxMip >= slotMax) {
+            maxMip = slotMax;
+        }
+        fetch[4] = (word4 & ~0x3C0u) | (maxMip << 6);
+        auto& dirty = *reinterpret_cast<uint64_t*>(state + 0x20);
+        dirty |= slot < 64 ? 0x8000000000000000ull >> slot : 0;
+    }
+    *reinterpret_cast<uint32_t*>(bound) = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(texture));
+
+    if (previous != nullptr) {
+        const uint32_t references = previous[0] - kReference;
+        previous[1] = *reinterpret_cast<uint32_t*>(state + 10396);
+        previous[0] = references;
+        if ((references & 0x00F800FFu) == 0) {
+            grcTexture_ReleaseResource(previous);
+        }
+    }
 }

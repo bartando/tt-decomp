@@ -367,7 +367,7 @@ extern "C" {
     void rage_6BF8_h(void* device, uint32_t reg, const uint32_t* values, uint32_t count); // @ 0x82356BF8
     void rage_6C50_h(void* device, uint32_t reg, const uint32_t* values, uint32_t count); // @ 0x82356C50
     void rage_6CA0_h(void* device, uint32_t reg, const uint32_t* values, uint32_t count); // @ 0x82356CA0
-    void rage_9940(void* device, uint32_t reg, uint32_t texture); // @ 0x82359940
+    void grcDevice_SetTexture(void* device, uint32_t slot, void* texture); // @ 0x82359940
     extern uint32_t g_grmUploadOverrideEnabled; // @ 0x825B1F70
     extern uint32_t g_grmUploadOverrideLayout;  // @ 0x825E784C
 }
@@ -478,7 +478,7 @@ extern "C" void rage_6370(void* parameterState) {
                     } else {
                         uint32_t texture;
                         std::memcpy(&texture, address(source), sizeof(texture));
-                        rage_9940(device, (flags >> 22) & 0xFF, texture);
+                        grcDevice_SetTexture(device, (flags >> 22) & 0xFF, reinterpret_cast<void*>(static_cast<uintptr_t>(texture)));
                     }
                 }
             }
