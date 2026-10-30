@@ -259,11 +259,12 @@ void crAnimDofVector3::CopyFrom(void* sourceAnimDof) {
     GetVectorFunc getVectorFn = reinterpret_cast<GetVectorFunc>(vtable[14]);
     float* sourceVec = getVectorFn(sourceAnimDof);
     
-    // Copy to our vector at offset +16
+    // The VMX load/store copies all four lanes without float arithmetic.
+    // Snapshot before writing, including when the source is our own value.
     float* destVec = reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(this) + 16);
-    destVec[0] = sourceVec[0];
-    destVec[1] = sourceVec[1];
-    destVec[2] = sourceVec[2];
+    uint32_t words[4];
+    __builtin_memcpy(words, sourceVec, sizeof(words));
+    __builtin_memcpy(destVec, words, sizeof(words));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
