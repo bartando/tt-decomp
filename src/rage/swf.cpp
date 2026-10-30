@@ -15,6 +15,8 @@
 #include <cmath>    // For fused multiply-add
 
 void swfSetMember(void* list, const char* name, const uint32_t* value); // @ 0x823FB258
+uint32_t swfHashMemberName(const char* name); // @ 0x8223A868
+uint32_t* swfFindMember(void* list, const char* name); // @ 0x823FB3B8
 
 void swfSetClipEvents(void* instance, uint32_t events, uint32_t records, int32_t count);  // @ 0x823FD320
 
@@ -22,7 +24,7 @@ void swfSetClipEvents(void* instance, uint32_t events, uint32_t records, int32_t
 extern "C" {
     extern const char lbl_82074EE4[];  // @ 0x82074EE4
     extern const char lbl_82074EF0[];  // @ 0x82074EF0
-    void swfCMD_PlaceObject2ClipEvent_D3E8(void* instance, int event, const char* name);  // @ 0x823FD3E8
+    void swfDispatchClipEvents(void* instance, int event, const char* name);  // @ 0x823FD3E8
     void rage_free(void* ptr);                  // @ 0x820C00C0 — canonical heap free (see src/crt/heap.c)
     void swfContext_Cleanup(void* ctx);         // @ 0x823F9B80 — cleanup stub (no-op in final binary)
     void atHashMap_Clear(void* ptr);            // @ 0x8234C0E0 — iterates linked-list hash buckets, frees all nodes
@@ -30,7 +32,6 @@ extern "C" {
     void swfInstance_Cleanup(void* ptr);        // @ 0x823FB670 — unlinks instance from display list
     void swfSymtab_Enumerate(void* symtab);     // @ 0x823FED10 — enumerate symtab members
     const char* swfInternString(const char* name, void* buffer, int maxLen);  // string interning
-    void* swfSymtab_Lookup(void* symtab, const char* key);   // symtab key lookup
     void* swfInstanceConstruct(void* storage);  // @ 0x823FB570
     void rage_DebugLog(const char* msg, ...);    // debug log stub (no-op)
     void swfSymtab_Delete(void* symtab, const char* key);   // symtab key delete
@@ -39,6 +40,9 @@ extern "C" {
     float swfComputeFramePosition(void* ctx, void* entry, float* outMin, float* outMax);
     const char* util_A768_1(const void* value, void* buffer, int maxLen);  // @ 0x823FA768 — SWF value to string
     int32_t swfValueToInteger(const void* value);  // @ 0x823FA5C8
+    int atoi(const char* text); // @ 0x82432120
+    void util_F7E8(const uint8_t* code, void* target, void* context, uint32_t length,
+                   void* registers, uint32_t keepStack); // @ 0x823FF7E8
     float util_EF98(void* instance, float* outMin);  // @ 0x823FEF98 — display width, optional minimum
     float swfINSTANCE_F0D8_w(void* instance, float* outMin);  // @ 0x823FF0D8 — display height, optional minimum
     void* util_B188(void* slots, int index);  // @ 0x823FB188
@@ -78,6 +82,63 @@ extern float g_swfPixelScaleY;    // @ 0x8260283C
 extern void (*g_swfBindFontTexture)(void* texture); // @ 0x82602820
 extern void* g_binkVideoPlayer;   // @ 0x825EB988 — graphics device (legacy global name)
 extern void fxEmitVertex2D(float x, float y); // @ 0x82406010
+
+// @ 0x823FA5C8
+extern "C" int32_t swfValueToInteger(const void* value) {
+    const auto* words = static_cast<const uint32_t*>(value);
+    switch (words[1]) {
+    case 0: case 1:
+        // Even the chunk-string tag is parsed directly, without flattening it.
+        return std::atoi(reinterpret_cast<const char*>(static_cast<uintptr_t>(words[0])));
+    case 2:
+        return *static_cast<const uint8_t*>(value);
+    case 3:
+        return static_cast<int32_t>(words[0]);
+    case 4: {
+        float number;
+        std::memcpy(&number, value, sizeof(number));
+        // Match fctiwz for infinities, NaNs and out-of-range finite floats.
+        if (number >= 2147483648.0f) return 2147483647;
+        if (!(number >= -2147483648.0f)) return -2147483647 - 1;
+        return static_cast<int32_t>(number);
+    }
+    default:
+        return 0;
+    }
+}
+
+// @ 0x823FB3B8
+uint32_t* swfFindMember(void* list, const char* name) {
+    uint32_t node = *static_cast<const uint32_t*>(list);
+    const uint32_t hash = swfHashMemberName(name);
+    while (node) {
+        const auto* fields = reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(node));
+        // Identity is hash-only; the first collision wins.
+        if (fields[4] == hash) {
+            return reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(node + 4));
+        }
+        node = fields[3];
+    }
+    return nullptr;
+}
+
+// @ 0x823FD3E8
+extern "C" void swfDispatchClipEvents(void* instance, int event, const char* name) {
+    // Callers supply a diagnostic event name, but retail never reads it.
+    (void)name;
+    auto* object = static_cast<uint8_t*>(instance);
+    uint32_t node = *reinterpret_cast<uint32_t*>(object + 0xC8);
+    while (node) {
+        auto* link = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(node));
+        const auto* record = reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(link[0]));
+        if (record[0] & static_cast<uint32_t>(event)) {
+            auto* actions = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(record[1]));
+            util_F7E8(actions + 2, instance, actions, 0, nullptr, 0);
+        }
+        // Scripts can change this link: reload it after executing the actions.
+        node = link[1];
+    }
+}
 
 // @ 0x823FA768
 extern "C" const char* util_A768_1(const void* value, void* buffer, int maxLen) {
@@ -748,7 +809,7 @@ bool swfSCRIPTOBJECT::GetMember(const char* name, void* result) {
     }
 
     // General case: search local SYMTAB
-    void* entry = swfSymtab_Lookup((char*)this + 4, interned);
+    void* entry = swfFindMember((char*)this + 4, interned);
     if (entry) {
         *(uint32_t*)result = *(uint32_t*)entry;
         *((uint32_t*)result + 1) = *((uint32_t*)entry + 1);
@@ -756,7 +817,7 @@ bool swfSCRIPTOBJECT::GetMember(const char* name, void* result) {
     }
 
     // Fallback: search global object table
-    entry = swfSymtab_Lookup(g_swfGlobalObject, interned);
+    entry = swfFindMember(g_swfGlobalObject, interned);
     if (entry) {
         *(uint32_t*)result = *(uint32_t*)entry;
         *((uint32_t*)result + 1) = *((uint32_t*)entry + 1);
@@ -765,7 +826,7 @@ bool swfSCRIPTOBJECT::GetMember(const char* name, void* result) {
 
     // Fallback: search global scope chain
     void* scopeSymtab = (char*)g_swfGlobalScope + 4;
-    entry = swfSymtab_Lookup(scopeSymtab, interned);
+    entry = swfFindMember(scopeSymtab, interned);
     if (entry) {
         *(uint32_t*)result = *(uint32_t*)entry;
         *((uint32_t*)result + 1) = *((uint32_t*)entry + 1);
@@ -974,7 +1035,7 @@ void swfFILE::AdvanceDefinitionFrame(swfINSTANCE* instance) {
 
     const bool playing = state[0xAA] != 0;
     if (playing) {
-        swfCMD_PlaceObject2ClipEvent_D3E8(instance, 2, lbl_82074EF0);
+        swfDispatchClipEvents(instance, 2, lbl_82074EF0);
     }
 
     auto* frames = *reinterpret_cast<uint8_t**>(file + 0x0C);
@@ -1209,7 +1270,24 @@ void swfCMD_PlaceObject2ClipEvent::Execute(swfINSTANCE* parent) {
     swfSetClipEvents(child, *reinterpret_cast<uint32_t*>(command + 0x20),
                      *reinterpret_cast<uint32_t*>(command + 0x28),
                      *reinterpret_cast<int32_t*>(command + 0x24));
-    swfCMD_PlaceObject2ClipEvent_D3E8(child, 1, lbl_82074EE4);
+    swfDispatchClipEvents(child, 1, lbl_82074EE4);
+}
+
+// Guest vtable slot 3 reapplies events without executing the placement command.
+// @ 0x824084B0
+void swfCMD_PlaceObject2ClipEvent::UpdateClipEvents(swfINSTANCE* parent) {
+    const auto* command = reinterpret_cast<const uint8_t*>(this);
+    const uint16_t depth = *reinterpret_cast<const uint16_t*>(command + 0x10);
+    auto* child = *reinterpret_cast<uint8_t**>(reinterpret_cast<uint8_t*>(parent) + 0xB4);
+    while (child && *reinterpret_cast<uint16_t*>(child + 0xA6) < depth) {
+        child = *reinterpret_cast<uint8_t**>(child + 0xB8);
+    }
+    if (!child || *reinterpret_cast<uint16_t*>(child + 0xA6) != depth) return;
+
+    swfSetClipEvents(child, *reinterpret_cast<const uint32_t*>(command + 0x20),
+                     *reinterpret_cast<const uint32_t*>(command + 0x28),
+                     *reinterpret_cast<const int32_t*>(command + 0x24));
+    swfDispatchClipEvents(child, 2, lbl_82074EF0);
 }
 
 /**
@@ -1701,7 +1779,6 @@ uint32_t swfINSTANCE::SetMember(const char* name, void* value) {
     extern void* g_swfScriptObjectPool;    // @ 0x82604C60
     extern void* g_vtable_swfSCRIPTOBJECT; // @ 0x82074D14
     extern float swfValueToFloat(const void* value); // @ 0x823FA688
-    extern int32_t swfValueToInt(const void* value); // @ 0x823FA5C8
     extern void swfReleaseText(void* text, int freeStorage); // @ 0x823F8A38
     extern void* swfCopyText(const char* text); // @ 0x823FABC0
     extern void* swfFindTexture(void* dictionary, const char* name); // @ 0x82151990
@@ -1741,13 +1818,13 @@ uint32_t swfINSTANCE::SetMember(const char* name, void* value) {
     if (strcmp(property, "_alpha") == 0) {
         // Xenon wraps the integer product before signed division by 100;
         // the byte store wraps again, without clamping to [0, 255].
-        uint32_t alpha = static_cast<uint32_t>(swfValueToInt(value));
+        uint32_t alpha = static_cast<uint32_t>(swfValueToInteger(value));
         int32_t scaled = static_cast<int32_t>((alpha << 8) - alpha);
         instance[0x4F] = static_cast<uint8_t>(scaled / 100);
         return 1;
     }
     if (strcmp(property, "textColor") == 0) {
-        uint32_t color = static_cast<uint32_t>(swfValueToInt(value));
+        uint32_t color = static_cast<uint32_t>(swfValueToInteger(value));
         instance[0x4C] = static_cast<uint8_t>(color >> 16);
         instance[0x4D] = static_cast<uint8_t>(color >> 8);
         instance[0x4E] = static_cast<uint8_t>(color);
@@ -1768,11 +1845,11 @@ uint32_t swfINSTANCE::SetMember(const char* name, void* value) {
         return 1;
     }
     if (strcmp(property, "__drawcallback") == 0) {
-        *reinterpret_cast<int32_t*>(instance + 0x98) = swfValueToInt(value);
+        *reinterpret_cast<int32_t*>(instance + 0x98) = swfValueToInteger(value);
         return 1;
     }
     if (strcmp(property, "_seamFix") == 0) {
-        instance[0x9C] = swfValueToInt(value) > 0;
+        instance[0x9C] = swfValueToInteger(value) > 0;
         return 1;
     }
     if (strcmp(property, "onEnterFrame") == 0) {
@@ -2047,8 +2124,7 @@ bool swfSCRIPTARRAY::GetMember(const char* name, void* result) {
 
 // Slot 11 converts the key to a signed index; it does not fall back to named members.
 uint32_t swfSCRIPTARRAY::SetMember(const char* name, void* value) {
-    extern int32_t swfValueToInt(const void* value); // @ 0x823FA5C8
-    int32_t index = swfValueToInt(name);
+    int32_t index = swfValueToInteger(name);
     char* array = reinterpret_cast<char*>(this);
     if (index >= *reinterpret_cast<uint16_t*>(array + 0x14)) return 0;
     // Retail only checks the upper bound. Callers must provide storage for the index.
@@ -2541,5 +2617,4 @@ const char* swfInternString(const char* a, void* b, int c) {
 void swfPopResult(void* a) { (void)a; }
 void swfSymtab_Delete(void* a, const char* b) { (void)a; (void)b; }
 void swfSymtab_Enumerate(void* a) { (void)a; }
-void* swfSymtab_Lookup(void* a, const char* b) { (void)a; (void)b; return nullptr; }
 } // extern "C"

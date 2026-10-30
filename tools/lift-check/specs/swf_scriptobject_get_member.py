@@ -11,7 +11,6 @@ FUNCTION = "rage::swfSCRIPTOBJECT::GetMember"
 ADDRESS = 0x823FBFC0
 SOURCE = "src/rage/swf.cpp"
 TRIALS = 600
-EXTERNS = {"swfSymtab_Lookup": 0x823FB3B8}
 
 
 def _lookup(ctx):
