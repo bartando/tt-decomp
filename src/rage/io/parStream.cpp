@@ -39,6 +39,8 @@ extern "C" int parStreamInXml_ReadArrayData(void* self, const char* name, uint32
 extern "C" void parStreamInXml_SkipUntilChar(void* self, const char* pattern);  // 9B38
 extern "C" bool parStreamInXml_ExpectChar(void* self, int ch, int pushBack);  // 9890
 
+uint32_t _ctrlfp(uint32_t desired, uint32_t mask); // @ 0x82436530
+
 // Forward declarations for CRT/kernel functions
 extern "C" {
 void KeBugCheck(uint32_t code);
@@ -1603,24 +1605,13 @@ double _fp_adjust_exponent(double value, int delta) {
 }
 
 /**
- * _fp_set_fpscr_bits @ 0x82436530 | size: 0x30
- *
- * Reads FPSCR, applies bitmask: new = (desired ^ 0xF8) & mask | (old & ~mask).
- * Returns old FPSCR XOR 0xF8.
- */
-uint32_t _fp_set_fpscr_bits(uint32_t desired, uint32_t mask) {
-    // FPSCR bit manipulation
-    return desired ^ 0xF8;
-}
-
-/**
  * _fp_init_fpscr @ 0x8243B278 | size: 0x30
  *
- * Initializes FPSCR by calling _fp_set_fpscr_bits(0, 0xFFF80700)
+ * Initializes FPSCR by calling _ctrlfp(0, 0xFFF80700)
  * then calling the FPSCR init helper.
  */
 void _fp_init_fpscr() {
-    _fp_set_fpscr_bits(0, 0xFFF80700);
+    _ctrlfp(0, 0xFFF80700);
     _fp_init_helper();
 }
 

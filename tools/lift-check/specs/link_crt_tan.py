@@ -15,7 +15,7 @@ FP_CONTRACT = "off"
 TRIALS = 2000
 _control = 0xF8
 CALLS = {
-    "_fp_set_fpscr_bits": stub(ret=lambda ctx: _control),
+    "_ctrlfp": stub(ret=lambda ctx: _control),
     "crt_fp_classify": run(),
     "crt_fp_adjust_exponent": run(),
     "crt_fp_round": run(),

@@ -40,6 +40,7 @@ add_definitions(-DTT_PLATFORM_PC=1)
 set(SOURCES
     # CRT layer
     src/crt/crt_init.c
+    src/crt/ctrlfp.cpp
     src/crt/entry.c
     src/crt/exit.c
     src/crt/heap.c
@@ -71,6 +72,7 @@ set(SOURCES
     src/rage/audio/aud_instance_update.cpp
     src/rage/audio/rage_audio.cpp
     src/rage/audio/xma_source.cpp
+    src/rage/audio/ld_xaudio_data.cpp
     src/rage/audio/xact_fade.cpp
     src/rage/audio/xact_sound.cpp
     src/rage/audio/xaudio_effect_buffer.cpp

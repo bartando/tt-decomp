@@ -59,10 +59,6 @@ extern "C" const float g_phJoint1Dof_errTol = 1.0e+08f;
 // @ 0x82005A58 (.rdata) — read with lhz
 extern "C" uint16_t g_phDefaultStatusId = 10;
 
-// @ 0x82006AF8 (.rdata) — [6][4][5] PPC code addresses (row 3 of each block
-// is null), indexed (mode * 4 + base) * 5 + state; null in the port
-extern "C" const uint32_t g_phStateTransitionTable[120] = {};
-
 // @ 0x82027660 (.rdata) — scope-open marker written before the resolve pass
 extern "C" const char* g_phResolveProfileTag = "{";
 
