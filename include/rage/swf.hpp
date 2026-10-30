@@ -119,6 +119,7 @@ public:
 class swfFILE : public swfBASE {
 public:
     virtual ~swfFILE();  // @ 0x823F8BE0 | size: 0xDC
+    virtual void AdvanceDefinitionFrame(swfINSTANCE* instance);
     virtual float FindExportFrame(float frameRate, const char* labelName, void* context);  // @ 0x823F9DC8 | size: 0xD4
 };
 
