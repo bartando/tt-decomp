@@ -562,7 +562,7 @@ extern "C" {
     // Collaborator functions already lifted / stubbed elsewhere.
     void     grmShaderInstance_Unbind(uint32_t self);      // @ 0x82159CF0
     void     rage_8C48(uint32_t descriptor, uint32_t data); // @ 0x82158C48
-    void     rage_9E70(uint32_t paramDesc);                 // @ 0x82159E70
+    void     grmShaderInstance_FilterAndUploadParameters(uint32_t instance); // @ 0x82159E70
     void     rage_5BF8(uint32_t effectObj);                 // @ 0x82445BF8
     void     rage_A1F8(uint32_t target, uint32_t registry); // @ 0x8215A1F8
     void     rage_F340(uint32_t self);                      // @ 0x820EF340
@@ -583,6 +583,33 @@ extern "C" {
     extern uint32_t g_grmShaderFx_flushRequired;    // @ 0x825EBB1C
     extern uint32_t g_grmShaderFx_forceResetFlag;   // @ 0x825EBAB4
     extern uint32_t g_grmShaderFx_frameCounter;     // @ 0x825C9010
+}
+
+// @ 0x82159E70
+void grmShaderInstance_FilterAndUploadParameters(uint32_t instance) {
+    auto* self = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(instance));
+    const auto aligned = [](uintptr_t address) {
+        return reinterpret_cast<uint32_t*>(address & ~uintptr_t(15));
+    };
+    // Each VMX iteration loads both vectors from each bank before writing either.
+    const auto filterGroup = [&](uintptr_t dirtyAddress, uintptr_t maskAddress) {
+        auto* dirty = aligned(dirtyAddress);
+        const auto* mask = aligned(maskAddress);
+        uint32_t result[8];
+        for (uint32_t lane = 0; lane < 8; ++lane)
+            result[lane] = dirty[lane] & mask[lane];
+        for (uint32_t lane = 0; lane < 8; ++lane)
+            dirty[lane] = result[lane];
+    };
+
+    for (uint32_t word = 0; word < *reinterpret_cast<uint32_t*>(self + 288); word += 4)
+        filterGroup(instance + word * 8, instance + 128 + word * 8);
+    for (uint32_t word = 0; word < *reinterpret_cast<uint32_t*>(self + 292); word += 4) {
+        const uint32_t dirty = *reinterpret_cast<uint32_t*>(self + 256);
+        const uint32_t mask = *reinterpret_cast<uint32_t*>(self + 260);
+        filterGroup(dirty + word * 8, mask + word * 8);
+    }
+    rage_6370(self);
 }
 
 // @ 0x82159CF0
@@ -775,7 +802,7 @@ void grmShaderFx::ClearActive() {
  *      g_grmShaderFx_boundContext; update if changed.
  *   5. If the upload either changed context or is targeting a different
  *      active instance than last time, publish the new instance into
- *      g_grmShaderFx_boundParam and run rage_9E70 (the descriptor-
+ *      g_grmShaderFx_boundParam and run grmShaderInstance_FilterAndUploadParameters (the descriptor-
  *      commit routine).
  * ═══════════════════════════════════════════════════════════════════════════ */
 void grmShaderFx::BindConstantSlot(int32_t varIndex) {
@@ -806,13 +833,13 @@ void grmShaderFx::BindConstantSlot(int32_t varIndex) {
 
     // Short-circuit: skip the commit if nothing changed AND the bound
     // instance already matches the live one.  Otherwise publish and
-    // commit through rage_9E70.
+    // commit through grmShaderInstance_FilterAndUploadParameters.
     const uint32_t liveInstance = g_grmShaderFx_activeInstance;
     if (!contextChanged && g_grmShaderFx_boundParam == liveInstance) {
         return;
     }
     g_grmShaderFx_boundParam = liveInstance;
-    rage_9E70(liveInstance);
+    grmShaderInstance_FilterAndUploadParameters(liveInstance);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
