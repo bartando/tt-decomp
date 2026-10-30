@@ -109,6 +109,7 @@ class Machine:
         uc = Uc(UC_ARCH_PPC, UC_MODE_PPC32 | UC_MODE_BIG_ENDIAN)
         uc.ctl_set_cpu_model(P.UC_CPU_PPC32_7400_V2_9)
         self.uc = uc
+        self.fixed_pages: set[int] = set()  # explicit Trial.map() device pages
         size = (len(image) + 0xFFFF) & ~0xFFFF
         uc.mem_map(IMAGE_BASE, size)
         uc.mem_write(IMAGE_BASE, image)

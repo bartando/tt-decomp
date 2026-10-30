@@ -43,6 +43,25 @@ class Trial:
         self._fake_next = FAKE_BASE + 0x100
         self.ignored: list[tuple[int, int]] = []
         self.stack_patches: dict[int, bytes] = {}
+        self.mapped: dict[int, bytearray] = {}
+
+    def map(self, addr: int, size: int, name: str = "mapped", fill="random") -> int:
+        """Map a fixed, page-aligned device region, reset identically on both sides.
+
+        This models stable MMIO contents, not asynchronous hardware transitions.
+        Writes are compared just like alloc() memory; unmapped accesses still fault.
+        """
+        if addr < 0 or addr + size > 0x100000000 or addr & 0xfff or size <= 0 or size & 0xfff:
+            raise ValueError("map() requires a page-aligned address and size")
+        if any(addr < base + len(data) and base < addr + size
+               for base, data in self.mapped.items()):
+            raise ValueError("overlapping map() regions")
+        data = self.rng.randbytes(size) if fill == "random" else bytes(size) if fill == "zero" else bytes(fill)
+        if len(data) != size:
+            raise ValueError("map() fill must match the region size")
+        self.mapped[addr] = bytearray(data)
+        self.regions.append((addr, size, name, None))
+        return addr
 
     # memory -----------------------------------------------------------------
     def alloc(self, size: int, name: str = "", fill: str | bytes = "random", align: int = 16,
@@ -88,6 +107,10 @@ class Trial:
     def put(self, addr: int, data: bytes):
         off = self._off(addr)
         if off is None:
+            for base, region in self.mapped.items():
+                if base <= addr and addr + len(data) <= base + len(region):
+                    region[addr - base:addr - base + len(data)] = data
+                    return
             if 0x82000000 <= addr < 0x82800000:
                 self.image_patches[addr] = bytes(data)
                 return
