@@ -259,12 +259,13 @@ struct pongScrnTransFreezeAndFadeOut {
 
 // ── pongShadowMap  [vtable @ 0x820346D0] ──────────────────────────
 // Confirmed methods: GenerateShadowMaps
+struct pongShadowConfig;
 struct pongShadowMap {
     void**      vtable;           // +0x00
 
     // ── header / config block (frequently accessed) @ +0x04..+0x48 ──
     uint32_t     m_flags;              // +0x04  R:3 W:3 — state/flags
-    uint32_t     m_state;              // +0x08  R:13 W:2 — hottest field (drives logic)
+    pongShadowConfig* m_config;        // +0x08  shadow slots and sampling scales
     uint32_t     m_counter;            // +0x0c  R:1 W:4
     uint32_t     m_activeLight;        // +0x10  R:1 W:0
     uint32_t     m_lightMask;          // +0x14  R:3 W:1
@@ -351,6 +352,10 @@ struct pongShadowMap {
 
     // ── non-virtual methods (from debug strings) ──
     void GenerateShadowMaps();
+    // Inferred name. pass 0 is the map pass; passes 1/2 select a player.
+    // Shader descriptor lengths must fit the initialized slot data. A player
+    // pass needs both texture handles when sampling offsets are consumed.
+    void applyShaderParameters(int32_t pass);  // @ 0x82147228
 };
 
 // ── pongSurface  [vtable @ 0x8204F70C] ──────────────────────────
