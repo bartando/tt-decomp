@@ -566,7 +566,7 @@ extern "C" {
     void     rage_5BF8(uint32_t effectObj);                 // @ 0x82445BF8
     void     rage_A1F8(uint32_t target, uint32_t registry); // @ 0x8215A1F8
     void     rage_F340(uint32_t self);                      // @ 0x820EF340
-    void     hudFlashBase_B138_g();                         // @ 0x8215B138
+    void     grcDevice_FlushRenderState();                 // @ 0x8215B138
     void     grmShaderFx_AF90_w(uint32_t effectSlot,
                                 uint32_t paramA,
                                 uint32_t paramB);           // @ 0x8215AF90
@@ -717,11 +717,10 @@ void grmShaderFx::Dispatch(uint32_t passIndex,
     const uint32_t variantIndex = grmShaderFx_resolveVariantIndex();
 
     // Post-publish render-state flush: either the flush latch is set
-    // or a global force-reset is pending.  hudFlashBase_B138_g runs
-    // the renderer's "drop all state" routine.
+    // or texture bindings are dirty. Publish the pending render state.
     if (g_grmShaderFx_flushRequired != 0 ||
         g_grmShaderFx_forceResetFlag != 0) {
-        hudFlashBase_B138_g();
+        grcDevice_FlushRenderState();
     }
 
     // Fast path: caller passed a direct entry — hand it straight to
