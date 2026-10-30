@@ -58,7 +58,8 @@ extern const float g_phSphereInertiaCoeff; // @ 0x825C9A40
 extern const float g_phSphereVolumeCoeff;  // @ 0x82079C30 — (4/3)*pi
 extern const float g_phTwo;  // @ 0x8202D10C: misnamed, the value is 0.5
 extern const float g_phTwoPi;   // @ lbl_8202C02C (6.283185...)
-extern const float g_phZeroFloat;
+extern const float g_phZeroFloat;  // @ 0x8202D110
+extern const float g_segmentTriangleMinArea;  // @ 0x82079C54
 extern const float g_springScale;    // @ 0x8207A0F4 (.rdata)
 
 /* --- Physics globals --- */
@@ -1526,6 +1527,56 @@ void rage::phBoundCapsule::ApplyTransform(const float* transform, const float* i
 // ═════════════════════════════════════════════════════════════════════════════
 // rage::phBoundGeometry — Collision Geometry Bound Functions
 // ═════════════════════════════════════════════════════════════════════════════
+
+// One-sided segment/triangle test. The direction is end - start; the triangle
+// normal and vertices are supplied separately. Outputs are written progressively,
+// even when a later test rejects the hit. Vectors are 16-byte aligned.
+// @ 0x8223DBC8
+int phSegmentTriangleIntersect(const float* start, const float* direction,
+                               const float* end, const float* normal,
+                               const float* a, const float* b, const float* c,
+                               float* startDistance, float* endDistance,
+                               float* fraction) {
+    const auto dot3 = [](const float* x, const float* y) {
+        return static_cast<float>(static_cast<double>(x[0]) * y[0]
+                                + static_cast<double>(x[1]) * y[1]
+                                + static_cast<double>(x[2]) * y[2]);
+    };
+    const auto cross3 = [](const float* x, const float* y, float* out) {
+        for (int i = 0; i < 3; ++i) {
+            const int j = (i + 1) % 3, k = (i + 2) % 3;
+            const float p = y[k] * x[j];
+            const float q = y[j] * x[k];
+            out[i] = -(q - p);
+        }
+    };
+    float fromA[3], endFromA[3];
+    for (int i = 0; i < 3; ++i) {
+        fromA[i] = start[i] - a[i];
+        endFromA[i] = end[i] - a[i];
+    }
+    *startDistance = dot3(fromA, normal);
+    if (*startDistance < g_phZeroFloat) return 2;
+    *endDistance = dot3(endFromA, normal);
+    if (*endDistance >= g_phZeroFloat) return 2;
+    *fraction = *startDistance / (*startDistance - *endDistance);
+    if (*fraction < g_phZeroFloat || *fraction > g_phClampMax) return 3;
+
+    float edgeB[3], edgeC[3], cross[3];
+    for (int i = 0; i < 3; ++i) {
+        edgeB[i] = b[i] - a[i];
+        edgeC[i] = c[i] - a[i];
+    }
+    cross3(direction, edgeC, cross);
+    const float area = dot3(edgeB, cross);
+    if (area < g_segmentTriangleMinArea) return 1;
+    const float u = dot3(fromA, cross);
+    if (u < g_phZeroFloat || u > area) return 4;
+    cross3(fromA, edgeB, cross);
+    const float v = dot3(direction, cross);
+    if (v < g_phZeroFloat || v + u > area) return 5;
+    return 0;
+}
 
 // Sphere contact against a triangle/quad: 0 = vertex, 1 = edge, 2 = face, 3 = miss.
 // Vectors are aligned vec4s; tests use xyz, but all output stores include w.

@@ -47,6 +47,18 @@ EXPECT = [
 ]
 
 MUTATIONS = [
+    ("ph_segment_triangle_intersect", "reject a start on the plane",
+     [("if (*startDistance < g_phZeroFloat) return 2;", "if (*startDistance <= g_phZeroFloat) return 2;")]),
+    ("ph_segment_triangle_intersect", "omit end-distance output",
+     [("*endDistance = dot3(endFromA, normal);", "/* omitted end distance */")]),
+    ("ph_segment_triangle_intersect", "invert fraction denominator",
+     [("*startDistance / (*startDistance - *endDistance)", "*startDistance / (*endDistance - *startDistance)")]),
+    ("ph_segment_triangle_intersect", "accept small or back-facing triangles",
+     [("if (area < g_segmentTriangleMinArea) return 1;", "if (false) return 1;")]),
+    ("ph_segment_triangle_intersect", "skip first barycentric rejection",
+     [("if (u < g_phZeroFloat || u > area) return 4;", "if (false) return 4;")]),
+    ("ph_segment_triangle_intersect", "skip second barycentric rejection",
+     [("if (v < g_phZeroFloat || v + u > area) return 5;", "if (false) return 5;")]),
     ("grc_device_flush_dirty_state", "lose upper bits of an outgoing uint64 argument",
      [("device, dirty(0x10), 0x4000,", "device, (uint32_t)dirty(0x10), 0x4000,")]),
     ("grc_device_flush_dirty_state", "change the integer following a uint64 argument",
