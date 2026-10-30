@@ -17,7 +17,7 @@
  *   Reset                     @ 0x8227D5B0 (size: 0x1B4) — world sync / initialize
  *   AddToRenderBucket         @ 0x8227D768 (size: 0x12C) — visibility test + enqueue
  *   RenderShadow              @ 0x8227D898 (size: 0xC8)  — shadow pass
- *   Cleanup                   @ 0x8227DA40 (size: 0x138) — transform propagation
+ *   UpdateDrawable            @ 0x8227DA40 (size: 0x138) — transform propagation
  *
  * Inheritance:
  *   phUpdateObject → phDemoObject → pongRenderable
@@ -81,7 +81,7 @@ extern void LocomotionStateAnim_3AD8_g(void* matrix,
  * phUpdateObject::ReleaseFrame(flags) — vtable slot 0
  * @ 0x8227DA08 | size: 0x30
  *
- * If m_pData is set, tail-calls slot 6 (Cleanup) on the current frame's
+ * If m_pData is set, tail-calls slot 6 (UpdateDrawable) on the current frame's
  * 64-byte slot of m_pFrameBuffer, passing the caller's flags (r4) on in r5.
  * Not a destructor.
  */
@@ -91,8 +91,8 @@ void phUpdateObject::ReleaseFrame(uint32_t flags)
         return;
 
     void* frameData = static_cast<uint8_t*>(m_pFrameBuffer) + g_phFrameIndex * 64;
-    typedef void (*CleanupFn)(phUpdateObject*, void*, uint32_t);
-    reinterpret_cast<CleanupFn>(vtable[6])(this, frameData, flags);
+    typedef void (*UpdateDrawableFn)(phUpdateObject*, void*, uint32_t);
+    reinterpret_cast<UpdateDrawableFn>(vtable[6])(this, frameData, flags);
 }
 
 /**
@@ -378,94 +378,33 @@ void phUpdateObject::RenderShadow(float shadowScale) {
     pongShadowMap_F010_g(g_phShadowState, m_pDrawable, localMatrix);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// phUpdateObject::Cleanup(void* frameData, uint32_t flags)
-// [vtable slot 6 @ 0x8227DA40]
-// Propagates the per-frame transform to the drawable object. Copies the
-// frame-indexed transform into a local buffer, optionally applies a
-// locomotion/skinning matrix transform, and dispatches to the drawable's
-// update function (vtable slot 5).
-// ─────────────────────────────────────────────────────────────────────────────
-/**
- * phUpdateObject::Cleanup @ 0x8227DA40 | size: 0x138
- *
- * Called from the destructor (~phUpdateObject) and during shutdown to
- * propagate the current frame transform to the drawable for final
- * rendering or cleanup.
- *
- * Two paths based on m_pCollider presence:
- *   1. Collider path: reads animated transform from the collider's
- *      frame state via dynamic stack allocation (alloca), copies
- *      the animation data, and updates the drawable.
- *   2. Direct path: copies 64-byte frameData to local buffer, checks
- *      g_animState for an active locomotion matrix, and if present,
- *      applies LocomotionStateAnim_3AD8_g to composite the animation.
- *
- * Both paths dispatch to m_pDrawable->vfn_5(transform, flags, visFlags, 0).
- */
-void phUpdateObject::Cleanup(void* frameData, uint32_t flags) {
-    if (!m_bActive)
+// phUpdateObject::UpdateDrawable @ 0x8227DA40 | size: 0x138
+// Publish either the collider's full pose or the frame matrix to drawable slot 5.
+// This is a per-frame update, not destruction/cleanup.
+void phUpdateObject::UpdateDrawable(void* frameData, uint32_t flags) {
+    if (!m_bActive || !m_pDrawable)
         return;
 
-    if (!m_pDrawable)
-        return;
-
+    typedef void (*UpdateFn)(void*, void*, uint32_t, uint32_t, int);
     if (m_pCollider) {
-        // ── Collider path: animated transform from articulated body ──────
-        uint8_t* colliderData = static_cast<uint8_t*>(m_pCollider);
-        void* stateInfo = *reinterpret_cast<void**>(colliderData + 4);
-        uint8_t* stateData = static_cast<uint8_t*>(stateInfo);
-
-        // Get the frame element size (used as stride for the copy)
-        uint16_t elemSize = *reinterpret_cast<uint16_t*>(stateData + 12);
-        uint32_t copySize = static_cast<uint32_t>(elemSize) * 64;
-
-        // Get source data pointer from the state's element array
-        void* arrayBase = *reinterpret_cast<void**>(stateData + 24);
-        uint16_t elemIndex = *reinterpret_cast<uint16_t*>(colliderData + 34);
-        uint32_t elemOffset = static_cast<uint32_t>(elemIndex) * 8;
-        void* elemData = *reinterpret_cast<void**>(
-            static_cast<uint8_t*>(arrayBase) + elemOffset);
-
-        // Copy animation frame data to stack-allocated buffer
-        uint8_t localBuffer[4096]; // Stack buffer (original uses alloca)
-        uint32_t actualSize = (copySize < sizeof(localBuffer))
-            ? copySize : sizeof(localBuffer);
-        __builtin_memcpy(localBuffer, elemData, actualSize);
-
-        // Update the drawable with the animated transform
-        // VCALL(m_pDrawable, 5): drawable->UpdateTransform(buffer, flags, visFlags, 0)
-        void** drawVtable = *reinterpret_cast<void***>(m_pDrawable);
-        typedef void (*UpdateFn)(void*, void*, uint32_t, uint32_t, int);
-        UpdateFn updateFn = reinterpret_cast<UpdateFn>(
-            *reinterpret_cast<void**>(
-                reinterpret_cast<uint8_t*>(drawVtable) + 20));
-        updateFn(m_pDrawable, localBuffer, flags, m_visFlags, 0);
-
+        uint8_t* collider = static_cast<uint8_t*>(m_pCollider);
+        uint8_t* state = *reinterpret_cast<uint8_t**>(collider + 4);
+        uint32_t size = static_cast<uint32_t>(*reinterpret_cast<uint16_t*>(state + 12)) * 64;
+        uint8_t* poses = *reinterpret_cast<uint8_t**>(collider + 24);
+        uint16_t index = *reinterpret_cast<uint16_t*>(collider + 34);
+        void* pose = *reinterpret_cast<void**>(poses + static_cast<uint32_t>(index) * 8);
+        void* buffer = __builtin_alloca(size);
+        __builtin_memcpy(buffer, pose, size);
+        reinterpret_cast<UpdateFn>((*static_cast<void***>(m_pDrawable))[5])(
+            m_pDrawable, buffer, flags, m_visFlags, 0);
     } else {
-        // ── Direct path: copy frameData and optionally apply locomotion ──
-        // Copy 64-byte transform from frameData to local buffer
-        float localMatrix[16]; // 64 bytes
-        __builtin_memcpy(localMatrix, frameData, 64);
-
-        // Check if a locomotion/skinning matrix override is active
-        if (g_animState) {
-            uint8_t* animData = static_cast<uint8_t*>(g_animState);
-            uint8_t animActive = *reinterpret_cast<uint8_t*>(animData + 24);
-            if (animActive) {
-                // Apply the locomotion matrix transform (4×3 → 4×4 composite)
-                LocomotionStateAnim_3AD8_g(localMatrix, animData + 32);
-            }
-        }
-
-        // Update the drawable with the final transform
-        // VCALL(m_pDrawable, 5): drawable->UpdateTransform(buffer, flags, visFlags, 0)
-        void** drawVtable = *reinterpret_cast<void***>(m_pDrawable);
-        typedef void (*UpdateFn)(void*, void*, uint32_t, uint32_t, int);
-        UpdateFn updateFn = reinterpret_cast<UpdateFn>(
-            *reinterpret_cast<void**>(
-                reinterpret_cast<uint8_t*>(drawVtable) + 20));
-        updateFn(m_pDrawable, localMatrix, flags, m_visFlags, 0);
+        alignas(16) float matrix[16];
+        __builtin_memcpy(matrix, frameData, sizeof(matrix));
+        uint8_t* animation = static_cast<uint8_t*>(g_animState);
+        if (animation[24])
+            LocomotionStateAnim_3AD8_g(matrix, animation + 32);
+        reinterpret_cast<UpdateFn>((*static_cast<void***>(m_pDrawable))[5])(
+            m_pDrawable, matrix, flags, m_visFlags, 0);
     }
 }
 
