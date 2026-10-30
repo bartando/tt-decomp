@@ -15,6 +15,7 @@ def main():
     source = (root / "src/graphics/fx_effects.cpp").read_text()
     source = source.replace('"fx_effects.hpp"', '"graphics/fx_effects.hpp"')
     source = source.replace('"../rage/memory.hpp"', '"rage/memory.hpp"')
+    source = source.replace('"../anim/locomotion.hpp"', '"anim/locomotion.hpp"')
     include = '#include "../../../src/graphics/fx_effects.cpp"'
     spec = Path(__file__).with_name("fx_spin_trail.py")
     mutations = [
