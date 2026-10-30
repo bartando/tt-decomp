@@ -490,6 +490,42 @@ extern "C" void grcDevice_SetViewport(void* device, const void* viewport) {
     *reinterpret_cast<uint64_t*>(state + 0x28) |= UINT64_C(0x0001F80000000000);
 }
 
+// Copy vertex shader float constants (one 16-byte register each) and mark
+// every touched group of four registers dirty for the next device flush.
+// @ 0x82356928
+extern "C" void grcDevice_SetVertexShaderConstantF(void* device, uint32_t first, const void* constants,
+                                                    uint32_t count) {
+    auto* state = static_cast<uint8_t*>(device);
+    const auto* src = static_cast<const uint8_t*>(constants);
+    const uint32_t originalCount = count;
+    uintptr_t address = reinterpret_cast<uintptr_t>(state) + ((first + 120u) << 4);
+    auto* dst = reinterpret_cast<uint8_t*>(address & ~uintptr_t(15));
+
+    // The four-register loop loads all four vectors before storing any of them.
+    while (count >= 4) {
+        uint8_t values[64];
+        for (uint32_t i = 0; i < 64; ++i) values[i] = src[i];
+        for (uint32_t i = 0; i < 64; ++i) dst[i] = values[i];
+        src += 64;
+        dst += 64;
+        count -= 4;
+    }
+    for (uint32_t n = 0; n < count; ++n) {
+        uint8_t value[16];
+        for (uint32_t i = 0; i < 16; ++i) value[i] = src[i];
+        for (uint32_t i = 0; i < 16; ++i) dst[i] = value[i];
+        src += 16;
+        dst += 16;
+    }
+
+    const uint32_t firstGroup = first >> 2;
+    const uint32_t lastGroup = (first + originalCount - 1u) >> 2;
+    const uint32_t span = (lastGroup - firstGroup) & 127u;
+    const uint64_t mask = UINT64_C(0x8000000000000000);
+    const uint64_t range = span >= 63 ? UINT64_MAX : static_cast<uint64_t>(static_cast<int64_t>(mask) >> span);
+    *reinterpret_cast<uint64_t*>(state + 0x10) |= (firstGroup & 127u) < 64 ? range >> (firstGroup & 127u) : 0;
+}
+
 // Bind `buffer` to vertex stream `stream` at `offset` with `stride` bytes per
 // vertex. Same reference swap as grcDevice_SetTexture; a non-null bind also
 // marks the vertex fetch constants dirty.
