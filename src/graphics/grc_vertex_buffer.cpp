@@ -10,7 +10,8 @@ namespace {
 struct PgVertexBuffer {
     uint8_t pad00[0x08];
     uint32_t formatAddress;             // +0x08: first word is the attribute flags
-    uint8_t pad0C[0x10];
+    uint8_t pad0C[0x0C];
+    uint32_t stagingAddress;            // +0x18: one vertex's data, no stride (pg_6B20_g)
     uint32_t dataAddress;               // +0x1C: CPU mapping, refreshed by pg_7578_g
     uint8_t pad20[0x03];
     uint8_t normalOffset;               // +0x23
@@ -28,6 +29,7 @@ struct PgVertexBuffer {
     uint8_t mapped;                     // +0xDB
 };
 
+static_assert(offsetof(PgVertexBuffer, stagingAddress) == 0x18);
 static_assert(offsetof(PgVertexBuffer, normalOffset) == 0x23);
 static_assert(offsetof(PgVertexBuffer, tangentOffset) == 0x2E);
 static_assert(offsetof(PgVertexBuffer, normalSize) == 0x68);
@@ -166,5 +168,28 @@ extern "C" void pg_6A40_w(void* vertexBuffer, uint32_t index, const float* norma
         std::memcpy(destination, &packed, sizeof(packed));
     } else {
         std::memcpy(destination, normal, buffer->normalSize);
+    }
+}
+
+// Same tangent formats as pg_6C00_w, minus the handedness path, written to the
+// staging vertex: the original stores the index argument but never reads it.
+// @ 0x82156B20
+extern "C" void pg_6B20_g(void* vertexBuffer, uint32_t /*index*/, const float* tangent) {
+    auto* buffer = static_cast<PgVertexBuffer*>(vertexBuffer);
+    auto* format = reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(buffer->formatAddress));
+    if ((*format & 0x4000) == 0) {
+        return;
+    }
+    if (buffer->mapped == 0) {
+        pg_7578_g(buffer);
+    }
+
+    auto* destination = reinterpret_cast<uint8_t*>(
+        static_cast<uintptr_t>(buffer->stagingAddress + buffer->tangentOffset));
+    if (buffer->packedTangent != 0) {
+        const uint32_t packed = packNormPacked32(align16(tangent));
+        std::memcpy(destination, &packed, sizeof(packed));
+    } else {
+        std::memcpy(destination, tangent, buffer->tangentSize);
     }
 }
