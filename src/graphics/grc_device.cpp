@@ -9,6 +9,7 @@
  *   - grcDevice_setSamplerMagFilter @ 0x823555A8 — Xenos texture fetch state
  *   - grcDevice_setSamplerMaxAnisotropy @ 0x82355828 — Xenos texture fetch state
  *   - grcDevice_setSamplerLodBias       @ 0x82355948 — Xenos texture fetch state
+ *   - grcDevice_SetStreamSource     @ 0x82356118 — bind a vertex buffer to a stream
  *   - grcDevice_SetTexture          @ 0x82359940 — bind a texture to a fetch slot
  *   - grcDevice_ReserveCommandSpace @ 0x82359E80 — carve space out of the command ring
  *
@@ -304,6 +305,34 @@ void grcDevice_setSamplerLodBias(void* device, uint32_t sampler, uint32_t biasBi
 }
 
 extern "C" void grcTexture_ReleaseResource(void* texture); // @ 0x82352708
+
+// Bind `buffer` to vertex stream `stream` at `offset` with `stride` bytes per
+// vertex. Same reference swap as grcDevice_SetTexture; a non-null bind also
+// marks the vertex fetch constants dirty.
+// @ 0x82356118
+extern "C" void grcDevice_SetStreamSource(void* device, uint32_t stream, void* buffer,
+                                          uint32_t offset, uint32_t stride) {
+    uint8_t* state = static_cast<uint8_t*>(device);
+    constexpr uint32_t kReference = 0x80000;
+    if (buffer != nullptr) {
+        static_cast<uint32_t*>(buffer)[0] += kReference;
+        *reinterpret_cast<uint64_t*>(state + 0x30) |= 0x400;
+    }
+
+    uint32_t* binding = reinterpret_cast<uint32_t*>(state + 0x310C + stream * 8u);
+    auto* previous = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(binding[1]));
+    if (previous != nullptr) {
+        const uint32_t references = previous[0] - kReference;
+        previous[1] = *reinterpret_cast<uint32_t*>(state + 10396);
+        previous[0] = references;
+        if ((references & 0x00F800FFu) == 0) {
+            grcTexture_ReleaseResource(previous);
+        }
+    }
+    binding[1] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(buffer));
+    binding[0] = offset;
+    state[0x3190 + stream] = static_cast<uint8_t>(stride >> 2);
+}
 
 // Bind `texture` (its header holds a fetch constant at +0x10..+0x24) to fetch
 // slot `slot`: copy it into the device's fetch constant, keeping the device's
