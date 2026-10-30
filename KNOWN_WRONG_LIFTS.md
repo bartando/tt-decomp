@@ -64,6 +64,16 @@ unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, a
 
 ## Wrong lifts
 
+- `swfINSTANCE::SetMember` (0x823FC1A8, `src/rage/swf.cpp`) and the shared
+  `SetMember` virtual interface return `void`, while the original returns r3:
+  1 for builtins or a successful definition setter, the script setter's result
+  otherwise. Fix the base and all overrides' return types together. Original
+  SWF slot-11 callers do read the result: 0x823F9598 (`SinglesNetworkClient_94B8_g`)
+  saves r3 with `mr r29,r3` at 0x823F959C, and 0x823F9794
+  (`SinglesNetworkClient_96D0_g`) saves it with `mr r30,r3` at 0x823F9798; both
+  return that saved status. These are indirect array-member assignments, not
+  proven calls to the concrete instance override. The instance's lift-check spec
+  explicitly excludes the return register until the shared interface is fixed.
 - `s_bucketData[32]` (`src/game/pong_render.cpp`) is a TU-local placeholder passed to
   the reconstructed bucket `Load`, with no image object behind it. The original
   `pongDrawBucketManager_Load` uses stack XML scratch and inline bucket setup; trace the
