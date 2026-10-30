@@ -5464,70 +5464,28 @@ extern "C" void pongPlayer_7358_g(pongPlayer* dst, const pongPlayer* src) {
 }
 
 
-// ---------------------------------------------------------------------------
-// pongPlayer_8B90_fw  @ 0x820D8B90 | size: 0x174 (372 bytes)
-//
-// Network-smoothed transform update.  Takes two vec3 outputs (position @ r5,
-// velocity @ r6), a source transform block at r4 (which lays out three
-// 3-vectors at +0/+16/+32 plus a translation at +48 — i.e. a 3×4 matrix-like
-// layout), and the player at r3.  After zero-initialising the output vecs,
-// it calls pongMatchSettings_GetCourtBounds (court bounds) with the player's context
-// pointer at +400, then folds the poll result into the vectors via an
-// affine transform of the form:
-//
-//   out_pos = src_col0 * pos_x  +  src_col1 * pos_y  +  src_col2 * pos_z
-//           + src_translation
-//   out_vel = src_col0 * vel_x  +  src_col1 * vel_y  +  src_col2 * vel_z
-//           + src_translation_vel
-//
-// After writing, it validates the X and Z components: if out_pos.x > out_vel.x
-// OR out_pos.z > out_vel.z, the two 16-byte vectors are swapped.  This
-// enforces an axis-aligned min/max invariant on the extracted AABB.
-// ---------------------------------------------------------------------------
+// Transform both court corners, then swap the complete vectors if X or Z
+// is reversed. The scalar multiply/fmadd order is observable after rounding.
+// @ 0x820D8B90 | size: 0x174
 extern "C" void pongPlayer_8B90_fw(pongPlayer* self, void* srcTransform,
-                                    vec3* outPos, vec3* outVel) {
-    uint8_t* base = reinterpret_cast<uint8_t*>(self);
-    uint8_t* src  = static_cast<uint8_t*>(srcTransform);
+                                  vec3* outPos, vec3* outVel) {
+    auto* base = reinterpret_cast<uint8_t*>(self);
+    const auto* m = static_cast<const float*>(srcTransform);
+    *outPos = {};
+    *outVel = {};
+    const int sideIndex = *reinterpret_cast<int32_t*>(base + 0x190);
+    pongMatchSettings_GetCourtBounds(g_pInputArrayTable, sideIndex, outPos, outVel);
 
-    // Zero both outputs first (matches the vxor prologue).
-    outPos->x = outPos->y = outPos->z = outPos->_pad = 0.0f;
-    outVel->x = outVel->y = outVel->z = outVel->_pad = 0.0f;
+    float x = outPos->x, y = outPos->y, z = outPos->z;
+    outPos->x = __builtin_fmaf(m[0], x, __builtin_fmaf(z, m[8], y * m[4])) + m[12];
+    outPos->y = __builtin_fmaf(m[9], z, __builtin_fmaf(m[1], x, m[5] * y)) + m[13];
+    outPos->z = __builtin_fmaf(z, m[10], __builtin_fmaf(x, m[2], y * m[6])) + m[14];
 
-    // Poll input for this player's context pointer at +400.
-    void* inputCtx = *reinterpret_cast<void**>(base + 400);
-    pongMatchSettings_GetCourtBounds(reinterpret_cast<void*>(&g_inputScoreByPlayer[0]),
-                      0, inputCtx, nullptr);
-
-    // Floats now populated in outPos (components at +0/+4/+8) and outVel.
-    float px = outPos->x, py = outPos->y, pz = outPos->z;
-    float vx = outVel->x, vy = outVel->y, vz = outVel->z;
-
-    // Rows of the source transform matrix (column-major 3×4).
-    float m0x = *reinterpret_cast<float*>(src +  0);
-    float m0y = *reinterpret_cast<float*>(src +  4);
-    float m0z = *reinterpret_cast<float*>(src +  8);
-    float m1x = *reinterpret_cast<float*>(src + 16);
-    float m1y = *reinterpret_cast<float*>(src + 20);
-    float m1z = *reinterpret_cast<float*>(src + 24);
-    float m2x = *reinterpret_cast<float*>(src + 32);
-    float m2y = *reinterpret_cast<float*>(src + 36);
-    float m2z = *reinterpret_cast<float*>(src + 40);
-    float tx  = *reinterpret_cast<float*>(src + 48);
-    float ty  = *reinterpret_cast<float*>(src + 52);
-    float tz  = *reinterpret_cast<float*>(src + 56);
-
-    // Affine transform of (px,py,pz) by the 3×4 matrix.
-    outPos->x = m0x * px + m1x * py + m2x * pz + tx;
-    outPos->y = m0y * px + m1y * py + m2y * pz + ty;
-    outPos->z = m0z * px + m1z * py + m2z * pz + tz;
-
-    // Same for (vx,vy,vz).
-    outVel->x = m0x * vx + m1x * vy + m2x * vz + tx;
-    outVel->y = m0y * vx + m1y * vy + m2y * vz + ty;
-    outVel->z = m0z * vx + m1z * vy + m2z * vz + tz;
-
-    // Enforce min/max ordering on X and Z.  If pos > vel on either axis,
-    // swap the 16-byte vectors so caller's "min" and "max" semantics hold.
+    // Reload the second corner after storing the first (outputs may alias).
+    x = outVel->x; y = outVel->y; z = outVel->z;
+    outVel->x = __builtin_fmaf(m[0], x, __builtin_fmaf(z, m[8], y * m[4])) + m[12];
+    outVel->y = __builtin_fmaf(m[9], z, __builtin_fmaf(m[1], x, m[5] * y)) + m[13];
+    outVel->z = __builtin_fmaf(z, m[10], __builtin_fmaf(x, m[2], y * m[6])) + m[14];
     if (outPos->x > outVel->x || outPos->z > outVel->z) {
         vec3 tmp = *outPos;
         *outPos = *outVel;
