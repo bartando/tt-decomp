@@ -50,6 +50,9 @@ float flushVmx(float value) {
 // @ 0x82340900 | size: 0x4B8 | formerly pongCreatureInst_0900
 // Called from cloth simulation at 0x82341600 and 0x82341A50, after the sibling
 // positional/attachment pass at 0x82340DB8. This is an inferred descriptive name.
+// Original w uses uninitialized stack scratch; preserve input w here and compare
+// xyz only. Open boundary: 0x823D8910 -> grc_69C0 copies vb+0x5C positionSize bytes;
+// cloth vertex formats and shader handling of a copied fourth lane are unverified.
 void clothSolveDistanceConstraints(int32_t count, LvlTableVector* positions,
                                    const ClothDistanceConstraint* constraints, float relaxation) {
     if (count <= 0)
