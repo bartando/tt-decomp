@@ -83,6 +83,8 @@ all fail (about 40 s).
   `t.sym("g_x")`; `t.w32(t.sym("g_x"), v)` patches a global in the image for this trial;
   `t.ignore(addr, size)` leaves bytes out of this trial's memory comparison;
   `t.w32(t.sp + 0x54, v)` writes the caller's frame (stack arguments) over the random fill.
+  `t.args(v1=[x, y, z, w])` sets a vector register's four float32 lanes in memory
+  order (v0..v127), for internal functions whose inputs use VMX registers.
   Unset registers are random; `r1` is a fresh stack, `r13` a zeroed block.
 - `CALLS`, keyed by symbol name, address or fake-function name:
   - `stub(ret=None|int|float|"void"|fn(ctx), out={"r4": size}, args=("r3", "f1"),
@@ -190,6 +192,15 @@ all fail (about 40 s).
   `vmaddfp128 v10, v0, v8, v3`); lift-check names VMX128 words itself in its reports.
 
 ## Findings so far
+
+- `lvl_table_7008` checks `lvlTable_7008_2h` (0x82337008), including mode truncation,
+  aligned-down position loads/stores, transform indexing, all four output lanes,
+  zero tangent and the strict correction threshold. Its explicit C++ vector references
+  receive the same values as the original's v1/v2/v3 via r6/r7/r8; no original code is
+  patched. Run `tools/lift-check/lift-check lvl_table_7008` (2,000 trials by default).
+  VMX reciprocal estimates are modelled as true reciprocals by the emulator; this
+  spec's `FTOL = 1e-6` does not establish bit-exact Xenon estimate behaviour or
+  NaN sign/payload equivalence. The fourth output lane compares bit-for-bit.
 
 - `pongPlayer_TossServeBall` (0x821934A0) fails: the lift computes the impulse's w lane
   as `(hit.w - pos.w) / t * mass`, but the asm's reciprocal comes from the `(1, 1, 1, 0)`
