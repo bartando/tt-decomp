@@ -98,6 +98,7 @@ void* g_swfContextStack[32] = {};       // @ 0x82604C68
 alignas(16) uint8_t g_swfStringBuffer[1024] = {};  // @ 0x82604850
 void* g_vtable_swfSCRIPTOBJECT[17] = {};          // @ 0x82074D14
 uint32_t g_swfCallDepth = 0;                     // @ 0x82604D1C
+uint32_t g_swfValueStack[192] = {};              // @ 0x82715C98 (768 bytes)
 float g_swfFrameScale = 0.0009765625f;           // @ 0x82079B90
 }
 TT_DATA_ALIAS("g_ambientStreamFlags", "g_grmShaderFx_flushRequired");  // @ 0x825EBB1C

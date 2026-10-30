@@ -139,6 +139,9 @@ extern void* g_swfScriptArrayPool;   // @ SDA offset 19552
 
 namespace rage {
 
+extern uint32_t g_swfCallDepth;       // @ 0x82604D1C
+extern uint32_t g_swfValueStack[192]; // @ 0x82715C98 — 96 {payload, tag} pairs
+
 struct swfAtlasGlyph {
     float u, v, width, height;  // Atlas texels.
     float left, top, right, bottom; // Glyph bounds relative to the text pen.
@@ -702,7 +705,7 @@ int swfSCRIPTOBJECT::VisitMembers() {
  * @param result Output: {value, type} pair written on success
  * @return       true if found, false otherwise
  */
-bool swfSCRIPTOBJECT::GetMember(const char* name, void* result) {
+uint32_t swfSCRIPTOBJECT::GetMember(const char* name, void* result) {
     extern void* g_swfStringBuffer;       // @ 0x82604850
     extern void* g_swfGlobalObject;       // @ 0x82602818
     extern void* g_swfGlobalScope;        // @ 0x8260282C
@@ -828,11 +831,7 @@ void swfSCRIPTOBJECT::Invoke(const char* methodName, void* args, int argCount, v
     swfValuePair lookupResult = { 0, 7 };
     auto* resultValue = static_cast<swfValuePair*>(outResult);
 
-    // The host class hierarchy does not reproduce the retail vtable layout.
-    // Keep the full return word: retail tests only its low byte.
-    using LookupFn = uint32_t (*)(void*, const swfValuePair*, swfValuePair*);
-    void** vtable = *reinterpret_cast<void***>(this);
-    uint32_t found = reinterpret_cast<LookupFn>(vtable[10])(this, &lookupKey, &lookupResult);
+    uint32_t found = this->GetMember(reinterpret_cast<const char*>(&lookupKey), &lookupResult);
     if (uint8_t(found) == 0) {
         rage_DebugLog("Unsupported script method: %s", methodName);
         *resultValue = {0, 3};
@@ -845,12 +844,9 @@ void swfSCRIPTOBJECT::Invoke(const char* methodName, void* args, int argCount, v
         auto fn = reinterpret_cast<NativeFunc>(static_cast<uintptr_t>(lookupResult.data));
         fn(this, args, argCount, outResult);
     } else if (lookupResult.type == 5) {
-        void* callableObj = reinterpret_cast<void*>(static_cast<uintptr_t>(lookupResult.data));
-        using ExecuteFn = void (*)(void*, void*, int, void*, int);
-        void** callableVtable = *static_cast<void***>(callableObj);
-        extern uint32_t g_swfCallDepth;  // @ 0x82604D1C
+        auto* callableObj = reinterpret_cast<swfACTIONFUNC*>(static_cast<uintptr_t>(lookupResult.data));
         uint32_t prevDepth = g_swfCallDepth;
-        reinterpret_cast<ExecuteFn>(callableVtable[14])(callableObj, args, argCount, this, 0);
+        callableObj->Execute(args, argCount, this, 0);
         if (static_cast<int32_t>(g_swfCallDepth) > static_cast<int32_t>(prevDepth)) {
             swfValuePair popped;
             *resultValue = *static_cast<swfValuePair*>(swfPopResult(&popped));
@@ -1563,7 +1559,7 @@ void swfACTIONFUNC::DeleteMember(const char* name) {
 // swfINSTANCE slot 10 @ 0x823FB970: display properties and script fallback.
 // The shared declaration calls r4 a const char*, but the game passes an SWF
 // {value, type} key. Convert it before comparing or forwarding the property name.
-bool swfINSTANCE::GetMember(const char* name, void* result) {
+uint32_t swfINSTANCE::GetMember(const char* name, void* result) {
     extern void* g_swfStringBuffer;        // @ 0x82604850
     extern void* g_swfRootObject;          // @ 0x82602828
     extern void* g_swfGlobalScope;         // @ 0x8260282C
@@ -1936,7 +1932,7 @@ void swfACTIONFUNC::Invoke(const char* methodName, void* args, int argCount, voi
 // then delegates to inner object's GetMember (vtable slot 10).
 // Local entries store 8-byte {value, type} pairs in m_pLocalValues (+7328).
 // ─────────────────────────────────────────────────────────────────────────────
-bool swfACTIONFUNC::GetMember(const char* name, void* result) {
+uint32_t swfACTIONFUNC::GetMember(const char* name, void* result) {
     // Intern the name string
     char internBuffer[SWF_INTERN_BUFFER_SIZE];
     extern const char* swfInternString(const char* name, void* buffer, int maxLen);
@@ -2007,7 +2003,7 @@ swfSCRIPTARRAY::~swfSCRIPTARRAY() {
 
 
 // @ 0x823FEB48
-bool swfSCRIPTARRAY::GetMember(const char* name, void* result) {
+uint32_t swfSCRIPTARRAY::GetMember(const char* name, void* result) {
     // Like the other GetMember overrides, name points at an 8-byte VM value,
     // despite the historical const char* declaration. String keys are never
     // parsed as array indices; only "length" is handled here.
@@ -2530,9 +2526,10 @@ const char* swfInternString(const char* a, void* b, int c) {
 }
 // @ 0x82403270
 void* swfPopResult(void* dst) {
-    // Same guest stack used by util_F7E8. Empty pops produce integer zero.
-    auto& depth = *reinterpret_cast<uint32_t*>(0x82604D1C);
-    auto* stack = reinterpret_cast<uint32_t*>(0x82715C98);
+    // Native storage is mapped to the retail addresses only by lift-check.
+    // Empty pops produce integer zero.
+    auto& depth = rage::g_swfCallDepth;
+    auto* stack = rage::g_swfValueStack;
     if (depth == 0) {
         rage_DebugLog("Warning: Attempting to pop object from the stack but nothing is on the stack");
         stack[0] = 0;

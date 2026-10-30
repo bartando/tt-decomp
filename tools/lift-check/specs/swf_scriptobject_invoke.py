@@ -15,7 +15,9 @@ ADDRESS = 0x823FEA28
 SOURCE = "src/rage/swf.cpp"
 TRIALS = 1600
 RET = None
-EXTERNS = {"rage_DebugLog": 0x8240E6D0, "swfPopResult": 0x82403270}
+EXTERNS = {"rage_DebugLog": 0x8240E6D0, "swfPopResult": 0x82403270,
+           "rage::g_swfCallDepth": 0x82604D1C,
+           "rage::g_swfValueStack": 0x82715C98}
 DEPTH = 0x82604D1C
 STACK = 0x82715C98
 

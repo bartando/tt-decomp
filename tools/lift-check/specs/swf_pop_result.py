@@ -11,7 +11,9 @@ ADDRESS = 0x82403270
 SOURCE = "src/rage/swf.cpp"
 TRIALS = 1000
 RET = "r3"
-EXTERNS = {"rage_DebugLog": 0x8240E6D0}
+EXTERNS = {"rage_DebugLog": 0x8240E6D0,
+           "rage::g_swfCallDepth": 0x82604D1C,
+           "rage::g_swfValueStack": 0x82715C98}
 CALLS = {0x8240E6D0: stub(ret="void", args=("r3",))}
 
 
