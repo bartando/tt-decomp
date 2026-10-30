@@ -79,6 +79,28 @@ struct XactSoundRuntime {
     uint8_t* parameters;
 };
 
+// Shared base of the memory-wave (0x8245B570) and streaming-wave
+// (0x8245C078) constructors, both of which call 0x8244A970.
+struct XactWaveRuntime {
+    XactLink link;
+    void** ownerVtable;
+    uint32_t unknown10;
+    void* engine;
+    uint8_t flags;
+    uint8_t unknown19[3];
+    void* bank;
+    int32_t state;
+    void* voice;
+    void* instance;
+    uint16_t index;
+    uint16_t unknown2e;
+    uint32_t stopRequested;
+    uint32_t updateRequested;
+    uint8_t unknown38[4];
+    void* retainedObject;
+    uint32_t unknown40;
+};
+
 static_assert(sizeof(void*) != 4 || offsetof(XactTrack, voice) == 0x18);
 static_assert(sizeof(void*) != 4 || offsetof(XactEvent, time) == 0x14);
 static_assert(sizeof(void*) != 4 || offsetof(XactEvent, state) == 0x24);
@@ -91,6 +113,13 @@ static_assert(sizeof(void*) != 4 || offsetof(XactSoundRuntime, pending) == 0x38)
 static_assert(sizeof(void*) != 4 || offsetof(XactSoundRuntime, active) == 0x44);
 static_assert(sizeof(void*) != 4 || offsetof(XactSoundRuntime, state) == 0x50);
 static_assert(sizeof(void*) != 4 || offsetof(XactSoundRuntime, parameters) == 0x60);
+static_assert(sizeof(void*) != 4 || offsetof(XactWaveRuntime, flags) == 0x18);
+static_assert(sizeof(void*) != 4 || offsetof(XactWaveRuntime, state) == 0x20);
+static_assert(sizeof(void*) != 4 || offsetof(XactWaveRuntime, voice) == 0x24);
+static_assert(sizeof(void*) != 4 || offsetof(XactWaveRuntime, instance) == 0x28);
+static_assert(sizeof(void*) != 4 || offsetof(XactWaveRuntime, stopRequested) == 0x30);
+static_assert(sizeof(void*) != 4 || offsetof(XactWaveRuntime, updateRequested) == 0x34);
+static_assert(sizeof(void*) != 4 || offsetof(XactWaveRuntime, retainedObject) == 0x3c);
 
 void unlinkEvent(XactLink* node) {
     node->next->previous = node->previous;
@@ -125,6 +154,9 @@ extern void atSingleton_27C0(void*); // @ 0x824527C0
 extern int32_t game_2880_h(void*); // @ 0x82452880
 extern void atSingleton_28A8_g_28A8_1(void*); // @ 0x824528A8
 extern void msgMsgSink_8B90_g(void*, uint16_t); // @ 0x82448B90
+extern void atSingleton_A6C8(void*, uint32_t); // @ 0x8244A6C8
+extern void msgMsgSink_A670_2hr(void*); // @ 0x8244A670
+extern void atSingleton_2378_g(void*); // @ 0x82452378
 
 void xactSound_Update(void* sound) { // @ 0x82455148
     auto self = static_cast<XactSoundRuntime*>(sound);
@@ -237,4 +269,63 @@ void xactSound_Update(void* sound) { // @ 0x82455148
         }
         link = next;
     }
+}
+
+// xactWave_Update @ 0x8244AAE8 | 496 bytes (was atSingleton_AAE8).
+// Role name inferred from the two wave constructors above and the bank's
+// live-wave traversal at 0x82456030; no original SDK symbol was recovered.
+void xactWave_Update(void* wave) {
+    auto self = static_cast<XactWaveRuntime*>(wave);
+    if (self->flags & 0x14) return;
+
+    auto stop = [self]() {
+        if (self->state >= 3 && self->state < 5) {
+            self->state = 5;
+            atSingleton_A6C8(self, 13);
+        }
+        // Notification callbacks may change state; the original overwrites it.
+        self->state = 5;
+    };
+
+    // InterlockedCompareExchange(request, 0, 1): consume only the value 1,
+    // but branch on the old value, including other nonzero values.
+    if (__sync_val_compare_and_swap(&self->stopRequested, 1u, 0u) != 0) {
+        if (self->state == 5) return;
+        stop();
+        auto retained = self->retainedObject;
+        auto instance = self->instance;
+        if (retained) {
+            self->retainedObject = nullptr;
+            auto table = *static_cast<void***>(instance);
+            reinterpret_cast<void (*)(void*, void*)>(table[31])(instance, retained);
+            self->instance = nullptr;
+            table = *static_cast<void***>(retained);
+            reinterpret_cast<void (*)(void*, uint32_t, uint32_t)>(table[2])(retained, 0, 0);
+            msgMsgSink_A670_2hr(self);
+        } else if (instance) {
+            atSingleton_2378_g(instance);
+        } else {
+            msgMsgSink_A670_2hr(self);
+        }
+        return;
+    }
+
+    if (__sync_val_compare_and_swap(&self->updateRequested, 1u, 0u) != 0) {
+        auto instance = self->instance;
+        if (instance) {
+            auto table = *static_cast<void***>(instance);
+            reinterpret_cast<void (*)(void*)>(table[8])(instance);
+        }
+    }
+
+    auto voice = self->voice;
+    if (!voice || (self->state != 3 && self->state != 4)) return;
+    uint32_t completed;
+    auto table = *static_cast<void***>(voice);
+    int32_t result = reinterpret_cast<int32_t (*)(void*, uint32_t*)>(table[0])(voice, &completed);
+    if (result < 0 || completed == 0 || (self->flags & 0x80)) return;
+    stop();
+    auto instance = self->instance;
+    if (instance) atSingleton_2378_g(instance);
+    else msgMsgSink_A670_2hr(self);
 }

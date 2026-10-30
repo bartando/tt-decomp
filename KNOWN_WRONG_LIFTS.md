@@ -280,4 +280,5 @@ libraries:
 | 0x82484…–0x82493… (`phObject_*`) | XMV movie decoder | allocator id 0x8C, HRESULTs |
 | 0x82448…–0x8244F… (`msgMsgSink_*`) | XACT 2 runtime | allocator id 0x84 |
 | 0x82455148 (`msgMsgSink_5148_g`, now `xactSound_Update`) | XACT 2 sound worker | cue+0x34 caller at 0x8244E0A4; track-event destructor 0x8245A6F0 uses allocator id 0x84 |
+| 0x8244AAE8 (`atSingleton_AAE8`, now `xactWave_Update`) | XACT 2 wave worker | bank traversal at 0x82456030; shared base constructor 0x8244A970 called by memory/streaming wave constructors 0x8245B570/0x8245C078 |
 | 0x821342A0–0x821359DC (`cmOperatorCtor_*`) | triangle stripifier (engine tool code, not cm graph) | no vtables; used by 0x82133A28 |

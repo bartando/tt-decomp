@@ -234,6 +234,12 @@ class Machine:
     def fpscr(self):
         return self.uc.reg_read(P.UC_PPC_REG_FPSCR) & M32
 
+    def msr(self):
+        return self.uc.reg_read(P.UC_PPC_REG_MSR) & M32
+
+    def set_msr(self, value):
+        self.uc.reg_write(P.UC_PPC_REG_MSR, value & M32)
+
     def pc(self):
         return self.uc.reg_read(P.UC_PPC_REG_PC) & M32
 

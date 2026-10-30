@@ -283,6 +283,13 @@ def main(argv=None) -> int:
         print(f"     {line}")
     bad += bool(wide_errors)
 
+    from .calltests import msr_regressions
+    msr_errors = msr_regressions()
+    print(f"{'ok  ' if not msr_errors else 'FAIL'} mtmsrd EE/RI and atomic reservation regressions")
+    for line in msr_errors:
+        print(f"     {line}")
+    bad += bool(msr_errors)
+
     packed_errors = _normpacked32()
     print(f"{'ok  ' if not packed_errors else 'FAIL'} vpkd3d128/vupkd3d128 NORMPACKED32 regression")
     for line in packed_errors:
