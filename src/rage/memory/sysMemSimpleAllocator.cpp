@@ -25,6 +25,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <cstring>
 #include "../misc/rage_misc.hpp"
 
 /* ── External helpers ─────────────────────────────────────────────────── */
@@ -43,6 +44,9 @@ extern "C" void fiStreamBuf_Close_stub(void* stream);
 
 // rage_debugLog — debug printf, compiled out (just blr)
 extern "C" void rage_debugLog(const char* format, ...);
+
+// Retail diagnostics return without stopping the allocator.
+extern "C" void nop_8240E6D0(const char* format, ...);  // @ 0x8240E6D0
 
 /* ── Global: active logging allocator ref count ───────────────────────── */
 // lbl_825EBD20 @ 0x825EBD20  (.data, 4 bytes)
@@ -445,14 +449,118 @@ void sysMemSimpleAllocator::ScalarDtor(int flags) {
     g_sysMemAllocatorInitLock = 0;
 }
 
+// Non-virtual Free body (788 bytes); the locking thunk follows below.
+// @ 0x821871C0
+extern "C" void sysMemSimpleAllocator_Free_body(sysMemSimpleAllocator* self, void* ptr) {
+    // Keep the Xbox's 32-bit links. The shared struct currently misnames these
+    // fields: +0x0C..+0x48 are heads, +0x54 is allocated bytes, +0x58..+0x94
+    // are tag totals, and +0x98 is total free bytes (not the largest block).
+    uint32_t* heap = reinterpret_cast<uint32_t*>(self);
+    struct Node {
+        uint32_t guard;
+        uint32_t size;
+        uint32_t physicalPrev;
+        uint32_t flags;
+        uint32_t freePrev;
+        uint32_t freeNext;
+    };
+    auto nodeAt = [](uint32_t address) {
+        return reinterpret_cast<Node*>(static_cast<uintptr_t>(address));
+    };
+    auto sizeClass = [](uint32_t size) {
+        // srawi/addze: signed division rounds toward zero, then caps at 15.
+        int32_t index = static_cast<int32_t>(size) / 16;
+        return index < 15 ? index : 15;
+    };
+    auto unlink = [&](Node* node) {
+        int32_t index = sizeClass(node->size);
+        if (node->freePrev != 0) {
+            nodeAt(node->freePrev)->freeNext = node->freeNext;
+        } else {
+            heap[index + 3] = node->freeNext;
+        }
+        if (node->freeNext != 0) {
+            nodeAt(node->freeNext)->freePrev = node->freePrev;
+        }
+    };
+
+    if (self->isLocked != 0) {
+        nop_8240E6D0("Attempting to free memory from a locked heap (%p)");
+    }
+    using IsOwned = uint32_t (*)(sysMemSimpleAllocator*, void*);
+    if (static_cast<uint8_t>(reinterpret_cast<IsOwned>(self->vtable[20])(self, ptr)) == 0) {
+        nop_8240E6D0("Attempting to free memory not allocated from this heap");
+    }
+
+    uint32_t address = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(ptr)) - 16;
+    Node* node = nodeAt(address);
+    if ((node->flags & 0x10) == 0) {
+        nop_8240E6D0("sysMemSimpleAllocator::Free - memory at %p already marked free", ptr);
+    }
+    node->flags &= ~0x10u;
+    if (node->guard != address) {
+        nop_8240E6D0("sysMemSimpleAllocator::Free - memory at %p had guard word trashed!\n\n"
+                    "This usually means somebody overran an array between this Free call\n"
+                    "and the immediately previous Allocate or Free call.", ptr);
+    }
+
+    // Retail's poison fill stops 16 bytes before the payload end.
+    std::memset(ptr, 0xDD, node->size - 16);
+    heap[0x98 / 4] += node->size;
+    heap[0x54 / 4] -= node->size;
+    heap[0x58 / 4 + (node->flags & 0xF)] -= node->size;
+
+    uint32_t end = heap[0x04 / 4] + heap[0x4C / 4];
+    uint32_t nextAddress = address + node->size + 16;
+    if (nextAddress != 0 && nextAddress < end) {
+        Node* next = nodeAt(nextAddress);
+        if ((next->flags & 0x10) == 0) {
+            node->size += next->size + 16;
+            heap[0x98 / 4] += 16;
+            heap[0x54 / 4] -= 16;
+            unlink(next);
+
+            uint32_t afterNext = nextAddress + next->size + 16;
+            end = heap[0x04 / 4] + heap[0x4C / 4];
+            if (afterNext != 0 && afterNext < end) {
+                nodeAt(afterNext)->physicalPrev = address;
+            }
+        }
+    }
+
+    if (node->physicalPrev != 0) {
+        Node* prev = nodeAt(node->physicalPrev);
+        if ((prev->flags & 0x10) == 0) {
+            unlink(prev);
+            prev->size += node->size + 16;
+            heap[0x98 / 4] += 16;
+            heap[0x54 / 4] -= 16;
+
+            end = heap[0x04 / 4] + heap[0x4C / 4];
+            nextAddress = address + node->size + 16;
+            if (nextAddress != 0 && nextAddress < end) {
+                nodeAt(nextAddress)->physicalPrev = node->physicalPrev;
+            }
+            address = node->physicalPrev;
+            node = prev;
+        }
+    }
+
+    int32_t index = sizeClass(node->size);
+    node->freeNext = heap[index + 3];
+    if (heap[index + 3] != 0) {
+        nodeAt(heap[index + 3])->freePrev = address;
+    }
+    node->freePrev = 0;
+    heap[index + 3] = address;
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // sysMemSimpleAllocator::Free (vfn_2) @ 0x82187178  (68 bytes)
 //
 // Virtual Free thunk. Acquires init-lock, delegates to the non-virtual
 // Free body at 0x821871C0, releases lock.
 // ═══════════════════════════════════════════════════════════════════════
-extern "C" void sysMemSimpleAllocator_Free_body(sysMemSimpleAllocator* self, void* ptr);
-
 void sysMemSimpleAllocator::Free(void* ptr) {
     sysMemSimpleAllocator_SpinAcquire(&g_sysMemAllocatorInitLock);
     sysMemSimpleAllocator_Free_body(this, ptr);

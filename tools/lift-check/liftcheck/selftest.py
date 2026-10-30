@@ -34,9 +34,30 @@ EXPECT = [
     ("lc_xact_image_dtor_thunk", "PASS", ()),     # a call through `b X` is a call to X
     ("lc_drill_strings", "PASS", ()),             # const char* by content, any length
     ("lc_world_bound_static_init", "PASS", ()),   # the static initializers have run
+    ("sysmem_simple_allocator_free", "PASS", ()),
 ]
 
 MUTATIONS = [
+    ("sysmem_simple_allocator_free", "skip forward coalescing",
+     [("if ((next->flags & 0x10) == 0) {", "if (false) {")]),
+    ("sysmem_simple_allocator_free", "skip backward coalescing",
+     [("if ((prev->flags & 0x10) == 0) {", "if (false) {")]),
+    ("sysmem_simple_allocator_free", "unlink from the tag counters instead of the free-list heads",
+     [("heap[index + 3] = node->freeNext;", "heap[index + 22] = node->freeNext;")]),
+    ("sysmem_simple_allocator_free", "lose the successor's free-list backlink",
+     [("nodeAt(node->freeNext)->freePrev = node->freePrev;", "/* lost free-list backlink */")]),
+    ("sysmem_simple_allocator_free", "lose the physical backlink after a forward merge",
+     [("nodeAt(afterNext)->physicalPrev = address;", "/* lost physical backlink */")]),
+    ("sysmem_simple_allocator_free", "lose the previous head's backlink on insertion",
+     [("nodeAt(heap[index + 3])->freePrev = address;", "/* lost insertion backlink */")]),
+    ("sysmem_simple_allocator_free", "poison the last 16 payload bytes too",
+     [("std::memset(ptr, 0xDD, node->size - 16);", "std::memset(ptr, 0xDD, node->size);")]),
+    ("sysmem_simple_allocator_free", "return early on a double free",
+     [("if ((node->flags & 0x10) == 0) {", "if ((node->flags & 0x10) == 0) { return;")]),
+    ("sysmem_simple_allocator_free", "forget recovered header bytes in free accounting",
+     [("heap[0x98 / 4] += 16;", "/* lost recovered header bytes */")]),
+    ("sysmem_simple_allocator_free", "pass the allocator instead of the freed pointer to diagnostics",
+     [('already marked free", ptr);', 'already marked free", self);')]),
     ("pg_6c00_w", "invert tangent handedness",
      [("lbl_82606750[k] > dot", "lbl_82606750[k] < dot")]),
     ("pg_6c00_w", "pack components at 9-bit intervals",
