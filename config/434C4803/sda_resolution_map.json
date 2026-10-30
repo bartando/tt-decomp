@@ -577,43 +577,43 @@
   },
   "25472": {
     "addr": "0x82606380",
-    "name": "lbl_82606380",
+    "name": "g_ambientCubeXPosHandle",
     "type": "object",
     "size": 4
   },
   "25476": {
     "addr": "0x82606384",
-    "name": "lbl_82606384",
+    "name": "g_ambientCubeXNegHandle",
     "type": "object",
     "size": 4
   },
   "25480": {
     "addr": "0x82606388",
-    "name": "lbl_82606388",
+    "name": "g_ambientCubeYPosHandle",
     "type": "object",
     "size": 4
   },
   "25484": {
     "addr": "0x8260638c",
-    "name": "lbl_8260638C",
+    "name": "g_ambientCubeYNegHandle",
     "type": "object",
     "size": 4
   },
   "25488": {
     "addr": "0x82606390",
-    "name": "lbl_82606390",
+    "name": "g_ambientCubeZPosHandle",
     "type": "object",
     "size": 4
   },
   "25492": {
     "addr": "0x82606394",
-    "name": "lbl_82606394",
+    "name": "g_ambientCubeZNegHandle",
     "type": "object",
     "size": 4
   },
   "25496": {
     "addr": "0x82606398",
-    "name": "lbl_82606398",
+    "name": "g_ambientCubeYFallHandle",
     "type": "object",
     "size": 4
   },

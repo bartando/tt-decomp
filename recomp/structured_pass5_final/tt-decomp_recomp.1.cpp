@@ -1792,7 +1792,7 @@ PPC_FUNC_IMPL(__imp__LocomotionStateAnim_vfn_7) {
 		ea = (ctx.r9.u32) & ~0xF;
 		simde_mm_store_si128((simde__m128i*)PPC_RAW_ADDR(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)ctx.v0.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
 		// bl 0x820c3ad8
-		LocomotionStateAnim_3AD8_g(ctx, base);
+		mat44ComposeAffineInPlace(ctx, base);
 		// addi r4,r1,144
 		ctx.r4.s64 = ctx.r1.s64 + 144;
 		// addi r3,r1,80
@@ -2292,7 +2292,7 @@ PPC_FUNC_IMPL(__imp__LocomotionStateAnim_vfn_9) {
 		// mr r3,r30
 		ctx.r3.u64 = var_r30;
 		// bl 0x820c3ad8
-		LocomotionStateAnim_3AD8_g(ctx, base);
+		mat44ComposeAffineInPlace(ctx, base);
 		// b 0x820e0e50
 	} else {
 		// lwz r9,32(r10)
@@ -57774,7 +57774,7 @@ loc_820FAC1C:
 		// mr r3,r26
 		ctx.r3.u64 = var_r26;
 		// bl 0x820c3ad8
-		LocomotionStateAnim_3AD8_g(ctx, base);
+		mat44ComposeAffineInPlace(ctx, base);
 		// addi r27,r27,-1
 		var_r27 = (uint32_t)(var_r27 + -1);
 		// addi r26,r26,64
@@ -65561,7 +65561,7 @@ PPC_FUNC_IMPL(__imp__game_E580) {
 			// li r3,2
 			ctx.r3.s64 = 2;
 			// bl 0x820fff78
-			game_FF78(ctx, base);
+			pongLighting_ApplyAmbientCube(ctx, base);
 			// b 0x820fe628
 			goto loc_820FE628;
 		}
@@ -65573,7 +65573,7 @@ PPC_FUNC_IMPL(__imp__game_E580) {
 		// li r3,2
 		ctx.r3.s64 = 2;
 		// bl 0x820fff78
-		game_FF78(ctx, base);
+		pongLighting_ApplyAmbientCube(ctx, base);
 		// b 0x820fe628
 	} else {
 	loc_820FE600:
@@ -68212,7 +68212,7 @@ PPC_FUNC_IMPL(__imp__LocomotionStateAnim_F748_g) {
 		// lwz r3,0(r11)
 		ctx.r3.u64 = PPC_LOAD_U32(ctx.r11.u32 + 0);
 		// bl 0x820c3ad8
-		LocomotionStateAnim_3AD8_g(ctx, base);
+		mat44ComposeAffineInPlace(ctx, base);
 		// lwz r11,4(r31)
 		ctx.r11.u64 = PPC_LOAD_U32(var_r31 + 4);
 		// lvx128 v13,r0,r26
@@ -69147,8 +69147,8 @@ loc_820FFF5C:
 	return;
 }
 
-__attribute__((alias("__imp__game_FF78"))) PPC_WEAK_FUNC(game_FF78);
-PPC_FUNC_IMPL(__imp__game_FF78) {
+__attribute__((alias("__imp__pongLighting_ApplyAmbientCube"))) PPC_WEAK_FUNC(pongLighting_ApplyAmbientCube);
+PPC_FUNC_IMPL(__imp__pongLighting_ApplyAmbientCube) {
 	PPC_FUNC_PROLOGUE();
 	uint32_t var_r30 = 0;
 	uint32_t var_r31 = 0;

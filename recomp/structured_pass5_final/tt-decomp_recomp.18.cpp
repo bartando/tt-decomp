@@ -48954,7 +48954,7 @@ PPC_FUNC_IMPL(__imp__fxAmbient_rtti_B0BC_0) {
 		// li r3,2
 		ctx.r3.s64 = 2;
 		// bl 0x820fff78
-		game_FF78(ctx, base);
+		pongLighting_ApplyAmbientCube(ctx, base);
 		// lwz r10,24(r31)
 		ctx.r10.u64 = PPC_LOAD_U32(var_r31 + 24);
 		// lwz r3,20(r31)

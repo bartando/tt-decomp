@@ -35388,7 +35388,7 @@ PPC_FUNC_IMPL(__imp__LocomotionStateAnim_8DB0_g) {
 			// addi r3,r1,160
 			ctx.r3.s64 = ctx.r1.s64 + 160;
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 			// addi r4,r1,160
 			ctx.r4.s64 = ctx.r1.s64 + 160;
 			// addi r3,r1,144

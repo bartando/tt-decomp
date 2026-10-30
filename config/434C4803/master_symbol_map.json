@@ -12115,7 +12115,7 @@
       "size": 8
     },
     "0x82030048": {
-      "name": "lbl_82030048",
+      "name": "g_ambientCubeParameterNames",
       "type": "object",
       "section": ".rdata",
       "size": 8
@@ -187999,7 +187999,7 @@
       "size": 24
     },
     "0x820c3ad8": {
-      "name": "LocomotionStateAnim_3AD8_g",
+      "name": "mat44ComposeAffineInPlace",
       "type": "function",
       "section": ".text",
       "size": 240
@@ -192997,7 +192997,7 @@
       "size": 120
     },
     "0x820fff78": {
-      "name": "game_FF78",
+      "name": "pongLighting_ApplyAmbientCube",
       "type": "function",
       "section": ".text",
       "size": 1732
@@ -199609,7 +199609,7 @@
       "size": 388
     },
     "0x82159908": {
-      "name": "game_9908",
+      "name": "grmShaderParameter_SetFloatArray",
       "type": "function",
       "section": ".text",
       "size": 404
@@ -299719,7 +299719,7 @@
       "size": 8
     },
     "0x825d4c88": {
-      "name": "lbl_825D4C88",
+      "name": "g_shaderParameterFourDirtyMasks",
       "type": "object",
       "section": ".data",
       "size": 16
@@ -311431,43 +311431,43 @@
       "size": 4
     },
     "0x82606380": {
-      "name": "lbl_82606380",
+      "name": "g_ambientCubeXPosHandle",
       "type": "object",
       "section": ".data",
       "size": 4
     },
     "0x82606384": {
-      "name": "lbl_82606384",
+      "name": "g_ambientCubeXNegHandle",
       "type": "object",
       "section": ".data",
       "size": 4
     },
     "0x82606388": {
-      "name": "lbl_82606388",
+      "name": "g_ambientCubeYPosHandle",
       "type": "object",
       "section": ".data",
       "size": 4
     },
     "0x8260638c": {
-      "name": "lbl_8260638C",
+      "name": "g_ambientCubeYNegHandle",
       "type": "object",
       "section": ".data",
       "size": 4
     },
     "0x82606390": {
-      "name": "lbl_82606390",
+      "name": "g_ambientCubeZPosHandle",
       "type": "object",
       "section": ".data",
       "size": 4
     },
     "0x82606394": {
-      "name": "lbl_82606394",
+      "name": "g_ambientCubeZNegHandle",
       "type": "object",
       "section": ".data",
       "size": 4
     },
     "0x82606398": {
-      "name": "lbl_82606398",
+      "name": "g_ambientCubeYFallHandle",
       "type": "object",
       "section": ".data",
       "size": 4
@@ -316745,7 +316745,7 @@
     "lbl_82030028": "0x82030028",
     "lbl_82030034": "0x82030034",
     "lbl_82030040": "0x82030040",
-    "lbl_82030048": "0x82030048",
+    "g_ambientCubeParameterNames": "0x82030048",
     "lbl_82030050": "0x82030050",
     "lbl_82030058": "0x82030058",
     "lbl_82030060": "0x82030060",
@@ -346059,7 +346059,7 @@
     "ke_39D8": "0x820c39d8",
     "ph_3AB0": "0x820c3ab0",
     "ph_3AC0": "0x820c3ac0",
-    "LocomotionStateAnim_3AD8_g": "0x820c3ad8",
+    "mat44ComposeAffineInPlace": "0x820c3ad8",
     "phJoint_3BC8_g": "0x820c3bc8",
     "game_3C70": "0x820c3c70",
     "LocomotionStateAnim_3D48_g": "0x820c3d48",
@@ -346892,7 +346892,7 @@
     "atSingleton_FCA8_fw": "0x820ffca8",
     "LocomotionStateAnim_FDC0_g": "0x820ffdc0",
     "xe_FF00": "0x820fff00",
-    "game_FF78": "0x820fff78",
+    "pongLighting_ApplyAmbientCube": "0x820fff78",
     "SinglesNetworkClient_0640_w": "0x82100640",
     "SinglesNetworkClient_0860_g": "0x82100860",
     "grcRenderer_init_0B78": "0x82100b78",
@@ -347994,7 +347994,7 @@
     "hudFlashBase_9558_w": "0x82159558",
     "phBoundCapsule_9660_g": "0x82159660",
     "hudFlashBase_9780_p45": "0x82159780",
-    "game_9908": "0x82159908",
+    "grmShaderParameter_SetFloatArray": "0x82159908",
     "game_9AA0": "0x82159aa0",
     "hudFlashBase_9BC8_p45": "0x82159bc8",
     "util_9CF0": "0x82159cf0",
@@ -364666,7 +364666,7 @@
     "lbl_825D4C44": "0x825d4c44",
     "lbl_825D4C64": "0x825d4c64",
     "lbl_825D4C80": "0x825d4c80",
-    "lbl_825D4C88": "0x825d4c88",
+    "g_shaderParameterFourDirtyMasks": "0x825d4c88",
     "lbl_825D4C98": "0x825d4c98",
     "lbl_825D4CC4": "0x825d4cc4",
     "lbl_825D4CD0": "0x825d4cd0",
@@ -366618,13 +366618,13 @@
     "lbl_82606379": "0x82606379",
     "lbl_8260637A": "0x8260637a",
     "lbl_8260637C": "0x8260637c",
-    "lbl_82606380": "0x82606380",
-    "lbl_82606384": "0x82606384",
-    "lbl_82606388": "0x82606388",
-    "lbl_8260638C": "0x8260638c",
-    "lbl_82606390": "0x82606390",
-    "lbl_82606394": "0x82606394",
-    "lbl_82606398": "0x82606398",
+    "g_ambientCubeXPosHandle": "0x82606380",
+    "g_ambientCubeXNegHandle": "0x82606384",
+    "g_ambientCubeYPosHandle": "0x82606388",
+    "g_ambientCubeYNegHandle": "0x8260638c",
+    "g_ambientCubeZPosHandle": "0x82606390",
+    "g_ambientCubeZNegHandle": "0x82606394",
+    "g_ambientCubeYFallHandle": "0x82606398",
     "lbl_8260639C": "0x8260639c",
     "lbl_826063A1": "0x826063a1",
     "lbl_826063A2": "0x826063a2",

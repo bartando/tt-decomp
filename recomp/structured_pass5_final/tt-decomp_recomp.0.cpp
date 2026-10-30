@@ -7573,8 +7573,8 @@ PPC_FUNC_IMPL(__imp__ph_3AC0) {
 	return;
 }
 
-__attribute__((alias("__imp__LocomotionStateAnim_3AD8_g"))) PPC_WEAK_FUNC(LocomotionStateAnim_3AD8_g);
-PPC_FUNC_IMPL(__imp__LocomotionStateAnim_3AD8_g) {
+__attribute__((alias("__imp__mat44ComposeAffineInPlace"))) PPC_WEAK_FUNC(mat44ComposeAffineInPlace);
+PPC_FUNC_IMPL(__imp__mat44ComposeAffineInPlace) {
 	PPC_FUNC_PROLOGUE();
 	uint32_t ea{};
 	// lis r10,-32158
@@ -7976,7 +7976,7 @@ PPC_FUNC_IMPL(__imp__LocomotionStateAnim_3D48_g) {
 	ea = (ctx.r10.u32) & ~0xF;
 	simde_mm_store_si128((simde__m128i*)PPC_RAW_ADDR(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)ctx.v0.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
 	// bl 0x820c3ad8
-	LocomotionStateAnim_3AD8_g(ctx, base);
+	mat44ComposeAffineInPlace(ctx, base);
 	// blr
 	return;
 }
@@ -13440,7 +13440,7 @@ loc_820C63C4:
 		// bl 0x8218e5c8
 		game_E5C8(ctx, base);
 		// bl 0x820fff78
-		game_FF78(ctx, base);
+		pongLighting_ApplyAmbientCube(ctx, base);
 		// lis r11,-32163
 		// lis r25,-32161
 		var_r25 = (uint32_t)(-2107703296);
@@ -53709,7 +53709,7 @@ loc_820D8298:
 			ea = (ctx.r11.u32) & ~0xF;
 			simde_mm_store_si128((simde__m128i*)PPC_RAW_ADDR(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)ctx.v0.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 		}
 	loc_820D836C:
 		// addi r10,r1,144

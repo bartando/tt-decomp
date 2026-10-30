@@ -40921,7 +40921,7 @@ loc_82119FF4:
 					// add r3,r19,r11
 					ctx.r3.u64 = var_r19 + ctx.r11.u64;
 					// bl 0x820c3ad8
-					LocomotionStateAnim_3AD8_g(ctx, base);
+					mat44ComposeAffineInPlace(ctx, base);
 					// lwz r11,204(r30)
 					ctx.r11.u64 = PPC_LOAD_U32(var_r30 + 204);
 					// addi r4,r31,144
@@ -51389,13 +51389,13 @@ loc_8211F38C:
 					// addi r3,r1,80
 					ctx.r3.s64 = ctx.r1.s64 + 80;
 					// bl 0x820c3ad8
-					LocomotionStateAnim_3AD8_g(ctx, base);
+					mat44ComposeAffineInPlace(ctx, base);
 					// mr r4,r27
 					ctx.r4.u64 = var_r27;
 					// addi r3,r1,80
 					ctx.r3.s64 = ctx.r1.s64 + 80;
 					// bl 0x820c3ad8
-					LocomotionStateAnim_3AD8_g(ctx, base);
+					mat44ComposeAffineInPlace(ctx, base);
 					// lwz r11,25528(r17)
 					ctx.r11.u64 = PPC_LOAD_U32(var_r17 + 25528);
 					// cmplwi cr6,r11,0
@@ -51537,7 +51537,7 @@ loc_8211F38C:
 								// addi r3,r1,80
 								ctx.r3.s64 = ctx.r1.s64 + 80;
 								// bl 0x820c3ad8
-								LocomotionStateAnim_3AD8_g(ctx, base);
+								mat44ComposeAffineInPlace(ctx, base);
 								}
 								loc_8211F7BC:
 								// lwz r10,4(r30)
@@ -51789,7 +51789,7 @@ loc_8211F38C:
 				// addi r4,r3,64
 				ctx.r4.s64 = ctx.r3.s64 + 64;
 				// bl 0x820c3ad8
-				LocomotionStateAnim_3AD8_g(ctx, base);
+				mat44ComposeAffineInPlace(ctx, base);
 			}
 		loc_8211F97C:
 			// lwz r5,4(r20)
@@ -52457,7 +52457,7 @@ loc_8211FD04:
 			ea = (ctx.r10.u32) & ~0xF;
 			simde_mm_store_si128((simde__m128i*)PPC_RAW_ADDR(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)ctx.v11.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 			// lwz r11,12(r30)
 			ctx.r11.u64 = PPC_LOAD_U32(var_r30 + 12);
 			// addi r4,r1,256
@@ -52473,7 +52473,7 @@ loc_8211FD04:
 			// addi r3,r1,96
 			ctx.r3.s64 = ctx.r1.s64 + 96;
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 			// cmpwi cr6,r31,0
 			// bne cr6,0x8211feb8
 			if ((int32_t)var_r31 == 0) {

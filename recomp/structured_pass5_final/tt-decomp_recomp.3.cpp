@@ -7678,7 +7678,7 @@ PPC_FUNC_IMPL(__imp__xe_89B8) {
 					ea = (ctx.r11.u32) & ~0xF;
 					simde_mm_store_si128((simde__m128i*)PPC_RAW_ADDR(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)ctx.v30.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
 					// bl 0x820c3ad8
-					LocomotionStateAnim_3AD8_g(ctx, base);
+					mat44ComposeAffineInPlace(ctx, base);
 					// addi r10,r1,320
 					ctx.r10.s64 = ctx.r1.s64 + 320;
 					// lfs f12,176(r1)
@@ -8493,7 +8493,7 @@ PPC_FUNC_IMPL(__imp__xe_89B8) {
 					ea = (ctx.r7.u32) & ~0xF;
 					simde_mm_store_si128((simde__m128i*)PPC_RAW_ADDR(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)ctx.v57.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
 					// bl 0x820c3ad8
-					LocomotionStateAnim_3AD8_g(ctx, base);
+					mat44ComposeAffineInPlace(ctx, base);
 					// addi r6,r1,240
 					ctx.r6.s64 = ctx.r1.s64 + 240;
 					// addi r5,r1,208
@@ -45486,7 +45486,7 @@ PPC_FUNC_IMPL(__imp__crIKSolverGleicherLimb_vfn_2) {
 			// addi r3,r1,672
 			ctx.r3.s64 = ctx.r1.s64 + 672;
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 			// lwz r31,16(r31)
 			var_r31 = (uint32_t)(PPC_LOAD_U32(var_r31 + 16));
 			// cmplw cr6,r31,r23
@@ -45497,7 +45497,7 @@ PPC_FUNC_IMPL(__imp__crIKSolverGleicherLimb_vfn_2) {
 			// addi r3,r1,528
 			ctx.r3.s64 = ctx.r1.s64 + 528;
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 		}
 	loc_8213B174:
 		// cmplwi cr6,r26,0
@@ -45544,7 +45544,7 @@ PPC_FUNC_IMPL(__imp__crIKSolverGleicherLimb_vfn_2) {
 			// addi r3,r1,736
 			ctx.r3.s64 = ctx.r1.s64 + 736;
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 			// lwz r31,16(r31)
 			var_r31 = (uint32_t)(PPC_LOAD_U32(var_r31 + 16));
 			// cmplw cr6,r31,r24
@@ -45555,7 +45555,7 @@ PPC_FUNC_IMPL(__imp__crIKSolverGleicherLimb_vfn_2) {
 			// addi r3,r1,336
 			ctx.r3.s64 = ctx.r1.s64 + 336;
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 		}
 	loc_8213B1E4:
 		// lwz r31,16(r24)
@@ -45605,7 +45605,7 @@ PPC_FUNC_IMPL(__imp__crIKSolverGleicherLimb_vfn_2) {
 			// add r4,r11,r10
 			ctx.r4.u64 = ctx.r11.u64 + ctx.r10.u64;
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 			// lwz r31,16(r31)
 			var_r31 = (uint32_t)(PPC_LOAD_U32(var_r31 + 16));
 			// b 0x8213b200
@@ -45624,7 +45624,7 @@ PPC_FUNC_IMPL(__imp__crIKSolverGleicherLimb_vfn_2) {
 			// addi r3,r1,800
 			ctx.r3.s64 = ctx.r1.s64 + 800;
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 			// lwz r31,16(r31)
 			var_r31 = (uint32_t)(PPC_LOAD_U32(var_r31 + 16));
 			// b 0x8213b200
@@ -45635,7 +45635,7 @@ PPC_FUNC_IMPL(__imp__crIKSolverGleicherLimb_vfn_2) {
 			// addi r3,r1,464
 			ctx.r3.s64 = ctx.r1.s64 + 464;
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 		}
 	loc_8213B27C:
 		// lwz r31,16(r22)
@@ -45685,7 +45685,7 @@ PPC_FUNC_IMPL(__imp__crIKSolverGleicherLimb_vfn_2) {
 			// add r4,r11,r10
 			ctx.r4.u64 = ctx.r11.u64 + ctx.r10.u64;
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 			// lwz r31,16(r31)
 			var_r31 = (uint32_t)(PPC_LOAD_U32(var_r31 + 16));
 			// b 0x8213b298
@@ -45704,7 +45704,7 @@ PPC_FUNC_IMPL(__imp__crIKSolverGleicherLimb_vfn_2) {
 			// addi r3,r1,864
 			ctx.r3.s64 = ctx.r1.s64 + 864;
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 			// lwz r31,16(r31)
 			var_r31 = (uint32_t)(PPC_LOAD_U32(var_r31 + 16));
 			// b 0x8213b298
@@ -45715,7 +45715,7 @@ PPC_FUNC_IMPL(__imp__crIKSolverGleicherLimb_vfn_2) {
 			// addi r3,r1,400
 			ctx.r3.s64 = ctx.r1.s64 + 400;
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 		}
 	loc_8213B314:
 		// addi r5,r1,272
@@ -45808,7 +45808,7 @@ PPC_FUNC_IMPL(__imp__crIKSolverGleicherLimb_vfn_2) {
 			// addi r3,r1,528
 			ctx.r3.s64 = ctx.r1.s64 + 528;
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 		}
 	loc_8213B3BC:
 		// cmplwi cr6,r26,0
@@ -45870,7 +45870,7 @@ PPC_FUNC_IMPL(__imp__crIKSolverGleicherLimb_vfn_2) {
 			// addi r3,r1,336
 			ctx.r3.s64 = ctx.r1.s64 + 336;
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 		}
 	loc_8213B428:
 		// lwz r10,16(r24)
@@ -45938,7 +45938,7 @@ PPC_FUNC_IMPL(__imp__crIKSolverGleicherLimb_vfn_2) {
 			// addi r3,r1,464
 			ctx.r3.s64 = ctx.r1.s64 + 464;
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 		}
 	loc_8213B49C:
 		// lwz r10,16(r22)
@@ -46006,7 +46006,7 @@ PPC_FUNC_IMPL(__imp__crIKSolverGleicherLimb_vfn_2) {
 			// addi r3,r1,400
 			ctx.r3.s64 = ctx.r1.s64 + 400;
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 		}
 	loc_8213B510:
 		// lfs f1,160(r1)
@@ -50963,7 +50963,7 @@ PPC_FUNC_IMPL(__imp__grc_D050) {
 				ea = (ctx.r8.u32) & ~0xF;
 				simde_mm_store_si128((simde__m128i*)PPC_RAW_ADDR(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)ctx.v29.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
 				// bl 0x820c3ad8
-				LocomotionStateAnim_3AD8_g(ctx, base);
+				mat44ComposeAffineInPlace(ctx, base);
 				// cmplwi cr6,r15,0
 				// bne cr6,0x8213d830
 				if (var_r15 == 0) {
@@ -85110,19 +85110,19 @@ loc_8214CF5C:
 	// add r4,r11,r10
 	ctx.r4.u64 = ctx.r11.u64 + ctx.r10.u64;
 	// bl 0x820c3ad8
-	LocomotionStateAnim_3AD8_g(ctx, base);
+	mat44ComposeAffineInPlace(ctx, base);
 	// addi r4,r1,144
 	ctx.r4.s64 = ctx.r1.s64 + 144;
 	// mr r3,r31
 	ctx.r3.u64 = var_r31;
 	// bl 0x820c3ad8
-	LocomotionStateAnim_3AD8_g(ctx, base);
+	mat44ComposeAffineInPlace(ctx, base);
 	// addi r4,r1,272
 	ctx.r4.s64 = ctx.r1.s64 + 272;
 	// mr r3,r31
 	ctx.r3.u64 = var_r31;
 	// bl 0x820c3ad8
-	LocomotionStateAnim_3AD8_g(ctx, base);
+	mat44ComposeAffineInPlace(ctx, base);
 	// addi r4,r29,112
 	ctx.r4.s64 = (int64_t)(int32_t)var_r29 + 112;
 	// addi r3,r1,336
@@ -85608,7 +85608,7 @@ loc_8214D244:
 	ea = (var_r30) & ~0xF;
 	simde_mm_store_si128((simde__m128i*)PPC_RAW_ADDR(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)ctx.v26.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
 	// bl 0x820c3ad8
-	LocomotionStateAnim_3AD8_g(ctx, base);
+	mat44ComposeAffineInPlace(ctx, base);
 	// addi r4,r1,272
 	ctx.r4.s64 = ctx.r1.s64 + 272;
 	// mr r3,r31
@@ -85626,7 +85626,7 @@ loc_8214D244:
 	// mr r3,r31
 	ctx.r3.u64 = var_r31;
 	// bl 0x820c3ad8
-	LocomotionStateAnim_3AD8_g(ctx, base);
+	mat44ComposeAffineInPlace(ctx, base);
 	// addi r9,r29,48
 	ctx.r9.s64 = (int64_t)(int32_t)var_r29 + 48;
 	// lis r11,-32158
@@ -85741,7 +85741,7 @@ while (var_r31 != 0) {
 		// mr r3,r29
 		ctx.r3.u64 = var_r29;
 		// bl 0x820c3ad8
-		LocomotionStateAnim_3AD8_g(ctx, base);
+		mat44ComposeAffineInPlace(ctx, base);
 		// lwz r31,16(r31)
 		var_r31 = (uint32_t)(PPC_LOAD_U32(var_r31 + 16));
 		// cmplwi cr6,r31,0
@@ -85756,7 +85756,7 @@ loc_8214D4D0:
 		// mr r3,r29
 		ctx.r3.u64 = var_r29;
 		// bl 0x820c3ad8
-		LocomotionStateAnim_3AD8_g(ctx, base);
+		mat44ComposeAffineInPlace(ctx, base);
 	}
 loc_8214D4E4:
 	return;
@@ -101092,7 +101092,7 @@ loc_82154538:
 	// lwz r3,0(r31)
 	ctx.r3.u64 = PPC_LOAD_U32(var_r31 + 0);
 	// bl 0x82159908
-	game_9908(ctx, base);
+	grmShaderParameter_SetFloatArray(ctx, base);
 	// rlwinm r10,r28,31,15,31
 	ctx.r10.u64 = __builtin_rotateleft64(var_r28 | (var_r28 << 32), 31) & 0x1FFFF;
 	// addi r7,r24,512
@@ -112707,8 +112707,8 @@ loc_82159874:
 	return;
 }
 
-__attribute__((alias("__imp__game_9908"))) PPC_WEAK_FUNC(game_9908);
-PPC_FUNC_IMPL(__imp__game_9908) {
+__attribute__((alias("__imp__grmShaderParameter_SetFloatArray"))) PPC_WEAK_FUNC(grmShaderParameter_SetFloatArray);
+PPC_FUNC_IMPL(__imp__grmShaderParameter_SetFloatArray) {
 	PPC_FUNC_PROLOGUE();
 	uint32_t var_r30 = 0;
 	uint32_t var_r31 = 0;

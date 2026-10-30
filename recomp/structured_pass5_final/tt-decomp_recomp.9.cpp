@@ -55245,13 +55245,13 @@ PPC_FUNC_IMPL(__imp__LocomotionStateAnim_3410_g) {
 		ea = (ctx.r5.u32) & ~0xF;
 		simde_mm_store_si128((simde__m128i*)PPC_RAW_ADDR(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)ctx.v7.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
 		// bl 0x820c3ad8
-		LocomotionStateAnim_3AD8_g(ctx, base);
+		mat44ComposeAffineInPlace(ctx, base);
 		// mr r4,r26
 		ctx.r4.u64 = var_r26;
 		// addi r3,r1,192
 		ctx.r3.s64 = ctx.r1.s64 + 192;
 		// bl 0x820c3ad8
-		LocomotionStateAnim_3AD8_g(ctx, base);
+		mat44ComposeAffineInPlace(ctx, base);
 		// addi r4,r1,192
 		ctx.r4.s64 = ctx.r1.s64 + 192;
 		// addi r3,r1,416
@@ -55756,7 +55756,7 @@ loc_8223382C:
 			ea = (ctx.r7.u32) & ~0xF;
 			simde_mm_store_si128((simde__m128i*)PPC_RAW_ADDR(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)ctx.v6.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 			// lwz r3,0(r24)
 			ctx.r3.u64 = PPC_LOAD_U32(var_r24 + 0);
 			// addi r7,r1,352
@@ -55778,7 +55778,7 @@ loc_8223382C:
 			// addi r3,r1,352
 			ctx.r3.s64 = ctx.r1.s64 + 352;
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 			// li r5,1
 			ctx.r5.s64 = 1;
 			// addi r4,r1,352
@@ -56702,13 +56702,13 @@ loc_82233E40:
 		ea = (ctx.r11.u32) & ~0xF;
 		simde_mm_store_si128((simde__m128i*)PPC_RAW_ADDR(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)ctx.v6.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
 		// bl 0x820c3ad8
-		LocomotionStateAnim_3AD8_g(ctx, base);
+		mat44ComposeAffineInPlace(ctx, base);
 		// addi r4,r1,256
 		ctx.r4.s64 = ctx.r1.s64 + 256;
 		// addi r3,r1,144
 		ctx.r3.s64 = ctx.r1.s64 + 144;
 		// bl 0x820c3ad8
-		LocomotionStateAnim_3AD8_g(ctx, base);
+		mat44ComposeAffineInPlace(ctx, base);
 		// li r10,0
 		ctx.r10.s64 = 0;
 		// li r9,0
