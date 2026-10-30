@@ -5,6 +5,7 @@
  * Implements GPU fence/resource management functions:
  *   grc_2CC8  @ 0x82352CC8 | size: 0xF0 — GPU memory tile/resolve management
  *   grc_EB10  @ 0x8214EB10 | size: 0x12C — Viewport scaling and setup
+ *   grcDevice_ApplyShaderState @ 0x82363500 — shader binding and dependent GPU state
  *   grc_SetupResource — synthetic link anchor (no binary address)
  *   grmShaderPreset_AllocArray_c — shader preset array allocation
  */
@@ -20,6 +21,13 @@ extern "C" {
 // rage_EEC0 — GPU memory resolve/invalidate helper
 // @ 0x8235EEC0 — takes two addresses (start, end) for a GPU memory region
 extern void rage_EEC0(void* start, void* end);
+
+extern void* rage_A980(void* device);  // @ 0x8235A980
+extern void rage_2A68(void* device, void* shader, uint32_t codeAddress, void* declaration);  // @ 0x82362A68
+extern void rage_32F0(void* device, uint32_t repatch, void* shader, uint32_t* programControl,
+                      void* declaration, const void* vertexInfo, const void* pixelInfo);  // @ 0x823632F0
+extern void grc_3410(void* device);  // @ 0x82363410
+extern uint32_t g_grcShaderPatchSerial;  // @ 0x8271A83C
 
 // grc_5ED0 — viewport apply function
 // @ 0x82355ED0 — applies a viewport rectangle to the GPU device
@@ -271,5 +279,213 @@ void grcDevice_WaitFence(void) {
     // The SDL_GL_SwapWindow call in sdl_PollAndSwap acts as a fence.
 }
 
+
+// Bind vertex/pixel programs, refresh cached vertex patches and derive depth state.
+// @ 0x82363500
+void grcDevice_ApplyShaderState(void* device) {
+    // Xenon device/shader layouts contain 32-bit addresses. The command cursor
+    // points at the last word written; each packet starts at cursor + 1.
+    auto word = [](void* base, uint32_t offset) -> uint32_t& {
+        return *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(base) + offset);
+    };
+    auto wide = [](void* base, uint32_t offset) -> uint64_t& {
+        return *reinterpret_cast<uint64_t*>(static_cast<uint8_t*>(base) + offset);
+    };
+    auto byte = [](void* base, uint32_t offset) -> uint8_t& {
+        return *(static_cast<uint8_t*>(base) + offset);
+    };
+    auto pointer = [&](void* base, uint32_t offset) -> void* {
+        return reinterpret_cast<void*>(static_cast<uintptr_t>(word(base, offset)));
+    };
+    auto commands = [&]() -> uint32_t* {
+        if (word(device, 0) > word(device, 8)) {
+            return static_cast<uint32_t*>(rage_A980(device));
+        }
+        return static_cast<uint32_t*>(pointer(device, 0));
+    };
+    auto publish = [&](uint32_t* cursor) {
+        word(device, 0) = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor));
+    };
+
+    void* vertexShader = pointer(device, 0x3294);
+    void* pixelShader = pointer(device, 0x3290);
+    void* declaration = pointer(device, 0x2C90);
+    void* vertexInfo = static_cast<uint8_t*>(vertexShader) + word(vertexShader, 0x264) + 0x250;
+    void* pixelInfo = pixelShader
+        ? static_cast<uint8_t*>(pixelShader) + word(pixelShader, 0x48) + 0x34 : nullptr;
+    uint32_t programControl = word(vertexInfo, 0);
+    uint32_t contextMisc = word(vertexInfo, 4);
+    uint32_t repatch = pixelInfo
+        ? ((word(pixelInfo, 0x10) ^ word(vertexInfo, 0x10)) & 0x7FFFF) != 0
+        : (word(vertexInfo, 0x10) & 0x1F) != 0;
+
+    bool copyVertexCode = (byte(device, 0x28C1) & 1) != 0 || repatch != 0;
+    if (!copyVertexCode && (wide(device, 0x30) & 0x80) != 0) {
+        const uint32_t codeAddress = word(vertexShader, 0x28);
+        if (declaration) {
+            const bool patchChanged = word(vertexShader, 0xC) != word(declaration, 0x20)
+                || (((wide(device, 0x3190) ^ wide(vertexShader, 0x18)) & wide(declaration, 0x10))
+                    | ((wide(device, 0x3198) ^ wide(vertexShader, 0x20)) & wide(declaration, 0x18))) != 0;
+            if (patchChanged) {
+                const uint32_t fence = word(device, 0x289C);
+                // Repatch in place only when the cached code is no longer in flight.
+                copyVertexCode = (word(vertexShader, 0x24C) & 0x80000000) != 0
+                    && (fence == 0 || fence - word(vertexShader, 8) < fence - word(pointer(device, 0x2890), 0));
+                if (!copyVertexCode) {
+                    rage_2A68(device, vertexShader, codeAddress, declaration);
+                    const uint32_t start = word(vertexShader, 0x28);
+                    rage_EEC0(reinterpret_cast<void*>(static_cast<uintptr_t>(start)),
+                              reinterpret_cast<void*>(static_cast<uintptr_t>(start + word(vertexShader, 0x258))));
+                    if (word(declaration, 0x20) == 0) {
+                        uint32_t serial;
+                        // lwarx/stwcx, with 0 and UINT32_MAX reserved as invalid IDs.
+                        do {
+                            serial = __atomic_add_fetch(&g_grcShaderPatchSerial, 1u, __ATOMIC_RELAXED);
+                        } while (serial + 1u < 2u);
+                        word(declaration, 0x20) = serial;
+                    }
+                    word(vertexShader, 0xC) = word(declaration, 0x20);
+                    word(vertexShader, 0x24C) |= 0x80000000;
+                    wide(vertexShader, 0x18) = wide(device, 0x3190);
+                    wide(vertexShader, 0x20) = wide(device, 0x3198);
+                }
+            }
+        }
+        if (!copyVertexCode) {
+            uint32_t* cursor = commands();
+            *++cursor = 0xC0003B00;  // INVALIDATE_STATE
+            *++cursor = 0x7FFF;
+            *++cursor = 0xC0012700;  // IM_LOAD: vertex shader
+            *++cursor = (codeAddress & 0x1FFFFFFF) + (((codeAddress >> 20) + 0x200) & 0x1000);
+            *++cursor = word(vertexShader, 0x258) >> 2;
+            publish(cursor);
+            word(vertexShader, 8) = word(device, 0x289C);
+            wide(device, 0x2CA0) = wide(device, 0x3190);
+            wide(device, 0x2CA8) = wide(device, 0x3198);
+        }
+    }
+    if (copyVertexCode) {
+        rage_32F0(device, repatch, vertexShader, &programControl, declaration, vertexInfo, pixelInfo);
+    }
+
+    if (!pixelInfo) {
+        if ((word(device, 0x2D94) & 7) != 5) {
+            grc_3410(device);
+        }
+    } else {
+        programControl |= word(pixelInfo, 0);
+        contextMisc |= word(pixelInfo, 4);
+        if ((programControl & 0x70000000) > 0x10000000) {
+            byte(device, 0x28C2) |= 0x20;
+        }
+        if ((wide(device, 0x30) & 0x100) != 0) {
+            uint32_t* cursor = commands();
+            *++cursor = 0xC0003B00;
+            *++cursor = 0x7FFF;
+            *++cursor = 0xC0012700;  // IM_LOAD: pixel shader (low bit = 1)
+            const uint32_t address = word(pixelShader, 0xC);
+            *++cursor = ((address & 0x1FFFFFFE) + (((address >> 20) + 0x200) & 0x1000)) | 1;
+            *++cursor = word(pixelShader, 0x3C) >> 2;
+            publish(cursor);
+            word(pixelShader, 8) = word(device, 0x289C);
+            word(device, 0x2D68) = word(pixelInfo, 0x18);
+            wide(device, 0x28) |= uint64_t(7) << 40;
+
+            if ((word(device, 0x2D94) & 7) == 5) {
+                word(device, 0x2D94) = (word(device, 0x2D94) & ~7u) | 4;
+                word(device, 0x2CF4) = 0;
+                cursor = commands();
+                *++cursor = 0x200D;
+                *++cursor = word(device, 0x2CF4);
+                *++cursor = 0x2208;
+                *++cursor = word(device, 0x2D94);
+                wide(device, 0x20) |= 0x10000;
+                wide(device, 0x28) |= 0x20000000;
+                publish(cursor);
+            }
+            uint32_t shaderControl = word(device, 0x28A0);
+            if ((shaderControl & 0x100) != 0) {
+                if ((programControl & 0x08000000) != 0) {
+                    shaderControl &= ~0x100u;
+                }
+                cursor = commands();
+                *++cursor = 0x5C8;
+                *++cursor = 0x20000;
+                *++cursor = 0xF01;
+                *++cursor = shaderControl;
+                publish(cursor);
+            }
+        }
+    }
+
+    word(device, 0x2D60) = programControl;
+    word(device, 0x2D64) = contextMisc;
+    wide(device, 0x28) |= uint64_t(3) << 41;
+    if ((wide(device, 0x30) & 0x20) != 0) {
+        const bool shaderExportsDepth = pixelInfo && (word(pixelInfo, 0) & 0x08000000) != 0;
+        const uint32_t depthControl = word(device, 0x2D74);
+        const uint32_t depthEnabled = depthControl >> 1;
+        uint32_t renderControl = (word(device, 0x2D80) & ~1u)
+            | ((byte(device, 0x28C2) >> 7) & depthEnabled);
+        word(device, 0x2D80) = renderControl;
+        const uint32_t depthFunc = (depthControl >> 4) & 7;
+        const bool reversed = (renderControl & 0x10) != 0;
+        bool earlyDepth = reversed ? (depthFunc == 4 || depthFunc == 6) : (depthFunc == 1 || depthFunc == 3);
+        earlyDepth = earlyDepth && !shaderExportsDepth && (renderControl & depthEnabled & 1) != 0;
+        if ((depthControl & 1) != 0) {
+            earlyDepth = earlyDepth && (depthControl & 0x3800) == 0 && (depthControl & 0xE0000) == 0;
+            if ((depthControl & 0x80) != 0) {
+                earlyDepth = earlyDepth && (depthControl & 0x03800000) == 0 && (depthControl & 0xE0000000) == 0;
+            }
+        }
+        renderControl = (renderControl & ~2u) | (uint32_t(earlyDepth) << 1);
+        word(device, 0x2D80) = renderControl;
+        if (earlyDepth) {
+            if ((byte(device, 0x28C1) & 8) != 0) {
+                byte(device, 0x28C1) &= 0xF7;
+                uint32_t* cursor = commands();
+                *++cursor = 0xC0004600;  // EVENT_WRITE
+                *++cursor = 0xF;
+                publish(cursor);
+            }
+        } else if ((depthEnabled & 1) != 0 && (depthControl & 4) != 0) {
+            const bool lateDepth = depthFunc == 7 || depthFunc == 5
+                || (reversed ? (depthFunc == 1 || depthFunc == 3) : (depthFunc == 4 || depthFunc == 6));
+            if (lateDepth) {
+                byte(device, 0x28C1) |= 8;
+            }
+        }
+        wide(device, 0x28) |= uint64_t(1) << 34;
+    }
+
+    if ((byte(device, 0x28C0) & 0x20) != 0) {
+        if ((wide(device, 0x28) & 0x20000000) != 0) {
+            uint32_t* cursor = commands();
+            *++cursor = 0x2208;
+            *++cursor = word(device, 0x2D94);
+            publish(cursor);
+            wide(device, 0x28) &= ~uint64_t(0x20000000);
+        }
+        const uint32_t modeControl = word(device, 0x2D94);
+        uint32_t mode = modeControl & 7;
+        if ((word(device, 0x2D7C) & 8) == 0 && (word(pixelInfo, 0x1C) & 0x30) == 0) {
+            mode = 5;
+        }
+        if (mode != word(device, 0x3298)) {
+            word(device, 0x3298) = mode;
+            uint32_t* cursor = commands();
+            *++cursor = 0xC0015000;
+            *++cursor = 0x15555555;
+            *++cursor = 0;
+            *++cursor = 0xC0012D01;
+            *++cursor = 0x40208;
+            *++cursor = (modeControl & ~7u) | mode;
+            *++cursor = 0xC0015000;
+            *++cursor = word(device, 0x32A0) != 0 ? word(device, 0x32A0) : 0xFFFFFFFF;
+            *++cursor = 0;
+            publish(cursor);
+        }
+    }
+}
 
 } // extern "C"
