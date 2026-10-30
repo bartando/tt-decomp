@@ -253,13 +253,12 @@ CShelvingFilterEffect::UnlockForProcess()
 
 ---
 
-## 9. Physics System Functions (5)
+## 9. Physics System Functions (4)
 
 ```
 phWorld_Construct
 phMaterialMgrImpl_AE20_p46
 phMaterialMgrImpl_C208_g(void*, void const*)
-phBoundCapsule_A080_g(void*)
 ph_21B0
 ```
 

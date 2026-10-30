@@ -192,6 +192,85 @@ void pongMover::Reset(void* creatureData) {
     memset(m_pathData, 0, sizeof(m_pathData));
 }
 
+// These movement helpers still have capsule/pg auto-names in the symbol map.
+extern float pongMover_GetBlendWeight(pongMover* mover); // @ 0x820CB598
+extern float pongMover_GetInputSpeed(pongMover* mover); // @ 0x820CB4D0
+extern float* pongMover_ComputeLocalVelocity(float* out, pongMover* mover); // @ 0x820CA640
+extern float* pongMover_ComputeRemoteVelocity(float* out, pongMover* mover); // @ 0x820CA790
+extern void pongMover_UpdateMovementState(pongMover* mover); // @ 0x820CA390
+extern void pongMover_AdjustVelocity(pongMover* mover, float* x, float* z); // @ 0x820CA488
+
+// Blend input and local/remote movement, mirror it for the court side, and
+// advance the stationary latch. +0x60 caches the creature's translation.
+// pongMover::UpdateVelocity (was phBoundCapsule_A080_g) @ 0x820CA080 | size: 0x30C
+void pongMover::UpdateVelocity() {
+    const auto* creature = static_cast<const uint8_t*>(m_pCreature);
+    const auto* instance = *reinterpret_cast<const uint8_t* const*>(creature + 0xA4);
+    memcpy(m_unk60, instance + 0x40, sizeof(m_unk60));
+    const float dt = *reinterpret_cast<const float*>(0x825CAEC0);
+    if (m_flags & 2) {
+        m_posZ -= dt;
+        if (m_posZ <= 0.0f) m_flags &= 0xFD;
+    }
+    const float inputWeight = 1.0f - pongMover_GetBlendWeight(this);
+    const double speed = pongMover_GetInputSpeed(this);
+    const double limit = m_unk48;
+    const float lowerDelta = static_cast<float>(speed - -limit);
+    const double lower = lowerDelta >= 0.0f ? speed : -limit;
+    const float clamped = static_cast<float>(lower - limit >= 0.0 ? limit : lower);
+    // VMX multiply and add round separately and flush denormals at each step.
+    const auto flush = [](float value) {
+        uint32_t bits;
+        memcpy(&bits, &value, sizeof(bits));
+        if ((bits & 0x7F800000u) == 0) {
+            bits &= 0x80000000u;
+            memcpy(&value, &bits, sizeof(value));
+        }
+        return value;
+    };
+    const auto blend = [&flush](float value, float weight, float sum) {
+        const float product = flush(flush(value) * flush(weight));
+        return flush(product + flush(sum));
+    };
+    float x = blend(m_unk20 * clamped, inputWeight, 0.0f);
+    float z = blend(m_unk24 * clamped, inputWeight, 0.0f);
+    const bool remote = (m_flags & 0x10) != 0;
+    const float movementWeight = pongMover_GetBlendWeight(this);
+    alignas(16) float scratch[4] = {};
+    const float* velocity = remote ? pongMover_ComputeRemoteVelocity(scratch, this)
+                                   : pongMover_ComputeLocalVelocity(scratch, this);
+    x = blend(velocity[0], movementWeight, x);
+    z = blend(velocity[2], movementWeight, z);
+    pongMover_UpdateMovementState(this);
+    m_unk30 = x;
+    m_unk34 = z;
+    if (*reinterpret_cast<const uint8_t*>(0x82606326))
+        pongMover_AdjustVelocity(this, &m_unk30, &m_unk34);
+    const float threshold = *reinterpret_cast<const float*>(0x825C9D64);
+    const float z2 = m_unk34 * m_unk34;
+    const float length2 = __builtin_fmaf(m_unk30, m_unk30, z2);
+    if (m_bIsMoving && length2 <= threshold)
+        m_bHasTarget = (__builtin_fabsf(m_unk20) != 0.0f || __builtin_fabsf(m_unk24) != 0.0f);
+    creature = static_cast<const uint8_t*>(m_pCreature);
+    const uint32_t offset = *reinterpret_cast<const uint32_t*>(creature + 0xCC);
+    const auto* players = *reinterpret_cast<const uint8_t* const*>(0x825EAB28);
+    const bool forward = players[offset + 0x40] != 0;
+    m_unk38 = forward ? m_unk30 : -m_unk30;
+    m_unk3C = forward ? m_unk34 : -m_unk34;
+    if (m_bTargetReached && m_unk30 == 0.0f && m_unk34 == 0.0f &&
+        m_unk38 == 0.0f && m_unk3C == 0.0f) {
+        float timer;
+        memcpy(&timer, _unk80, sizeof(timer));
+        timer += *reinterpret_cast<const float*>(0x825CAEC0);
+        memcpy(_unk80, &timer, sizeof(timer));
+        if (timer > threshold) {
+            timer = 0.0f;
+            memcpy(_unk80, &timer, sizeof(timer));
+            m_bTargetReached = 0;
+        }
+    }
+}
+
 /**
  * pongMover::CalcInitMatrix @ 0x820CAC78 | size: 0x29C
  * 
@@ -3941,7 +4020,7 @@ struct pongCreatureLayout {
 extern void pongCreature_Teleport(pongCreature* creature, const pongCreatureMatrix* matrix,
                                   bool resetWorkers, bool updatePoseFirst, bool keepInstanceMatrix);
 // @ 0x820C3F98 — rotation by angle about y into rows a, b, c (cos at [0] and [10])
-extern void phBoundCapsule_3F98_g(pongCreatureMatrix* outRotation, float angle);
+extern void ph_BuildRotationMatrixY(float* outRotation, double angle);
 // @ 0x820C3BC8 — matrix's 3x3 = matrix's 3x3 * rotation's 3x3; row d untouched
 extern void phJoint_3BC8_g(pongCreatureMatrix* matrix, const pongCreatureMatrix* rotation);
 // @ 0x820CC5A8 — the player state's list for the replay list it is given
@@ -4057,7 +4136,7 @@ void pongCreature::ReplayStarting(bool keepInstanceMatrix) {
     memcpy(&matrix, g_identityMatrixRef, sizeof(matrix));
     if (frame.position[2] < 0.0f) {
         pongCreatureMatrix turn;
-        phBoundCapsule_3F98_g(&turn, 3.14159274f);  // 0x82079B30
+        ph_BuildRotationMatrixY(turn.a, 3.14159274f);  // 0x82079B30
         phJoint_3BC8_g(&matrix, &turn);
     }
     memcpy(matrix.d, frame.position, sizeof(matrix.d));

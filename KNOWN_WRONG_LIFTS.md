@@ -113,7 +113,6 @@ unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, a
 - 0x825EBC54 (`boundContext` in `rage_grm.cpp`) behaves like a write counter.
 - `pongPlayer_B208_g` and `pongPlayer_D7B0_g` are `pongPlayerState` functions.
 - `pongMover::Reset` is still broadly wrong (only its teleport call was fixed).
-- `ph_physics.cpp` has two conflicting names for 0x820C3F98 (builds a rotation about y).
 - 0x8271A2EC/0x8271A2F0 hold replay data in `pong_creature.cpp` but are called "shadow
   table"/"match logic" elsewhere; 0x8271A2F4 is stored as `uint32_t` in `pong_ball`.
 - `pongCreature::Reset`, `RegisterShadowCasters`, `RestorePoseFromRollback` look rough and

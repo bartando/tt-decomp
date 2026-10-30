@@ -864,7 +864,6 @@ struct phBoundCapsule {
     void ScaleRadius(float scale);
     void ComputeBounds(float scale, float* outMin, float* outMax);
     float ComputeExtent(float param1, float param2) const;
-    void InitializeAxisAlignedY(float halfLength, float* outMatrix);
     void InitializeAxisAlignedZ(float halfLength, float* outMatrix);
     void TransformByDirection(float halfLength, const float* direction, float* outMatrix);
     void SetMaterialIndex(uint32_t index);
@@ -877,7 +876,6 @@ struct phBoundCapsule {
     void SetupCapsuleFromState();
     float SumFloatArray(int count) const;
     void RotateVectors();
-    void RotateVectorsAlt();
     int NormalizeVector2D(float* outVec) const;
     void LookupTableValues(void* outValues);
     void SetActiveState(int stateIndex);
@@ -1265,7 +1263,7 @@ struct phBoundTaperedCapsule {
     uint32_t    m_nMaterialIndex; // +0xF0  active material/face index (used by slot 12/13)
 
     ~phBoundTaperedCapsule();                        // [0] @ 0x820C9168
-    void   CalcAABB();                                // [3]  @ 0x8233AB98
+    void   TransformEndpoints(const float* matrix);   // [3]  @ 0x8233AB98
     float  GetVolume();                               // [8]  @ 0x8233A898
     void   GetSupportPoint(void* direction,
                                    void* outPoint);           // [9]  @ 0x8233AD38

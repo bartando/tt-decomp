@@ -22,7 +22,7 @@
  *
  *   [outer shell: pongPlayer]
  *     ├── m_pPhysicsBody    +0x0A4  physics transform/pose
- *     ├── m_pPhysicsBound   +0x0A8  phBoundCapsule for collision
+ *     ├── m_pPhysicsBound   +0x0A8  pongMover (legacy field name)
  *     ├── m_pPlayerState    +0x0BC  heap-alloc'd inner state (swing, anim, recovery)
  *     ├── m_swingInputResult +0x0C8  result code from pongPlayer_BF18 swing evaluator
  *     ├── m_swingInputSlot  +0x0CC  index into the global per-player input score table
@@ -58,7 +58,7 @@
  *   +0x090  ?
  *   +0x094  pongSwingData*      m_pSwingData         byte@+341, float@+344, vec3@+352
  *   +0x0A4  void*               m_pPhysicsBody       vtable slot3 called in 5FB8
- *   +0x0A8  void*               m_pPhysicsBound      phBoundCapsule, floats at +56,+60,+64,+72
+ *   +0x0A8  void*               m_pPhysicsBound      pongMover; velocity at +56/+60
  *   +0x0BC  pongPlayerState*    m_pPlayerState       heap-alloc'd inner state (R:large)
  *   +0x0C4  ?
  *   +0x0C5  uint8_t             m_bSwingActive       bool; written by SetSwingActiveState
@@ -235,7 +235,7 @@ struct pongPlayer {
     pongSwingData*      m_pSwingData;        // +0x094  byte@+341, float@+344, vec3@+352
     uint8_t             _pad6[12];
     void*               m_pPhysicsBody;      // +0x0A4  vtable slot3 = physics pose update
-    void*               m_pPhysicsBound;     // +0x0A8  phBoundCapsule; floats +56,+60,+64,+72
+    void*               m_pPhysicsBound;     // +0x0A8  pongMover (legacy field name)
     uint8_t             _pad7_AC[4];         // +0x0AC
     float               m_animTimer;         // +0x0B0  compared vs g_recoveryTimerThreshold in D228
     uint8_t             _pad7_B4[8];         // +0x0B4
