@@ -1226,3 +1226,27 @@ pcrAnimObserver* PlaceAnimObserver(pcrAnimObserver* observer, datResource& rsc) 
 }
 
 } // namespace rage
+
+namespace rage {
+
+// The original calls these helpers; their implementations live at the game addresses.
+double AnimFloor(double value); // @ 0x82431910
+float DecodeQuantizedFloat(crAnimChannelQuantizeFloat* channel, int index); // @ 0x82244CB8
+
+// @ 0x822478E0
+void crAnimChannelQuantizeFloat::vfn_5(void* context, float time, float* outValue) {
+    (void)context;
+    int frame = static_cast<int>(static_cast<float>(AnimFloor(time)));
+    float fraction = time - static_cast<float>(frame);
+    if (fraction > 0.999f) {
+        *outValue = DecodeQuantizedFloat(this, frame + 1);
+    } else if (fraction <= 0.001f) {
+        *outValue = DecodeQuantizedFloat(this, frame);
+    } else {
+        float next = DecodeQuantizedFloat(this, frame + 1);
+        float current = DecodeQuantizedFloat(this, frame);
+        *outValue = __builtin_fmaf(next - current, fraction, current);
+    }
+}
+
+} // namespace rage

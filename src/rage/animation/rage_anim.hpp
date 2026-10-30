@@ -49,7 +49,7 @@ struct crAnimChannelQuantizeFloat {
     ~crAnimChannelQuantizeFloat();                  // [0] @ 0x82244aa0
     void ScalarDtor(int flags); // [1] @ 0x82247888
     void vfn_2();  // [2] @ 0x82244a28
-    void vfn_5();  // [5] @ 0x822478e0
+    void vfn_5(void* context, float time, float* outValue);  // [5] @ 0x822478e0
     void vfn_8();  // [8] @ 0x822479b0
     void vfn_13();  // [13] @ 0x82247b00
     void vfn_14();  // [14] @ 0x82247b10
