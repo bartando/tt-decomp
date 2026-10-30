@@ -73,7 +73,9 @@ def verified(log):
 
 
 def known_wrong():
-    text = (ROOT / "KNOWN_WRONG_LIFTS.md").read_text()
+    # The sections from "The recomp is not ground truth" on are reference notes
+    # (recomp bugs, disassembly caveats, library ranges), not wrong lifts.
+    text = (ROOT / "KNOWN_WRONG_LIFTS.md").read_text().split("\n## The recomp is not ground truth")[0]
     return {int(a, 16) for a in re.findall(r"0x(82[0-9A-Fa-f]{6})", text)}
 
 
