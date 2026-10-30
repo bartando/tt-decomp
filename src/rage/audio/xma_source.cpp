@@ -503,7 +503,7 @@ int32_t PcmSource_Render(PcmSourceLayout* self, void*, void* output) { // @ 0x82
         stream.gain = self->gain;
         stream.previousGain = stream.gain;
         for (auto& value : stream.filterHistory) value = 0;
-        stream.filterGain = 0.0f;
+        stream.resamplePosition = 0.0f;
         setFlags(2, 0);
     }
     if (self->flags & 4) {
