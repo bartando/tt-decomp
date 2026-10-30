@@ -39,6 +39,7 @@
  */
 
 #include "../misc/pong_misc.hpp"
+#include "audio/xact_sound.hpp"
 #include <cstddef>
 #include <cstring>
 
@@ -1222,8 +1223,7 @@ void msgMsgSink::ProcessPendingMessages() {
     // Flush the message object if present
     void* msgObj = *(void**)((uint8_t*)this + 52);
     if (msgObj != nullptr) {
-        extern void msgMsgSink_5148_g(void*);
-        msgMsgSink_5148_g(msgObj);
+        xactSound_Update(msgObj);
     }
 }
 
