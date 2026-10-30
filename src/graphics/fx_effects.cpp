@@ -5,6 +5,8 @@
 
 #include "fx_effects.hpp"
 #include "../rage/memory.hpp"
+#include "rage/mat33.hpp"
+#include "globals.h"
 
 // ── fxVector4 definition ──────────────────────────────────────────────
 // 16-byte SIMD vector. Only fwd-declared in the header; the cpp owns the
@@ -33,9 +35,11 @@ extern void rage_5908(void*);
 
 // ── Forward declarations of helpers referenced in implementations ──
 extern void util_C880(void* meshPtr);                 // mesh/resource releaser @ 0x8214C880
-extern int  rage_2A78(int type, int size);            // rage resource allocator @ 0x82152A78
-extern void phBoundCapsule_3DA0_g(void* out, float radius);  // capsule builder @ 0x820C3DA0
-extern int  util_F840(void* /*tmp*/, float arg);      // scratch conversion @ 0x8223F840
+extern int  rage_2A78(int primitiveType, int vertexCount); // begin immediate batch @ 0x82152A78
+extern uint32_t* util_F840(uint32_t* out, const fxVector4* color); // @ 0x8223F840
+extern uint32_t g_fxVertexCursor;                    // @ 0x825EBA74
+extern uint32_t g_fxCountOnly;                       // @ 0x825EBA84
+extern void* g_binkVideoPlayer;                      // @ 0x825EB988
 extern void pongDrawBucket_AddEntry(void* bucket, fxCrowdGfx* self, int handle);
 
 // Global draw registry slot referenced by fxBallSpinTex::RegisterAndInit
@@ -854,61 +858,70 @@ void fxBallSpinTex::Reset() {
     field<int    >(this, kSpinTrailAccumIdx) = 0;
 }
 
-/**
- * fxBallSpinTex::DrawSpinTrail @ 0x82389740 | [vtable slot 6]
- *
- * Emits 31 capsule primitives along the ball's spin axis to form the
- * motion-blur trail. For each step i in [-15, +15]:
- *   - scales the spin-axis by `i * kScale * lifetime`
- *   - allocates a phBoundCapsule via rage_2A78(6, 124)
- *   - computes final world transform = xform * (segmentOffset + axis*i)
- *   - submits a billboard through fxDrawBillboardQuad in the original
- *
- * Also re-arms the render-pass sentinel at the end (the big
- * `lwz r10,-16(r11)` / `stw r10,0(r11)` block).
- *
- * Because the scaffold has >300 lines of vector permute work this
- * implementation keeps the *shape* only. The original billboard arguments
- * have not been recovered here; fxDrawBillboardQuad does no matrix multiplication.
- *
- * FIXME: f26/f27/f28/f30 are pulled from the fxBallSpinTex .rdata float
- *        pool at 0x82077E40-0x82077EE0; exact per-register mapping has not
- *        been excavated. Shape-only lift uses default curve values (0.5
- *        base, 1/15 spacing, 0.95 damping) which produce visually-correct
- *        trails in the 30-capsule ring.
- */
-void fxBallSpinTex::DrawSpinTrail(float lifetime,
-                                  const fxMatrix44& xform,
-                                  grcMaterial* mat,
-                                  const fxVector4& spinAxis) {
-    constexpr float kCurveBase   = 0.5f;   // from 0x82077E40 pool (shape-verified)
-    constexpr float kCurveScale  = 1.0f;
-    constexpr float kStepSpacing = 1.0f / 15.0f;
-    constexpr float kDamping     = 0.95f;  // from f30 in scaffold
-
-    const char* xformBytes = reinterpret_cast<const char*>(&xform);
-    const fxVector4* xformRow0 = reinterpret_cast<const fxVector4*>(xformBytes + 16);
-    const fxVector4* xformRow1 = reinterpret_cast<const fxVector4*>(xformBytes + 48);
-
-    for (int step = 0; step < kSpinSamplesPerPass; ++step) {
-        float t = (step - 15) * kStepSpacing;
-        float axisScale = t * kCurveBase * kCurveScale;
-
-        // Build per-step capsule.
-        char capsuleStorage[128];
-        rage_2A78(6, 124);                              // original return unused
-        phBoundCapsule_3DA0_g(capsuleStorage, axisScale);
-
-        // FIXME: recover angle, centre, half extents and packed colour before
-        // calling fxDrawBillboardQuad; the old no-argument placeholder was invalid.
-        (void)xformRow0; (void)xformRow1; (void)mat; (void)spinAxis; (void)lifetime;
-        (void)kDamping;
+// Xenon VMX arithmetic flushes subnormal inputs and results to signed zero.
+static float fxSpinVectorFloat(float value) {
+    uint32_t bits;
+    __builtin_memcpy(&bits, &value, sizeof(bits));
+    if ((bits & 0x7f800000u) == 0) {
+        bits &= 0x80000000u;
+        __builtin_memcpy(&value, &bits, sizeof(value));
     }
-    // Re-arm the render sentinel: the registry stores a "pass-open" flag
-    // one u32 back from the current count. This is the post-emit slot
-    // acknowledging that all 31 capsules have been submitted for this pass.
-    if (g_fxSpinRegistryCount >= 1) {
-        g_fxSpinRegistryKinds[g_fxSpinRegistryCount - 1] |= 0x1;
+    return value;
+}
+
+// Emit 31 rotated samples as one quad batch (124 vertices). The input matrix's
+// second row is the radial direction and its fourth row is the world centre.
+// Xenon: r3=this, r4=xform, r5=axis, r6=color, f1=radius.
+// @ 0x82389740 | size: 0x210
+void fxBallSpinTex::DrawSpinTrail(const fxMatrix44& xform,
+                                const fxVector4& spinAxis,
+                                const fxVector4& color, float radius) {
+    rage_2A78(6, 124);
+    const float* matrix = reinterpret_cast<const float*>(&xform);
+    for (int step = 0; step < kSpinSamplesPerPass; ++step) {
+        // Two separately rounded multiplies: angular spacing is 1/15, with
+        // an additional 1.75 radians sweep scale from 0x825C9D60.
+        const float t = static_cast<float>(step - 15) * 0.06666667014360428f;
+        const float angle = t * 1.75f;
+        alignas(16) float rotation[12];
+        rage::mat33RotationAxisAngle(rotation, &spinAxis.x, angle);
+
+        float position[3];
+        for (unsigned lane = 0; lane < 3; ++lane) {
+            // vmsum3fp rounds once after all three products. Rotation row
+            // padding is deliberately excluded, as is the source vector's w.
+            double dot = 0.0;
+            for (unsigned row = 0; row < 3; ++row)
+                dot += static_cast<double>(fxSpinVectorFloat(rotation[row * 4 + lane])) *
+                       fxSpinVectorFloat(matrix[4 + row]);
+            const float rotated = fxSpinVectorFloat(static_cast<float>(dot));
+            const float scaled = fxSpinVectorFloat(rotated * fxSpinVectorFloat(radius));
+            position[lane] = fxSpinVectorFloat(scaled + fxSpinVectorFloat(matrix[12 + lane]));
+        }
+
+        fxVector4 sampleColor = color;
+        const uint32_t sampleOffset = g_phFrameCounter << 6;
+        const float height = field<float>(this, sampleOffset + 104);
+        if (position[2] < height)
+            sampleColor.w *= 0.0f;
+        uint32_t packed;
+        const uint32_t* packedColor = util_F840(&packed, &sampleColor);
+        const float taper = 1.0f - __builtin_fabsf(t);
+        const float extent = static_cast<float>(static_cast<double>(taper) *
+                                                0.007999999448657036f +
+                                                0.0020000000949949026f);
+        fxDrawBillboardQuad(0, 0.0f, position[0], position[1], position[2],
+                            extent, extent, *packedColor);
+    }
+
+    // End the immediate batch: clear cursor/count-only and restore the device
+    // word only when there was an active stream. This is not the spin registry.
+    if (g_fxVertexCursor == 0) {
+        g_fxCountOnly = 0;
+    } else {
+        g_fxVertexCursor = 0;
+        g_fxCountOnly = 0;
+        field<uint32_t>(g_binkVideoPlayer, 0) = field<uint32_t>(g_binkVideoPlayer, 13652);
     }
 }
 

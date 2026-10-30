@@ -110,8 +110,8 @@ struct fxBallSpinTex {
     virtual void RegisterAndInit();  // [2] @ 0x82388978 — reset state then register into draw registry slot
     virtual void Reset();  // [3] @ 0x82388c58 — zero segment vectors, seed default floats
     virtual void vfn_4();  // [4] @ 0x82280898 — (thunk; inherited)
-    virtual void DrawSpinTrail(float lifetime, const fxMatrix44& xform,
-                               grcMaterial* mat, const fxVector4& spinAxis);  // [6] @ 0x82389740 — emit 30-capsule trail
+    virtual void DrawSpinTrail(const fxMatrix44& xform, const fxVector4& spinAxis,
+                               const fxVector4& color, float radius);  // [6] @ 0x82389740 — emit 31 quads
 };
 
 // ── fxBallSpinTexData  [vtable @ 0x8206B388] ──────────────────────────
