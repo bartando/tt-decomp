@@ -427,12 +427,29 @@ struct crAnimDofVector3 {
 // ── rage::crAnimFrame  [vtable @ 0x8204FCBC] ──────────────────────────
 struct crAnimFrame {
     void**      vtable;           // +0x00
+    uint32_t    m_flags;          // +0x04
+    void**      m_dofs;           // +0x08  sorted by (type at +5, uint16 ID at +6)
+    uint16_t    m_dofCount;       // +0x0C
+    uint16_t    m_dofCapacity;    // +0x0E
 
     // ── virtual methods ──
     ~crAnimFrame();                  // [0] @ 0x822e1020
     void ScalarDtor(int flags); // [1] @ 0x8224c0f8
     void vfn_2();  // [2] @ 0x8224c100
 };
+
+// Only the low byte of the filter's return register determines acceptance.
+using crAnimDofFilter = uint32_t (*)(void* context, uint32_t type, uint32_t id,
+                                   void* userData, float* outWeight);
+// The operation's r5 is unused; r6 is always zero. Float arguments use f1.
+using crAnimDofOperation = void (*)(void* dst, void* src, float weight,
+                                   uint32_t unusedR5, uint32_t flags);
+
+// Descriptive name inferred from the sorted frame walk and its callers.
+// @ 0x8224B800
+void crAnimFrame_ApplyMatchingDofs(crAnimFrame* dst, const crAnimFrame* src,
+                                 void* context, crAnimDofFilter filter, void* userData,
+                                 float weight, void* unusedR8, crAnimDofOperation operation);
 
 // ── rage::crAnimPlayer  [vtable @ 0x8204FD00] ──────────────────────────
 struct crAnimPlayer {
