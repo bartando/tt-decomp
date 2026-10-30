@@ -16,7 +16,9 @@
  *   - grcDevice_setSamplerTrilinearThreshold @ 0x82355C48 — Xenos texture fetch state
  *   - grcDevice_setSamplerLodBias       @ 0x82355948 — Xenos texture fetch state
  *   - grcDevice_SetViewport         @ 0x82355ED0 — clip and load the viewport transform
+ *   - grcDevice_SetZEnable / SetStencilEnable @ 0x82354120/41F0 — RB_DEPTHCONTROL
  *   - grcDevice_SetIndices          @ 0x82356210 — bind the index buffer
+ *   - grcDevice_SetDepthStencilSurface @ 0x823565F8 — bind the depth surface
  *   - grcDevice_SetStreamSource     @ 0x82356118 — bind a vertex buffer to a stream
  *   - grcDevice_SetRenderTarget     @ 0x82356290 — bind a colour surface to a target slot
  *   - grcDevice_SetPixelShaderConstantF @ 0x82356A70 — upload pixel shader constants 0..19
@@ -682,6 +684,82 @@ static void dropDeviceReference(uint8_t* state, uint32_t* resource) {
     if ((references & 0x00F800FFu) == 0) {
         grcTexture_ReleaseResource(resource);
     }
+}
+
+// RB_DEPTHCONTROL lives at +0x2D74. Without a depth surface both switches
+// are written off, but the requested values are kept for the next bind.
+static void setDepthControlBit(uint8_t* state, uint32_t requestOffset, uint32_t enable, uint32_t bit) {
+    auto word = [state](uint32_t offset) -> uint32_t& {
+        return *reinterpret_cast<uint32_t*>(state + offset);
+    };
+    word(requestOffset) = enable;
+    if (word(0x3108) == 0) {
+        enable = 0;
+    }
+    word(0x2D74) = (word(0x2D74) & ~(1u << bit)) | ((enable << bit) & (1u << bit));
+    *reinterpret_cast<uint64_t*>(state + 0x28) |= UINT64_C(1) << 37;
+    *reinterpret_cast<uint64_t*>(state + 0x30) |= 0x20;
+}
+
+// @ 0x82354120
+extern "C" void grcDevice_SetZEnable(void* device, uint32_t enable) {
+    setDepthControlBit(static_cast<uint8_t*>(device), 0x2EC4, enable, 1);
+}
+
+// @ 0x823541F0
+extern "C" void grcDevice_SetStencilEnable(void* device, uint32_t enable) {
+    setDepthControlBit(static_cast<uint8_t*>(device), 0x2EC8, enable, 0);
+}
+
+extern "C" void grc_36E8(void* device, void* surface); // @ 0x823536E8
+
+// Binding a depth surface without a colour target lets grc_36E8 size the
+// viewport from it. Afterwards the Z and stencil switches are reapplied, and
+// bit 2 of +0x28C0 records whether every bound surface still matches the cached
+// set (an unbound slot matches anything).
+// @ 0x823565F8
+extern "C" void grcDevice_SetDepthStencilSurface(void* device, void* surface) {
+    uint8_t* state = static_cast<uint8_t*>(device);
+    auto word = [state](uint32_t offset) -> uint32_t& {
+        return *reinterpret_cast<uint32_t*>(state + offset);
+    };
+    auto dirty = [state](uint32_t offset) -> uint64_t& {
+        return *reinterpret_cast<uint64_t*>(state + offset);
+    };
+    dropDeviceReference(state, reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(word(0x3108))));
+    word(0x3108) = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(surface));
+    if (surface != nullptr) {
+        auto* header = static_cast<uint32_t*>(surface);
+        header[0] += kDeviceReference;
+        if (word(0x30F8) == 0) {
+            grc_36E8(device, surface);
+        }
+        word(0x2CC8) = header[0x34 / 4];
+        word(0x2D80) = header[0x38 / 4];
+        state[0x28C2] = static_cast<uint8_t>((state[0x28C2] & 0x7Fu) | ((header[0x38 / 4] << 7) & 0x80u));
+        dirty(0x20) |= 0x08000000u;
+        dirty(0x28) |= UINT64_C(1) << 34;
+        dirty(0x30) |= 0x20;
+    } else {
+        word(0x2D80) &= 0xFFFFFFF0u;
+        state[0x28C2] &= 0x7Fu;
+        dirty(0x28) |= UINT64_C(1) << 34;
+    }
+
+    bool matchesCache = false;
+    if (word(0x32A0) == 0 && (state[0x28C0] & 0x10u) != 0) {
+        matchesCache = true;
+        for (uint32_t i = 0; i < 5; ++i) {
+            const uint32_t bound = word(0x30F8 + i * 4);
+            if (word(0x32B0 + i * 4) != bound && bound != 0) {
+                matchesCache = false;
+                break;
+            }
+        }
+    }
+    state[0x28C0] = static_cast<uint8_t>((state[0x28C0] & ~4u) | (matchesCache ? 4u : 0u));
+    grcDevice_SetZEnable(device, word(0x2EC4));
+    grcDevice_SetStencilEnable(device, word(0x2EC8));
 }
 
 // Name inferred: device+0x30F4 sits just before the render targets.
