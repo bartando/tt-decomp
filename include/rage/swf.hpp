@@ -379,6 +379,7 @@ class swfCMD_PlaceObject2ClipEvent : public swfBASE {
 public:
     virtual ~swfCMD_PlaceObject2ClipEvent();
     void Execute(swfINSTANCE* parent);  // Guest vtable slot 1; dispatched explicitly.
+    void UpdateClipEvents(swfINSTANCE* parent); // Guest vtable slot 3; dispatched explicitly.
 };
 
 /**
