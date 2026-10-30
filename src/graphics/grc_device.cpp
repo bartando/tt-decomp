@@ -9,6 +9,7 @@
  *   - grcDevice_setSamplerMagFilter @ 0x823555A8 — Xenos texture fetch state
  *   - grcDevice_setSamplerMaxAnisotropy @ 0x82355828 — Xenos texture fetch state
  *   - grcDevice_setSamplerLodBias       @ 0x82355948 — Xenos texture fetch state
+ *   - grcDevice_SetViewport         @ 0x82355ED0 — clip and load the viewport transform
  *   - grcDevice_SetStreamSource     @ 0x82356118 — bind a vertex buffer to a stream
  *   - grcGpuResource_Release        @ 0x82356DA8 — drop a reference, free on the last
  *   - grcDevice_SetTexture          @ 0x82359940 — bind a texture to a fetch slot
@@ -343,6 +344,69 @@ extern "C" uint32_t grcGpuResource_Release(void* resource) {
         _locale_register(resource, 0x24800000);
     }
     return 0;
+}
+
+extern "C" void grc_5E08(void* device, void* out);  // @ 0x82355E08
+extern const float g_grcHalf;                       // @ 0x8202D10C
+
+// D3DVIEWPORT9 layout.
+struct grcViewportRect {
+    uint32_t x, y, width, height;
+    float minZ, maxZ;
+};
+
+// Clip `viewport` to the bound render target and load the viewport transform
+// (scale/offset per axis, depth range) into the shadow constants. The target
+// size comes from the surface (color 0, else depth) unless the device's cached
+// target set (+0x32B0) still matches, in which case its cached size is used.
+// @ 0x82355ED0
+extern "C" void grcDevice_SetViewport(void* device, const void* viewport) {
+    uint8_t* state = static_cast<uint8_t*>(device);
+    const auto* targets = reinterpret_cast<const uint32_t*>(state + 0x30F8);
+    const auto* vp = static_cast<const grcViewportRect*>(viewport);
+    uint32_t surface = targets[0] != 0 ? targets[0] : targets[4];
+    if (surface == 0) {
+        return;
+    }
+
+    bool cached = (state[0x28C0] & 0x10) != 0;
+    const auto* cachedTargets = reinterpret_cast<const uint32_t*>(state + 0x32B0);
+    for (int i = 0; cached && i < 5; ++i) {
+        cached = cachedTargets[i] == targets[i] || targets[i] == 0;
+    }
+    uint32_t targetWidth, targetHeight;
+    if (cached) {
+        targetWidth = *reinterpret_cast<const uint32_t*>(state + 0x34A8);
+        targetHeight = *reinterpret_cast<const uint32_t*>(state + 0x34AC);
+    } else {
+        const uint32_t size = reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(surface))[6];
+        targetWidth = (size & 0x1FFF) + 1;
+        targetHeight = ((size >> 13) & 0x1FFF) + 1;
+    }
+
+    const uint32_t x = vp->x, y = vp->y;
+    const uint32_t right = x + vp->width < targetWidth ? x + vp->width : targetWidth;
+    const uint32_t bottom = y + vp->height < targetHeight ? y + vp->height : targetHeight;
+    const uint32_t width = right - x, height = bottom - y;
+    auto* clipped = reinterpret_cast<grcViewportRect*>(state + 0x3208);
+    clipped->x = x;
+    clipped->y = y;
+    clipped->width = width;
+    clipped->height = height;
+    clipped->minZ = vp->minZ;
+    clipped->maxZ = vp->maxZ;
+    grc_5E08(device, state + 0x3220);
+
+    auto* transform = reinterpret_cast<float*>(state + 0x2D48);
+    const float halfWidth = static_cast<float>(width) * g_grcHalf;
+    const float halfHeight = static_cast<float>(height) * g_grcHalf;
+    transform[0] = halfWidth;
+    transform[1] = static_cast<float>(x) + halfWidth;
+    transform[2] = -halfHeight;
+    transform[3] = static_cast<float>(y) + halfHeight;
+    transform[4] = vp->maxZ - vp->minZ;
+    transform[5] = vp->minZ;
+    *reinterpret_cast<uint64_t*>(state + 0x28) |= UINT64_C(0x0001F80000000000);
 }
 
 // Bind `buffer` to vertex stream `stream` at `offset` with `stride` bytes per

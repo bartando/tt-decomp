@@ -720,12 +720,12 @@ void grcTextureFactoryString_FF68(rage::grcTextureFactoryString* pObj, const cha
 // Copies 6 float values (24 bytes) from device+12808 into a local buffer,
 // then conditionally flips the Y/V coordinates (subtracts from 1.0f) when
 // g_grcFormatId matches the sentinel 0x1A220197. Finally dispatches the
-// transform data to grc_5ED0 for GPU submission.
+// transform data to grcDevice_SetViewport for GPU submission.
 // ─────────────────────────────────────────────────────────────────────────────
 extern void* g_grcTextureDevice __asm__("_g_binkVideoPlayer");   // @ 0x825EB988, defined in globals.c
 extern uint32_t g_grcFormatId;     // @ 0x825C9030
 extern void rage_6290(void* pDevice, void* pSrc, void* pParam);
-extern void grc_5ED0(void* pDevice, float* pTransformData);
+extern "C" void grcDevice_SetViewport(void* device, const void* viewport);  // @ 0x82355ED0
 
 // @ 0x8214EFE8
 void grcTextureFactoryXenon_EFE8(void* pDevice, void* pSrc, void* pParam)
@@ -748,7 +748,7 @@ void grcTextureFactoryXenon_EFE8(void* pDevice, void* pSrc, void* pParam)
         transformData[5] = 1.0f - transformData[5];   // flip V scale
     }
 
-    grc_5ED0(g_grcTextureDevice, transformData);
+    grcDevice_SetViewport(g_grcTextureDevice, transformData);
 }
 
 

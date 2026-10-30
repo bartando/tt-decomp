@@ -35,9 +35,7 @@ void grcDevice_FlushDirtySixRegisterGroups(void* device, uint64_t dirty, uint32_
 void grcDevice_FlushDirtySixteenRegisterGroups(void* device, uint64_t dirty, uint32_t firstRegister,
                                               const uint32_t* values);  // defined below
 
-// grc_5ED0 — viewport apply function
-// @ 0x82355ED0 — applies a viewport rectangle to the GPU device
-extern void grc_5ED0(void* device, int32_t* viewportRect);
+extern "C" void grcDevice_SetViewport(void* device, const void* viewport);  // @ 0x82355ED0
 
 // Global GPU device pointer
 // @ 0x825EB988 (.data, 4 bytes)
@@ -194,7 +192,7 @@ void grc_EB10(void* a) {
     // Apply viewport to the GPU device
     void* device = lbl_825EB988;
     if (device) {
-        grc_5ED0(device, viewportRect);
+        grcDevice_SetViewport(device, viewportRect);
     }
 }
 
