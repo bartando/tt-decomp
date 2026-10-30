@@ -45,6 +45,35 @@ void pongRender_ResetState(int32_t pass);  // @ 0x82225590
 
 // Forward declarations (full definition below)
 
+// Inferred layer descriptor shared by AddEntry, sorting and Render. Two frame
+// buffers each have an entry array/count and a 200-byte sorted-index list.
+struct pongDrawBucketLayer {
+    struct Entry {
+        void** vtable;            // +0x00, slot 0 draws with an int32 pass
+        uint8_t _04[8];
+        int32_t lightIndex;        // +0x0C, negative means no per-entry lights
+    };
+    struct Buffer {
+        Entry** entries;
+        uint16_t capacity;
+        uint16_t _06;
+    };
+    char name[32];
+    int32_t sortMode;             // +0x20, mode 4 supports the shader override pass
+    Buffer buffers[2];           // +0x24
+    int32_t counts[2];            // +0x34
+    uint32_t beforeCallback;      // +0x3C, index into the callback table
+    uint32_t afterCallback;       // +0x40
+    uint8_t order[2][200];        // +0x44
+    uint8_t enabled;              // +0x1D4
+
+    void Render(int32_t pass);    // @ 0x82225D90 (rage_5D90), inferred name
+};
+#if UINTPTR_MAX == UINT32_MAX
+static_assert(__builtin_offsetof(pongDrawBucketLayer, enabled) == 468, "layer enabled offset");
+static_assert(__builtin_offsetof(pongDrawBucketLayer::Entry, lightIndex) == 12, "entry light index");
+#endif
+
 /**
  * pongDrawBucket — A single render bucket that holds renderable pointers.
  * Layout verified from pongDrawBucket_AddEntry @ 0x822278D8
