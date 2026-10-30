@@ -60,6 +60,7 @@ extern "C" {
 extern bool CheckButtonPressed(void* record);  // @ 0x821DFFF8
 
 extern int rage_2A78(int primitiveType, int vertexCount);  // @ 0x82152A78
+extern void fxEmitVertex2D(float x, float y); // @ 0x82406010
 extern uint32_t g_fxVertexCursor;  // @ 0x825EBA74
 extern uint32_t g_fxCountOnly;     // @ 0x825EBA84
 extern uint32_t g_fxVertexCount;   // @ 0x825EBA88
@@ -230,6 +231,75 @@ void swfDrawFontGlyph(const swfFontAtlas* atlas, float x, float y, float scale, 
         device[0] = device[13652 / 4];
     }
     g_fxCountOnly = 0;
+}
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC pop_options
+#endif
+
+struct swfShapeFillState {
+    uint32_t type;
+    uint32_t color; // ARGB
+    float textureMatrix[6];
+    void* texture;
+    void* gradient;
+};
+
+extern uint32_t swfSampleGradient(const void* gradient, float x, float y); // @ 0x824060B8
+extern const float g_swfTwipScale; // @ 0x820290F0
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("fp-contract=off")
+#endif
+// Formerly pongShadowMap_6920_w. swfSHAPE::vfn_1 (0x82406C58) dispatches
+// command 7 here; primitive 3 is a triangle list. The shape argument is unused.
+// @ 0x82406920
+uint32_t swfDrawShapeTriangles(const swfSHAPE*, const void* command,
+                               const void* transform, const swfShapeFillState* fill) {
+#if defined(__clang__)
+#pragma clang fp contract(off)
+#endif
+    const auto* words = static_cast<const uint32_t*>(command);
+    const uint32_t count = words[0];
+    rage_2A78(3, static_cast<int32_t>(count));
+
+    const auto* state = static_cast<const uint8_t*>(transform);
+    const float* world = reinterpret_cast<const float*>(state + 24);
+    const auto* multiply = reinterpret_cast<const int8_t*>(state + 56);
+    const auto* add = reinterpret_cast<const int8_t*>(state + 60);
+    for (int32_t i = 0; i < static_cast<int32_t>(count); ++i) {
+        float x, y;
+        std::memcpy(&x, words + 1 + 2 * i, sizeof(x));
+        std::memcpy(&y, words + 2 + 2 * i, sizeof(y));
+        const uint32_t color = fill->gradient ? swfSampleGradient(fill->gradient, x, y) : fill->color;
+
+        uint32_t transformed = 0;
+        for (unsigned channel = 0; channel < 4; ++channel) {
+            // RGBA signed 2.6 multipliers and signed additions in units of four.
+            const unsigned shift = channel == 3 ? 24 : 16 - channel * 8;
+            int value = ((int((color >> shift) & 255) * multiply[channel]) >> 6) + int(add[channel]) * 4;
+            value = value < 0 ? 0 : value > 255 ? 255 : value;
+            if (channel == 3) value = value * state[71] / 255;
+            transformed |= static_cast<uint32_t>(value) << shift;
+        }
+        g_fxCurrentColor = transformed;
+
+        const float px = x * g_swfTwipScale;
+        const float py = y * g_swfTwipScale;
+        // Preserve the separate fmuls, fused second product, then translation.
+        const float screenX = (std::fma(world[2], py, world[0] * px) + world[4]) * g_swfPixelScaleX;
+        const float screenY = (std::fma(world[3], py, world[1] * px) + world[5]) * g_swfPixelScaleY;
+        g_fxVertexU = std::fma(fill->textureMatrix[2], py, fill->textureMatrix[0] * px) + fill->textureMatrix[4];
+        g_fxVertexV = std::fma(fill->textureMatrix[3], py, fill->textureMatrix[1] * px) + fill->textureMatrix[5];
+        fxEmitVertex2D(screenX, screenY);
+    }
+    if (g_fxVertexCursor != 0) {
+        g_fxVertexCursor = 0;
+        auto* device = static_cast<uint32_t*>(g_binkVideoPlayer);
+        device[0] = device[13652 / 4];
+    }
+    g_fxCountOnly = 0;
+    return count * 2u + 1u;
 }
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC pop_options

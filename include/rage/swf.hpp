@@ -49,6 +49,11 @@ struct swfFontAtlas;
 // Draw one atlas glyph at the text pen position using the current SWF transform.
 void swfDrawFontGlyph(const swfFontAtlas* atlas, float x, float y, float scale, int glyphIndex);
 
+struct swfShapeFillState;
+// Command: vertex count followed by float twip-coordinate pairs. Returns words consumed.
+uint32_t swfDrawShapeTriangles(const swfSHAPE* shape, const void* command,
+                               const void* transform, const swfShapeFillState* fill);
+
 /**
  * swfValueType — ActionScript value type constants
  *
