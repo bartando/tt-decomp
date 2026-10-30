@@ -951,7 +951,77 @@ extern "C" void grcDevice_SetTexture(void* device, uint32_t slot, void* texture)
     dropDeviceReference(state, previous);
 }
 
-extern "C" void grcDevice_CommitCommandSpace(void* device, uint32_t end, uint32_t sequence); // @ 0x82359DC0
+extern "C" void* g_sda_base;  // @ 0x82600000 — r13 / per-thread kernel state
+extern int D3DDeviceXenon_ReportGPUHang(void* hangState);  // @ 0x823643E0
+
+// Wait until the GPU no longer owns the requested command-ring range. The low
+// two fence bits encode its wrap sequence; the remaining bits are its cursor.
+// The watchdog keeps the initial queue head/tick across retries and may abort.
+// @ 0x82359DC0
+extern "C" void grcDevice_CommitCommandSpace(void* device, uint32_t end, uint32_t sequence) {
+    auto* state = static_cast<uint8_t*>(device);
+    const auto queue = [state]() {
+        const uint32_t address = *reinterpret_cast<const volatile uint32_t*>(state + 0x2890);
+        return reinterpret_cast<const volatile uint32_t*>(static_cast<uintptr_t>(address));
+    };
+    const auto pending = [end, sequence](uint32_t fence) {
+        const uint32_t lag = (sequence - fence) & 3u;
+        return lag != 0 && (lag != 1 || end > (fence & ~3u));
+    };
+    const volatile uint32_t* initialQueue = queue();
+    if (!pending(initialQueue[1])) {
+        return;
+    }
+    struct HangState {
+        void* device;
+        uint32_t lastGpuTick;
+        uint32_t lastQueueHead;
+    } hang;
+    hang.device = device;
+    hang.lastQueueHead = initialQueue[0];
+    const auto* thread = *reinterpret_cast<const uint8_t* const*>(
+        static_cast<const uint8_t*>(g_sda_base) + 0x100);
+    hang.lastGpuTick = *reinterpret_cast<const uint32_t*>(thread + 0x58);
+    do {
+        if (D3DDeviceXenon_ReportGPUHang(&hang) == 0) {
+            return;
+        }
+        // Retail busy delay, followed by a fresh queue pointer and fence read.
+        for (volatile uint32_t delay = 100; delay != 0; --delay) {}
+    } while (pending(queue()[1]));
+}
+
+// Allocate a word-count of aligned data through the device's reserve callback.
+// This is a function pointer at +0x3544, not a vtable slot. The callback can
+// change the byte count and device state even when allocation fails.
+// @ 0x8235A088
+extern "C" void* grcDevice_AllocateCommandData(void* device, uint32_t wordCount, uint32_t alignment) {
+    auto* state = static_cast<uint8_t*>(device);
+    const auto field = [state](uint32_t offset) -> uint32_t& {
+        return *reinterpret_cast<uint32_t*>(state + offset);
+    };
+    uint32_t bytes = wordCount * 4u;
+    if ((state[0x28C1] & 0x80u) != 0) {
+        return nullptr;
+    }
+    using Reserve = void* (*)(void*, void*, uint32_t, uint32_t*, uint32_t);
+    auto reserve = reinterpret_cast<Reserve>(static_cast<uintptr_t>(field(0x3544)));
+    void* result = reserve(reinterpret_cast<void*>(static_cast<uintptr_t>(field(0x3548))),
+                           device, 1, &bytes, alignment);
+    field(0x36D0) += bytes;
+    if (field(0x36D0) > field(0x36D4) && field(0x34E0) == 0) {
+        const uint32_t cursor = field(0);
+        field(8) = cursor;
+        field(4) = cursor + 0xA0u;
+        if (field(0x36C8) != field(0x36B4)) {
+            field(0x36C0) = field(0x36B8);
+        }
+    }
+    if (result == nullptr) {
+        state[0x28C1] |= 0x80u;
+    }
+    return result;
+}
 
 // Reserve space in the device's command ring (all fields are 32-bit addresses):
 // +14004/+14008 ring start/end, +14012 minimum block, +14016 cursor in the
@@ -1205,7 +1275,6 @@ extern void game_37B0(void* device, int32_t left, int32_t top,
                       int32_t right, int32_t bottom);  // @ 0x823537B0
 extern void grc_3E20(void* device);  // @ 0x82363E20
 extern uint32_t* grc_DBF8(void* device, uint32_t* cursor);  // @ 0x8235DBF8
-extern float* grcDevice_AllocateCommandData(void* device, uint32_t count, uint32_t stride);  // @ 0x8235A088
 extern void grc_CFD8(void* device, uint32_t flags, const int32_t* rect, const float* color,
                      float depth, uint32_t stencil);  // @ 0x8235CFD8
 extern void rage_AD98(void* device);  // @ 0x8235AD98
@@ -1521,7 +1590,7 @@ extern "C" void grcDevice_Resolve(void* device, uint32_t flags, const int32_t* s
         }
     }
     cursor = available();
-    float* vertices = grcDevice_AllocateCommandData(device, 6, 4);
+    float* vertices = static_cast<float*>(grcDevice_AllocateCommandData(device, 6, 4));
     if (!vertices) {
         saveCursor(cursor);
         return;
