@@ -22,10 +22,19 @@ namespace rage {
 // ── rage::crAnimChannel  [vtable @ 0x8204F724] ──────────────────────────
 struct crAnimChannel {
     void**      vtable;           // +0x00
+    uint8_t     m_flags;          // +0x04
+    uint8_t     m_encoding;       // +0x05
+    uint16_t    m_tag;            // +0x06
 
     // ── virtual methods ──
     ~crAnimChannel();                  // [0] @ 0x82244040
 };
+
+// Descriptive name: xe_D850 creates the smallest usable float channel.
+// skip is the number of intervening floats (sample stride = skip + 1).
+crAnimChannel* CreateFloatAnimChannel(void* dof, const float* samples,
+                                    int32_t sampleCount, int32_t skip,
+                                    float tolerance); // @ 0x8224D850
 
 // ── rage::crAnimChannelCurveFloat  [vtable @ 0x8204F964] ──────────────────────────
 struct crAnimChannelCurveFloat {

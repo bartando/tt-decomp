@@ -12,8 +12,80 @@
 #include <cmath>
 
 extern double crt_sqrt(double value); // @ 0x824301D0
+extern "C" void sysMemAllocator_InitMainThread(); // @ 0x820C0038
+extern "C" void* xe_Alloc_EC88(uint32_t size); // @ 0x820DEC88
+extern uint32_t* g_sda_base; // @ 0x82600000
 
 namespace rage {
+
+extern void* g_crAnimChannelStaticFloat_vtable[];   // @ 0x8204F8D4
+extern void* g_crAnimChannelQuantizeFloat_vtable[]; // @ 0x8204F9AC
+extern void* g_crAnimChannelRawFloat_vtable[];      // @ 0x8204F76C
+
+// The raw and quantized channels share an atArray header at +8. The
+// quantized channel's scale/bias at +16/+20 are left for its initializer.
+struct FloatSampleChannel : crAnimChannel {
+    void* samples;        // +0x08 (float raw samples or uint16_t quantized samples)
+    uint16_t count;       // +0x0C
+    uint16_t capacity;    // +0x0E
+};
+
+// @ 0x8224D850 | size: 0x230 (xe_D850)
+// The DOF argument is unused. Allocation success is a precondition in the
+// original too: its null-allocation branches immediately dereference null.
+crAnimChannel* CreateFloatAnimChannel(void* /*dof*/, const float* samples,
+                                    int32_t sampleCount, int32_t skip,
+                                    float tolerance) {
+    using AllocateFn = void* (*)(void*, uint32_t, uint32_t);
+    using InitializeFn = uint32_t (*)(crAnimChannel*, const float*, int32_t, int32_t, float);
+    using DestroyFn = void (*)(crAnimChannel*, int32_t);
+    using SizeFn = int32_t (*)(crAnimChannel*);
+
+    sysMemAllocator_InitMainThread();
+    void** thread = *reinterpret_cast<void***>(g_sda_base);
+    void* allocator = thread[1];
+    auto allocate = reinterpret_cast<AllocateFn>((*static_cast<void***>(allocator))[1]);
+    auto* constant = static_cast<crAnimChannel*>(allocate(allocator, 12, 16));
+    constant->vtable = g_crAnimChannelStaticFloat_vtable;
+    constant->m_encoding = 4;
+    auto initialize = reinterpret_cast<InitializeFn>(constant->vtable[8]);
+    if (static_cast<uint8_t>(initialize(constant, samples, sampleCount, skip, tolerance)) != 0)
+        return constant;
+
+    reinterpret_cast<DestroyFn>(constant->vtable[0])(constant, 1);
+    auto* quantized = static_cast<FloatSampleChannel*>(xe_Alloc_EC88(24));
+    quantized->vtable = g_crAnimChannelQuantizeFloat_vtable;
+    quantized->m_encoding = 6;
+    quantized->samples = nullptr;
+    quantized->count = 0;
+    quantized->capacity = 0;
+    initialize = reinterpret_cast<InitializeFn>(quantized->vtable[8]);
+    if (static_cast<uint8_t>(initialize(quantized, samples, sampleCount, skip, tolerance)) == 0) {
+        reinterpret_cast<DestroyFn>(quantized->vtable[0])(quantized, 1);
+        quantized = nullptr;
+    }
+
+    auto* raw = static_cast<FloatSampleChannel*>(xe_Alloc_EC88(16));
+    raw->vtable = g_crAnimChannelRawFloat_vtable;
+    raw->m_encoding = 1;
+    raw->samples = nullptr;
+    raw->count = 0;
+    raw->capacity = 0;
+    // Raw initialization always runs; its return value is deliberately ignored.
+    reinterpret_cast<InitializeFn>(raw->vtable[8])(raw, samples, sampleCount, skip, tolerance);
+
+    if (quantized) {
+        int32_t quantizedSize = reinterpret_cast<SizeFn>(quantized->vtable[13])(quantized);
+        int32_t rawSize = reinterpret_cast<SizeFn>(raw->vtable[13])(raw);
+        if (quantizedSize < rawSize) {
+            reinterpret_cast<DestroyFn>(raw->vtable[0])(raw, 1);
+            return quantized;
+        }
+        // Equal sizes retain raw, just like the signed cmpw/bge in the original.
+        reinterpret_cast<DestroyFn>(quantized->vtable[0])(quantized, 1);
+    }
+    return raw;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // crAnimDofFloat::Blend()  [vtable slot 7 @ 0x8216EC30]
