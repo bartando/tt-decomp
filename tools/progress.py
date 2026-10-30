@@ -6,7 +6,7 @@
     python3 tools/progress.py --hot hot.tsv       # also the split over what a match runs
 
 verified:   a lift-check spec for it passes
-lifted:     has a `@ 0x...` marker in src/ but no passing spec
+lifted:     has a marked definition in src/ but no passing spec
 wrong:      named in KNOWN_WRONG_LIFTS.md (overrides the two above)
 todo:       nothing yet
 
@@ -30,12 +30,33 @@ def all_functions():
     return {int(address, 16) for address in pattern.findall(text)}
 
 
-def lifted():
+MARKER = re.compile(r"@\s*0x(82[0-9A-Fa-f]{6})")
+
+
+def _defines(text, marker):
+    """True if the marker belongs to a definition: code on its own line ending
+    in `{` or `}` (a one-line body), or the code after its comment reaching `{`
+    before `;`."""
+    if text.rfind("/*", 0, marker.start()) > text.rfind("*/", 0, marker.start()):
+        rest = text[text.find("*/", marker.end()) + 2:]
+    else:
+        line_start = text.rfind("\n", 0, marker.start()) + 1
+        code_before = text[line_start:marker.start()].split("//")[0].strip()
+        if code_before:
+            return code_before.endswith(("{", "}"))
+        rest = text[text.find("\n", marker.end()) + 1:]
+    rest = re.sub(r"/\*.*?\*/|//[^\n]*", "", rest[:1500], flags=re.S)
+    brace, semi = rest.find("{"), rest.find(";")
+    return brace != -1 and (semi == -1 or brace < semi)
+
+
+def lifted(root=ROOT):
+    """Addresses with a marked definition in src/ (declarations don't count)."""
     found = set()
-    for path in (ROOT / "src").rglob("*"):
+    for path in (root / "src").rglob("*"):
         if path.suffix in (".c", ".cpp"):
             text = path.read_text(errors="ignore")
-            found.update(int(a, 16) for a in re.findall(r"@\s*0x(82[0-9A-Fa-f]{6})", text))
+            found.update(int(m.group(1), 16) for m in MARKER.finditer(text) if _defines(text, m))
     return found
 
 
