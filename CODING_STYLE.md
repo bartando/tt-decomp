@@ -57,7 +57,11 @@ This project follows the coding style of the original Rockstar Table Tennis code
 - `fcmpu` + `blt`/`bgt`/`beq` are taken only on that result; `bge`/`ble`/`bne` mean
   "not less"/"not greater"/"not equal" and *are* taken when unordered (NaN). Write the
   branch's condition plainly (`a < b` for a `bge` that skips), not `!(a >= b)`.
-- `fmadds`/`fmsubs`/`vmaddfp` are fused: use `__builtin_fmaf`, and set
+- Scalar `fmadds`/`fmsubs` are fused: use `__builtin_fmaf`, and set
   `FP_CONTRACT = "off"` in the spec so lift-check doesn't fuse anything else for you.
+- VMX `vmaddfp`/`vnmsubfp`: lift-check rounds the product first (that's what ReXGlue's
+  `instr_vmaddfp.s` test expects), so write them unfused. Open question: ReXGlue's
+  recompiler emits them fused and AltiVec documents them fused; nobody has checked a
+  real console.
 - `vnmsubfp` is `-(a*b - c)`, not `c - a*b`: the negation flips NaN and zero signs.
 - VMX flushes subnormal inputs and results to signed zero; scalar FPU code doesn't.

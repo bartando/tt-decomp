@@ -44,7 +44,7 @@ MUTATIONS = [
     ("pg_6c00_w", "skip mapping refresh",
      [("        pg_7578_g(buffer);", "        /* omitted mapping */")]),
     ("pg_6c00_w", "keep VMX subnormals",
-     [("            bits &= 0x80000000u;", "            /* omitted VMX flush */")]),
+     [("        bits &= 0x80000000u;", "        /* omitted VMX flush */")]),
     ("strip_vertex_cache_access", "flip the pass comparison",
      [("if (m_pass[i] != pass) {", "if (m_pass[i] == pass) {")]),
     ("strip_vertex_cache_access", "wrap m_next at 17 instead of 18",
