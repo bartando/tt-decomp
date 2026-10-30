@@ -80,6 +80,7 @@ uint32_t g_activeLoggingAllocatorCount = 0;  // @ 0x825EBD20
 extern "C" uint8_t g_sysMemDebugFillFlag = 0;  // @ 0x8260642D
 
 namespace rage {
+uint32_t g_sysMemAllocationTag = 0;     // @ 0x825EBCE4
 uint32_t g_sysMemAllocatorInitLock = 0;  // @ 0x825EBCF8
 int32_t g_swfPointerX = 0;              // @ 0x825F312C
 int32_t g_swfPointerY = 0;              // @ 0x825F3138
