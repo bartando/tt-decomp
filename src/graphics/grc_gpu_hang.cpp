@@ -50,7 +50,7 @@ extern void rage_DebugBuf_Append(void* pBuf, const char* pText, ...);
 /* printf-style debug console output — sub_82363FE0. */
 extern void rage_DebugPrintf(const char* pFmt, ...);
 
-/* Watchdog: returns a monotonically increasing tick used to measure stalls — sub_82566B78. */
+/* Kernel current-fiber accessor (despite the lift's old name) — sub_82566B78. */
 extern uint32_t sys_GetGpuWatchdogTick(void);
 
 /* Flushes the accumulated debug buffer to the debug console — sub_823640E8's sink. */
@@ -325,99 +325,79 @@ void D3DDeviceXenon_DumpHangGpuState(void* pBuf, uint32_t /*arg1*/, uint32_t /*a
 }
 
 /* ──────────────────────────────────────────────────────────────────────────── */
-/*  D3DDeviceXenon_ReportGPUHang  @ 0x823643E0 (0x120 bytes)                   */
-/*                                                                              */
-/*  Watchdog entrypoint:                                                        */
-/*     - Early-out if the device's "hang reported" flag is already set.         */
-/*     - Stamp the current tick; if less than 0x7D0 (2000) ticks have elapsed   */
-/*       since the last GPU progress sample, return 1 (still progressing).      */
-/*     - Otherwise print the big plus-banner, call DumpHangGpuState, and if a   */
-/*       real device context exists set the "hang reported" flag + break into  */
-/*       the debugger via the ERR[D3D] / "Breaking into..." prints and a 0x16  */
-/*       trap.                                                                  */
-/*                                                                              */
-/*  Return: 0 if the hang was just reported (or was already reported),          */
-/*          1 if the GPU seems to still be progressing.                         */
+/*  D3DDeviceXenon_ReportGPUHang  @ 0x823643E0 (0x114 bytes)                  */
 /* ──────────────────────────────────────────────────────────────────────────── */
 struct D3DDeviceXenon {
-    /* Only the fields we touch are laid out exactly; everything else is
-       opaque padding. */
     uint8_t     m_pad0000[0x2888];
-    uint32_t*   m_pGpuProgressCounter;       /* +0x2888 — compared with r3 of sub_82566B78 */
-    uint32_t*   m_pCommandQueueHead;         /* +0x2890 — *m_pCommandQueueHead advances on progress */
-    uint8_t     m_pad2894[0x28C1 - 0x2894];
-    uint8_t     m_hangFlags;                 /* +0x28C1 bit 2 (mask 4) = "reported" */
-    uint8_t     m_pad28C2[0x2940 - 0x28C2];
+    uint32_t    m_gpuFiberId;                /* +0x2888 */
+    uint32_t    m_pad288C;
+    uint32_t*   m_pCommandQueueHead;         /* +0x2890 */
+    uint8_t     m_pad2894[0x289C - 0x2894];
+    uint32_t    m_queueRollbackHead;         /* +0x289C */
+    uint8_t     m_pad28A0[0x28C1 - 0x28A0];
+    uint8_t     m_hangFlags;                 /* +0x28C1: bit 2 = reported */
+    uint8_t     m_pad28C2[0x28F8 - 0x28C2];
+    uint32_t    m_progressGate;              /* +0x28F8 */
+    uint32_t    m_pendingProgress;           /* +0x28FC */
+    uint8_t     m_pad2900[0x354C - 0x2900];
+    void*       m_pDiagnosticContext;        /* +0x354C */
+    uint8_t     m_pad3550[0x5010 - 0x3550];
+    uint32_t    m_ltcgFlag;                  /* +0x5010 */
 };
+
+extern "C" void* g_sda_base;                 // @ 0x82600000 (r13)
+extern uint32_t g_gpuHangSentinel;            // @ 0x82606654
 
 int D3DDeviceXenon_ReportGPUHang(void* pHangState)
 {
     struct HangState {
-        D3DDeviceXenon* m_pDevice;            /* +0 */
-        uint32_t        m_lastGpuTick;        /* +4 */
-        uint32_t        m_lastQueueHead;      /* +8 */
+        D3DDeviceXenon* m_pDevice;
+        uint32_t        m_lastGpuTick;
+        uint32_t        m_lastQueueHead;
     };
-
-    HangState*      pState  = (HangState*)pHangState;
+    HangState* pState = static_cast<HangState*>(pHangState);
     D3DDeviceXenon* pDevice = pState->m_pDevice;
-
-    /* Bit 2 (0x04) of flags == "hang already reported"?  Then bail. */
-    if ((pDevice->m_hangFlags & 0x04) != 0) {
+    if (pDevice->m_hangFlags & 0x04) {
         return 0;
     }
 
-    /* Sample current GPU tick via TLS slot 0x58 (r13 + 0x100). */
-    uint32_t curTick = *(uint32_t*)((uint8_t*)__builtin_frame_address(0));
-    (void)curTick;  /* placeholder; real impl reads from the TLS block */
-
-    /* Snapshot the command-queue head; if it changed since last check, the
-       GPU is still making forward progress — update bookkeeping and skip. */
+    // r13+0x100 points at the kernel thread block; +0x58 holds its tick.
+    const uint8_t* thread = *reinterpret_cast<uint8_t**>(
+        static_cast<uint8_t*>(g_sda_base) + 0x100);
+    uint32_t curTick = *reinterpret_cast<const uint32_t*>(thread + 0x58);
     uint32_t queueHead = *pDevice->m_pCommandQueueHead;
     if (pState->m_lastQueueHead != queueHead) {
-        pState->m_lastGpuTick   = 0;  /* real code writes the TLS tick here */
-        pState->m_lastQueueHead = queueHead;
+        pState->m_lastGpuTick = curTick;
+        pState->m_lastQueueHead = *pDevice->m_pCommandQueueHead;
     }
 
-    /* Secondary progress check: compare progress counter pointer vs. watchdog. */
-    uint32_t wd = sys_GetGpuWatchdogTick();
-    if ((uintptr_t)pDevice->m_pGpuProgressCounter == wd &&
-        *(uint32_t*)((uint8_t*)pDevice + 0x28F8) != 0) {
-        pState->m_lastGpuTick = 0;
+    // The accessor returns the current fiber ID, not a watchdog timestamp.
+    uint32_t fiberId = sys_GetGpuWatchdogTick();
+    if (pDevice->m_gpuFiberId == fiberId && pDevice->m_progressGate != 0) {
+        pState->m_lastGpuTick = curTick;
     }
-
-    /* If less than 0x7D0 ticks of no-progress, GPU is alive — return 1. */
-    if ((pState->m_lastGpuTick - 0 /* TLS tick */) < 0x7D0u) {
+    if (uint32_t(curTick - pState->m_lastGpuTick) < 2000u) {
         return 1;
     }
 
-    /* Big "+++++++..." banner. */
-    rage_DebugPrintf("%s\n");      /* asc_820664D4 */
-
-    /* Decode the hang + dump state (ltcgFlag comes from device +0x5010). */
-    uint32_t ltcgFlag = *(uint32_t*)((uint8_t*)pDevice + 0x5010);
-    void*    pBuf    = *(void**)((uint8_t*)pDevice + 0x354C);
-    D3DDeviceXenon_DumpHangGpuState(pBuf, 0, 0, ltcgFlag);
-
-    /* If we have a real debug print context, flag the hang and break. */
-    if (pBuf != nullptr) {
-        /* Decrement queue-head snapshot by 2 and re-set flags bit 2 | bit 1. */
-        uint32_t qh = *pDevice->m_pCommandQueueHead;
+    rage_DebugPrintf("+++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+    D3DDeviceXenon_DumpHangGpuState(pDevice->m_pDiagnosticContext, 0, 0,
+                                   pDevice->m_ltcgFlag);
+    // Reload the context after diagnostics, as the original does.
+    if (pDevice->m_pDiagnosticContext != nullptr) {
+        uint32_t rollbackHead = pDevice->m_queueRollbackHead - 2;
         pDevice->m_hangFlags |= 0x06;
-        *pDevice->m_pCommandQueueHead = qh - 2;
-
-        /* Stamp the global "gpu-hung sentinel" if unset. */
-        extern uint32_t g_gpuHangSentinel;                // dword_82606654
-        if (g_gpuHangSentinel == 0) {
-            g_gpuHangSentinel = 0x0F;
+        *pDevice->m_pCommandQueueHead = rollbackHead;
+        uint32_t sentinel = g_gpuHangSentinel;
+        pDevice->m_pendingProgress = 0;
+        if (sentinel == 0) {
+            g_gpuHangSentinel = 15;
         }
         return 0;
     }
 
-    /* No buffer — fall through to the emergency printf + debug trap. */
     rage_DebugPrintf(rage::k_str_d3d_hang_try_instrumented);
     rage_DebugPrintf(rage::k_str_d3d_hang_breaking_into_debugger);
-
-    /* twui r0, 0x16 → trap into the debugger. */
 #if defined(__PPC__) || defined(__powerpc__)
     __asm__ volatile("twui 0, 0x16");
 #endif
