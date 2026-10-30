@@ -15,6 +15,7 @@
  *   - grcDevice_setSamplerLodBias       @ 0x82355948 — Xenos texture fetch state
  *   - grcDevice_SetViewport         @ 0x82355ED0 — clip and load the viewport transform
  *   - grcDevice_SetStreamSource     @ 0x82356118 — bind a vertex buffer to a stream
+ *   - grcDevice_SetPixelShaderConstantF @ 0x82356A70 — upload pixel shader constants 0..19
  *   - grcGpuResource_Release        @ 0x82356DA8 — drop a reference, free on the last
  *   - grcDevice_SetTexture          @ 0x82359940 — bind a texture to a fetch slot
  *   - grcDevice_ReserveCommandSpace @ 0x82359E80 — carve space out of the command ring
@@ -568,6 +569,27 @@ extern "C" void grcDevice_SetVertexShaderConstantF(void* device, uint32_t first,
     const uint64_t mask = UINT64_C(0x8000000000000000);
     const uint64_t range = span >= 63 ? UINT64_MAX : static_cast<uint64_t>(static_cast<int64_t>(mask) >> span);
     *reinterpret_cast<uint64_t*>(state + 0x10) |= (firstGroup & 127u) < 64 ? range >> (firstGroup & 127u) : 0;
+}
+
+// The game's build is specialized for its only call shape: every caller passes
+// first = 0 and count = 20, and the body ignores both. Pixel constants live
+// after the 256 vertex ones; their dirty groups are the second mask word.
+// @ 0x82356A70
+extern "C" void grcDevice_SetPixelShaderConstantF(void* device, uint32_t /*first*/,
+                                                   const void* constants, uint32_t /*count*/) {
+    auto* state = static_cast<uint8_t*>(device);
+    const auto* src = static_cast<const uint8_t*>(constants);
+    auto* dst = reinterpret_cast<uint8_t*>(reinterpret_cast<uintptr_t>(state + 0x1780) & ~uintptr_t(15));
+
+    // Each group of four registers is loaded in full before any of it is stored.
+    for (uint32_t group = 0; group < 5; ++group) {
+        uint8_t values[64];
+        for (uint32_t i = 0; i < 64; ++i) values[i] = src[i];
+        for (uint32_t i = 0; i < 64; ++i) dst[i] = values[i];
+        src += 64;
+        dst += 64;
+    }
+    *reinterpret_cast<uint64_t*>(state + 0x18) |= UINT64_C(0xF800000000000000);
 }
 
 // Bind `buffer` to vertex stream `stream` at `offset` with `stride` bytes per
