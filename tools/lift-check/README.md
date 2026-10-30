@@ -83,6 +83,8 @@ all fail (about 40 s).
   `t.sym("g_x")`; `t.w32(t.sym("g_x"), v)` patches a global in the image for this trial;
   `t.ignore(addr, size)` leaves bytes out of this trial's memory comparison;
   `t.w32(t.sp + 0x54, v)` writes the caller's frame (stack arguments) over the random fill.
+  `t.args(v1=[x, y, z, w])` sets a vector register's four float32 lanes in memory
+  order (v0..v127), for internal functions whose inputs use VMX registers.
   Unset registers are random; `r1` is a fresh stack, `r13` a zeroed block.
 - `CALLS`, keyed by symbol name, address or fake-function name:
   - `stub(ret=None|int|float|"void"|fn(ctx), out={"r4": size}, args=("r3", "f1"),
@@ -163,7 +165,9 @@ all fail (about 40 s).
 
 ## Limits
 
-- **VMX128 D3D packing** (`vpkd3d128`, `vupkd3d128`) and AltiVec ops outside the common set
+- **VMX128 D3D packing**: `vpkd3d128` supports only NORMPACKED32 (format=2, mask=1,
+  shift=0), matching ReXGlue's `build_vpkd3d128`, including NaN clamping and preserving
+  untouched lanes. Other forms, `vupkd3d128`, and AltiVec ops outside the common set
   (vmsum*, vmul*, vsum*, pixel packs) report `unsupported`.
 - **Estimates aren't Xenon's**: vrefp, vrsqrtefp, vexptefp and vlogefp give the true value,
   fres and frsqrte the G4's estimate. Lifts that divide where the original estimates differ
@@ -191,15 +195,6 @@ all fail (about 40 s).
 
 ## Findings so far
 
-- `pongPlayer_0270_g` (0x821E0270) passes `lf_player_mirror_position_id`: 4096
-  trials each with seeds 1 and 7. Each corpus covers all 16 remapped button IDs
-  under all 16 combinations of the pad's four flag bytes, plus non-boolean flag
-  values, range boundaries and signed 32-bit IDs. Despite its name, this is a
-  pad button remapper with no vtable calls; no lift fix was needed. Mutating a
-  reflection-table entry, the second pair's flag offset, the nonzero-byte test
-  or the upper ID bound makes the spec fail. Reproduce the passing checks with
-  `tools/lift-check/lift-check lf_player_mirror_position_id` and the same command
-  with `--seed 7`.
 - `pongPlayer_TossServeBall` (0x821934A0) fails: the lift computes the impulse's w lane
   as `(hit.w - pos.w) / t * mass`, but the asm's reciprocal comes from the `(1, 1, 1, 0)`
   constant at 0x825CB7C0, so the original's w lane is 0. With `velocity._pad = 0.0f` it
