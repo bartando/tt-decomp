@@ -26,7 +26,6 @@ extern const uint32_t g_boxFaceIndices[24]; // @ 0x825D4A90
 namespace rage {
 
 // These names describe the actual helpers, rather than their capsule/animation auto-names.
-extern void buildBoxCorners(float (*out)[4], const float* center, const float* size); // @ 0x82147EF8
 extern void invertAffineInPlace(float (*matrix)[4]); // @ 0x820D7B30
 extern bool clipAabbToActiveCamera(void* context, float (*box)[4], const float* referencePoint); // @ 0x82148608
 // LTCG leaves the output in r8, with unused integer slots r4..r7.
@@ -70,6 +69,27 @@ void transformClipPoint(float* point, const float (*matrix)[4]) {
 }
 
 } // namespace
+
+// Eight corners of an AABB, in the order consumed by g_boxFaceIndices.
+// Formerly phBoundCapsule_7EF8_g; r3=out, r4=center, r5=full size.
+// @ 0x82147EF8
+void buildBoxCorners(float (*out)[4], const float* center, const float* size) {
+    float halfSize[3];
+    for (unsigned lane = 0; lane < 3; ++lane)
+        halfSize[lane] = flushClipVmx(flushClipVmx(size[lane]) * 0.5f);
+
+    // The original loads size before broadcasting center, then edits xyz only.
+    // Snapshot both inputs before any stores so output/input aliases work too.
+    float origin[4];
+    __builtin_memcpy(origin, center, sizeof(origin));
+    for (unsigned corner = 0; corner < 8; ++corner)
+        __builtin_memcpy(out[corner], origin, sizeof(origin));
+    for (unsigned corner = 0; corner < 8; ++corner) {
+        out[corner][0] += (corner & 1) ? halfSize[0] : -halfSize[0];
+        out[corner][1] += (corner & 2) ? halfSize[1] : -halfSize[1];
+        out[corner][2] += (corner & 4) ? -halfSize[2] : halfSize[2];
+    }
+}
 
 // @ 0x82147A88
 void clipPolygonToPlane(void* /*context*/, int32_t vertexCount, const float (*vertices)[4],

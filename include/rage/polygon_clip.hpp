@@ -4,6 +4,10 @@
 
 namespace rage {
 
+// Build eight aligned vec4 corners from center and full size. center.w is copied
+// unchanged to every corner. Either input may alias any aligned output slot.
+void buildBoxCorners(float (*out)[4], const float* center, const float* size);
+
 // VMX loads/stores use aligned, 16-byte vertices, including the fourth lane.
 // Output must be separate from input, with space for up to 2 * vertexCount vertices.
 // r3 is unused in the original; retain it so the remaining arguments occupy r4..r8.
