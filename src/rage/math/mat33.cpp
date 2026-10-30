@@ -1,5 +1,9 @@
 #include "rage/mat33.hpp"
+#include "rage/math.hpp"
 #include <cstdint>
+
+double crt_cos(double angle); // @ 0x824302B0
+double crt_sin(double angle); // @ 0x824301D8
 
 #if defined(__clang__)
 #pragma clang fp contract(off)
@@ -14,7 +18,6 @@ namespace rage {
 extern void mat33RotationX(float* out, double angle); // @ 0x820C3F10
 extern void mat33RotationY(float* out, double angle); // @ 0x820C3F98
 extern void mat33RotationZ(float* out, double angle); // @ 0x820C4020
-extern void mat33RotationNormalizedAxis(float* out, const float* axis, double angle); // @ 0x820C40A8
 
 namespace {
 
@@ -29,6 +32,45 @@ float flushRotationVmx(float value) {
 }
 
 } // namespace
+
+// Formerly phBoundCapsule_40A8_g / phBoundCapsule::TransformByDirection.
+// Row-vector Rodrigues formula. fmuls rounds the square/scaled axis first;
+// fmadds/fmsubs fuse only the final multiply and add/subtract. Reload the axis
+// between stores because it can alias the destination.
+// @ 0x820C40A8 | size: 0x13C
+void mat33RotationNormalizedAxis(float* out, const float* axis, double angle) {
+    const float cosine = static_cast<float>(crt_cos(angle));
+    const float sine = static_cast<float>(crt_sin(angle));
+    const float scale = 1.0f - cosine;
+    out[0] = __builtin_fmaf(axis[0] * axis[0], scale, cosine);
+    out[5] = __builtin_fmaf(axis[1] * axis[1], scale, cosine);
+    out[10] = __builtin_fmaf(axis[2] * axis[2], scale, cosine);
+    out[1] = __builtin_fmaf(axis[0] * scale, axis[1], sine * axis[2]);
+    out[4] = __builtin_fmaf(axis[0] * scale, axis[1], -(sine * axis[2]));
+    out[2] = __builtin_fmaf(axis[0] * scale, axis[2], -(sine * axis[1]));
+    out[8] = __builtin_fmaf(axis[0] * scale, axis[2], sine * axis[1]);
+    out[6] = __builtin_fmaf(scale * axis[2], axis[1], axis[0] * sine);
+    out[9] = __builtin_fmaf(scale * axis[2], axis[1], -(axis[0] * sine));
+}
+
+// Formerly phBoundCapsule_05A0_g / phBoundCapsule::RotateVectors.
+// @ 0x820D05A0 | size: 0xB4
+void mat33RotateX(float* matrix, double angle) {
+    float cosine, sine;
+    cosSin(&cosine, &sine, angle);
+    cosine = flushRotationVmx(cosine);
+    sine = flushRotationVmx(sine);
+    for (unsigned lane = 0; lane < 4; ++lane) {
+        const float y = flushRotationVmx(matrix[4 + lane]);
+        const float z = flushRotationVmx(matrix[8 + lane]);
+        const float zCosine = flushRotationVmx(z * cosine);
+        const float yCosine = flushRotationVmx(y * cosine);
+        const float zSine = flushRotationVmx(z * sine);
+        const float ySine = flushRotationVmx(y * sine);
+        matrix[8 + lane] = -flushRotationVmx(ySine - zCosine);
+        matrix[4 + lane] = flushRotationVmx(zSine + yCosine);
+    }
+}
 
 // Formerly phBoundCapsule_3DA0_g. Build a row-vector axis-angle rotation;
 // zero angle writes identity without touching the axis or any row's w padding.

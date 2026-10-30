@@ -14,6 +14,7 @@
  */
 
 #include <cstdint>
+#include "rage/math.hpp"
 
 // The mixed FP/integer Xenon interfaces leave GPR slots for FP arguments.
 // Explicit unused slots keep these declarations callable under ppc32 SysV too.
@@ -413,6 +414,13 @@ float ph_Sinf(float x) { return static_cast<float>(crt_sin(x)); }
 float ph_Cosf(float x) { return static_cast<float>(crt_cos(x)); }
 float ph_Atan2f(float y, float x) { return static_cast<float>(crt_atan2(y, x)); }
 float ph_Sqrtf(float x) { return static_cast<float>(crt_sqrt(x)); }
+
+// Formerly phBoundCapsule_04F0_g and the spurious capsule ComputeBounds lift.
+// @ 0x820D04F0 | size: 0x60
+void rage::cosSin(float* cosine, float* sine, double angle) {
+    *cosine = static_cast<float>(crt_cos(angle));
+    *sine = static_cast<float>(crt_sin(angle));
+}
 
 // @ 0x82431910
 double crt_floor(double x) {

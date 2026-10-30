@@ -8,6 +8,11 @@ namespace rage {
 // unchanged to every corner. Either input may alias any aligned output slot.
 void buildBoxCorners(float (*out)[4], const float* center, const float* size);
 
+// Merge box[0] + box[2] (center + offset) and box[1] (full size) into destination.
+// Zero XYZ size is empty; size.w is masked out. All vectors are aligned vec4s.
+// Calls the center/size merge helper; source and destination may alias.
+void expandAabbByOffsetBox(float (*destination)[4], const float (*box)[4]);
+
 // VMX loads/stores use aligned, 16-byte vertices, including the fourth lane.
 // Output must be separate from input, with space for up to 2 * vertexCount vertices.
 // r3 is unused in the original; retain it so the remaining arguments occupy r4..r8.
