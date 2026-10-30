@@ -13,7 +13,7 @@ CASES = {
         [("cache mask", "(node->flags & 0x30) == 0", "(node->flags & 0x20) == 0"),
          ("recursion flag", "node->flags |= 0x10;", "node->flags |= 0x08;"),
          ("cache valid flag", "(node->flags | 0x20) & ~0x10u", "(node->flags | 0x40) & ~0x10u"),
-         ("dispatch dimension", "node->value, &node->port, 0)", "node->value, &node->port, 1)")]),
+         ("dispatch port", "node->value, &node->port)", "node->value, reinterpret_cast<const cmNodePort*>(&node->reserved14))")]),
     "xaudio_effect_update_buffer": (
         "src/rage/audio/xaudio_effect.cpp",
         [("flag mask", "effect->flags & 4", "effect->flags & 8"),

@@ -8,7 +8,6 @@
 #include <cstring>
 
 // Forward declarations for external functions
-extern "C" void fragDrawable_0AA0_2h(void* state, void* geom, void* drawable, int index, void* param); // @ 0x820F0AA0
 namespace rage {
 extern uint32_t* g_iccProfilePtr;     // @ 0x825EB1D0  (defined in rage_core_utils.cpp)
 extern void*     g_currentGeometry;   // @ 0x82606350
@@ -56,6 +55,49 @@ extern "C" void fragDrawable_1D80_wrh(void* model, void* skinContext, void* shad
                                       void* drawContext, uint32_t lod); // @ 0x820F1D80
 
 namespace rage {
+
+// @ 0x820F0AA0 | size: 0xAC (was fragDrawable_0AA0_2h)
+// The override used by the grmModel draw paths queues model/geometry pairs
+// under each shader. The consumer at 0x820F0B50 walks these linked lists;
+// index zero is its sentinel. The fifth argument from callers is unused.
+void grmDrawQueue_AddGeometry(void* state, void* shader, void* model, uint32_t geometryIndex) {
+    struct Entry {
+        void* object;
+        uint16_t firstOrIndex;
+        uint16_t next;
+    };
+    struct Array {
+        Entry* entries;
+        uint16_t count;
+        uint16_t capacity;
+    };
+    auto* arrays = static_cast<Array*>(state);
+    auto& shaderIndex = *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(shader) + 8);
+    Entry* bucket;
+    if (shaderIndex == 0) {
+        shaderIndex = arrays[0].count;
+        bucket = &arrays[0].entries[arrays[0].count];
+        ++arrays[0].count;
+        bucket->object = shader;
+        bucket->next = 0;
+        bucket->firstOrIndex = 0;
+    } else {
+        bucket = &arrays[0].entries[shaderIndex];
+    }
+    const uint16_t drawIndex = arrays[1].count;
+    if (bucket->next != 0) {
+        arrays[1].entries[bucket->next].next = drawIndex;
+    }
+    bucket->next = drawIndex;
+    if (bucket->firstOrIndex == 0) {
+        bucket->firstOrIndex = drawIndex;
+    }
+    Entry& draw = arrays[1].entries[arrays[1].count];
+    ++arrays[1].count;
+    draw.object = model;
+    draw.next = 0;
+    draw.firstOrIndex = static_cast<uint16_t>(geometryIndex);
+}
 
 // @ 0x8225D8A0 | size: 0x1E8 (original auto-name: fragDrawable_D8A0)
 // Callers pass drawable+0x10, not the drawable itself. The group has four
@@ -172,7 +214,7 @@ void fragDrawable::ProcessGeometry(void* geometryContainer, void* param1, void* 
         }
 
         if (statePtr != nullptr) {
-            fragDrawable_0AA0_2h(statePtr, geom, this, i, param3);
+            grmDrawQueue_AddGeometry(statePtr, geom, this, i);
             continue;
         }
 

@@ -12018,29 +12018,6 @@ extern "C" void phCollider_vfn_4(rage::phArticulatedCollider* collider) {
 }
 
 /**
- * fragDrawable_0AA0_2h @ 0x820F0AA0 | size: 0xAC
- *
- * SIMD-heavy fragment drawable function that computes bounding box
- * intersection distances using trigonometric functions. The function
- * takes a drawable, a bounding box, a flags word, and an output
- * parameter, and computes the minimum penetration distance.
- *
- * This function uses fsel (floating-point select), fabs, and calls
- * to sub_8243A0B0 (likely sinf/cosf). The sp_wrong flag in IDA
- * indicates unusual stack frame handling.
- *
- * TODO: Full SIMD lift deferred — this is a complex trigonometric
- * bounding computation. The stub preserves link compatibility.
- */
-extern "C" void fragDrawable_0AA0_2h(void* drawable, void* bounds,
-                                      uint32_t flags, void* outResult) {
-    (void)drawable; (void)bounds; (void)flags; (void)outResult;
-    // TODO: SIMD-heavy trigonometric bounding box computation.
-    // See pseudocode at 0x820F0AA0 — uses fsel, fabs, sin/cos.
-    // Deferred until SIMD translation infrastructure is in place.
-}
-
-/**
  * msgMsgSink_Broadcast — Message sink broadcast
  *
  * Broadcasts a message through the message sink system. Used by the

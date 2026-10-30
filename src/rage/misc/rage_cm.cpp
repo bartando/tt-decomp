@@ -85,7 +85,7 @@ namespace rage {
 
 // Globals and free functions declared in rage_cm_types.hpp.
 // Forward-declare helper used before its definition in this file:
-void cmNode_SetFromPort_Dispatch(void* dst, const cmNodePort* port, int32_t dim);
+void cmNode_SetFromPort_Dispatch(void* dst, const cmNodePort* port);
 
 
 // ── Types (cmDataObj, cmPortDesc, CM_PORT_*, CM_DIM_*) from rage_cm_types.hpp ─
@@ -628,15 +628,15 @@ void cmMemory::GetFloat(float* out) {
 // at stack; clears bit 3 of m_flags.
 void cmMemory::Update() {
     // Resolve portA into m_pCurrentValue, using the generic SetFromPort dispatcher
-    // (cmNode_SetFromPort_Dispatch dispatches by m_outputType: float, bool, vec4, int, dim).
-    cmNode_SetFromPort_Dispatch(m_pCurrentValue, &portA, m_outputType);
+    // cmNode_SetFromPort_Dispatch reads the destination buffer's type byte.
+    cmNode_SetFromPort_Dispatch(m_pCurrentValue, &portA);
 
     // Build a temporary port struct pointing m_pCurrentValue as a direct-data port
     // so that m_pPreviousValue sees the newly written value next frame.
     cmNodePort tempPort;
     tempPort.m_pData = m_pCurrentValue;
     tempPort.m_type  = CM_PORT_DIRECT;
-    cmNode_SetFromPort_Dispatch(m_pPreviousValue, &tempPort, m_outputType);
+    cmNode_SetFromPort_Dispatch(m_pPreviousValue, &tempPort);
 
     // Clear bit 3 of flags (marks that the node has been updated this frame).
     m_flags = (m_flags & ~8) ^ 8;  // rlwinm + xori pattern from assembly
@@ -648,7 +648,7 @@ void cmMemory::SetValue() {
     cmNodePort tempPort;
     tempPort.m_pData = m_pCurrentValue;
     tempPort.m_type  = CM_PORT_DIRECT;
-    cmNode_SetFromPort_Dispatch(m_pPreviousValue, &tempPort, m_outputType);
+    cmNode_SetFromPort_Dispatch(m_pPreviousValue, &tempPort);
 }
 
 // cmMemory::SetInitialInput @ 0x82271518
@@ -657,14 +657,14 @@ void cmMemory::SetValue() {
 void cmMemory::SetInitialInput() {
     // This is vfn_9 / vfn_14 — sets the initial accumulator from portB.
     // assembly: addi r4, r31, 20 → portB; lwz r3, 36(r31) → m_pPreviousValue
-    cmNode_SetFromPort_Dispatch(m_pPreviousValue, &portB, m_outputType);
+    cmNode_SetFromPort_Dispatch(m_pPreviousValue, &portB);
 }
 
 // cmMemory::SyncInput @ 0x82278158
 // Forwarding helper: dispatches portA to m_pCurrentValue.
 // Used internally by Sync() which is vtable slot 8.
 void cmMemory::SyncInput() {
-    cmNode_SetFromPort_Dispatch(m_pCurrentValue, &portA, m_outputType);
+    cmNode_SetFromPort_Dispatch(m_pCurrentValue, &portA);
 }
 
 // cmMemory::Reset / ReInit @ 0x82271390 (vfn_17)
@@ -918,32 +918,30 @@ void cmApproachOperator::Tick() {
  * cmNode_SetFromPort_Dispatch @ 0x82275380  (cmNode_SetFromPort_Dispatch)
  *
  * Evaluates `port` and writes the result into `dst` (a cmDataObj buffer).
- * The output type is determined by dst->m_dim:
- *   CM_DIM_FLOAT = 1 : writes float via GetFloat
- *   CM_DIM_BOOL  = 2 : writes bool  via GetBool (cmCond_21B0)
- *   CM_DIM_INT   = 0 : writes int32 via GetDim
- *   CM_DIM_VEC4  = 3 : writes vec4  via GetVector
- *   CM_DIM_INT32 = 4 : writes int32 via GetInt
+ * The asm reads the byte at dst+16; there is no third argument.
+ * Its on-buffer tags are 1=GetDim, 2=float, 3=bool, 4=vec4, 5=GetInt.
+ * Other tags leave the buffer untouched. These tags are one-based, unlike
+ * the cmDimType enum currently used by other reconstructed node paths.
  */
-void cmNode_SetFromPort_Dispatch(void* dst, const cmNodePort* port, int32_t dim) {
+void cmNode_SetFromPort_Dispatch(void* dst, const cmNodePort* port) {
     cmDataObj* obj = reinterpret_cast<cmDataObj*>(dst);
-    int32_t idx = dim - 1;  // table is 0-indexed with (dim-1)
-    if (idx < 0 || idx > 4) return;  // out of range — noop
-
-    switch (dim) {
-    case CM_DIM_FLOAT:
+    switch (obj->m_dim) {
+    case 1:
+        obj->m_int = cmNode_GetDim(port);
+        break;
+    case 2:
         obj->m_float = cmNode_GetFloat(port);
         break;
-    case CM_DIM_BOOL:
+    case 3:
         obj->m_bool = cmNode_GetBool(port);
         break;
-    case CM_DIM_INT:
-        obj->m_int = static_cast<int32_t>(cmNode_GetDim(port));
+    case 4: {
+        alignas(16) float value[4];
+        float* result = cmNode_GetVector(value, port);
+        __builtin_memcpy(obj->m_vec4, result, sizeof(value));
         break;
-    case CM_DIM_VEC4:
-        cmNode_GetVector(obj->m_vec4, port);
-        break;
-    case CM_DIM_INT32:
+    }
+    case 5:
         obj->m_int = cmNode_GetInt(port);
         break;
     default:
@@ -1120,7 +1118,7 @@ void cmNormalizedTimer::SetValue() {
     tempPort.m_type = CM_PORT_DIRECT;
     
     // Dispatch to the generic setter to copy the value
-    cmNode_SetFromPort_Dispatch(m_pCurrentValue, &tempPort, m_outputType);
+    cmNode_SetFromPort_Dispatch(m_pCurrentValue, &tempPort);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1733,7 +1731,7 @@ struct cmCachedFloatOperator {
 void cmCachedOperator_GetFloat(cmCachedFloatOperator* node, float* output) {
     if ((node->flags & 0x30) == 0) {
         node->flags |= 0x10;
-        cmNode_SetFromPort_Dispatch(node->value, &node->port, 0);
+        cmNode_SetFromPort_Dispatch(node->value, &node->port);
         *output = *node->value;
         node->flags = (node->flags | 0x20) & ~0x10u;
     } else {
