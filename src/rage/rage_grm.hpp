@@ -19,6 +19,8 @@ namespace rage {
 struct datResource;     // animation/rage_anim.hpp — rsc pointer-fixup state
 struct grmShaderGroup;
 
+void grmDrawQueue_AddGeometry(void* state, void* shader, void* model, uint32_t geometryIndex); // @ 0x820F0AA0
+
 // ── rage::fragDrawable  [vtable @ 0x82033094] ──────────────────────────
 struct fragDrawable {
     void**      vtable;           // +0x00

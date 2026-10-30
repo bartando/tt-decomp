@@ -13,7 +13,7 @@ FORCED = 0x82606350
 CALLS = {
     # 0x820F0AA0 never writes r3, and the original keeps the override pointer
     # in r3 across the call instead of reloading it.
-    "fragDrawable_0AA0_2h": stub(ret=lambda ctx: ctx.r(3), args=("r3", "r4", "r5", "r6", "r7")),
+    "rage::grmDrawQueue_AddGeometry": stub(ret=lambda ctx: ctx.r(3), args=("r3", "r4", "r5", "r6")),
     "shader.vfn_4": stub(ret="void", args=("r3", "r4", "r5", "r6", "r7", "r8", "r9")),
 }
 
