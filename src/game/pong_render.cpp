@@ -3,6 +3,7 @@
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
  *
  * Lifted functions:
+ *   pongLightState_CopyLights                      @ 0x8213E110
  *   pongLightState_Apply                           @ 0x82154320
  *   pongDrawBucketManager::~pongDrawBucketManager  @ 0x822272B0  (vfn_0)
  *   pongDrawBucketManager::Load                    @ 0x82227430
@@ -12,8 +13,25 @@
  */
 
 #include "pong_render.hpp"
-#include <stddef.h>
 #include <string.h>
+
+// pongLightState_CopyLights @ 0x8213E110 | size: 0x30C (was game_E110)
+// Copies all eight slots, regardless of count. game_E0A8 (0x8213E0A8)
+// wraps this to also copy ambient and the two halfwords; those are untouched here.
+// The original returns dst in r3 and leaves each light's tail padding alone.
+pongLightState* pongLightState_CopyLights(pongLightState* dst, const pongLightState* src) {
+    for (int i = 0; i < 8; ++i) {
+        for (int v = 0; v < 3; ++v) {
+            dst->lights[i].vectors[v] = src->lights[i].vectors[v];
+        }
+        dst->lights[i].scalars[0] = src->lights[i].scalars[0];
+        dst->lights[i].scalars[1] = src->lights[i].scalars[1];
+        for (int f = 0; f < 4; ++f) {
+            dst->lights[i].flags[f] = src->lights[i].flags[f];
+        }
+    }
+    return dst;
+}
 
 struct LightShaderVector {
     float lane[4];
@@ -39,10 +57,6 @@ float flushLightVmx(float value) {
     return value;
 }
 }  // namespace
-
-static_assert(sizeof(pongLightState::Light) == 0x40, "light stride");
-static_assert(offsetof(pongLightState, ambient) == 0x200, "ambient offset");
-static_assert(offsetof(pongLightState, count) == 0x210, "signed count offset");
 
 extern pongLightState lbl_825CA610;             // @ 0x825CA610  applied light-state snapshot
 extern uint32_t lbl_825EBB18;                   // @ 0x825EBB18  Diffuse handle / initialization sentinel
@@ -74,21 +88,23 @@ void pongLightState_Apply(const pongLightState* state) {
     const uint32_t mode = g_grmShaderFx_variantTable[1];
     for (int i = 0; i < count; ++i) {
         const pongLightState::Light& light = state->lights[i];
-        const bool directional = mode == 2 && light.type == 0;
-        memcpy(position[i].lane, directional ? light.direction : light.position, 16);
-        position[i].lane[3] = light.intensity;
-        memcpy(diffuse[i].lane, light.diffuse, 16);
-        diffuse[i].lane[3] = light.falloff;
+        // vectors: position/direction/diffuse; scalars: falloff/intensity.
+        // flags: type, negate falloff, negate diffuse (all retain raw bytes).
+        const bool directional = mode == 2 && light.flags[0] == 0;
+        memcpy(position[i].lane, light.vectors[directional ? 1 : 0].bits, 16);
+        position[i].lane[3] = light.scalars[1];
+        memcpy(diffuse[i].lane, light.vectors[2].bits, 16);
+        diffuse[i].lane[3] = light.scalars[0];
         type[i] = directional ? 0.0f : 1.0f;
 
-        if (light.negateDiffuse != 0) {
+        if (light.flags[2] != 0) {
             // The VMX multiply flushes subnormals in all four lanes; w uses +1.
             for (int lane = 0; lane < 4; ++lane) {
                 const float sign = lane == 3 ? lbl_8202D108 : lbl_825C5938;
                 diffuse[i].lane[lane] = flushLightVmx(flushLightVmx(diffuse[i].lane[lane]) * sign);
             }
         }
-        if (light.negateFalloff != 0) {
+        if (light.flags[1] != 0) {
             // This is scalar fmuls: retain subnormals when the VMX path was skipped.
             diffuse[i].lane[3] *= lbl_825C5938;
         }
@@ -131,7 +147,7 @@ void pongLightState_Apply(const pongLightState* state) {
     g_grmShaderFx_boundContext += 3;
     table->dirtyBits[bit >> 3] |= lbl_825D4C80[bit & 7];
     slot = table->entries[(ambientHandle >> 18) * 2 + 1] & 0xFFFF;
-    memcpy(table->values[slot].lane, state->ambient, 16);
+    memcpy(table->values[slot].lane, state->ambient.bits, 16);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

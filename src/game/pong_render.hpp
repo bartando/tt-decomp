@@ -12,27 +12,29 @@
 #pragma once
 #include <stdint.h>
 
-// Eight 64-byte light records followed by ambient and the signed active count.
-// Layout shared by the light-state copy routines and Apply @ 0x82154320.
+// Inferred lighting-state layout: game_4320 (0x82154320) uploads these
+// records to Diffuse/Position/LightType, followed by LightCount and Ambient.
 struct alignas(16) pongLightState {
-    struct Light {
-        float position[4];        // +0x00
-        float direction[4];       // +0x10  used by render mode 2 when type == 0
-        float diffuse[4];         // +0x20
-        float falloff;            // +0x30  replaces diffuse.w
-        float intensity;          // +0x34  replaces position.w
-        uint8_t type;              // +0x38
-        uint8_t negateFalloff;     // +0x39
-        uint8_t negateDiffuse;     // +0x3A
-        uint8_t _pad3B[5];
+    struct Vector {
+        uint32_t bits[4]; // VMX copies all bits, including non-finite float payloads.
     };
-
-    Light lights[8];              // +0x000
-    float ambient[4];             // +0x200
-    int16_t count;                // +0x210
-    uint16_t flags;               // +0x212
+    struct alignas(16) Light {
+        Vector vectors[3];   // +0x00, +0x10, +0x20
+        float scalars[2];    // +0x30, +0x34
+        uint8_t flags[4];    // +0x38..+0x3B (byte fields, not normalized bools)
+        uint8_t padding[4];  // +0x3C..+0x3F, untouched by CopyLights
+    };
+    Light lights[8];         // +0x000
+    Vector ambient;         // +0x200
+    int16_t count;           // +0x210
+    int16_t field_212;       // +0x212, copied by game_E0A8; meaning unresolved
 };
+static_assert(sizeof(pongLightState::Light) == 0x40, "light stride");
+static_assert(sizeof(pongLightState) == 0x220, "state stride in game_E640 (0x8218E640)");
+static_assert(__builtin_offsetof(pongLightState, ambient) == 0x200, "ambient offset");
+static_assert(__builtin_offsetof(pongLightState, count) == 0x210, "light count offset");
 
+pongLightState* pongLightState_CopyLights(pongLightState* dst, const pongLightState* src); // @ 0x8213E110
 void pongLightState_Apply(const pongLightState* state);  // @ 0x82154320
 
 // Structs that carry the game's vtable as an explicit `vtable` member list
