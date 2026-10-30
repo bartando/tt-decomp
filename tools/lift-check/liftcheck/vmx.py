@@ -353,7 +353,21 @@ class VectorUnit:
         if x3 == 1008:
             v[d] = self._fmap1(B, math.trunc); return "vrfiz128"
         if (i & 0x730) == 0x610:
-            raise Unsupported("vpkd3d128")
+            # Only the form used by pg_6C00_w: NORMPACKED32, mask=1, shift=0.
+            # Match ReXGlue build_vpkd3d128 (vector.cpp), including NaN -> min.
+            # Our lanes are guest order; ReXGlue's host array is reversed, so
+            # its word[0] is our word[3]. Preserve all other destination words.
+            fmt, mask, shift = (i >> 18) & 7, (i >> 16) & 3, (i >> 6) & 3
+            if (fmt, mask, shift) != (2, 1, 0):
+                raise Unsupported("vpkd3d128")
+            packed = 0
+            for k, word in enumerate(B):
+                lo, hi = (0x403FFE01, 0x404001FF) if k < 3 else (0x40400000, 0x40400003)
+                x = u2f(word)
+                bits = lo if not x >= u2f(lo) else hi if x > u2f(hi) else word
+                packed |= (bits & (0x3FF if k < 3 else 3)) << (10 * k)
+            v[d] = D[:3] + [packed]
+            return "vpkd3d128"
         if x3 == 1584:
             v[d] = self._fmap1(B, _recip); return "vrefp128"
         if x3 == 1648:
