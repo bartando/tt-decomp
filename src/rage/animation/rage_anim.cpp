@@ -11,6 +11,8 @@
 #include <cmath>
 #include <cmath>
 
+extern double crt_sqrt(double value); // @ 0x824301D0
+
 namespace rage {
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1023,41 +1025,48 @@ int crAnimDofQuaternion::IsQuaternion() {
 // ─────────────────────────────────────────────────────────────────────────────
 // crAnimDofQuaternion::EvaluateChannels() — Helper function
 //
-// Evaluates animation channels to compute the quaternion value.
-// Handles different channel configurations:
-//   0x00 — Single channel evaluating entire quaternion
-//   0x10 — Four separate channels for x, y, z, w with normalization
+// r3 points to channel data, not the owning DOF: flags at +1, array pointer at +4.
+// r4 is an unused ABI slot; time is in f1 and the output pointer is in r5.
+//   0x00 — One channel evaluating the entire quaternion (slot 4)
+//   0x10 — Four scalar channels (slot 5), followed by normalization
+//   0x20 — Three scalar channels, reconstructing nonnegative w or normalizing xyz
 // ─────────────────────────────────────────────────────────────────────────────
+// @ 0x820C44A0 | size: 0x1E8 (phBoundCapsule_44A0_h in the symbol map)
 void crAnimDofQuaternion::EvaluateChannels(void* animContext, float time, float* outQuat) {
-    uint8_t* thisPtr = reinterpret_cast<uint8_t*>(this);
-    uint8_t channelConfig = thisPtr[1] & 0xF0;
+    auto* data = reinterpret_cast<uint8_t*>(this);
+    const uint8_t config = data[1] & 0xF0;
+    if (config != 0 && config != 0x10 && config != 0x20)
+        return;
 
-    if (channelConfig == 0) {
-        // Single channel mode — evaluate one channel for all quaternion components
-        void** channels = reinterpret_cast<void**>(thisPtr + 4);
-        void* channel = channels[0];
+    const int count = config == 0 ? 1 : (config == 0x10 ? 4 : 3);
+    using EvalFunc = void (*)(void*, void*, float, float*);
+    for (int i = 0; i < count; ++i) {
+        // A callback can replace the array; the original reloads it each time.
+        void** channels = *reinterpret_cast<void***>(data + 4);
+        void* channel = channels[i];
+        void** vtable = *reinterpret_cast<void***>(channel);
+        auto evaluate = reinterpret_cast<EvalFunc>(vtable[config == 0 ? 4 : 5]);
+        evaluate(channel, animContext, time, outQuat + i);
+    }
 
-        if (channel) {
-            void** vtable = *reinterpret_cast<void***>(channel);
-            typedef void (*EvalFunc)(void*, float, float*);
-            EvalFunc evalFn = reinterpret_cast<EvalFunc>(vtable[4]);
-            evalFn(channel, time, outQuat);
-        }
-    } else if (channelConfig == 0x10) {
-        // Four channel mode — separate channels for x, y, z, w
-        void** channels = reinterpret_cast<void**>(thisPtr + 4);
-
-        for (int i = 0; i < 4; i++) {
-            if (channels[i]) {
-                void** vtable = *reinterpret_cast<void***>(channels[i]);
-                typedef void (*EvalFunc)(void*, float, float*);
-                EvalFunc evalFn = reinterpret_cast<EvalFunc>(vtable[5]);
-                evalFn(channels[i], time, outQuat + i);
-            }
-        }
-
-        // Normalize the resulting quaternion
+    if (config == 0x10) {
         NormalizeQuaternion(outQuat);
+    } else if (config == 0x20) {
+        // Match the original's rounded y*y followed by two fused multiply-adds.
+        const float yy = outQuat[1] * outQuat[1];
+        const float xy = outQuat[0] * outQuat[0] + yy;
+        const float lengthSq = outQuat[2] * outQuat[2] + xy;
+        // PPC ble tests !GT, so unordered (NaN) reconstructs w as well.
+        if (!(lengthSq > 1.0f)) {
+            outQuat[3] = static_cast<float>(crt_sqrt(1.0f - lengthSq));
+        } else {
+            const float length = static_cast<float>(crt_sqrt(lengthSq));
+            outQuat[3] = 0.0f;
+            const float scale = 1.0f / length;
+            outQuat[0] *= scale;
+            outQuat[1] *= scale;
+            outQuat[2] *= scale;
+        }
     }
 }
 
