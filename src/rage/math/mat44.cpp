@@ -2,6 +2,55 @@
 
 namespace rage {
 
+float mat44Determinant(const float* m); // @ 0x8223F008
+
+// A 3x3 minor, with the original single-precision product/FMA ordering.
+// The translation cofactor starts its positive sum with b*f*g instead.
+static float mat44Minor(float a, float b, float c, float d, float e, float f,
+                        float g, float h, float i, bool translation) {
+    const float cd = c * d, bf = b * f, ae = a * e;
+    const float af = a * f, bd = b * d, ce = c * e;
+    float sum;
+    if (translation) {
+        sum = bf * g;
+        sum = __builtin_fmaf(ae, i, sum);
+        sum = __builtin_fmaf(cd, h, sum);
+    } else {
+        sum = cd * h;
+        sum = __builtin_fmaf(bf, g, sum);
+        sum = __builtin_fmaf(ae, i, sum);
+    }
+    sum = -__builtin_fmaf(af, h, -sum);
+    sum = -__builtin_fmaf(bd, i, -sum);
+    return -__builtin_fmaf(ce, g, -sum);
+}
+
+// General 4x4 inverse: transpose the signed minors, scaled by 1/determinant.
+// Unlike mat44InverseAffine this writes all 16 lanes and has no singularity
+// check. Preserve column-at-a-time stores and reload each minor: overlapping
+// buffers observe earlier writes (this is not an in-place-safe inverse).
+// mat44Inverse (was phBoundCapsule_F140_g) @ 0x8223F140 | size: 0x614
+void mat44Inverse(float* out, const float* m) {
+    const float invDet = 1.0f / mat44Determinant(m);
+    for (unsigned row = 0; row < 4; ++row) {
+        unsigned rows[3];
+        for (unsigned r = 0, n = 0; r < 4; ++r)
+            if (r != row) rows[n++] = r * 4;
+        for (unsigned col = 0; col < 4; ++col) {
+            unsigned cols[3];
+            for (unsigned c = 0, n = 0; c < 4; ++c)
+                if (c != col) cols[n++] = c;
+            const float minor = mat44Minor(
+                m[rows[0] + cols[0]], m[rows[0] + cols[1]], m[rows[0] + cols[2]],
+                m[rows[1] + cols[0]], m[rows[1] + cols[1]], m[rows[1] + cols[2]],
+                m[rows[2] + cols[0]], m[rows[2] + cols[1]], m[rows[2] + cols[2]],
+                row == 0 && col == 3);
+            const float scaled = minor * invDet;
+            out[col * 4 + row] = ((row + col) & 1) ? -scaled : scaled;
+        }
+    }
+}
+
 // Invert the affine xyz basis and translation; leave all four w lanes untouched.
 // Reject |det| <= max(|basis element|) * 3.6e-7 without writing the destination.
 // This is not the in-place wrapper at 0x820D7B30: keep the original load/store
