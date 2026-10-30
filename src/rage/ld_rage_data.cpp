@@ -32,6 +32,10 @@ extern "C" const float kDebugShadowOffsetY = 2.0f;
 
 namespace rage {
 
+extern const float g_xactFadeZero = 0.0f; // @ 0x82003DA8
+extern const float g_xactFadeOne = 1.0f; // @ 0x82003DAC
+extern const float g_xactFadeStep = 5.0f; // @ 0x82004AA8
+
 // @ 0x8202D344 (.rdata)
 extern const float g_audVolumeScaleFactor = 5000.0f;
 
