@@ -1879,6 +1879,24 @@ struct phLevelBase {
     void**      vtable;           // +0x00
 };
 
+// Query prefix built by phLevelNew's broadphase callers (e.g. 0x822C76E8).
+// Callers may append iteration state at +0x40; this filter reads only this prefix.
+struct alignas(16) phLevelQuery {
+    float start[4];              // +0x00: centre or segment start
+    float endOrRadius[4];        // +0x10: segment end/direction, or radius in x
+    float length;               // +0x20: capsule axis length
+    float radius;               // +0x24: capsule radius
+    uint8_t _pad28[8];
+    int32_t type;               // +0x30: sphere, segment, cylinder, capsule, point
+    uint32_t typeMask;          // +0x34: intersects archetype +0x10
+    uint32_t includeMask;       // +0x38: intersects archetype +0x14
+    uint32_t stateMask;         // +0x3C: used by the caller, not this filter
+};
+static_assert(sizeof(phLevelQuery) == 0x40, "phLevelQuery layout");
+static_assert(offsetof(phLevelQuery, type) == 0x30, "phLevelQuery type offset");
+
+uint8_t phLevelNew_QueryOverlapsInstance(const phLevelQuery* query, const phInst* instance); // @ 0x822DE3D0
+
 // ── rage::phLevelNew  [vtable @ 0x82059894] ──────────────────────────────────
 //
 // Physics world / level. Manages collision pairs, object placement,
