@@ -191,6 +191,15 @@ all fail (about 40 s).
 
 ## Findings so far
 
+- `pongPlayer_0270_g` (0x821E0270) passes `lf_player_mirror_position_id`: 4096
+  trials each with seeds 1 and 7. Each corpus covers all 16 remapped button IDs
+  under all 16 combinations of the pad's four flag bytes, plus non-boolean flag
+  values, range boundaries and signed 32-bit IDs. Despite its name, this is a
+  pad button remapper with no vtable calls; no lift fix was needed. Mutating a
+  reflection-table entry, the second pair's flag offset, the nonzero-byte test
+  or the upper ID bound makes the spec fail. Reproduce the passing checks with
+  `tools/lift-check/lift-check lf_player_mirror_position_id` and the same command
+  with `--seed 7`.
 - `pongPlayer_TossServeBall` (0x821934A0) fails: the lift computes the impulse's w lane
   as `(hit.w - pos.w) / t * mass`, but the asm's reciprocal comes from the `(1, 1, 1, 0)`
   constant at 0x825CB7C0, so the original's w lane is 0. With `velocity._pad = 0.0f` it
