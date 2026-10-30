@@ -41,7 +41,7 @@ MUTATIONS = (
      'positionHandle = game_A2F8("Position", 1);'),
     ("truncate diffuse upload", "game_A670(diffuseHandle, diffuse, count);",
      "game_A670(diffuseHandle, diffuse, count > 0 ? count - 1 : count);"),
-    ("reverse dirty-bit order", "table->dirtyBits[bit >> 3] |= lbl_825D4C80[bit & 7];",
+    ("reverse dirty-bit order", "table->dirtyBits[bit >> 3] |= g_shaderParameterDirtyMasks[bit & 7];",
      "table->dirtyBits[bit >> 3] |= 1u << (bit & 7);"),
     ("clobber another count lane", "table->values[slot].lane[0] = static_cast<float>(count);",
      "table->values[slot].lane[0] = static_cast<float>(count);\n    table->values[slot].lane[1] = 0.0f;"),

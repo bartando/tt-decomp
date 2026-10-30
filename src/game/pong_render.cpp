@@ -65,7 +65,7 @@ extern uint32_t lbl_825EBC30;                   // @ 0x825EBC30  LightCount hand
 extern uint32_t lbl_825EBAB0;                   // @ 0x825EBAB0  LightType handle
 extern uint32_t lbl_825EBC34;                   // @ 0x825EBC34  Ambient handle
 extern LightShaderTable* lbl_825EBC40;          // @ 0x825EBC40
-extern const uint8_t lbl_825D4C80[8];           // @ 0x825D4C80  MSB-first dirty-bit masks
+extern "C" const uint8_t g_shaderParameterDirtyMasks[8];           // @ 0x825D4C80  MSB-first dirty-bit masks
 extern const float lbl_825C5938;               // @ 0x825C5938  -1.0f
 extern const float lbl_8202D108;               // @ 0x8202D108  1.0f
 extern "C" uint32_t g_grmShaderFx_variantTable[23];  // @ 0x825EBBD8  pending render state
@@ -136,7 +136,7 @@ void pongLightState_Apply(const pongLightState* state) {
 
     LightShaderTable* table = lbl_825EBC40;
     uint32_t bit = (countHandle >> 1) & 0x1FFFF;
-    table->dirtyBits[bit >> 3] |= lbl_825D4C80[bit & 7];
+    table->dirtyBits[bit >> 3] |= g_shaderParameterDirtyMasks[bit & 7];
     uint32_t slot = table->entries[(countHandle >> 18) * 2 + 1] & 0xFFFF;
     table->values[slot].lane[0] = static_cast<float>(count);
 
@@ -145,7 +145,7 @@ void pongLightState_Apply(const pongLightState* state) {
     table = lbl_825EBC40;
     bit = (ambientHandle >> 1) & 0x1FFFF;
     g_grmShaderFx_boundContext += 3;
-    table->dirtyBits[bit >> 3] |= lbl_825D4C80[bit & 7];
+    table->dirtyBits[bit >> 3] |= g_shaderParameterDirtyMasks[bit & 7];
     slot = table->entries[(ambientHandle >> 18) * 2 + 1] & 0xFFFF;
     memcpy(table->values[slot].lane, state->ambient.bits, 16);
 }

@@ -1321,7 +1321,7 @@ extern gmball::Holder826063C8View*   lbl_826063C8;        // @ 0x826063C8
 extern gmball::AssetManagerView      g_assetFolderStack;  // @ 0x825D0080
 extern gmball::ShaderGlobalTableView* lbl_825EBC40;       // @ 0x825EBC40
 extern "C" uint32_t                  g_grmShaderFx_boundContext;  // @ 0x825EBC54  bumped on every shader-global write
-extern const uint8_t                 lbl_825D4C80[8];     // @ 0x825D4C80  0x80 >> n
+extern "C" const uint8_t             g_shaderParameterDirtyMasks[8];     // @ 0x825D4C80  0x80 >> n
 extern const float                   lbl_825C5938;        // @ 0x825C5938  -1.0 in the image
 extern const int32_t                 lbl_825C9A2C;        // @ 0x825C9A2C
 extern gmball::Options825C5EC8View   lbl_825C5EC8;        // @ 0x825C5EC8
@@ -1418,7 +1418,7 @@ inline void SetShaderGlobal(uint32_t handle, const Vec4& value) {
     ++g_grmShaderFx_boundContext;
     uint32_t bit = (handle >> 1) & 0x1FFFF;
     uint32_t entryWord = table->entries[(handle >> 18) * 2 + 1];
-    table->dirtyBits[bit >> 3] |= lbl_825D4C80[bit & 7];
+    table->dirtyBits[bit >> 3] |= g_shaderParameterDirtyMasks[bit & 7];
     table->values[entryWord & 0xFFFF] = value;
 }
 
