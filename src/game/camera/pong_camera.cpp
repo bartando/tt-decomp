@@ -1628,7 +1628,7 @@ static T& FieldAt(void* base, uint32_t offset) {
 // lbl_825EBAA0 holds the current grcViewport: ~grcViewport clears it and
 // 0x82153070 re-uploads a viewport that is current. globals.c defines the slot
 // as g_pCurrentViewport.
-extern "C" void* g_pCurrentViewport;
+extern "C" void* g_pCurrentViewport; // @ 0x825EBAA0
 static void*& g_currentViewport = g_pCurrentViewport;
 
 // lbl_8271A318 is the atSingleton<camShotMgr> instance. camShotMgr is an
@@ -1698,7 +1698,7 @@ extern CamVec4  g_cineSampleVecPrev;   // @ 0x82619AD0
 extern float    g_cineSampleInterval;  // @ 0x826064C8 - 0x821F3C44 divides (vec.z - prev.z) by it
 
 extern void  pongCreatureInst_50A0_g(CamMatrix44* out, const CamMatrix44* in);  // @ 0x820D50A0 - rigid inverse
-extern void  game_3070(grcViewport* viewport);     // @ 0x82153070 - rebuild composites, upload if current
+extern void grcViewportUploadMatrices(grcViewport* viewport); // @ 0x82152E80
 extern void  game_7180(pongCineCamMgr* cine);      // @ 0x82167180 - per-frame cine update, sets m_mode
 extern void* pongCSActionCamAnim_4870_g(const void* table, const char* name);  // @ 0x82274870 - null if absent
 extern void  PostGameMessage(uint32_t messageId, uint32_t flags,
@@ -1897,6 +1897,45 @@ void pongCameraMgr::Update() {
     pongCameraMgr_6280_g(this);
 }
 
+namespace {
+float FlushViewportVmx(float value) {
+    uint32_t bits;
+    std::memcpy(&bits, &value, sizeof(bits));
+    if ((bits & 0x7F800000u) == 0) {
+        bits &= 0x80000000u;
+        std::memcpy(&value, &bits, sizeof(value));
+    }
+    return value;
+}
+
+CamMatrix44 MultiplyViewportMatrices(const CamMatrix44& left, const CamMatrix44& right) {
+    float a[4][4], b[4][4], result[4][4];
+    std::memcpy(a, &left, sizeof(a));
+    std::memcpy(b, &right, sizeof(b));
+    for (unsigned row = 0; row < 4; ++row) {
+        for (unsigned col = 0; col < 4; ++col) {
+            // VMX vmsum4fp accumulates products before rounding to float.
+            double sum = 0.0;
+            for (unsigned k = 0; k < 4; ++k)
+                sum += double(FlushViewportVmx(a[row][k])) * FlushViewportVmx(b[k][col]);
+            result[row][col] = FlushViewportVmx(static_cast<float>(sum));
+        }
+    }
+    CamMatrix44 out;
+    std::memcpy(&out, result, sizeof(out));
+    return out;
+}
+} // namespace
+
+// @ 0x82153070 | size: 0x2A8
+void grcViewport::RebuildCompositeMatrices() {
+    m_modelViewMtx = MultiplyViewportMatrices(m_transformMtx44, m_viewMtx);
+    m_modelViewProjectionMtx = MultiplyViewportMatrices(m_modelViewMtx, m_projectionMtx);
+    m_modelScreenMtx = MultiplyViewportMatrices(m_modelViewProjectionMtx, m_screenMtx);
+    if (g_currentViewport == this)
+        grcViewportUploadMatrices(this);
+}
+
 // 0x821538C0: keep the first matrix verbatim and build homogeneous copies of
 // both inputs before rebuilding the viewport composites.
 void grcViewport::SetTransformMatrices(const CamMatrix44& first, const CamMatrix44& second) {
@@ -1909,7 +1948,7 @@ void grcViewport::SetTransformMatrices(const CamMatrix44& first, const CamMatrix
     m_secondMtx44.b = { second.b.x, second.b.y, second.b.z, 0.0f };
     m_secondMtx44.c = { second.c.x, second.c.y, second.c.z, 0.0f };
     m_secondMtx44.d = { second.d.x, second.d.y, second.d.z, 1.0f };
-    game_3070(this);
+    RebuildCompositeMatrices();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1939,7 +1978,7 @@ void grcViewport::SetCameraMtx(const CamMatrix44& cameraMtx) {
     m_viewMtxFlipZ.c = { m_viewMtx.c.x, m_viewMtx.c.y, -m_viewMtx.c.z, m_viewMtx.c.w };
     m_viewMtxFlipZ.d = { m_viewMtx.d.x, m_viewMtx.d.y, -m_viewMtx.d.z, m_viewMtx.d.w };
 
-    game_3070(this);
+    RebuildCompositeMatrices();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

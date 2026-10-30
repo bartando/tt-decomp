@@ -47,8 +47,6 @@ extern "C" {
     extern void* g_sda_6404;  // @ 0x82606404 — shared texture lookup owner
     void hudFlashBase_76F8_g(int stage, int slot, void* texture);  // @ 0x820F76F8
     void hudFlashBase_B138_g();  // @ 0x8215B138
-    void hudFlashBase_AE98_wrh(uint8_t* out, const uint8_t* local, const uint8_t* parent,
-                              uint32_t rgb, uint32_t alpha);  // @ 0x823FAE98
     void sysCallback_Invoke(void* callback, void* argument);  // @ 0x8225FFF8
     void grcDevice_Present(uint32_t flags, int color, int clearDepth, float depth,
                            bool clearStencil, int stencil);  // @ 0x8214F088
@@ -2099,6 +2097,24 @@ bool swfContext_IsGlobalSlot13AltMode() {
     return (xorResult > 127);
 }
 
+// @ 0x823FAE98 | size: 0x17C
+// Four signed 2.6 multipliers followed by four byte offsets. Stores wrap,
+// without saturation. Preserve offset-before-multiplier writes for aliasing.
+void swfConcatColorTransform(uint8_t* out, const uint8_t* local, const uint8_t* parent,
+                             uint32_t rgb, uint32_t alpha) {
+    int32_t factors[4];
+    for (unsigned channel = 0; channel < 4; ++channel) {
+        const int32_t inherited = static_cast<int8_t>(parent[channel]);
+        const int32_t offset = (static_cast<int8_t>(local[channel + 4]) * inherited) >> 6;
+        factors[channel] = static_cast<int8_t>((static_cast<int8_t>(local[channel]) * inherited) >> 6);
+        out[channel + 4] = static_cast<uint8_t>(offset + parent[channel + 4]);
+    }
+    out[0] = static_cast<uint8_t>((factors[0] * int32_t((rgb >> 16) & 255)) / 255);
+    out[1] = static_cast<uint8_t>((factors[1] * int32_t((rgb >> 8) & 255)) / 255);
+    out[2] = static_cast<uint8_t>((factors[2] * int32_t(rgb & 255)) / 255);
+    out[3] = static_cast<uint8_t>((factors[3] * int32_t(alpha & 255)) / 255);
+}
+
 // The old hudFlashBase_D450_g label belongs to the SWF instance renderer.
 // instance +8 and parentTransform use the embedded transform layout (local
 // matrix +0, world matrix +24, local colour +48, world colour +56, flag +140).
@@ -2121,7 +2137,7 @@ void swfRenderInstanceTree(void* instance, const void* parentTransform) {
                     reinterpret_cast<const float*>(parent + 24));
     node[0x94] = parent[140];
     const uint32_t rgb = (uint32_t(parent[68]) << 16) | (uint32_t(parent[69]) << 8) | parent[70];
-    hudFlashBase_AE98_wrh(node + 0x40, node + 0x38, parent + 56, rgb, parent[71]);
+    swfConcatColorTransform(node + 0x40, node + 0x38, parent + 56, rgb, parent[71]);
     if (node[0x43] == 0) return;
 
     uint32_t flags;

@@ -6,7 +6,7 @@ ADDRESS = 0x821538C0
 SOURCE = "src/game/camera/pong_camera.cpp"
 TRIALS = 1000
 FTOL = 0
-CALLS = {"game_3070": stub(ret="void", args=("r3",), deref={"r3": 256})}
+CALLS = {"grcViewport::RebuildCompositeMatrices": stub(ret="void", args=("r3",), deref={"r3": 256})}
 
 
 def inputs(t):

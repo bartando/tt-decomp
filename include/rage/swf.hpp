@@ -42,6 +42,10 @@ namespace rage {
 // The transform begins at swfINSTANCE + 8; matrix is {a, b, c, d, tx, ty}.
 void swfSetTransformMatrix(void* transform, const float* matrix);
 
+// Compose signed 2.6 color multipliers and byte offsets, then apply RGBA tint.
+void swfConcatColorTransform(uint8_t* out, const uint8_t* local, const uint8_t* parent,
+                             uint32_t rgb, uint32_t alpha); // @ 0x823FAE98
+
 // Compose inherited render state, traverse children, and draw leaf definitions.
 void swfRenderInstanceTree(void* instance, const void* parentTransform);
 
