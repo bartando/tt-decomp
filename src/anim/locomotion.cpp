@@ -20,7 +20,7 @@
  *   LocomotionStateAnim_BlendLocomotionAnims       → project-internal name (sub_table entry)
  *   LocomotionStateAnim_TransitionLocomotionState  → project-internal name (sub_table entry)
  *   LocomotionStateAnim_AccumNode / ApplySpeed / ComputeOffset / FindAnim /
- *     GrowArray / InitCapsuleImpl / ProcessNode / SetMatrixImpl / SetSpeed
+ *     GrowArray / InitCapsuleImpl / ProcessNode / SetSpeed
  *                                  — all referenced as externs by pong_creature.cpp
  *   LocomotionStateMf_ApplyConstraints / BlendPoses / Finish / ScaleWeights /
  *     UpdateTransforms             — referenced as externs by pong_creature.cpp
@@ -291,7 +291,6 @@ extern "C" void LocomotionStateAnim_InitCapsuleImpl(void* self, float radius, co
     (void)self; (void)radius; (void)desc;
 }
 extern "C" void LocomotionStateAnim_ProcessNode(void* self, void* node) { (void)self; (void)node; }
-extern "C" void LocomotionStateAnim_SetMatrixImpl(void* self, const void* src) { (void)self; (void)src; }
 extern "C" void LocomotionStateAnim_SetSpeed(void* self, float speed) { (void)self; (void)speed; }
 
 /**

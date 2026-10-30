@@ -110,6 +110,16 @@ bool mat44InverseAffine(float* out, const float* m) {
     return true;
 }
 
+// Snapshot all four rows before inversion so the source is safe from writes.
+// Failed inversions preserve the matrix, and successful ones preserve w lanes.
+// mat44InverseAffineInPlace (was LocomotionStateAnim_7B30_g) @ 0x820D7B30 | size: 0x60
+bool mat44InverseAffineInPlace(float* matrix) {
+    alignas(16) float snapshot[16];
+    for (unsigned i = 0; i < 16; ++i)
+        snapshot[i] = matrix[i];
+    return mat44InverseAffine(matrix, snapshot);
+}
+
 // out = point * matrix. Lane 0 accumulates z, w, y, x; lanes 1-3 w, x, z, y, all
 // fused. Each lane is stored before the next one's loads, so `out` may alias `point`.
 // @ 0x8214EA10

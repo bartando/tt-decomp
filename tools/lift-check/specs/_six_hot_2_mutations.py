@@ -1,4 +1,4 @@
-"""Mutation checks: PYTHONPATH=tools/lift-check tools/lift-check/.venv/bin/python tools/lift-check/specs/_six_hot_mutations.py"""
+"""Mutation checks: PYTHONPATH=tools/lift-check tools/lift-check/.venv/bin/python tools/lift-check/specs/_six_hot_2_mutations.py"""
 import contextlib
 import io
 from pathlib import Path

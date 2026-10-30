@@ -27,7 +27,7 @@ extern const uint32_t g_boxFaceIndices[24]; // @ 0x825D4A90
 namespace rage {
 
 // These names describe the actual helpers, rather than their capsule/animation auto-names.
-extern void invertAffineInPlace(float (*matrix)[4]); // @ 0x820D7B30
+extern bool mat44InverseAffineInPlace(float* matrix); // @ 0x820D7B30
 // LTCG leaves the output in r8, with unused integer slots r4..r7.
 extern void buildClipFrustumPlanes(void* context, uint32_t, uint32_t, uint32_t, uint32_t,
                                    float (*planes)[4], float nearClip, float farClip,
@@ -244,7 +244,7 @@ bool clipAabbToFrustum(void* context, float (*box)[4], const float (*cameraToWor
     buildBoxCorners(corners, box[0], box[1]);
     alignas(16) float worldToCamera[4][4];
     __builtin_memcpy(worldToCamera, cameraToWorld, sizeof(worldToCamera));
-    invertAffineInPlace(worldToCamera);
+    mat44InverseAffineInPlace(&worldToCamera[0][0]);
     for (unsigned corner = 0; corner < 8; ++corner)
         transformClipPoint(corners[corner], worldToCamera);
 

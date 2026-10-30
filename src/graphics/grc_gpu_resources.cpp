@@ -4,7 +4,7 @@
  *
  * Implements GPU fence/resource management functions:
  *   grc_2CC8  @ 0x82352CC8 | size: 0xF0 — GPU memory tile/resolve management
- *   grc_EB10  @ 0x8214EB10 | size: 0x12C — Viewport scaling and setup
+ *   grcSetNormalizedViewport  @ 0x8214EB10 | size: 0x12C — Viewport scaling and setup
  *   grcDevice_ApplyShaderState @ 0x82363500 — shader binding and dependent GPU state
  *   grc_SetupResource — synthetic link anchor (no binary address)
  *   grmShaderPreset_AllocArray_c — shader preset array allocation
@@ -119,14 +119,14 @@ void grc_2CC8(void* a, uint32_t b, uint32_t c) {
 }
 
 /**
- * grc_EB10 @ 0x8214EB10 | size: 0x12C
+ * grcSetNormalizedViewport @ 0x8214EB10 | size: 0x12C
  *
  * Computes a scaled viewport rectangle from normalized coordinates and
  * applies it to the GPU device. Used during render target setup to map
  * a normalized [0,1] viewport specification to pixel coordinates.
  *
  * Parameters:
- *   a — pointer to a 24-byte viewport descriptor:
+ *   vp — pointer to a 24-byte viewport descriptor:
  *     +0x00  float m_fLeft       — normalized left   (0.0 - 1.0)
  *     +0x04  float m_fTop        — normalized top    (0.0 - 1.0)
  *     +0x08  float m_fRight      — normalized right  (0.0 - 1.0)
@@ -140,10 +140,7 @@ void grc_2CC8(void* a, uint32_t b, uint32_t c) {
  * If the chip ID matches 0x1A220197 (Xenos R500), depth values are
  * inverted (1.0 - depth).
  */
-void grc_EB10(void* a) {
-    if (!a) return;
-
-    const float* vp = static_cast<const float*>(a);
+void grcSetNormalizedViewport(const float* vp) {
 
     float fLeft     = vp[0];   // +0x00
     float fTop      = vp[1];   // +0x04
@@ -191,9 +188,7 @@ void grc_EB10(void* a) {
 
     // Apply viewport to the GPU device
     void* device = lbl_825EB988;
-    if (device) {
-        grcDevice_SetViewport(device, viewportRect);
-    }
+    grcDevice_SetViewport(device, viewportRect);
 }
 
 /**

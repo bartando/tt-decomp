@@ -25,6 +25,11 @@
 
 // Forward decls of the typed implementations in rage_cm.cpp.
 // (Pulling rage_cm_types.hpp here would force unrelated engine headers.)
+namespace rage {
+struct cmNodePort;
+int32_t cmNode_GetDim(const cmNodePort* port); // @ 0x82184B60
+}
+
 namespace {
 struct cmNodePortLite {
     int32_t  m_type;
@@ -107,23 +112,12 @@ int cmNode_GetInt(void* port) {
 }
 
 /**
- * cmNode_GetDim_stub — read a dimension (int32) from a cmPort.
+ * cmNode_GetDim_stub — linkage shim for callers using void-pointer ports.
+ * Use the canonical {pointer, type} port evaluator, not cmNodePortLite's
+ * reversed layout. The typed lift owns the slot-5 dispatch and out-param.
  */
 int cmNode_GetDim_stub(void* port) {
-    const auto* p = static_cast<const cmNodePortLite*>(port);
-    if (!p) return 0;
-    if (p->m_type == 1) {
-        return *static_cast<const int32_t*>(p->m_pData);
-    }
-    if (p->m_type == 2) {
-        struct N { void** vtable; };
-        auto* n = static_cast<N*>(p->m_pData);
-        int32_t tmp = 0;
-        using Fn = void(*)(void*, int32_t*);
-        reinterpret_cast<Fn>(n->vtable[5])(n, &tmp);
-        return tmp;
-    }
-    return 0;
+    return rage::cmNode_GetDim(static_cast<const rage::cmNodePort*>(port));
 }
 
 /**
