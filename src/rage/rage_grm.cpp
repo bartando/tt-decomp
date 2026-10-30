@@ -677,6 +677,48 @@ void grmShaderInstance_Unbind(uint32_t instance) {
     *reinterpret_cast<uint32_t*>(self + 520) = 0;
 }
 
+// @ 0x825D4C80: MSB-first masks for shader parameter dirty bits.
+extern "C" const uint8_t g_shaderParameterDirtyMasks[8];
+
+// The low handle bit selects the indirect parameter bank. Both banks use
+// 8-byte descriptors whose low 16 bits select a 16-byte value slot.
+static __attribute__((always_inline)) inline uint8_t* grmParameterWriteTarget(
+    uint32_t context, uint32_t handle) {
+    auto* state = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(
+        *reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(context))));
+    auto word = [](uint8_t* p) { return *reinterpret_cast<uint32_t*>(p); };
+    const bool indirect = (handle & 1) != 0;
+    auto address = [](uint32_t p) { return reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(p)); };
+    uint8_t* dirty = indirect ? address(word(state + 256)) : state;
+    uint8_t* entries = address(indirect ? word(address(word(state + 268))) : word(state + 264));
+    uint8_t* values = address(indirect ? word(address(word(state + 300))) : word(state + 296));
+    const uint32_t bit = (handle >> 1) & 0x1FFFF;
+    dirty[bit >> 3] |= g_shaderParameterDirtyMasks[bit & 7];
+    const uint32_t slot = word(entries + ((handle >> 18) * 8) + 4) & 0xFFFF;
+    return values + slot * 16;
+}
+
+// The scalar value bank must be 16-byte aligned: stvewx selects a lane by
+// destination alignment, and other lanes contain unrelated stack contents.
+// @ 0x8215AA90
+void grmShaderParameter_SetFloat(uint32_t context, uint32_t handle, float value) {
+    auto* counter = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(context + 16));
+    --*counter;
+    uint8_t* target = grmParameterWriteTarget(context, handle);
+    std::memcpy(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(target) & ~uintptr_t(3)), &value, sizeof(value));
+}
+
+// @ 0x8215AD28
+void grmShaderParameter_SetVector(uint32_t context, uint32_t handle, const void* value) {
+    auto* counter = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(context + 16));
+    --*counter;
+    // lvx rounds the source down and snapshots it before the dirty-bit write.
+    uint8_t vector[16];
+    std::memcpy(vector, reinterpret_cast<const void*>(reinterpret_cast<uintptr_t>(value) & ~uintptr_t(15)), 16);
+    uint8_t* target = grmParameterWriteTarget(context, handle);
+    std::memcpy(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(target) & ~uintptr_t(15)), vector, 16);
+}
+
 // @ 0x8215AE90
 void grmShaderInstance_Select(uint32_t /* context */, uint32_t entryId) {
     uint32_t* context = g_grmShaderInstance_context;
