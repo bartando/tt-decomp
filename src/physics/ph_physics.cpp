@@ -1527,6 +1527,50 @@ void rage::phBoundCapsule::ApplyTransform(const float* transform, const float* i
 // rage::phBoundGeometry — Collision Geometry Bound Functions
 // ═════════════════════════════════════════════════════════════════════════════
 
+// Segment against an indexed triangle or quad; returns whether the hit is
+// within maxFraction. The helper reports 0 for a hit and >=4 to try the
+// second triangle of a quad.
+extern int phBoundGeometry_DBC8_wrh(const float* start, const float* direction, const float* end,
+    const void* polygon, const float* a, const float* b, const float* c,
+    float* startDistance, float* endDistance, float* fraction); // @ 0x8223DBC8
+
+// @ 0x822200C0
+int phPolygon_IntersectSegment(const void* polygon, const float* vertices,
+                               const float* segment, void* hit, float maxFraction) {
+    const auto* bytes = static_cast<const uint8_t*>(polygon);
+    const auto* indices = reinterpret_cast<const uint16_t*>(bytes + 16);
+    const float* a = vertices + 4 * indices[0];
+    const float* c = vertices + 4 * indices[2];
+    alignas(16) float direction[4];
+    for (int i = 0; i < 4; ++i) direction[i] = segment[4 + i] - segment[i];
+    float startDistance, endDistance, fraction;
+    int result = phBoundGeometry_DBC8_wrh(segment, direction, segment + 4, polygon, a,
+        vertices + 4 * indices[1], c, &startDistance, &endDistance, &fraction);
+    if (result >= 4 && indices[3] != 0) {
+        result = phBoundGeometry_DBC8_wrh(segment, direction, segment + 4, polygon, a, c,
+            vertices + 4 * indices[3], &startDistance, &endDistance, &fraction);
+    }
+    if (result != 0 || fraction > maxFraction) return 0;
+    if (hit) {
+        auto* out = static_cast<uint8_t*>(hit);
+        auto* point = reinterpret_cast<float*>(out + 16);
+        for (int i = 0; i < 4; ++i) {
+            volatile float product = direction[i] * fraction;
+            point[i] = product + segment[i];
+        }
+        memcpy(out + 32, polygon, 16);
+        *reinterpret_cast<float*>(out + 48) = fraction;
+        *reinterpret_cast<float*>(out + 52) = -endDistance;
+        *reinterpret_cast<uint32_t*>(out + 56) = bytes[15];
+        *reinterpret_cast<uint32_t*>(out + 60) = 0xffffffffu;
+        *reinterpret_cast<uint16_t*>(out + 64) = 0;
+        *reinterpret_cast<uint16_t*>(out + 66) = 2;
+        out[68] = 1;
+        *reinterpret_cast<uint16_t*>(out + 70) = 0;
+    }
+    return 1;
+}
+
 // Sphere contact against a triangle/quad: 0 = vertex, 1 = edge, 2 = face, 3 = miss.
 // Vectors are aligned vec4s; tests use xyz, but all output stores include w.
 // Xenon reserves r4 for the f1 argument. Keep that slot explicit for ppc32
