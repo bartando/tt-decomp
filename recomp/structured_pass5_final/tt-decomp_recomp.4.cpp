@@ -38625,7 +38625,7 @@ loc_8216D49C:
 	// mr r3,r30
 	ctx.r3.u64 = var_r30;
 	// bl 0x820c3ad8
-	LocomotionStateAnim_3AD8_g(ctx, base);
+	mat44ComposeAffineInPlace(ctx, base);
 	return;
 }
 

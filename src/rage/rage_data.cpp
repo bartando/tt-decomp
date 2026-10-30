@@ -105,3 +105,13 @@ TT_DATA_ALIAS("g_ambientStreamFlags", "g_grmShaderFx_flushRequired");  // @ 0x82
 
 extern "C" void* g_hsmHelperContext = nullptr;     // @ 0x8271A7C0
 extern "C" void* g_hsmHelperNameSource = nullptr;  // @ 0x8271A7C4
+
+// Homogeneous affine vector constants, populated by the original static init.
+extern "C" alignas(16) const uint32_t g_affineXYZMask[4] = { // @ 0x82619BE0
+    0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0
+};
+extern "C" alignas(16) const uint32_t g_affineHomogeneousW[4] = { // @ 0x82619BD0
+    0, 0, 0, 0x3F800000u
+};
+TT_DATA_ALIAS("lbl_82619BE0", "g_affineXYZMask");
+TT_DATA_ALIAS("lbl_82619BD0", "g_affineHomogeneousW");

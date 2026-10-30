@@ -31049,7 +31049,7 @@ loc_823D42E8:
 		// addi r3,r1,80
 		ctx.r3.s64 = ctx.r1.s64 + 80;
 		// bl 0x820c3ad8
-		LocomotionStateAnim_3AD8_g(ctx, base);
+		mat44ComposeAffineInPlace(ctx, base);
 	}
 loc_823D4304:
 	// lis r30,-32163
@@ -31165,7 +31165,7 @@ loc_823D4304:
 		// lwz r3,12(r31)
 		ctx.r3.u64 = PPC_LOAD_U32(var_r31 + 12);
 		// bl 0x820fff78
-		game_FF78(ctx, base);
+		pongLighting_ApplyAmbientCube(ctx, base);
 	}
 loc_823D43F0:
 	// lwz r3,16(r31)

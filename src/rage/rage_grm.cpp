@@ -6,6 +6,7 @@
 #include "rage_grm.hpp"
 #include "animation/rage_anim.hpp"   // rage::datResource
 #include <cstring>
+#include "rage/shader_parameters.hpp"
 
 // Forward declarations for external functions
 namespace rage {
@@ -1307,4 +1308,44 @@ uint16_t* grmU16Array_AppendSlot(grmU16Array* array) {
     uint16_t* slot = array->data + array->count;
     array->count = static_cast<uint16_t>(array->count + 1);
     return slot;
+}
+
+extern "C" const uint8_t g_shaderParameterFourDirtyMasks[16]; // @ 0x825D4C88
+
+// @ 0x82159908 | size: 0x194 (was game_9908)
+// The handle names an array header; its elements begin at the NEXT descriptor.
+// Four-element batches snapshot their source before setting the dirty bits.
+void grmShaderParameter_SetFloatArray(ShaderTable* table, uint32_t handle,
+                                     const float* values, uint32_t count) {
+    uint32_t* entry = table->entries + (handle >> 18) * 2;
+    uint32_t bit = (handle >> 1) & 0x1FFFFu;
+    const uint32_t length = count != 0 ? count : ((entry[0] >> 2) & 0x3FFFu);
+    const uint32_t end = bit + length;
+    while (bit + 3 < end) {
+        uint32_t vector[4];
+        std::memcpy(vector, values, 16);
+        // Apply the image's big-endian halfword mask as bytes on every host.
+        table->dirtyBits[bit >> 3] |= g_shaderParameterFourDirtyMasks[(bit & 7) * 2];
+        table->dirtyBits[(bit >> 3) + 1] |= g_shaderParameterFourDirtyMasks[(bit & 7) * 2 + 1];
+        for (unsigned lane = 0; lane < 4; ++lane) {
+            const uint32_t slot = entry[(lane + 1) * 2 + 1] & 0xFFFFu;
+            std::memcpy(table->values[slot].lane, &vector[lane], 4);
+        }
+        bit += 4;
+        entry += 8;
+        values += 4;
+    }
+    while (bit < end) {
+        ShaderVector* bank = table->values;
+        entry += 2;
+        // lvlx alone zero-fills bytes crossing the next 16-byte boundary.
+        uint8_t scalar[4] = {};
+        const unsigned available = 16 - (reinterpret_cast<uintptr_t>(values) & 15);
+        std::memcpy(scalar, values, available < 4 ? available : 4);
+        table->dirtyBits[bit >> 3] |= g_shaderParameterDirtyMasks[bit & 7];
+        const uint32_t slot = entry[1] & 0xFFFFu;
+        std::memcpy(bank[slot].lane, scalar, 4);
+        ++bit;
+        ++values;
+    }
 }

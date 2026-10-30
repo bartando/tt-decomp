@@ -81471,13 +81471,13 @@ loc_82341694:
 		ea = (ctx.r5.u32) & ~0xF;
 		simde_mm_store_si128((simde__m128i*)PPC_RAW_ADDR(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)ctx.v28.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
 		// bl 0x820c3ad8
-		LocomotionStateAnim_3AD8_g(ctx, base);
+		mat44ComposeAffineInPlace(ctx, base);
 		// addi r4,r1,288
 		ctx.r4.s64 = ctx.r1.s64 + 288;
 		// addi r3,r1,160
 		ctx.r3.s64 = ctx.r1.s64 + 160;
 		// bl 0x820c3ad8
-		LocomotionStateAnim_3AD8_g(ctx, base);
+		mat44ComposeAffineInPlace(ctx, base);
 		// addi r3,r1,96
 		ctx.r3.s64 = ctx.r1.s64 + 96;
 		// bl 0x8233ed10

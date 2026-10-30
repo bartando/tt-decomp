@@ -1,6 +1,59 @@
+#include "rage/mat44.hpp"
+#include <cstdint>
+#include <cstring>
+
+extern "C" const uint32_t g_affineXYZMask[4]; // @ 0x82619BE0 — xyz mask
+extern "C" const uint32_t g_affineHomogeneousW[4]; // @ 0x82619BD0 — homogeneous w
+
 // 4x4 matrices as four 16-byte rows (row 3 is translation).
 
 namespace rage {
+
+namespace {
+float flushComposeVmx(float value) {
+    uint32_t bits;
+    std::memcpy(&bits, &value, 4);
+    if ((bits & 0x7F800000u) == 0) {
+        bits &= 0x80000000u;
+        std::memcpy(&value, &bits, 4);
+    }
+    return value;
+}
+}
+
+// @ 0x820C3AD8 | size: 0xF0 (was LocomotionStateAnim_3AD8_g)
+// .text.s mislabels VMX128 loads and dot products as vmaddfp128/stvx128.
+// Keep the early translation store: overlapping source matrices see it.
+void mat44ComposeAffineInPlace(void* matrix, const void* transform) {
+    auto* out = reinterpret_cast<float*>(reinterpret_cast<uintptr_t>(matrix) & ~uintptr_t(15));
+    auto* source = reinterpret_cast<const float*>(reinterpret_cast<uintptr_t>(transform) & ~uintptr_t(15));
+    float rows[4][4], right[4][4], result[4][4];
+    std::memcpy(rows[0], out, 16);
+    uint32_t translation[4];
+    std::memcpy(translation, out + 12, 16);
+    for (unsigned lane = 0; lane < 4; ++lane)
+        translation[lane] = (translation[lane] & g_affineXYZMask[lane]) | g_affineHomogeneousW[lane];
+    std::memcpy(out + 12, translation, 16);
+    std::memcpy(right, source, 64);
+    std::memcpy(rows[1], out + 4, 16);
+    std::memcpy(rows[3], out + 12, 16);
+    std::memcpy(rows[2], out + 8, 16);
+    for (unsigned row = 0; row < 4; ++row) {
+        for (unsigned col = 0; col < 3; ++col) {
+            // vmsum3/4 accumulate products before rounding once to float.
+            double sum = 0.0;
+            for (unsigned k = 0; k < (row == 3 ? 4u : 3u); ++k)
+                sum += static_cast<double>(flushComposeVmx(rows[row][k])) * flushComposeVmx(right[k][col]);
+            result[row][col] = flushComposeVmx(static_cast<float>(sum));
+        }
+        // These merges copy raw bits, including denormals and NaN payloads.
+        std::memcpy(&result[row][3], &rows[row][0], 4);
+    }
+    std::memcpy(out, result[0], 16);
+    std::memcpy(out + 4, result[1], 16);
+    std::memcpy(out + 12, result[3], 16);
+    std::memcpy(out + 8, result[2], 16);
+}
 
 float mat44Determinant(const float* m); // @ 0x8223F008
 

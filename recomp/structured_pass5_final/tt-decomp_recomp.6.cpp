@@ -73161,7 +73161,7 @@ PPC_FUNC_IMPL(__imp__phBoundCapsule_0880_g) {
 		ea = (var_r29) & ~0xF;
 		simde_mm_store_si128((simde__m128i*)PPC_RAW_ADDR(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)ctx.v13.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
 		// bl 0x820c3ad8
-		LocomotionStateAnim_3AD8_g(ctx, base);
+		mat44ComposeAffineInPlace(ctx, base);
 		return;
 	}
 loc_821D095C:

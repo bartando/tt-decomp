@@ -1013,7 +1013,7 @@ extern void  LocomotionStateAnim_C288_g(void* entry, void* unusedR4, void* skele
                                         float weight);                 // @ 0x8224C288 — "full weight" apply variant
 extern void  LocomotionStateAnim_C8F8_g(void* anim);                   // @ 0x8214C8F8 — post-apply release
 extern void  pongShadowMap_38C0_g(void* heap, void* a, void* b);       // @ 0x821538C0 — tex/shadow bind
-extern void  game_FF78(int slot);                                      // @ 0x820FFF78 — stream-slot gate toggle
+extern void pongLighting_ApplyAmbientCube(uint32_t lightIndex); // @ 0x820FFF78
 extern void* sub_82389330(void* node);                                 // anim-node walker (inside fxBallSpinTex_vfn_0 +0xE8)
 extern void  sub_82388758(void* self, int a, int b);                   // flush helper
 
@@ -1213,7 +1213,7 @@ void fxAmbient::RequestStreamSlot(int requestedSlot) {
  * When enabled (this+108 != 0):
  *   1. RequestStreamSlot(2) to reserve the stream slot.
  *   2. pongShadowMap_38C0_g(streaming_heap, &lbl_825CB800, &lbl_825CB800).
- *   3. game_FF78(2) — re-open the stream gate.
+ *   3. pongLighting_ApplyAmbientCube(2) — upload the selected ambient cube.
  *   4. If (this+24) != 0: VCALL(this+20, slot5,
  *          *(this + ((glob[0x82597198]+23)*4))) — dispatch to a per-frame
  *      applier; else VCALL(this+20, slot5, &lbl_825CB800).
@@ -1229,7 +1229,7 @@ void fxAmbient::LoadAndApply(void* param) {
 
     this->RequestStreamSlot(2);
     pongShadowMap_38C0_g(g_ambientStreamingHeap, lbl_825CB800, lbl_825CB800);
-    game_FF78(2);
+    pongLighting_ApplyAmbientCube(2);
 
     void* target       = *(void**)(self + 20);
     void* altArg       = *(void**)(self + 24);

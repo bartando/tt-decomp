@@ -22634,7 +22634,7 @@ PPC_FUNC_IMPL(__imp__phUpdateObject_vfn_6) {
 			// addi r3,r31,80
 			ctx.r3.s64 = (int64_t)(int32_t)var_r31 + 80;
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 		}
 	loc_8227DB4C:
 		// lwz r3,96(r30)
@@ -59739,7 +59739,7 @@ PPC_FUNC_IMPL(__imp__phBoundComposite_vfn_3) {
 		ea = (ctx.r10.u32) & ~0xF;
 		simde_mm_store_si128((simde__m128i*)PPC_RAW_ADDR(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)ctx.v11.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
 		// bl 0x820c3ad8
-		LocomotionStateAnim_3AD8_g(ctx, base);
+		mat44ComposeAffineInPlace(ctx, base);
 		// lwz r9,112(r31)
 		ctx.r9.u64 = PPC_LOAD_U32(var_r31 + 112);
 		// lwzx r3,r9,r29
@@ -65255,7 +65255,7 @@ while ((int32_t)var_r25 < ctx.r10.s32) {
 			ea = (ctx.r11.u32) & ~0xF;
 			simde_mm_store_si128((simde__m128i*)PPC_RAW_ADDR(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)ctx.v7.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 			// addi r9,r1,128
 			ctx.r9.s64 = ctx.r1.s64 + 128;
 			// lbz r10,5(r27)
@@ -65481,7 +65481,7 @@ while ((int32_t)var_r25 < ctx.r10.s32) {
 			ea = (ctx.r5.u32) & ~0xF;
 			simde_mm_store_si128((simde__m128i*)PPC_RAW_ADDR(ea), simde_mm_shuffle_epi8(simde_mm_load_si128((simde__m128i*)ctx.v2.u8), simde_mm_load_si128((simde__m128i*)VectorMaskL)));
 			// bl 0x820c3ad8
-			LocomotionStateAnim_3AD8_g(ctx, base);
+			mat44ComposeAffineInPlace(ctx, base);
 			// addi r4,r1,144
 			ctx.r4.s64 = ctx.r1.s64 + 144;
 			// addi r3,r1,160
