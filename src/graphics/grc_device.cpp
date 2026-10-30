@@ -7,6 +7,7 @@
  *   - grcDevice_shutdownAlt @ 0x821540D0 — Alternate shutdown path
  *   - grcDevice_setSamplerMinFilter @ 0x82355418 — Xenos texture fetch state
  *   - grcDevice_setSamplerMagFilter @ 0x823555A8 — Xenos texture fetch state
+ *   - grcDevice_setSamplerMaxAnisotropy @ 0x82355828 — Xenos texture fetch state
  *   - grcDevice_SetTexture          @ 0x82359940 — bind a texture to a fetch slot
  *   - grcDevice_ReserveCommandSpace @ 0x82359E80 — carve space out of the command ring
  *
@@ -255,6 +256,22 @@ void grcDevice_setSamplerMagFilter(void* device, uint32_t sampler, uint32_t filt
     uint64_t dirtyBit = shift < 64u ? (UINT64_C(0x8000000000000000) >> shift) : 0;
     uint64_t* dirtySamplers = reinterpret_cast<uint64_t*>(state + 32);
     *dirtySamplers |= dirtyBit;
+}
+
+// @ 0x82355828
+void grcDevice_setSamplerMaxAnisotropy(void* device, uint32_t sampler, uint32_t anisotropy) {
+    uint8_t* state = static_cast<uint8_t*>(device);
+    uint32_t* fetch = reinterpret_cast<uint32_t*>(state + (sampler + 48u) * 24u);
+    if (fetch[4] & 0xC00u) {
+        uint32_t anisoFilter = g_grcAnisoFilterTable[anisotropy];
+        fetch[3] = (fetch[3] & ~0x0E000000u) | ((anisoFilter << 25) & 0x0E000000u);
+
+        // srd uses seven shift bits and returns zero for shifts 64..127.
+        uint32_t shift = sampler & 127u;
+        uint64_t dirtyBit = shift < 64u ? (UINT64_C(0x8000000000000000) >> shift) : 0;
+        *reinterpret_cast<uint64_t*>(state + 32) |= dirtyBit;
+    }
+    state[12020u + sampler] = static_cast<uint8_t>(anisotropy);
 }
 
 extern "C" void grcTexture_ReleaseResource(void* texture); // @ 0x82352708
