@@ -30,6 +30,9 @@ extern "C" {
     void swfPopResult(void* dst);               // pop result from call stack
     int _stricmp(const char*, const char*);     // case-insensitive string compare
     float swfComputeFramePosition(void* ctx, void* entry, float* outMin, float* outMax);
+    const char* util_A768_1(const void* value, void* buffer, int maxLen);  // @ 0x823FA768 — SWF value to string
+    float util_EF98(void* instance, int includeChildren);  // @ 0x823FEF98 — display width
+    float swfINSTANCE_F0D8_w(void* instance, int includeChildren);  // @ 0x823FF0D8 — display height
 }
 
 // Global SWF object pools (SDA - Small Data Area)
@@ -963,16 +966,128 @@ void swfACTIONFUNC::DeleteMember(const char* name) {
 }
 
 
-// swfINSTANCE overrides for Flash display object properties:
-// slot 10 = GetMember (770 lines — dispatches "this", "_parent", "_root", textColor,
-//          _name, _width, _height, _xscale, _yscale, _alpha, _rotation, _x, _y, etc.)
+// swfINSTANCE slot 10 @ 0x823FB970: display properties and script fallback.
+// The shared declaration calls r4 a const char*, but the game passes an SWF
+// {value, type} key. Convert it before comparing or forwarding the property name.
 bool swfINSTANCE::GetMember(const char* name, void* result) {
-    // Full body @ 0x823FB970 is a 770-line property dispatcher that fans
-    // out to "this", "_parent", "_root", textColor, _name, _width,
-    // _height, _xscale, _yscale, _alpha, _rotation, _x, _y and friends
-    // before falling back to the script-object base. Pending dedicated
-    // lift; forwarding to base keeps non-display lookups working today.
-    return swfSCRIPTOBJECT::GetMember(name, result);
+    extern void* g_swfStringBuffer;        // @ 0x82604850
+    extern void* g_swfRootObject;          // @ 0x82602828
+    extern void* g_swfGlobalScope;         // @ 0x8260282C
+    extern void* g_swfScriptObjectPool;    // @ 0x82604C60
+    extern void* g_vtable_swfSCRIPTOBJECT; // @ 0x82074D14
+
+    const char* property = util_A768_1(name, &g_swfStringBuffer, SWF_INTERN_BUFFER_SIZE);
+    char* instance = reinterpret_cast<char*>(this);
+    uint32_t& type = *(reinterpret_cast<uint32_t*>(result) + 1);
+
+    if (strcmp(property, "this") == 0) {
+        *reinterpret_cast<void**>(result) = this;
+        type = 5;
+        return true;
+    }
+    if (strcmp(property, "_root") == 0) {
+        *reinterpret_cast<void**>(result) = g_swfRootObject;
+        type = 5;
+        return true;
+    }
+    if (strcmp(property, "_global") == 0) {
+        *reinterpret_cast<void**>(result) = g_swfGlobalScope;
+        type = 5;
+        return true;
+    }
+    if (strcmp(property, "textColor") == 0) {
+        const uint8_t* color = reinterpret_cast<const uint8_t*>(instance + 0x4C);
+        *reinterpret_cast<uint32_t*>(result) = (uint32_t(color[0]) << 16)
+                                            | (uint32_t(color[1]) << 8) | color[2];
+        type = 3;
+        return true;
+    }
+    if (strcmp(property, "_parent") == 0) {
+        void* parent = *reinterpret_cast<void**>(instance + 0xB0);
+        *reinterpret_cast<void**>(result) = parent ? parent : this;
+        type = 5;
+        return true;
+    }
+    if (strcmp(property, "onEnterFrame") == 0) {
+        *reinterpret_cast<void**>(result) = *reinterpret_cast<void**>(instance + 0xCC);
+        type = 5;
+        return true;
+    }
+    if (strcmp(property, "_name") == 0) {
+        *reinterpret_cast<void**>(result) = *reinterpret_cast<void**>(instance + 0xBC);
+        type = 1;
+        return true;
+    }
+
+    // Tag 4 is a single-precision number here; set it even for delegated lookups.
+    type = 4;
+    if (strcmp(property, "_x") == 0) {
+        *reinterpret_cast<float*>(result) = *reinterpret_cast<float*>(instance + 0x70);
+        return true;
+    }
+    if (strcmp(property, "_y") == 0) {
+        *reinterpret_cast<float*>(result) = *reinterpret_cast<float*>(instance + 0x74);
+        return true;
+    }
+    if (strcmp(property, "_width") == 0) {
+        *reinterpret_cast<float*>(result) = util_EF98(this, 0);
+        return true;
+    }
+    if (strcmp(property, "_height") == 0) {
+        *reinterpret_cast<float*>(result) = swfINSTANCE_F0D8_w(this, 0);
+        return true;
+    }
+    if (strcmp(property, "_xscale") == 0) {
+        *reinterpret_cast<float*>(result) = *reinterpret_cast<float*>(instance + 0x68);
+        return true;
+    }
+    if (strcmp(property, "_yscale") == 0) {
+        *reinterpret_cast<float*>(result) = *reinterpret_cast<float*>(instance + 0x6C);
+        return true;
+    }
+    if (strcmp(property, "_alpha") == 0) {
+        // Preserve both single-precision multiplies (100, then 1/255).
+        float alpha = float(*reinterpret_cast<uint8_t*>(instance + 0x4F)) * 100.0f;
+        *reinterpret_cast<float*>(result) = alpha * (1.0f / 255.0f);
+        return true;
+    }
+    if (strcmp(property, "_rotation") == 0) {
+        *reinterpret_cast<float*>(result) = *reinterpret_cast<float*>(instance + 0x54);
+        return true;
+    }
+
+    // Use the game's slots: C++ virtual ordering in this header is different.
+    using DefinitionLookup = uint32_t (*)(void*, const char*, void*);
+    void* definition = SwfGetDefinition(this);
+    void** definitionVtable = *reinterpret_cast<void***>(definition);
+    if (uint8_t(reinterpret_cast<DefinitionLookup>(definitionVtable[4])(definition, property, result))) {
+        return true;
+    }
+
+    using ScriptLookup = uint32_t (*)(void*, const swfValuePair*, void*);
+    swfValuePair key = {uint32_t(reinterpret_cast<uintptr_t>(property)), 1};
+    void*& script = *reinterpret_cast<void**>(instance + 0xA0);
+    if (script) {
+        void** vtable = *reinterpret_cast<void***>(script);
+        if (uint8_t(reinterpret_cast<ScriptLookup>(vtable[10])(script, &key, result))) {
+            return true;
+        }
+    }
+
+    // A failed lookup replaces even an existing script object with a fresh one.
+    // The pool must have a free node; the original dereferences its head unconditionally.
+    char* pool = reinterpret_cast<char*>(g_swfScriptObjectPool);
+    void* object = *reinterpret_cast<void**>(pool + 12);
+    void* next = *reinterpret_cast<void**>(object);
+    --*reinterpret_cast<uint16_t*>(pool + 6);
+    *reinterpret_cast<void**>(pool + 12) = next;
+    *reinterpret_cast<void**>(object) = &g_vtable_swfSCRIPTOBJECT;
+    *reinterpret_cast<uint32_t*>(reinterpret_cast<char*>(object) + 8) = 0;
+    *reinterpret_cast<uint32_t*>(reinterpret_cast<char*>(object) + 4) = 0;
+    *reinterpret_cast<uint32_t*>(reinterpret_cast<char*>(object) + 12) = 0;
+    script = object;
+    void** vtable = *reinterpret_cast<void***>(script);
+    return reinterpret_cast<ScriptLookup>(vtable[10])(script, &key, result);
 }
 
 // slot 11 = SetMember (736 lines — handles _x, _y, _xscale, _yscale, _alpha,
@@ -1332,9 +1447,9 @@ void*    g_currentSwfContext = nullptr;
 uint32_t g_swfCallDepth = 0;
 float    g_swfFrameScale = 1.0f;
 void*    g_swfGlobalObject = nullptr;
-void*    g_swfGlobalScope = nullptr;
-void*    g_swfStringBuffer = nullptr;
-void*    g_vtable_swfSCRIPTOBJECT = nullptr;
+extern void* g_swfGlobalScope;         // @ 0x8260282C
+extern void* g_swfStringBuffer;        // @ 0x82604850 — address of the 1024-byte buffer
+extern void* g_vtable_swfSCRIPTOBJECT; // @ 0x82074D14 — address of the table
 
 // ── swfINSTANCE::FindOrCreateChildByDepth @ 0x823FC908 size:0x144 ──
 // Looks up a child instance by 16-bit depth key (+164/+166/+168/+176/+184).

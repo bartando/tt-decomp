@@ -191,6 +191,16 @@ all fail (about 40 s).
 
 ## Findings so far
 
+- `swfINSTANCE_vfn_10` / `rage::swfINSTANCE::GetMember` (0x823FB970) was a placeholder
+  forwarding to the base. `swf_instance_get_member` now checks all 15 built-in properties,
+  exact name matching, string/chunked-value keys, definition and script lookups, and pool
+  allocation after missing/failed script lookups. The replacement dispatcher passes
+  10,000 trials (seed 7) exactly, including the two rounded `_alpha` multiplies. The
+  value-to-string helper runs as original code; width/height and delegated lookups are
+  stubbed/modelled. Three null placeholder globals in the TU were changed to externs
+  at the original buffer, global-scope and vtable addresses. The shared header's `const
+  char*` key declaration still represents a tagged SWF value at this function's ABI;
+  other SWF lifts and native-port integration remain outside this check's scope.
 - `pongPlayer_TossServeBall` (0x821934A0) fails: the lift computes the impulse's w lane
   as `(hit.w - pos.w) / t * mass`, but the asm's reciprocal comes from the `(1, 1, 1, 0)`
   constant at 0x825CB7C0, so the original's w lane is 0. With `velocity._pad = 0.0f` it
