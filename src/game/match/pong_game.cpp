@@ -1516,3 +1516,123 @@ extern "C" void pongGameContext_rtti_1B50_0(void* secondaryThis, int32_t flags) 
     auto*    primary = reinterpret_cast<pongGameContext*>(raw);
     primary->Dtor(flags);
 }
+
+
+namespace {
+// Each control has a one-frame override and a persistent default fade.
+struct PongControlFade {
+    float rate;
+    float target;
+    float current;
+    float defaultRate;
+    float defaultTarget;
+    uint8_t overridden;
+    uint8_t _pad[3];
+};
+
+struct PongControlGroupView {
+    uint8_t _base[56];
+    uint32_t name;
+    uint32_t next;
+    int32_t type;
+    uint32_t _field44;
+    PongControlFade controls[4]; // master, direct, reverb, effect
+};
+static_assert(sizeof(PongControlFade) == 24, "control fade stride");
+static_assert(offsetof(PongControlGroupView, controls) == 72, "control fade offset");
+} // namespace
+
+extern void* g_pongControlGroupRegistry;          // @ 0x8271A310
+extern uint32_t g_pongControlGroupOverride;       // @ 0x825CB090
+extern const uint8_t* g_pongControlGroupConfig;   // @ 0x8271A398
+extern uint8_t g_pongControlGroupEvent6471;        // @ 0x82606471
+extern uint8_t g_pongControlGroupEvent6473;        // @ 0x82606473
+extern uint8_t g_pongControlGroupEvent6484;        // @ 0x82606484
+extern uint8_t g_pongControlGroupEvent6486;        // @ 0x82606486
+extern uint8_t g_pongControlGroupPlayerFlag;       // @ 0x82606487
+extern const float g_pongControlGroupEpsilon;     // @ 0x8202D168
+extern const float g_pongControlGroupFallbackRate; // @ 0x825C90BC
+extern float g_pongControlGroupDeltaTime;         // @ 0x825CAEC0
+extern "C" {
+    void pg_6E58_wrh(void* group); // @ 0x821B6E58
+    void game_6B90(void* group);   // @ 0x821B6B90
+    bool pongControlGroup_Approach(float* current, float target, float rate, float dt); // @ 0x820C99B0
+    // Xenon varargs pass the promoted double's bits in r5, not an FP argument.
+    void pongControlGroup_LogMultiplier(const char* format, const char* name, uint64_t bits); // @ 0x8240E6D0
+}
+
+// pongControlGroup::Update @ 0x821B7038 | size: 0x448
+// The caller at 0x821B7480 walks the audControlGroup list. The four debug
+// strings identify these as the master/direct/reverb/effect volume multipliers.
+void pongControlGroup::Update(uint8_t skipStateChanges) {
+    auto* group = reinterpret_cast<PongControlGroupView*>(this);
+    const auto* input = static_cast<const uint8_t*>(g_input_obj_ptr);
+    const uint32_t key = *reinterpret_cast<const uint32_t*>(input + 40);
+    const auto* player = static_cast<const uint8_t*>(pg_C2A0_g(g_pongControlGroupRegistry, key));
+    const uint8_t playerFlag = player[32];
+    g_pongControlGroupPlayerFlag = playerFlag;
+
+    if (skipStateChanges == 0 && g_pongControlGroupOverride == 0) {
+        pg_6E58_wrh(this);
+        const uint8_t* config = g_pongControlGroupConfig;
+        auto& master = group->controls[0];
+        const auto setMaster = [&](int targetOffset, int rateOffset, float defaultRate) {
+            master.target = *reinterpret_cast<const float*>(config + targetOffset);
+            master.rate = *reinterpret_cast<const float*>(config + rateOffset);
+            master.defaultRate = defaultRate;
+            master.defaultTarget = 1.0f;
+            master.overridden = 1;
+        };
+        if (group->type == 11 && static_cast<const uint8_t*>(g_pSceneRenderObj)[83] != 0 &&
+            master.overridden == 0) {
+            setMaster(376, 380, *reinterpret_cast<const float*>(config + 384));
+        }
+
+        game_6B90(this);
+        // Reload the type after the helper; it may have changed the group.
+        const int32_t type = group->type;
+        if ((type == 0 || type == 7) && g_pongControlGroupEvent6484 != 0 &&
+            g_pongControlGroupEvent6471 != 0 && master.overridden == 0) {
+            setMaster(352, 356, *reinterpret_cast<const float*>(config + 360));
+        }
+        if (type == 14 && g_pongControlGroupEvent6473 != 0 && master.overridden == 0) {
+            setMaster(388, 392, *reinterpret_cast<const float*>(config + 396));
+        }
+        if (type == 1 && g_pongControlGroupEvent6486 != 0 && playerFlag == 0 && master.overridden == 0) {
+            setMaster(364, 368, *reinterpret_cast<const float*>(config + 372));
+        }
+        if (type == 10 && static_cast<const uint8_t*>(lbl_8271A308)[157] == 0 && master.overridden == 0) {
+            // Deliberately shares the type-14 rate, but uses the fixed fallback rate.
+            setMaster(400, 392, g_pongControlGroupFallbackRate);
+        }
+        for (auto& control : group->controls) {
+            if (control.overridden == 0) {
+                control.target = control.defaultTarget;
+                control.rate = control.defaultRate;
+            }
+        }
+    }
+
+    // Clear all four flags before any approach/log call, including on the skip path.
+    for (auto& control : group->controls) {
+        control.overridden = 0;
+    }
+    const float epsilon = g_pongControlGroupEpsilon;
+    const char* const formats[4] = {
+        "%s master volume multiplier = %f", "%s direct volume multiplier = %f",
+        "%s reverb volume multiplier = %f", "%s effect volume multiplier = %f"
+    };
+    for (int i = 0; i < 4; ++i) {
+        auto& control = group->controls[i];
+        if (__builtin_fabsf(control.current - control.target) > epsilon) {
+            pongControlGroup_Approach(&control.current, control.target, control.rate, g_pongControlGroupDeltaTime);
+            if (reinterpret_cast<const uint8_t*>(this)[165] != 0) {
+                const double value = control.current;
+                uint64_t bits;
+                std::memcpy(&bits, &value, sizeof(bits));
+                pongControlGroup_LogMultiplier(formats[i], reinterpret_cast<const char*>(
+                    static_cast<uintptr_t>(group->name)), bits);
+            }
+        }
+    }
+}
