@@ -821,6 +821,71 @@ void swfCMD_PlaceObject2_ScalarDestructor(swfCMD_PlaceObject2* obj, int flags) {
     }
 }
 
+// @ 0x824081B0
+void swfCMD_PlaceObject2::Execute(swfINSTANCE* parent) {
+    extern void* g_swfCurrentFile;  // @ 0x82602838
+    auto* command = reinterpret_cast<uint8_t*>(this);
+    auto* container = reinterpret_cast<uint8_t*>(parent);
+    const uint16_t resourceIndex = *reinterpret_cast<uint16_t*>(command + 0x14);
+    uint8_t* child;
+    if (resourceIndex != 0xFFFF) {
+        auto* file = static_cast<uint8_t*>(g_swfCurrentFile);
+        auto** resources = *reinterpret_cast<void***>(file + 0x14);
+        void** vtable = *reinterpret_cast<void***>(parent);
+        using PlaceFn = swfINSTANCE* (*)(swfINSTANCE*, uint32_t, uint32_t, void*);
+        child = reinterpret_cast<uint8_t*>(reinterpret_cast<PlaceFn>(vtable[7])(
+            parent, *reinterpret_cast<uint16_t*>(command + 0x10),
+            *reinterpret_cast<uint16_t*>(command + 0x12), resources[resourceIndex]));
+    } else {
+        // A move-only tag searches the sorted display list without creating a child.
+        const uint16_t depth = *reinterpret_cast<uint16_t*>(command + 0x10);
+        child = *reinterpret_cast<uint8_t**>(container + 0xB4);
+        while (child && *reinterpret_cast<uint16_t*>(child + 0xA6) < depth) {
+            child = *reinterpret_cast<uint8_t**>(child + 0xB8);
+        }
+        if (child && *reinterpret_cast<uint16_t*>(child + 0xA6) != depth) {
+            child = nullptr;
+        }
+    }
+    if (!child) {
+        rage_DebugLog(reinterpret_cast<const char*>(0x820755A4),
+                      *reinterpret_cast<const char**>(container + 0xBC),
+                      *reinterpret_cast<uint16_t*>(command + 0x10));
+        return;
+    }
+
+    child[0xAF] = 1;
+    const int16_t* packed = *reinterpret_cast<const int16_t**>(command + 0x18);
+    if (packed) {
+        // Optional signed 8.8 scale/shear pairs, followed by signed twip translation.
+        const uint8_t flags = command[5];
+        unsigned int index = 0;
+        float matrix[6];
+        if (flags & 1) {
+            matrix[0] = static_cast<float>(packed[index++]) * 0.00390625f;
+            matrix[3] = static_cast<float>(packed[index++]) * 0.00390625f;
+        } else {
+            matrix[0] = matrix[3] = 1.0f;
+        }
+        if (flags & 2) {
+            matrix[1] = static_cast<float>(packed[index++]) * 0.00390625f;
+            matrix[2] = static_cast<float>(packed[index++]) * 0.00390625f;
+        } else {
+            matrix[1] = matrix[2] = 0.0f;
+        }
+        matrix[4] = static_cast<float>(packed[index++]) * 0.05f;
+        matrix[5] = static_cast<float>(packed[index]) * 0.05f;
+        swfSetTransformMatrix(child + 8, matrix);
+    }
+    const void* color = *reinterpret_cast<void**>(command + 0x1C);
+    if (color) {
+        // The PPC loads all eight bytes before storing, including when source aliases child.
+        uint64_t value;
+        std::memcpy(&value, color, sizeof(value));
+        std::memcpy(child + 0x38, &value, sizeof(value));
+    }
+}
+
 /**
  * swfCMD_PlaceObject2ClipEvent::~swfCMD_PlaceObject2ClipEvent() @ 0x82408160 | size: 0x50
  * 

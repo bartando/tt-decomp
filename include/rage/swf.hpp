@@ -326,6 +326,7 @@ public:
 class swfCMD_PlaceObject2 : public swfCMD {
 public:
     virtual ~swfCMD_PlaceObject2();
+    void Execute(swfINSTANCE* parent);  // Guest vtable slot 1; dispatched explicitly.
 };
 
 /**
