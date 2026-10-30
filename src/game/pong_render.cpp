@@ -1,17 +1,138 @@
 /**
- * pong_render.cpp — Render bucket manager implementation
+ * pong_render.cpp — Light state and render bucket implementation
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
  *
  * Lifted functions:
+ *   pongLightState_Apply                           @ 0x82154320
  *   pongDrawBucketManager::~pongDrawBucketManager  @ 0x822272B0  (vfn_0)
  *   pongDrawBucketManager::Load                    @ 0x82227430
  *   pongDrawBucket_AddEntry                        @ 0x822278D8
  *
- * Sources: recomp/structured_pass5_final/tt-decomp_recomp.9.cpp
+ * Sources: recomp/structured_pass5_final/tt-decomp_recomp.{3,9}.cpp
  */
 
 #include "pong_render.hpp"
+#include <stddef.h>
 #include <string.h>
+
+struct LightShaderVector {
+    float lane[4];
+};
+
+// Shader handles pack the dirty-bit index in bits 1..17 and the entry index
+// in bits 18..31. The entry's low 16 bits select a 16-byte value slot.
+struct LightShaderTable {
+    uint8_t dirtyBits[0x100];
+    uint32_t* entries;             // +0x100
+    uint32_t _104;
+    LightShaderVector* values;     // +0x108
+};
+
+namespace {
+float flushLightVmx(float value) {
+    uint32_t bits;
+    memcpy(&bits, &value, sizeof(bits));
+    if ((bits & 0x7F800000u) == 0) {
+        bits &= 0x80000000u;
+        memcpy(&value, &bits, sizeof(value));
+    }
+    return value;
+}
+}  // namespace
+
+static_assert(sizeof(pongLightState::Light) == 0x40, "light stride");
+static_assert(offsetof(pongLightState, ambient) == 0x200, "ambient offset");
+static_assert(offsetof(pongLightState, count) == 0x210, "signed count offset");
+
+extern pongLightState lbl_825CA610;             // @ 0x825CA610  applied light-state snapshot
+extern uint32_t lbl_825EBB18;                   // @ 0x825EBB18  Diffuse handle / initialization sentinel
+extern uint32_t lbl_825EBAAC;                   // @ 0x825EBAAC  Position handle
+extern uint32_t lbl_825EBC30;                   // @ 0x825EBC30  LightCount handle
+extern uint32_t lbl_825EBAB0;                   // @ 0x825EBAB0  LightType handle
+extern uint32_t lbl_825EBC34;                   // @ 0x825EBC34  Ambient handle
+extern LightShaderTable* lbl_825EBC40;          // @ 0x825EBC40
+extern const uint8_t lbl_825D4C80[8];           // @ 0x825D4C80  MSB-first dirty-bit masks
+extern const float lbl_825C5938;               // @ 0x825C5938  -1.0f
+extern const float lbl_8202D108;               // @ 0x8202D108  1.0f
+extern "C" uint32_t g_grmShaderFx_variantTable[23];  // @ 0x825EBBD8  pending render state
+extern "C" uint32_t g_grmShaderFx_boundContext;      // @ 0x825EBC54  shader-global write counter
+
+extern void game_E0A8(pongLightState* dst, const pongLightState* src);  // @ 0x8213E0A8
+extern uint32_t game_A2F8(const char* name, int create);              // @ 0x8215A2F8
+extern void game_A670(uint32_t handle, const LightShaderVector* values, int count);  // @ 0x8215A670
+extern void game_9908(LightShaderTable* table, uint32_t handle, const float* values, int count);  // @ 0x82159908
+
+// @ 0x82154320 | size: 0x308 (game_4320)
+// Inferred name: upload the light state to Diffuse/Position/LightCount/LightType/Ambient.
+void pongLightState_Apply(const pongLightState* state) {
+    game_E0A8(&lbl_825CA610, state);
+
+    const int count = state->count;
+    alignas(16) LightShaderVector diffuse[8];
+    alignas(16) LightShaderVector position[8];
+    float type[8];
+    const uint32_t mode = g_grmShaderFx_variantTable[1];
+    for (int i = 0; i < count; ++i) {
+        const pongLightState::Light& light = state->lights[i];
+        const bool directional = mode == 2 && light.type == 0;
+        memcpy(position[i].lane, directional ? light.direction : light.position, 16);
+        position[i].lane[3] = light.intensity;
+        memcpy(diffuse[i].lane, light.diffuse, 16);
+        diffuse[i].lane[3] = light.falloff;
+        type[i] = directional ? 0.0f : 1.0f;
+
+        if (light.negateDiffuse != 0) {
+            // The VMX multiply flushes subnormals in all four lanes; w uses +1.
+            for (int lane = 0; lane < 4; ++lane) {
+                const float sign = lane == 3 ? lbl_8202D108 : lbl_825C5938;
+                diffuse[i].lane[lane] = flushLightVmx(flushLightVmx(diffuse[i].lane[lane]) * sign);
+            }
+        }
+        if (light.negateFalloff != 0) {
+            // This is scalar fmuls: retain subnormals when the VMX path was skipped.
+            diffuse[i].lane[3] *= lbl_825C5938;
+        }
+    }
+
+    uint32_t diffuseHandle = lbl_825EBB18;
+    uint32_t positionHandle;
+    uint32_t countHandle;
+    uint32_t typeHandle;
+    uint32_t ambientHandle;
+    if (diffuseHandle == 0) {
+        lbl_825EBB18 = diffuseHandle = game_A2F8("Diffuse", 1);
+        lbl_825EBAAC = positionHandle = game_A2F8("Position", 1);
+        lbl_825EBC30 = countHandle = game_A2F8("LightCount", 1);
+        lbl_825EBAB0 = typeHandle = game_A2F8("LightType", 1);
+        lbl_825EBC34 = ambientHandle = game_A2F8("Ambient", 1);
+        // All five lookups happen even when the Diffuse lookup fails.
+        if (diffuseHandle == 0)
+            return;
+    } else {
+        positionHandle = lbl_825EBAAC;
+        countHandle = lbl_825EBC30;
+        typeHandle = lbl_825EBAB0;
+        ambientHandle = lbl_825EBC34;
+    }
+
+    game_A670(diffuseHandle, diffuse, count);
+    game_A670(positionHandle, position, count);
+
+    LightShaderTable* table = lbl_825EBC40;
+    uint32_t bit = (countHandle >> 1) & 0x1FFFF;
+    table->dirtyBits[bit >> 3] |= lbl_825D4C80[bit & 7];
+    uint32_t slot = table->entries[(countHandle >> 18) * 2 + 1] & 0xFFFF;
+    table->values[slot].lane[0] = static_cast<float>(count);
+
+    game_9908(lbl_825EBC40, typeHandle, type, count);
+
+    table = lbl_825EBC40;
+    bit = (ambientHandle >> 1) & 0x1FFFF;
+    g_grmShaderFx_boundContext += 3;
+    table->dirtyBits[bit >> 3] |= lbl_825D4C80[bit & 7];
+    slot = table->entries[(ambientHandle >> 18) * 2 + 1] & 0xFFFF;
+    memcpy(table->values[slot].lane, state->ambient, 16);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Globals

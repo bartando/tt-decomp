@@ -12,6 +12,29 @@
 #pragma once
 #include <stdint.h>
 
+// Eight 64-byte light records followed by ambient and the signed active count.
+// Layout shared by the light-state copy routines and Apply @ 0x82154320.
+struct alignas(16) pongLightState {
+    struct Light {
+        float position[4];        // +0x00
+        float direction[4];       // +0x10  used by render mode 2 when type == 0
+        float diffuse[4];         // +0x20
+        float falloff;            // +0x30  replaces diffuse.w
+        float intensity;          // +0x34  replaces position.w
+        uint8_t type;              // +0x38
+        uint8_t negateFalloff;     // +0x39
+        uint8_t negateDiffuse;     // +0x3A
+        uint8_t _pad3B[5];
+    };
+
+    Light lights[8];              // +0x000
+    float ambient[4];             // +0x200
+    int16_t count;                // +0x210
+    uint16_t flags;               // +0x212
+};
+
+void pongLightState_Apply(const pongLightState* state);  // @ 0x82154320
+
 // Structs that carry the game's vtable as an explicit `vtable` member list
 // their slots as plain (non-virtual) methods: a C++ virtual would add a hidden
 // vptr in front of `vtable` and shift every member by 4.
