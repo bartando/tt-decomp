@@ -847,49 +847,34 @@ void crAnimDofQuaternion::Evaluate(void* animContext, float time, float* outQuat
 // Blends towards another DOF's quaternion value with shortest-path interpolation.
 // ─────────────────────────────────────────────────────────────────────────────
 void crAnimDofQuaternion::BlendFrom(void* sourceAnimDof, float blendFactor) {
-    if (blendFactor <= 0.0f) {
+    if (!(blendFactor > 0.0f)) {
         return;
     }
 
-    // Get source quaternion via virtual call to slot 15
     void** vtable = *reinterpret_cast<void***>(sourceAnimDof);
     typedef float* (*GetQuatFunc)(void*);
-    GetQuatFunc getQuatFn = reinterpret_cast<GetQuatFunc>(vtable[15]);
-    float* sourceQuat = getQuatFn(sourceAnimDof);
-
-    // Get current quaternion
+    float* sourceQuat = reinterpret_cast<GetQuatFunc>(vtable[15])(sourceAnimDof);
     float* currentQuat = reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(this) + 16);
 
     if (blendFactor < 1.0f) {
-        // Dot product for hemisphere check
-        float dot = sourceQuat[3] * currentQuat[3] + sourceQuat[0] * currentQuat[0] +
-                    currentQuat[1] * sourceQuat[1] + currentQuat[2] * sourceQuat[2];
-
-        // Negate current quaternion if dot < 0 (shortest path)
+        float dot = sourceQuat[3] * currentQuat[3];
+        dot = __builtin_fmaf(sourceQuat[0], currentQuat[0], dot);
+        dot = __builtin_fmaf(currentQuat[1], sourceQuat[1], dot);
+        dot = __builtin_fmaf(currentQuat[2], sourceQuat[2], dot);
         if (dot < 0.0f) {
-            currentQuat[0] = -currentQuat[0];
-            currentQuat[1] = -currentQuat[1];
-            currentQuat[2] = -currentQuat[2];
-            currentQuat[3] = -currentQuat[3];
+            for (int i = 0; i < 4; ++i) {
+                currentQuat[i] = -currentQuat[i];
+            }
         }
 
-        // Lerp: current += (source - current) * blendFactor
-        currentQuat[0] += (sourceQuat[0] - currentQuat[0]) * blendFactor;
-        *reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(this) + 20) +=
-            (sourceQuat[1] - *reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(this) + 20)) * blendFactor;
-        *reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(this) + 24) +=
-            (sourceQuat[2] - *reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(this) + 24)) * blendFactor;
-        *reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(this) + 28) +=
-            (sourceQuat[3] - *reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(this) + 28)) * blendFactor;
-
-        // Normalize the result
+        for (int i = 0; i < 4; ++i) {
+            float difference = sourceQuat[i] - currentQuat[i];
+            currentQuat[i] = __builtin_fmaf(difference, blendFactor, currentQuat[i]);
+        }
         NormalizeQuaternion(currentQuat);
     } else {
-        // Full blend — direct copy
-        currentQuat[0] = sourceQuat[0];
-        currentQuat[1] = sourceQuat[1];
-        currentQuat[2] = sourceQuat[2];
-        currentQuat[3] = sourceQuat[3];
+        // The original copies two 64-bit words, preserving the quaternion bits.
+        __builtin_memcpy(currentQuat, sourceQuat, 16);
     }
 }
 
