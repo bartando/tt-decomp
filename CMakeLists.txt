@@ -154,6 +154,7 @@ set(SOURCES
     src/physics/ph_update_object.cpp
     
     # Graphics
+    src/graphics/fx_crowd.cpp
     src/graphics/grc_debug_strings.cpp
     src/graphics/grc_device.cpp
     src/graphics/grc_render.cpp

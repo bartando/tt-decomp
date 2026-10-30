@@ -16,6 +16,10 @@
 void fxDrawBillboardQuad(uint32_t uvIndex, float angle, float x, float y, float z,
                          float halfWidth, float halfHeight, uint32_t color);
 
+struct fxCrowdAnimPlayback;
+// Descriptive name; called by the crowd manager for active crowd archetypes.
+void fxCrowdAnimPlayback_Update(fxCrowdAnimPlayback* playback); // @ 0x82386A20
+
 // ── fxAmbAnimData  [vtable @ 0x8206AA74] ──────────────────────────
 struct fxAmbAnimData {
     void**      vtable;           // +0x00
