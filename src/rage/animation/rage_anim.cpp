@@ -5,6 +5,7 @@
  * RAGE animation DOF (Degree of Freedom) classes for blending and interpolation.
  */
 
+#include "rage/singleton.h"
 #include "rage_anim.hpp"
 #include "rage/rage.h"
 #include <algorithm>
@@ -1358,7 +1359,6 @@ void crAnimChannelQuantizeFloat::vfn_5(void* context, float time, float* outValu
 
 // Pointer elements use the resource-aware constructor at 0x8224DFC0.
 extern "C" void crAnimPointer_Construct(void* slot); // @ 0x8224DFC0
-extern "C" uint32_t atSingleton_Find_90D0(uint32_t address); // @ 0x820F90D0
 
 namespace rage {
 
@@ -1382,7 +1382,7 @@ void** crAnimPointerArray_AppendSlot(crAnimPointerArray* array, uint32_t growth)
         for (uint32_t i = 0; i < array->count; ++i)
             data[i] = array->data[i];
         void** old = array->data;
-        if (old && (atSingleton_Find_90D0(reinterpret_cast<uintptr_t>(old)) & 0xFF) == 0) {
+        if (old && (rage_FindSingleton(old) & 0xFF) == 0) {
             void** thread = *reinterpret_cast<void***>(g_sda_base);
             void* allocator = thread[1];
             auto** vtable = *static_cast<void***>(allocator);

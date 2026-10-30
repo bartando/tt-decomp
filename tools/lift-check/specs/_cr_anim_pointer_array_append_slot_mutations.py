@@ -11,8 +11,8 @@ MUTATIONS = [
     ("skip construction", "crAnimPointer_Construct(data + i);", ";"),
     ("skip copy", "data[i] = array->data[i];", ";"),
     ("free tracked storage", "& 0xFF) == 0", "& 0xFF) != 0"),
-    ("test whole tracking result", "(atSingleton_Find_90D0(reinterpret_cast<uintptr_t>(old)) & 0xFF)",
-     "atSingleton_Find_90D0(reinterpret_cast<uintptr_t>(old))"),
+    ("test whole tracking result", "(rage_FindSingleton(old) & 0xFF)",
+     "rage_FindSingleton(old)"),
     ("return next slot", "array->data + array->count;", "array->data + array->count + 1;"),
     ("omit count increment", "array->count = static_cast<uint16_t>(array->count + 1);", ";"),
 ]

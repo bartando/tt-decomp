@@ -5,6 +5,7 @@
  * Player manager and game data structures.
  */
 // Binary string constants
+#include "rage/singleton.h"
 #include "game/pong_strings.hpp"
 
 #include "gd_data.hpp"
@@ -16,10 +17,9 @@ extern void rage_free(void* ptr);
 extern void ReleaseObjectWithFlags(void* obj, uint32_t flags);    // @ 0x82566C20 - Free/release with flags
 extern void sysMemAllocator_PlatformFree(void* obj, uint32_t flags);    // @ 0x82566C20 - Free/release with flags
 extern void sysMemAllocator_Free(void* ptr);                            // @ 0x82186228 - TLS allocator free
-extern bool atSingleton_IsTracked(void* obj);        // @ 0x820F90D0 - Check if singleton exists
 
 // Forward declaration — canonical definition lives later in this file alongside
-// the TemplateRegistry struct and the game_94F0 binary-search helper.
+// the shared interval registry.
 void datResourceMgr_RemoveEntry(void* templateKey);
 
 // Global state
@@ -67,7 +67,7 @@ void plrPlayerMgr_DestroySubObjects(void* subObjectArrayBase) {
         // Handle singleton-managed object
         if (subObj->m_pObject2) {
             // Check if object is in singleton registry
-            if (!atSingleton_IsTracked(subObj->m_pObject2)) {
+            if (!rage_FindSingleton(subObj->m_pObject2)) {
                 // Not in singleton registry — free via the thread-local
                 // rage::sysMemAllocator (vtable slot 2). The original PPC
                 // code fetches the allocator from r13+0 → TLS[1] (+4),
@@ -629,7 +629,7 @@ void RegisterSerializedField(void* obj,
  * with a count at offset 0x10000. Maximum capacity is 8192 entries.
  * 
  * Called by:
- * - pg_8C38_g, atSingleton_IsTracked, lvlLevelMgr_vfn_24
+ * - pg_8C38_g, rage_FindSingleton, lvlLevelMgr_vfn_24
  * - fxAmbientMgr_vfn_24, plrPropMgr_vfn_24, plrPlayerMgr_ReleaseResourcePairs, pg_8918_gen
  * 
  * @param templateKey Pointer to 8-byte template key to remove

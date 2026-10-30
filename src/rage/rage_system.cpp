@@ -7,6 +7,7 @@
  * device state updates.
  */
 
+#include "rage/singleton.h"
 #include <cstdint>
 #include <cstring>
 
@@ -24,7 +25,6 @@ extern "C" {
     void rage_UpdateDeviceState(void* devicePtr);                    // @ 0x82357400
     void rage_ApplyRenderState(void* device, void* state,
                                uint32_t flags, uint8_t forceApply);  // @ 0x820EE6E8
-    uint8_t datBase_FindInPool(void* ptr);                           // @ 0x820F90D0
     void datBase_DestroyArrayEntries(void* array);                   // @ 0x820E3548
     void LocomotionController_DestroyAnimData(void* obj);            // @ 0x820E3D70
     void rage_ReleaseTextureRef(void* ptr, int flags);               // @ 0x820EE988
@@ -168,7 +168,7 @@ void rage_DestroyArray104WithRelease(void* dataPtr) {
                 void* innerPtr = *(void**)subObj;
                 if (innerPtr != nullptr) {
                     // Check if this object is in the global pool
-                    uint8_t found = datBase_FindInPool(innerPtr);
+                    uint8_t found = rage_FindSingleton(innerPtr);
                     if (found == 0) {
                         // Not in pool - release via global allocator vtable slot 2
                         void* sdaBase = *(void**)((uint8_t*)&g_sdaBasePtr);

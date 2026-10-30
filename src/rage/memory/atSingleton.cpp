@@ -7,9 +7,8 @@
  *
  * Functions:
  *   ComputeHash          — ELF hash for string-based singleton keys
- *   FindSingleton        — hash table lookup in global registry (stub)
  *   UnregisterSingleton  — remove singleton by name (stub)
- *   InitializeSingleton  — dynamic array growth for singleton entries
+ *   InitializeSingleton is implemented in singleton_array.cpp.
  *   ReleaseSingleton     — destroy singleton + notify observers
  *   AcquireReference     — increment reference count
  *   BindObject           — register singleton by hash (stub)
@@ -23,6 +22,7 @@
  */
 
 #include "rage/atSingleton.hpp"
+#include "rage/singleton.h"
 #include <cstring>
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -38,22 +38,9 @@ extern "C" {
     void rage_dealloc(void* ptr, uint32_t mode);
 }
 
-// Hash table lookup — searches global singleton hash table for a key.
-// @ 0x820F94F0 | size: 0xA4
-extern void* atHashTable_Find(void* hashTable, uint32_t key);
-
 // xmlTree cleanup — resets/cleans up a rage::xmlTree resource.
 // @ 0x821A9EC0 | size: 0x48 | class: rage::xmlTree
 extern void xmlTree_Cleanup(void* obj);
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// External globals
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Global singleton registry hash table (65,616 bytes).
-// @ 0x82607C40
-extern uint8_t g_singletonRegistry[];
 
 
 namespace rage {
@@ -85,51 +72,6 @@ uint32_t ComputeHash(const char* str)
     }
 
     return hash;
-}
-
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  FindSingleton
-//
-//  @ 0x820F90D0 | size: 0xA4
-//  Original symbol: atSingleton_IsTracked
-//
-//  Searches the global singleton registry hash table for a singleton
-//  matching the given hash.
-//
-//  If hash < 0 (signed):
-//    1. Stores hash as search key in stack locals
-//    2. Calls atHashTable_Find on g_singletonRegistry
-//    3. If found (result != -1): computes entry address via (index << 3)
-//       and reads data from the registry
-//    4. If not found (-1): falls through to return 0
-//
-//  Returns: pointer to singleton entry, or nullptr if not found.
-// ═══════════════════════════════════════════════════════════════════════════════
-atSingleton* FindSingleton(uint32_t hash)
-{
-    if (static_cast<int32_t>(hash) < 0) {
-        // Search the global singleton registry hash table
-        int32_t index = reinterpret_cast<intptr_t>(
-            atHashTable_Find(g_singletonRegistry, hash));
-
-        if (index != -1) {
-            // Compute entry offset: (index << 3) = index * 8
-            uint32_t entryOffset = static_cast<uint32_t>(index) << 3;
-            uint32_t* registryBase = reinterpret_cast<uint32_t*>(
-                g_singletonRegistry);
-
-            // Read entry base from registry at computed offset
-            uint32_t entryBase = *reinterpret_cast<uint32_t*>(
-                reinterpret_cast<uint8_t*>(registryBase) + entryOffset);
-
-            // Compute final pointer: hash - entryBase
-            return reinterpret_cast<atSingleton*>(
-                static_cast<uintptr_t>(hash - entryBase));
-        }
-    }
-
-    return nullptr;
 }
 
 
@@ -167,94 +109,6 @@ void UnregisterSingleton(const char* name)
     // Scaffold ends here — caller is responsible for using nameCopy.
     // (The original function returns void; the allocation leak-on-null is
     //  matched to original behavior.)
-}
-
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  InitializeSingleton
-//
-//  @ 0x821A8588 | size: 0x194 (404 bytes)
-//
-//  Initializes/grows the singleton array with dynamic capacity management.
-//  Grows by 16 entries at a time, clamped to max 0x5555 (21845) entries.
-//  Each entry is 12 bytes (3 × uint32_t: name, hash, instance, refCount).
-// ═══════════════════════════════════════════════════════════════════════════════
-void InitializeSingleton(SingletonArray* singletonArray)
-{
-    if (!singletonArray)
-        return;
-
-    // Check if array needs to grow
-    if (singletonArray->count >= singletonArray->capacity) {
-        uint16_t newCapacity = singletonArray->capacity + 16;
-
-        // Clamp to maximum (0x5555 = 21845 entries)
-        if (newCapacity > 0x5555)
-            return;
-
-        // Each entry is 12 bytes (3 × uint32_t)
-        uint32_t allocSize = newCapacity * 3 * sizeof(uint32_t);
-
-        // Allocate new array (extra 4 bytes for capacity header)
-        SingletonEntry* newEntries = static_cast<SingletonEntry*>(
-            rage_alloc(allocSize + 4));
-
-        if (newEntries) {
-            // Store capacity at start
-            *reinterpret_cast<uint32_t*>(newEntries) = newCapacity;
-
-            // Actual entries start after capacity field
-            SingletonEntry* entries = reinterpret_cast<SingletonEntry*>(
-                reinterpret_cast<uint8_t*>(newEntries) + 4);
-
-            // Initialize new entries to zero
-            for (uint16_t i = 0; i < newCapacity; i++) {
-                entries[i].name = nullptr;
-                entries[i].hash = 0;
-                entries[i].instance = nullptr;
-                entries[i].refCount = 0;
-            }
-
-            // Copy existing entries
-            if (singletonArray->count > 0) {
-                for (uint16_t i = 0; i < singletonArray->count; i++) {
-                    // Copy name string
-                    const char* oldName = singletonArray->entries[i].name;
-                    if (oldName) {
-                        // NOTE: Original code calls UnregisterSingleton here,
-                        // which returns void — possible cast error in original
-                        // decompilation.  Left as-is for now.
-                        char* newName = static_cast<char*>(
-                            reinterpret_cast<void*>(
-                                const_cast<char*>(oldName)));
-                        entries[i].name = newName;
-                    }
-
-                    // Copy hash and verify singleton
-                    uint32_t hash = singletonArray->entries[i].hash;
-                    if (hash) {
-                        atSingleton* instance = FindSingleton(hash);
-                        entries[i].instance = instance;
-                    }
-
-                    entries[i].hash = singletonArray->entries[i].hash;
-                    entries[i].refCount = singletonArray->entries[i].refCount;
-                }
-            }
-
-            // Free old array
-            if (singletonArray->entries) {
-                rage_dealloc(singletonArray->entries, 3);
-            }
-
-            // Update array pointer and capacity
-            singletonArray->entries = entries;
-            singletonArray->capacity = newCapacity;
-        }
-    }
-
-    // Add new entry slot at end
-    singletonArray->count++;
 }
 
 
@@ -675,7 +529,7 @@ struct atContainer
 //   (3) For each of the 6 side-block fields
 //         (m_pElementsA, m_pElementsA2, m_pElementsB, m_pElementsB2,
 //          m_pExtraBlock0, m_pLateBlock):
-//         if the block is NOT a tracked singleton (low byte of FindSingleton
+//         if the block is NOT a tracked singleton (low byte of rage_FindSingleton
 //         return is zero), call allocator->free(block).  Then clear the
 //         block pointer and both size halfwords.
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -687,13 +541,7 @@ static inline void atContainer_ReleaseSideBlock(
     void* block = *blockField;
     if (block != nullptr)
     {
-        atSingleton* tracked = FindSingleton(
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(block)));
-        // FindSingleton returns nullptr when not in the registry; the scaffold
-        // masks the low byte of the return, so "tracked" is true only when the
-        // low byte is non-zero (i.e. the call yielded a real singleton with a
-        // non-zero entry byte).  Untracked blocks are owned → free them.
-        bool isTracked = (reinterpret_cast<uintptr_t>(tracked) & 0xFF) != 0;
+        bool isTracked = (rage_FindSingleton(block) & 0xFF) != 0;
         if (!isTracked)
         {
             sysMemAllocator* alloc = sysMemGetCurrentAllocator();
@@ -765,10 +613,7 @@ void atContainer_Teardown(atContainer* self)
     // before any final zero-stores landed on +0x174/+0x176.
     if (self->m_pLateBlock != nullptr)
     {
-        atSingleton* tracked = FindSingleton(
-            static_cast<uint32_t>(
-                reinterpret_cast<uintptr_t>(self->m_pLateBlock)));
-        bool isTracked = (reinterpret_cast<uintptr_t>(tracked) & 0xFF) != 0;
+        bool isTracked = (rage_FindSingleton(self->m_pLateBlock) & 0xFF) != 0;
         if (!isTracked)
         {
             sysMemAllocator* alloc = sysMemGetCurrentAllocator();
@@ -1044,10 +889,10 @@ extern "C" void* xe_Alloc_EC88(uint32_t size);
 
 // Matches the identical PPC idiom found in every batch-10 destructor:
 //
-//    if (p && !FindSingleton((uint32_t)p))
+//    if (p && !rage_FindSingleton(p))
 //        ((*g_tlsAllocatorBase).vtable_slot_2)(g_tlsAllocatorBase, p);
 //
-// The low byte of FindSingleton's return indicates "is this a tracked
+// The low byte of rage_FindSingleton's return indicates "is this a tracked
 // registry entry"; only non-tracked entries are freed through the
 // allocator.  This helper collapses that 12-instruction sequence used
 // by atSingleton_dtor_3468, 5878, 9370_g and A680_g.
@@ -1056,10 +901,7 @@ static inline void FreeIfUntracked(void* ptr)
     if (ptr == nullptr)
         return;
 
-    // FindSingleton returns nonzero in low byte when ptr IS tracked.
-    const uint8_t tracked = static_cast<uint8_t>(
-        reinterpret_cast<uintptr_t>(FindSingleton(
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(ptr)))) & 0xFF);
+    const uint8_t tracked = static_cast<uint8_t>(rage_FindSingleton(ptr));
     if (tracked != 0)
         return;
 
@@ -1655,12 +1497,6 @@ extern "C" void rage_01B8(uint32_t key, uint32_t token);
 // Locale-register shim (already lifted) @ 0x820C02D0.
 extern "C" void _locale_register(uint32_t key, uint32_t token);
 
-// Global singleton-registry hash-table search (already lifted) @ 0x820F94F0.
-extern "C" int32_t game_94F0(void* table, uint32_t hash);
-
-// Name-buffer alias helper used by the 32-byte dedup branch @ 0x820F8EE8.
-extern "C" void game_8EE8(uint32_t /*buf*/);
-
 // ─────────────────────────────────────────────────────────────────────────────
 //  [1] atSingleton_DC30_gen  @ 0x824ADC30  | size: 0x0C (12 bytes)
 //
@@ -2090,56 +1926,6 @@ void atSingleton_E998_g(
 
         slotIx++;
     }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  [9] atSingleton_Find_90D0 (refinement)  @ 0x820F90D0  | size: 0xA4
-//
-//  The original stub (see FindSingleton above) only handled the "hash < 0"
-//  plus hash-table-hit leaf.  The scaffold also contains a 32-byte alias path:
-//    - If the lookup missed AND (hash & 0xFF) == 32, subtract 32 from hash
-//      and (if non-zero) run game_8EE8(newHash) + _locale_register(newHash, ...)
-//      to publish the alias, then return 1 (= "registered").
-//    - Otherwise return 0.
-//
-//  This variant is called 433× in the hottest_functions profile and is the
-//  entry point used by alias-registration plumbing.  We expose it as a new
-//  named helper; callers that used the old FindSingleton keep working because
-//  the leaf behaviour (return ptr-or-null) is unchanged.
-// ─────────────────────────────────────────────────────────────────────────────
-uint32_t atSingleton_Find_90D0(uint32_t hash)
-{
-    if (static_cast<int32_t>(hash) >= 0)
-        return 0;
-
-    // Primary registry lookup (same as FindSingleton).
-    int32_t idx = game_94F0(g_singletonRegistry, hash);
-    if (idx != -1)
-    {
-        // Hit: translate to the concrete singleton pointer (hash - entryBase).
-        uint32_t entryOffset = static_cast<uint32_t>(idx) << 3;
-        uint32_t entryBase = *reinterpret_cast<uint32_t*>(
-            reinterpret_cast<uint8_t*>(g_singletonRegistry) + entryOffset);
-        // Scaffold returns the subtracted value in r11 but doesn't use it —
-        // callers read 0/1.  Return 1 to signal "resolved".
-        (void)(hash - entryBase);
-        return 1;
-    }
-
-    // Miss — check the 32-byte alias path.
-    // Scaffold: "cmplwi cr6,r11,32 / bne cr6,0x820f9150" where r11 is the
-    // low 8 bits of hash (scaffold uses clrlwi before the cmp).
-    if ((hash & 0xFF) == 32)
-    {
-        uint32_t trimmed = hash - 32;
-        if (trimmed != 0)
-        {
-            game_8EE8(trimmed);
-            _locale_register(trimmed, 0xE001u /* lis -8191 */);
-        }
-        return 1;
-    }
-    return 0;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

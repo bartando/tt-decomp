@@ -16,21 +16,17 @@ extern "C" {
 #endif
 
 /**
- * rage::FindSingleton @ 0x820F90D0 | size: 0xA4
+ * rage_FindSingleton @ 0x820F90D0 | size: 0xA4
  *
  * Checks if a pointer is owned by a registered singleton.
- * Returns nonzero if the pointer belongs to a singleton (do NOT free).
+ * Returns 1 if the pointer belongs to a singleton (do NOT free).
  * Returns zero if the pointer is not singleton-owned (safe to free).
  *
- * C-linkage alias: rage_FindSingleton
+ * The 32-bit result models guest r3; callers that test its low byte keep
+ * that explicit, as in the original PowerPC code.
  */
-uint8_t rage_FindSingleton(void* ptr);
+uint32_t rage_FindSingleton(void* ptr);
 
 #ifdef __cplusplus
 }  /* extern "C" */
-
-/* C++ namespace alias */
-namespace rage {
-    inline uint8_t FindSingleton(void* ptr) { return rage_FindSingleton(ptr); }
-}
 #endif

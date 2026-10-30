@@ -5,6 +5,7 @@
  * Player manager and game data structures.
  */
 
+#include "rage/singleton.h"
 #include "gd_data.hpp"
 #include "game/gd_data_strings.hpp"
 #include <cstddef>
@@ -19,7 +20,6 @@ extern void sysMemAllocator_InitMainThread(void);          // @ 0x820C0038 - Mai
 
 namespace rage {
     void  ReleaseSingleton(void* obj);               // @ 0x821A9420
-    bool  FindSingleton(void* obj);                  // @ 0x820F90D0
     void* UnregisterSingleton(const void* key);      // @ 0x820C29E0
 }
 
@@ -100,7 +100,7 @@ void plrPlayerMgr_ReleaseResourcePairs(void* subObjectArrayBase) {
         // Handle singleton-managed object
         if (subObj->m_pObject2) {
             // Check if object is in singleton registry
-            if (!rage::FindSingleton(subObj->m_pObject2)) {
+            if (!rage_FindSingleton(subObj->m_pObject2)) {
                 // Not in singleton registry — free via the thread-local
                 // rage::sysMemAllocator (vtable slot 2). The original PPC
                 // code fetches the allocator from r13+0 → TLS[1] (+4),

@@ -5,6 +5,7 @@
  * atSingleton class methods and memory allocation utilities.
  */
 
+#include "rage/singleton.h"
 #include "memory.hpp"
 
 // External function declarations
@@ -13,7 +14,6 @@ extern void grcDevice_Shutdown(void *obj);
 extern void MmFreePhysicalMemory(uint32_t flags, void *address);
 extern void *rage_strDuplicate(const char *str);
 extern void datArray_Grow(void *array, uint32_t newCapacity);
-extern uint8_t rage_FindSingleton(void *ptr);
 extern void *g_allocator_ptr;
 void datArray_DestroyGeneric(uint8_t *arrayData);
 
@@ -1463,7 +1463,6 @@ int32_t pgArray_FindActiveEntry(uint8_t *array, int32_t startOffset,
 //   r3 = object with refCount at +6 and vtable/array pointer at +0
 // ─────────────────────────────────────────────────────────────────────────────
 void datBase_DestroyPointerArray(atSingleton *obj) {
-  extern bool atSingleton_IsTracked(void *ptr);
   extern void sysMemAllocator_Free(void *ptr);
 
   // Only process if refCount is non-zero
@@ -1490,7 +1489,7 @@ void datBase_DestroyPointerArray(atSingleton *obj) {
     }
 
     // Check if element is tracked by singleton system
-    if (!atSingleton_IsTracked(element)) {
+    if (!rage_FindSingleton(element)) {
       // Not tracked - free via allocator (SDA vtable slot 2)
       void **sdaPtr = *(void ***)0x82600000;
       void *allocator = ((void **)sdaPtr)[1];
@@ -1832,8 +1831,6 @@ int32_t grmShaderFx_FindOrRegisterByName(const char *name) {
 //   r3 = fxHairGroup object
 // ─────────────────────────────────────────────────────────────────────────────
 void fxHairGroup_Destroy(uint8_t *obj) {
-  extern bool atSingleton_IsTracked(void *ptr);
-
   // Set vtable to fxHairGroup
   *(void **)obj = (void *)0x82030040;
 
@@ -1857,7 +1854,7 @@ void fxHairGroup_Destroy(uint8_t *obj) {
   // Free the element array if it exists and is not tracked
   void *arrayPtr = *(void **)(obj + 36);
   if (arrayPtr != nullptr) {
-    if (!atSingleton_IsTracked(arrayPtr)) {
+    if (!rage_FindSingleton(arrayPtr)) {
       // Not tracked - free via allocator (SDA vtable slot 2)
       void **sdaPtr = *(void ***)0x82600000;
       void *allocator = ((void **)sdaPtr)[1];
@@ -2068,8 +2065,6 @@ void phInst_FormatAndStoreName(uint8_t *obj, void *source) {
 // if the node is tracked by the singleton system and either frees
 // directly or unregisters through the allocator.
 // ─────────────────────────────────────────────────────────────────────────────
-extern bool atSingleton_IsTracked(void *ptr);
-
 void datBase_DestroyTreeNode(void *node, int deleteFlag) {
   uint8_t *nodePtr = (uint8_t *)node;
 
@@ -2097,7 +2092,7 @@ void datBase_DestroyTreeNode(void *node, int deleteFlag) {
   }
 
   // Check if data is registered in singleton system
-  if (atSingleton_IsTracked(dataPtr)) {
+  if (rage_FindSingleton(dataPtr)) {
     rage_free(node);
     return;
   }
@@ -2140,7 +2135,7 @@ void datBase_DestroyArray192(uint8_t *container) {
 
       if (element != nullptr) {
         // Check if element is tracked by singleton system
-        if (!atSingleton_IsTracked(element)) {
+        if (!rage_FindSingleton(element)) {
           // Unregister through allocator
           extern void *g_allocator_ptr;
           void **allocatorBase = *(void ***)&g_allocator_ptr;
@@ -2192,7 +2187,7 @@ void datBase_DestroyHashMap(uint8_t *hashMap) {
       void *element = *(void **)entry;
       if (element != nullptr) {
         // Check if element is tracked
-        if (!atSingleton_IsTracked(element)) {
+        if (!rage_FindSingleton(element)) {
           // Unregister through allocator
           extern void *g_allocator_ptr;
           void **allocatorBase = *(void ***)&g_allocator_ptr;

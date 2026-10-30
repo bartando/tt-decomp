@@ -2,6 +2,7 @@
  * rage_grm.cpp — Graphics / rendering class implementations
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
  */
+#include "rage/singleton.h"
 #include "rage_grm.hpp"
 #include "animation/rage_anim.hpp"   // rage::datResource
 #include <cstring>
@@ -1242,7 +1243,6 @@ struct grmU16Array {
 };
 
 extern "C" void* xe_EC88(uint32_t size);  // @ 0x820DEC88
-extern "C" uint32_t atSingleton_Find_90D0(uint32_t address);  // @ 0x820F90D0
 extern "C" void* g_sda_base;
 
 // @ 0x82378040
@@ -1254,7 +1254,7 @@ uint16_t* grmU16Array_AppendSlot(grmU16Array* array) {
             data[i] = array->data[i];
         }
         uint16_t* old = array->data;
-        if (old != nullptr && (atSingleton_Find_90D0(reinterpret_cast<uintptr_t>(old)) & 0xFF) == 0) {
+        if (old != nullptr && (rage_FindSingleton(old) & 0xFF) == 0) {
             auto* thread = *static_cast<void***>(g_sda_base);
             void* allocator = thread[1];
             auto** vtable = *static_cast<void***>(allocator);

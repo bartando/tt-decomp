@@ -19,14 +19,13 @@ class SingletonFactory;
 
 /**
  * Singleton registry entry
- * Each entry tracks a registered singleton instance with its hash and metadata
+ * Three-word array entry; growth duplicates the name and copies the other words.
  */
 struct SingletonEntry
 {
     const char* name;        // Singleton name string
     uint32_t hash;           // ELF hash of singleton name  
     atSingleton* instance;   // Pointer to singleton instance
-    uint32_t refCount;       // Reference count
 };
 
 /**
@@ -90,17 +89,6 @@ public:
 uint32_t ComputeHash(const char* str);
 
 /**
- * FindSingleton @ 0x820F90D0 | size: 0xA4
- * 
- * Find singleton instance by hash value.
- * Performs linear search through singleton registry.
- * 
- * @param hash Hash value to search for
- * @return Singleton instance or nullptr if not found
- */
-atSingleton* FindSingleton(uint32_t hash);
-
-/**
  * UnregisterSingleton @ 0x820C29E0 | size: 0x74
  * 
  * Remove singleton from registry by name.
@@ -125,14 +113,14 @@ SingletonFactory* GetFactory(uint32_t hash);
 // ============================================================================
 
 /**
- * InitializeSingleton @ 0x821A8588 | size: 0x194
+ * InitializeSingleton @ 0x821A8588 | size: 0x190
  * 
- * Initialize singleton array with dynamic growth.
- * Handles array reallocation when capacity is reached.
+ * Append an entry, growing by 16 when count equals capacity.
+ * Names are duplicated; the remaining two entry words are copied unchanged.
  * 
  * @param singletonArray Array to initialize
  */
-void InitializeSingleton(SingletonArray* singletonArray);
+SingletonEntry* InitializeSingleton(SingletonArray* singletonArray);
 
 /**
  * ReleaseSingleton @ 0x821A9420 - ReleaseSingleton | size: 0x7C

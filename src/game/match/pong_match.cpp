@@ -3,6 +3,7 @@
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
  */
 
+#include "rage/singleton.h"
 #include "pong_match.hpp"
 #include <cstdint>
 #include <cstddef>
@@ -1395,7 +1396,6 @@ extern "C" void sysMemAllocator_InitMainThread();     // @ 0x820C0038
 namespace rage { void* rage_alloc_aligned(unsigned long size, unsigned long alignment); }
 // The matching inlined `delete`: pointers inside a resource are left alone,
 // anything else goes back through the current allocator's slot 2.
-namespace rage { uint8_t FindSingleton(void* ptr); }  // @ 0x820F90D0
 extern "C" void sysMemAllocator_Free(void* ptr);
 extern "C" void* xe_EC88(uint32_t size);              // @ 0x820DEC88, operator new
 
