@@ -232,7 +232,7 @@ struct swfSHAPE {
 
     // ── virtual methods ──
     virtual ~swfSHAPE();                  // [0] @ 0x824065d0
-    virtual void ScalarDtor(int flags); // [1] @ 0x82406c58
+    virtual void Render(const void* transform, int mode); // [1] @ 0x82406c58
     virtual void SetMember(const char* name, void* value);  // [9] @ 0x82406008
 };
 

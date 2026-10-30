@@ -40,6 +40,8 @@ extern "C" {
     float swfComputeFramePosition(void* ctx, void* entry, float* outMin, float* outMax);
     const char* util_A768_1(const void* value, void* buffer, int maxLen);  // @ 0x823FA768 — SWF value to string
     int32_t swfValueToInteger(const void* value);  // @ 0x823FA5C8
+    float swfValueToFloat(const void* value);  // @ 0x823FA688
+    double atof(const char* text); // @ 0x82432B80
     int atoi(const char* text); // @ 0x82432120
     void util_F7E8(const uint8_t* code, void* target, void* context, uint32_t length,
                    void* registers, uint32_t keepStack); // @ 0x823FF7E8
@@ -102,6 +104,27 @@ extern "C" int32_t swfValueToInteger(const void* value) {
     }
     default:
         return 0;
+    }
+}
+
+// Formerly phBoundCapsule_A688_g; these are SWF VM tags, not physics data.
+// @ 0x823FA688
+extern "C" float swfValueToFloat(const void* value) {
+    const auto* words = static_cast<const uint32_t*>(value);
+    switch (words[1]) {
+    case 0: case 1:
+        return static_cast<float>(std::atof(reinterpret_cast<const char*>(static_cast<uintptr_t>(words[0]))));
+    case 2:
+        return static_cast<float>(*static_cast<const uint8_t*>(value));
+    case 3:
+        return static_cast<float>(static_cast<int32_t>(words[0]));
+    case 4: {
+        float number;
+        std::memcpy(&number, value, sizeof(number));
+        return number;
+    }
+    default:
+        return 0.0f;
     }
 }
 
@@ -321,7 +344,7 @@ extern const float g_swfTwipScale; // @ 0x820290F0
 #pragma GCC push_options
 #pragma GCC optimize("fp-contract=off")
 #endif
-// Formerly pongShadowMap_6920_w. swfSHAPE::vfn_1 (0x82406C58) dispatches
+// Formerly pongShadowMap_6920_w. swfSHAPE::Render (0x82406C58) dispatches
 // command 7 here; primitive 3 is a triangle list. The shape argument is unused.
 // @ 0x82406920
 uint32_t swfDrawShapeTriangles(const swfSHAPE*, const void* command,
@@ -370,6 +393,133 @@ uint32_t swfDrawShapeTriangles(const swfSHAPE*, const void* command,
     }
     g_fxCountOnly = 0;
     return count * 2u + 1u;
+}
+
+// The command stream mixes float stroke/triangle coordinates with signed
+// integer fan coordinates. Style indices are one-based; zero retains state.
+// Mode is supplied by the instance renderer but unused by this implementation.
+// @ 0x82406C58
+void swfSHAPE::Render(const void* transform, int mode) {
+#if defined(__clang__)
+#pragma clang fp contract(off)
+#endif
+    (void)mode;
+    extern void swfApplyStrokeStyle(const void* stroke, const void* transform); // @ 0x82406290
+    const auto* state = static_cast<const uint8_t*>(transform);
+    const auto* world = reinterpret_cast<const float*>(state + 24);
+    swfShapeFillState defaultFill = {0, 0xFFFFFFFFu, {1, 0, 0, 1, 0, 0}, nullptr, nullptr};
+    const swfShapeFillState* fill = &defaultFill;
+    uint64_t stroke;
+    auto* strokeBytes = reinterpret_cast<uint8_t*>(&stroke);
+    uint16_t width = 20;
+    std::memcpy(strokeBytes, &width, 2);
+    const uint32_t white = 0xFFFFFFFFu;
+    std::memcpy(strokeBytes + 4, &white, 4);
+    std::memcpy(g_swfLineRenderState.matrix, world, 24);
+    const uint32_t* command = commands;
+    for (;;) {
+        switch (*command++) {
+        case 0:
+            return;
+        case 1: { // Connected polyline, including the initial point.
+            swfApplyStrokeStyle(&stroke, transform);
+            int32_t remaining = static_cast<int32_t>(*command++) - 1;
+            const uint32_t* end = command + 2 * remaining;
+            const uint32_t* point = command;
+            while (remaining != 0) {
+                float endpoints[4];
+                std::memcpy(endpoints, point, sizeof(endpoints));
+                swfDrawLine(endpoints[0], endpoints[1], endpoints[2], endpoints[3], static_cast<float>(width));
+                --remaining;
+                point += 2;
+            }
+            command = end + 2;
+            break;
+        }
+        case 6: { // Independent pairs of endpoints.
+            swfApplyStrokeStyle(&stroke, transform);
+            int32_t remaining = static_cast<int32_t>(*command++);
+            const uint32_t* point = command;
+            command += 4 * remaining;
+            while (remaining != 0) {
+                float endpoints[4];
+                std::memcpy(endpoints, point, sizeof(endpoints));
+                swfDrawLine(endpoints[0], endpoints[1], endpoints[2], endpoints[3], static_cast<float>(width));
+                --remaining;
+                point += 4;
+            }
+            break;
+        }
+        case 2: case 7: {
+            // Capture opcode before helpers can alter render state.
+            const uint32_t opcode = command[-1];
+            std::memcpy(g_swfLineRenderState.uvMatrix, fill->textureMatrix, 24);
+            if (state[140] == 0) {
+                g_swfBindFontTexture(fill->texture ? static_cast<void**>(fill->texture)[2] : nullptr);
+            }
+            if (opcode == 7) {
+                command += swfDrawShapeTriangles(this, command, transform, fill);
+                break;
+            }
+            int32_t remaining = static_cast<int32_t>(*command++);
+            rage_2A78(5, remaining);
+            // Retail's do/while requires a positive fan count.
+            do {
+                const float x = static_cast<float>(static_cast<int32_t>(command[0]));
+                const float y = static_cast<float>(static_cast<int32_t>(command[1]));
+                const uint32_t color = fill->gradient ? swfSampleGradient(fill->gradient, x, y) : fill->color;
+                uint32_t transformed = 0;
+                for (unsigned channel = 0; channel < 4; ++channel) {
+                    const unsigned shift = channel == 3 ? 24 : 16 - channel * 8;
+                    const int multiply = static_cast<int8_t>(state[56 + channel]);
+                    const int add = static_cast<int8_t>(state[60 + channel]);
+                    int value = ((int((color >> shift) & 255) * multiply) >> 6) + add * 4;
+                    value = value < 0 ? 0 : value > 255 ? 255 : value;
+                    if (channel == 3) value = value * state[71] / 255;
+                    transformed |= uint32_t(value) << shift;
+                }
+                g_fxCurrentColor = transformed;
+                const float px = static_cast<float>(static_cast<int32_t>(command[0])) * g_swfTwipsToPixels;
+                const float py = static_cast<float>(static_cast<int32_t>(command[1])) * g_swfTwipsToPixels;
+                const float* uv = g_swfLineRenderState.uvMatrix;
+                const float* m = g_swfLineRenderState.matrix;
+                const float v = std::fma(py, uv[3], uv[1] * px) + uv[5];
+                const float u = std::fma(py, uv[2], uv[0] * px) + uv[4];
+                const float screenX = std::fma(py, m[2], m[0] * px) + m[4];
+                const float screenY = std::fma(py, m[3], m[1] * px) + m[5];
+                g_fxVertexU = u;
+                g_fxVertexV = v;
+                fxEmitVertex2D(screenX * g_swfPixelScaleX, screenY * g_swfPixelScaleY);
+                command += 2;
+            } while (--remaining != 0);
+            if (g_fxVertexCursor != 0) {
+                g_fxVertexCursor = 0;
+                auto* device = static_cast<uint32_t*>(g_binkVideoPlayer);
+                device[0] = device[0x3554 / 4];
+            }
+            g_fxCountOnly = 0;
+            break;
+        }
+        case 3:
+            command += 2; // Metadata pair ignored by the renderer.
+            break;
+        case 4: {
+            const uint32_t index = *command++;
+            if (index != 0) fill = fills + index - 1;
+            break;
+        }
+        case 5: {
+            const uint32_t index = *command++;
+            if (index != 0) {
+                stroke = strokes[index - 1];
+                std::memcpy(&width, &stroke, 2);
+            }
+            break;
+        }
+        default:
+            break; // Unknown words are skipped, not treated as a terminator.
+        }
+    }
 }
 
 // Formerly pongShadowMap_6620_wrh: UVs follow the centerline, while position
@@ -998,9 +1148,7 @@ swfFILE::~swfFILE() {
         for (uint16_t i = 0; i < resourceCount; i++) {
             swfOBJECT* resource = reinterpret_cast<swfOBJECT*>(resourceArray[i]);
             if (resource) {
-                void** vtable = *((void***)resource);
-                typedef void (*DestructorFn)(swfOBJECT*, int);
-                ((DestructorFn)vtable[0])(resource, 1);
+                resource->Destroy(1);
             }
         }
     }
@@ -1762,7 +1910,6 @@ uint32_t swfINSTANCE::SetMember(const char* name, void* value) {
     extern void* g_swfStringBuffer;        // @ 0x82604850
     extern void* g_swfScriptObjectPool;    // @ 0x82604C60
     extern void* g_vtable_swfSCRIPTOBJECT; // @ 0x82074D14
-    extern float swfValueToFloat(const void* value); // @ 0x823FA688
     extern void swfReleaseText(void* text, int freeStorage); // @ 0x823F8A38
     extern void* swfCopyText(const char* text); // @ 0x823FABC0
     extern void* swfFindTexture(void* dictionary, const char* name); // @ 0x82151990
@@ -2275,10 +2422,8 @@ void swfRenderInstanceTree(void* instance, const void* parentTransform) {
         }
         if (node[0x43] != 0) {
             const int mode = g_currentSwfContext == instance ? (swfContext_IsGlobalSlot13AltMode() ? 3 : 2) : 1;
-            void* definition = *reinterpret_cast<void**>(node + 4);
-            void** vtable = *static_cast<void***>(definition);
-            using DrawFn = void (*)(void*, void*, int);
-            reinterpret_cast<DrawFn>(vtable[1])(definition, node + 8, mode);
+            auto* definition = *reinterpret_cast<swfOBJECT**>(node + 4);
+            definition->Render(node + 8, mode);
             flags = g_grmShaderFx_flushRequired;
         }
         // fcmpu/bne considers NaNs changed; signed zeros compare equal.

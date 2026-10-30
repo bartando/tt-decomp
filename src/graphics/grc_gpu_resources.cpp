@@ -23,7 +23,7 @@ extern "C" {
 extern void rage_EEC0(void* start, void* end);
 
 extern void* rage_A980(void* device);  // @ 0x8235A980
-extern void rage_2A68(void* device, void* shader, uint32_t codeAddress, void* declaration);  // @ 0x82362A68
+extern void grcPatchVertexFetchInstructions(void* device, void* shader, uint32_t codeAddress, void* declaration);  // @ 0x82362A68
 extern void rage_32F0(void* device, uint32_t repatch, void* shader, uint32_t* programControl,
                       void* declaration, const void* vertexInfo, const void* pixelInfo);  // @ 0x823632F0
 extern void grc_3410(void* device);  // @ 0x82363410
@@ -279,6 +279,179 @@ void grcDevice_WaitFence(void) {
 }
 
 
+// Vertex declaration entries and shader fetch templates use the Xenon layouts.
+struct grcVertexElement {
+    uint16_t stream;
+    uint16_t offset;
+    uint32_t format;
+    uint8_t method;
+    uint8_t usage;
+    uint8_t usageIndex;
+    uint8_t reserved;
+};
+static_assert(sizeof(grcVertexElement) == 12);
+struct grcFetchInstruction { uint32_t opcode, format, offset; };
+struct grcVertexFetchShader {
+    uint8_t reserved[0x34];
+    uint32_t fetchCount;
+    uint32_t fetchLocations[32]; // low 12 bits: instruction index; bits 20..23: boundary
+    grcFetchInstruction fetchTemplates[32];
+};
+static_assert(offsetof(grcVertexFetchShader, fetchTemplates) == 0xB8);
+struct grcVertexFetchDeclaration {
+    uint8_t reserved[8];
+    uint32_t elementCount;
+    uint8_t state[0x18];
+};
+static_assert(sizeof(grcVertexFetchDeclaration) == 0x24);
+extern const uint16_t g_grcFetchSwizzleMasks[8]; // @ 0x8202C318
+extern const uint8_t g_grcFetchFormatSizes[64]; // @ 0x82065F68
+
+static uint32_t rotateFetchWord(uint32_t value, unsigned shift) {
+    return (value << shift) | (value >> (32 - shift));
+}
+static uint32_t fetchConstantIndex(uint32_t opcode) {
+    return ((opcode >> 18) & 0x7C) | ((opcode >> 25) & 3);
+}
+static int32_t fetchOffset(uint32_t word) {
+    return static_cast<int32_t>(word << 1) >> 9;
+}
+
+// Formerly rage_2A68. Patch fetch formats/streams, sort bounded fetch groups,
+// and merge adjacent fetches into bursts before scattering into shader code.
+// Scratch capacity matches the shader's 32-entry metadata arrays.
+// @ 0x82362A68
+void grcPatchVertexFetchInstructions(void* device, void* shader, uint32_t codeAddress, void* declaration) {
+    const auto* input = static_cast<const grcVertexFetchShader*>(shader);
+    const auto* layout = static_cast<const grcVertexFetchDeclaration*>(declaration);
+    const auto* elements = reinterpret_cast<const grcVertexElement*>(layout + 1);
+    const auto* strides = static_cast<const uint8_t*>(device) + 0x3190;
+    grcFetchInstruction patched[32];
+    const uint32_t count = input->fetchCount;
+    for (uint32_t i = 0; i < count; ++i) {
+        const uint32_t location = input->fetchLocations[i];
+        const grcVertexElement* element = nullptr;
+        for (uint32_t j = 0; j < layout->elementCount; ++j) {
+            const auto& candidate = elements[j];
+            if (candidate.usage == ((location >> 12) & 15) &&
+                candidate.usageIndex == ((location >> 16) & 15)) {
+                element = &candidate;
+                break;
+            }
+        }
+        auto instruction = input->fetchTemplates[i];
+        uint32_t swizzle;
+        if (!element) {
+            instruction.opcode = (instruction.opcode & ~0x3FF00000u) | 0x05F00000u;
+            instruction.format = (instruction.format & 0xBFC6CFFFu) | 0x60000u;
+            instruction.offset = (instruction.offset & 0x80000000u) | strides[0];
+            swizzle = 0x9250;
+        } else {
+            const uint32_t format = element->format;
+            swizzle = (((format >> 16) & 7) | ((format >> 10) & 0x38));
+            swizzle = (swizzle << 3) | ((format >> 19) & 7);
+            swizzle = ((swizzle << 1) | (format & 0xFC00)) << 3;
+            swizzle &= 0xFFFF;
+            // Signed normalized formats swap selectors 0..3 with their signed variant.
+            if ((format & 0xC0) == 0x40) {
+                const uint32_t masks[] = {0xE000, 0x1C00, 0x380, 0x70};
+                const uint32_t limits[] = {0x6000, 0xC00, 0x180, 0x30};
+                const uint32_t toggles[] = {0x2000, 0x400, 0x80, 0x10};
+                for (unsigned lane = 0; lane < 4; ++lane) {
+                    if ((swizzle & masks[lane]) <= limits[lane]) swizzle ^= toggles[lane];
+                }
+            }
+            instruction.format = (instruction.format & 0xBFC0CFFFu) |
+                ((((rotateFetchWord(format, 12) & 0x3F000) | (format & 0x300)) << 4));
+            const uint32_t streamBits = (0x5Fu - element->stream) * 0x01560056u;
+            const uint32_t stream = (streamBits & ~0x00F80000u) |
+                                   (rotateFetchWord(streamBits, 11) & 0x00F80000u);
+            instruction.opcode = ((instruction.opcode & ~0x07F00000u) |
+                                   (rotateFetchWord(stream, 1) & 0x07F00000u)) & 0xC7FFFFFFu;
+            instruction.offset = (instruction.offset & 0x80000000u) |
+                                 ((uint32_t(element->offset) << 6) & 0x7FFFFF00u) | strides[element->stream];
+        }
+        // The compiler's uninitialized low swizzle nibble is masked away by
+        // every table entry. Bits 1..3 are then forced to one (constant lanes).
+        swizzle |= 0xE;
+        auto selected = [&](unsigned selector) {
+            return uint32_t(g_grcFetchSwizzleMasks[selector] & swizzle);
+        };
+        uint32_t bits = selected(instruction.format & 7);
+        uint32_t folded = bits;
+        for (unsigned n = 0; n < 4; ++n) folded = (folded >> 3) | bits;
+        instruction.format = (instruction.format & ~7u) | ((folded >> 1) & 7);
+        bits = selected((instruction.format >> 3) & 7);
+        folded = bits;
+        for (unsigned n = 0; n < 3; ++n) folded = (folded >> 3) | bits;
+        instruction.format = (instruction.format & ~0x38u) | (((folded >> 1) | (bits << 2)) & 0x38);
+        bits = selected((instruction.format >> 6) & 7);
+        folded = (bits >> 3) | bits;
+        folded = (folded >> 3) | bits;
+        instruction.format = (instruction.format & ~0x1C0u) |
+                             (((folded >> 1) | (((bits << 3) | bits) << 2)) & 0x1C0);
+        bits = selected((instruction.format >> 9) & 7);
+        instruction.format = (instruction.format & ~0xE00u) |
+            ((((((bits << 3) | bits) << 3) | bits) << 2 | (((bits >> 3) | bits) >> 1)) & 0xE00);
+        patched[i] = instruction;
+    }
+
+    uint32_t next = 0;
+    while (next < count) {
+        while (next < count && !(input->fetchLocations[next] & 0x300000)) ++next;
+        const uint32_t first = next++;
+        if (next >= count) break;
+        while (next < count && !(input->fetchLocations[next] & 0x300000)) ++next;
+        if (next >= count) break;
+        const uint32_t end = next++;
+        const bool fixedLast = (input->fetchLocations[end] & 0x300000) == 0x300000;
+        const uint32_t sortEnd = fixedLast ? end : end + 1;
+        const int32_t lastConstant = fixedLast ? int32_t(fetchConstantIndex(patched[end].opcode)) : -1;
+        // Selection sort, including the original tie breaks and swap order.
+        for (uint32_t a = first; a + 1 < sortEnd; ++a) {
+            for (uint32_t b = a + 1; b < sortEnd; ++b) {
+                const auto& left = patched[a];
+                const auto& right = patched[b];
+                const int32_t leftConstant = int32_t(fetchConstantIndex(left.opcode));
+                const int32_t rightConstant = int32_t(fetchConstantIndex(right.opcode));
+                int32_t order = rightConstant - leftConstant;
+                bool swap = leftConstant == lastConstant && order != 0;
+                if (order != 0) {
+                    if (rightConstant == lastConstant) order = -1;
+                } else {
+                    order = fetchOffset(left.offset) - fetchOffset(right.offset);
+                    if (!order) order = int32_t(g_grcFetchFormatSizes[(left.format >> 16) & 63]) -
+                                        int32_t(g_grcFetchFormatSizes[(right.format >> 16) & 63]);
+                }
+                if (swap || order > 0) {
+                    const auto temp = patched[a];
+                    patched[a] = patched[b];
+                    patched[b] = temp;
+                }
+            }
+        }
+        uint32_t burst = first;
+        for (uint32_t i = first + 1; i <= end; ++i) {
+            auto& head = patched[burst];
+            const auto& current = patched[i];
+            const uint32_t headOffset = uint32_t(fetchOffset(head.offset));
+            const uint32_t currentOffset = uint32_t(fetchOffset(current.offset));
+            const uint32_t span = currentOffset - headOffset + g_grcFetchFormatSizes[(current.format >> 16) & 63];
+            if (fetchConstantIndex(head.opcode) == fetchConstantIndex(current.opcode) &&
+                headOffset <= currentOffset && span <= 8) {
+                uint32_t length = (head.opcode >> 27) & 7;
+                if (length <= span - 1) length = span - 1;
+                head.opcode = (head.opcode & ~0x38000000u) | ((length << 27) & 0x38000000u);
+                patched[i].format |= 0x40000000u;
+            } else {
+                burst = i;
+            }
+        }
+    }
+    auto* code = reinterpret_cast<grcFetchInstruction*>(static_cast<uintptr_t>(codeAddress));
+    for (uint32_t i = 0; i < count; ++i) code[input->fetchLocations[i] & 0xFFF] = patched[i];
+}
+
 // Bind vertex/pixel programs, refresh cached vertex patches and derive depth state.
 // @ 0x82363500
 void grcDevice_ApplyShaderState(void* device) {
@@ -331,7 +504,7 @@ void grcDevice_ApplyShaderState(void* device) {
                 copyVertexCode = (word(vertexShader, 0x24C) & 0x80000000) != 0
                     && (fence == 0 || fence - word(vertexShader, 8) < fence - word(pointer(device, 0x2890), 0));
                 if (!copyVertexCode) {
-                    rage_2A68(device, vertexShader, codeAddress, declaration);
+                    grcPatchVertexFetchInstructions(device, vertexShader, codeAddress, declaration);
                     const uint32_t start = word(vertexShader, 0x28);
                     rage_EEC0(reinterpret_cast<void*>(static_cast<uintptr_t>(start)),
                               reinterpret_cast<void*>(static_cast<uintptr_t>(start + word(vertexShader, 0x258))));

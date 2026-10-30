@@ -16,7 +16,7 @@ extern "C" {
     uint8_t swfValueToBoolean(const SwfVmValue* value);  // @ 0x823FA420
     uint8_t swfValueIsInteger(const SwfVmValue* value);  // @ 0x823FA4C8
     int32_t swfValueToInteger(const SwfVmValue* value);  // @ 0x823FA5C8
-    float swfValueToFloat(const SwfVmValue* value);  // @ 0x823FA688
+    float swfValueToFloat(const void* value);  // @ 0x823FA688
     const char* util_A768_1(const void* value, void* buffer, int maxLen);  // @ 0x823FA768
     uint8_t swfValuesEqual(const SwfVmValue* a, const SwfVmValue* b);  // @ 0x823FA928
     void* swfCopyString(const char* text);  // @ 0x823FABC0

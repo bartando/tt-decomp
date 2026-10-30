@@ -17703,7 +17703,7 @@ struct swfSCRIPTOBJECT_vtable {
 // swfSHAPE vtable (3 named slots, max slot 9)
 struct swfSHAPE_vtable {
     void* vfn_0;  // swfSHAPE_vfn_0  // destructor
-    void* vfn_1;  // swfSHAPE_vfn_1  // scalar_destructor
+    void* vfn_1;  // swfSHAPE_Render  // render
     void* vfn_2;  // (unnamed)
     void* vfn_3;  // (unnamed)
     void* vfn_4;  // (unnamed)

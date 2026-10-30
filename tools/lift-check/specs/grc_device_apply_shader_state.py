@@ -27,7 +27,7 @@ def rollover(ctx):
 
 CALLS = {
     "rage_A980": model(rollover, args=("r3",)),
-    "rage_2A68": stub(ret="void", args=("r3", "r4", "r5", "r6")),
+    "grcPatchVertexFetchInstructions": stub(ret="void", args=("r3", "r4", "r5", "r6")),
     "rage_EEC0": stub(ret="void", args=("r3", "r4")),
     "rage_32F0": stub(ret="void", args=("r3", "r4", "r5", "r6", "r7", "r8", "r9"),
                       out={"r6": 4}, deref={"r6": 4, "r8": 0x20, "r9": 0x20}),

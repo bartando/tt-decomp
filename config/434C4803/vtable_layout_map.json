@@ -30617,10 +30617,10 @@
     },
     "1": {
       "addr": "0x82406c58",
-      "symbol": "swfSHAPE_vfn_1",
+      "symbol": "swfSHAPE_Render",
       "slot": 1,
       "source": "vfn_symbol",
-      "inferred_role": "scalar_destructor"
+      "inferred_role": "render"
     },
     "9": {
       "addr": "0x82406008",

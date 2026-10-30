@@ -73435,7 +73435,7 @@ loc_822EC460:
 		// beq cr6,0x822ec540
 		if (ctx.r3.u32 != 0) {
 			// bl 0x823fa688
-			phBoundCapsule_A688_g(ctx, base);
+			swfValueToFloat(ctx, base);
 		}
 	loc_822EC540:
 		// lis r11,-32250
@@ -87181,7 +87181,7 @@ PPC_FUNC_IMPL(__imp__ref_fi_2DF8) {
 	// beq cr6,0x822f2e78
 	if (ctx.r3.u32 != 0) {
 		// bl 0x823fa688
-		phBoundCapsule_A688_g(ctx, base);
+		swfValueToFloat(ctx, base);
 		// b 0x822f2e7c
 	} else {
 	loc_822F2E78:
