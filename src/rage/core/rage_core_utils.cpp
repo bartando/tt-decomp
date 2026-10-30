@@ -992,12 +992,22 @@ extern "C" void xe_GetLoadContext(void* context) { (void)context; }
 // Utility link targets (only referenced from generated code)
 // ============================================================================
 
+// Shared 36-byte records; byte 28 marks a live slot table.
+extern uint8_t g_network_array1[144]; // @ 0x82619AF0
+
 extern "C" {
 
 /** util_B188 @ 0x823FB188 | size: 0x64 — SWF context lookup */
 void* util_B188(void* swfContext, int index) {
-    (void)swfContext; (void)index;
-    return nullptr;
+    auto* context = static_cast<uint8_t*>(swfContext);
+    auto* slot = reinterpret_cast<uint32_t*>(context + static_cast<uint32_t>(index) * 8);
+    const uint32_t table = slot[0];
+    const uint32_t entry = slot[1];
+    if (entry == 0xFFFFFFFF || g_network_array1[table * 36 + 28] == 0) {
+        return context + 1060;
+    }
+    auto* entries = *reinterpret_cast<uint8_t**>(context + (table + 261) * 4);
+    return entries + entry * 4;
 }
 
 /** util_5A70 @ 0x822E5A70 | size: 0x190 — file device operation */
