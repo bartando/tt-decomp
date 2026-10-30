@@ -5,6 +5,7 @@
  * Lifted functions:
  *   pongLightState_CopyLights                      @ 0x8213E110
  *   pongLightState_Apply                           @ 0x82154320
+ *   pongRender_ResetState                         @ 0x82225590
  *   pongDrawBucketManager::~pongDrawBucketManager  @ 0x822272B0  (vfn_0)
  *   pongDrawBucketManager::Load                    @ 0x82227430
  *   pongDrawBucket_AddEntry                        @ 0x822278D8
@@ -148,6 +149,130 @@ void pongLightState_Apply(const pongLightState* state) {
     table->dirtyBits[bit >> 3] |= g_shaderParameterDirtyMasks[bit & 7];
     slot = table->entries[(ambientHandle >> 18) * 2 + 1] & 0xFFFF;
     memcpy(table->values[slot].lane, state->ambient.bits, 16);
+}
+
+extern "C" {
+    extern uint32_t g_grmShaderFx_flushRequired;       // @ 0x825EBB1C
+    extern uint32_t g_grmShaderFx_forceResetFlag;      // @ 0x825EBAB4
+    extern uint32_t g_grcAppliedRenderState[22];       // @ 0x825EBB80
+    extern uint32_t g_grcPendingTextureState[24];      // @ 0x825EBB20
+    extern uint32_t g_grcAppliedTextureState[24];      // @ 0x825EBAB8
+    extern void* g_grcDefaultTexture;                 // @ 0x825EBA20
+    extern uint32_t g_grcFormatId;                    // @ 0x825C9030
+    extern void* lbl_826063C8;                        // @ 0x826063C8
+}
+extern void game_5450();                              // @ 0x82225450 — reset all 16 device samplers
+extern void pongShadowMap_A5C8_g(uint32_t handle, void* texture); // @ 0x8215A5C8 — shader texture write
+
+// @ 0x82225590 | size: 0x7FC (was pongShadowMap_5590_g)
+// Inferred name: establish per-pass render defaults, reset device samplers and
+// update the fallback tables consumed by grmShaderInstance_Unbind. Called by
+// ordinary draw passes as well as GenerateShadowMaps; this is not a shadow-map method.
+// Negative passes request full colour writes and cull mode 1; 13/14 use cull mode 0.
+// The baseline blocks and fallback tables retain their image addresses, as in rage_grm.cpp.
+void pongRender_ResetState(int32_t pass) {
+    auto* defaults = reinterpret_cast<uint32_t*>(0x825C8F58u);
+    auto* pending = g_grmShaderFx_variantTable;
+    const auto* applied = g_grcAppliedRenderState;
+    uint32_t dirty = g_grmShaderFx_flushRequired;
+    const auto setDefault = [&](uint32_t index, uint32_t value) {
+        defaults[index] = value;
+        pending[index] = value;
+        const uint32_t bit = 1u << index;
+        dirty = applied[index] == value ? dirty & ~bit : dirty | bit;
+    };
+
+    setDefault(12, static_cast<uint32_t>(pass) - 1u <= 15u);
+    setDefault(3, 0);
+    setDefault(10, 0);
+    setDefault(5, 0);
+    setDefault(6, 3);
+    setDefault(19, 1);
+    setDefault(7, 1);
+    const bool fullColour = pass < 0 || (pass >= 4 && pass < 17);
+    setDefault(9, fullColour ? 15 : 7);
+    const uint32_t cullMode = pass < 0 ? 1 : (static_cast<uint32_t>(pass) - 13u <= 1u ? 0 : 2);
+    setDefault(0, cullMode);
+    *reinterpret_cast<uint32_t*>(0x825C8F54u) = 2;
+    // The PPC briefly updates bit 1 if the previous pending value exceeded 2,
+    // then unconditionally replaces it with this comparison before publishing.
+    setDefault(1, 2);
+    g_grmShaderFx_flushRequired = dirty;
+
+    auto* defaultTextures = reinterpret_cast<uint32_t*>(0x825C8FB0u);
+    const uint32_t texture = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(g_grcDefaultTexture));
+    uint32_t textureDirty = g_grmShaderFx_forceResetFlag;
+    for (uint32_t slot = 0; slot < 8; ++slot) {
+        defaultTextures[slot * 3] = texture;
+        g_grcPendingTextureState[slot * 3] = texture;
+        const uint32_t bit = 1u << (slot * 4);
+        textureDirty = g_grcAppliedTextureState[slot * 3] == texture
+            ? textureDirty & ~bit : textureDirty | bit;
+        // On a mismatch the original publishes immediately, then again after the loop.
+        if (g_grcAppliedTextureState[slot * 3] != texture)
+            g_grmShaderFx_forceResetFlag = textureDirty;
+    }
+    g_grmShaderFx_forceResetFlag = textureDirty;
+    game_5450();
+
+    if (pass == 0 || pass == 17 || pass == 18) {
+        const auto* shadow = *reinterpret_cast<uint8_t**>(static_cast<uint8_t*>(lbl_826063C8) + 8);
+        const uint32_t handle = *reinterpret_cast<const uint32_t*>(shadow + 1028);
+        if (handle != 0) {
+            void* shadowTexture = *reinterpret_cast<void* const*>(shadow + (pass == 18 ? 980 : 976));
+            pongShadowMap_A5C8_g(handle, shadowTexture);
+        }
+    }
+
+    auto* renderDefaults = reinterpret_cast<uint32_t*>(0x825B1F90u);
+    const auto setRenderDefault = [&](uint32_t offset, uint32_t value) {
+        for (uint32_t i = 0; i < 87; ++i) {
+            if (renderDefaults[i * 2] == offset) {
+                renderDefaults[i * 2 + 1] = value;
+                break;
+            }
+        }
+    };
+    setRenderDefault(60, pass > 0 && pass < 17);
+    setRenderDefault(80, 0);
+    setRenderDefault(72, 6);
+    setRenderDefault(76, 7);
+    setRenderDefault(96, 0);
+    setRenderDefault(100, 0);
+    setRenderDefault(44, g_grcFormatId == 0x1A220197u ? 6 : 3);
+    setRenderDefault(40, 1);
+    setRenderDefault(48, 1);
+    setRenderDefault(212, fullColour ? 15 : 7);
+    setRenderDefault(56, pass < 0 ? 6 : (static_cast<uint32_t>(pass) - 13u <= 1u ? 0 : 2));
+
+    struct SamplerDefault {
+        uint16_t field_0;
+        uint16_t offset;
+        uint32_t value;
+    };
+    auto* samplerDefaults = reinterpret_cast<SamplerDefault*>(0x825B2248u);
+    const auto setSamplerDefault = [&](uint16_t offset, uint32_t value) {
+        for (uint32_t i = 0; i < 20; ++i) {
+            if (samplerDefaults[i].offset == offset) {
+                samplerDefaults[i].value = value;
+                break;
+            }
+        }
+    };
+    // Preserve the scalar load/store conversion before copying the LOD's raw word.
+    const float lod = *reinterpret_cast<const uint8_t*>(0x826064E2u) != 0
+        ? lbl_825C5938 : *reinterpret_cast<const float*>(0x8202D110u);
+    uint32_t lodBits;
+    memcpy(&lodBits, &lod, sizeof(lodBits));
+    setSamplerDefault(24, 0);
+    setSamplerDefault(16, 4);
+    setSamplerDefault(20, 4);
+    setSamplerDefault(36, 2);
+    setSamplerDefault(0, 0);
+    setSamplerDefault(4, 0);
+    setSamplerDefault(8, 0);
+    setSamplerDefault(28, lodBits);
+    setSamplerDefault(56, 3);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
