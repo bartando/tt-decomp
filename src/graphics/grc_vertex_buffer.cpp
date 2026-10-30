@@ -12,9 +12,13 @@ struct PgVertexBuffer {
     uint32_t formatAddress;             // +0x08: first word is the attribute flags
     uint8_t pad0C[0x10];
     uint32_t dataAddress;               // +0x1C: CPU mapping, refreshed by pg_7578_g
-    uint8_t pad20[0x0E];
+    uint8_t pad20[0x03];
+    uint8_t normalOffset;               // +0x23
+    uint8_t pad24[0x0A];
     uint8_t tangentOffset;              // +0x2E
-    uint8_t pad2F[0x65];
+    uint8_t pad2F[0x39];
+    uint32_t normalSize;                // +0x68: bytes for the raw-copy format
+    uint8_t pad6C[0x28];
     uint32_t tangentSize;               // +0x94: bytes for the raw-copy format
     uint8_t pad98[0x3C];
     uint32_t stride;                    // +0xD4
@@ -24,10 +28,50 @@ struct PgVertexBuffer {
     uint8_t mapped;                     // +0xDB
 };
 
+static_assert(offsetof(PgVertexBuffer, normalOffset) == 0x23);
 static_assert(offsetof(PgVertexBuffer, tangentOffset) == 0x2E);
+static_assert(offsetof(PgVertexBuffer, normalSize) == 0x68);
 static_assert(offsetof(PgVertexBuffer, tangentSize) == 0x94);
 static_assert(offsetof(PgVertexBuffer, stride) == 0xD4);
 static_assert(offsetof(PgVertexBuffer, mapped) == 0xDB);
+
+// Xenon's VMX non-Java mode flushes subnormal inputs/results to signed zero.
+// Scalar host/PPC floating-point does not necessarily use that mode.
+float vmxFloat(float value) {
+    uint32_t bits;
+    std::memcpy(&bits, &value, sizeof(bits));
+    if ((bits & 0x7F800000u) == 0) {
+        bits &= 0x80000000u;
+    }
+    std::memcpy(&value, &bits, sizeof(value));
+    return value;
+}
+
+// vnmsubfp with the constants at 0x82034D60/0x82034D70 encodes a signed integer
+// in the low mantissa bits around 3.0f; vpkd3d128 (NORMPACKED32) then
+// clamps/extracts 10 bits for xyz and 2 bits for w. `v` is 16-byte aligned.
+uint32_t packNormPacked32(const float* v) {
+    uint32_t packed = 0;
+    for (unsigned k = 0; k < 4; ++k) {
+        const float scale = k < 3 ? -511.0f / 4194304.0f : -3.0f / 4194304.0f;
+        volatile float product = vmxFloat(v[k]) * scale;
+        float encoded = 3.0f - vmxFloat(product);
+        const uint32_t minBits = k < 3 ? 0x403FFE01u : 0x40400000u;
+        const uint32_t maxBits = k < 3 ? 0x404001FFu : 0x40400003u;
+        float minimum, maximum;
+        std::memcpy(&minimum, &minBits, sizeof(minimum));
+        std::memcpy(&maximum, &maxBits, sizeof(maximum));
+        encoded = !(encoded >= minimum) ? minimum : encoded > maximum ? maximum : encoded;
+        uint32_t bits;
+        std::memcpy(&bits, &encoded, sizeof(bits));
+        packed |= (bits & (k < 3 ? 0x3FFu : 3u)) << (10 * k);
+    }
+    return packed;
+}
+
+const float* align16(const float* p) {
+    return reinterpret_cast<const float*>(reinterpret_cast<uintptr_t>(p) & ~uintptr_t(15));
+}
 
 } // namespace
 
@@ -42,17 +86,6 @@ extern const uint32_t lbl_82619BE0[4]; // @ 0x82619BE0
 // @ 0x82156C00
 extern "C" void pg_6C00_w(void* vertexBuffer, uint32_t index, uint32_t /*unused*/,
                           const float* tangent, const float* normal, const float* bitangent) {
-    // Xenon's VMX non-Java mode flushes subnormal inputs/results to signed zero.
-    // Scalar host/PPC floating-point does not necessarily use that mode.
-    const auto vmxFloat = [](float value) {
-        uint32_t bits;
-        std::memcpy(&bits, &value, sizeof(bits));
-        if ((bits & 0x7F800000u) == 0) {
-            bits &= 0x80000000u;
-        }
-        std::memcpy(&value, &bits, sizeof(value));
-        return value;
-    };
     auto* buffer = static_cast<PgVertexBuffer*>(vertexBuffer);
     auto* format = reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(buffer->formatAddress));
     if ((*format & 0x4000) == 0) {
@@ -104,27 +137,34 @@ extern "C" void pg_6C00_w(void* vertexBuffer, uint32_t index, uint32_t /*unused*
         destination = reinterpret_cast<uint8_t*>(reinterpret_cast<uintptr_t>(destination) & ~uintptr_t(15));
         std::memcpy(destination, result, sizeof(result));
     } else if (buffer->packedTangent != 0) {
-        tangent = reinterpret_cast<const float*>(reinterpret_cast<uintptr_t>(tangent) & ~uintptr_t(15));
-        // vnmsubfp encodes a signed integer in the low mantissa bits around 3.0f;
-        // vpkd3d128 then clamps/extracts 10 bits for xyz and 2 bits for w.
-        uint32_t packed = 0;
-        for (unsigned k = 0; k < 4; ++k) {
-            const float scale = k < 3 ? -511.0f / 4194304.0f : -3.0f / 4194304.0f;
-            volatile float product = vmxFloat(tangent[k]) * scale;
-            float encoded = 3.0f - vmxFloat(product);
-            const uint32_t minBits = k < 3 ? 0x403FFE01u : 0x40400000u;
-            const uint32_t maxBits = k < 3 ? 0x404001FFu : 0x40400003u;
-            float minimum, maximum;
-            std::memcpy(&minimum, &minBits, sizeof(minimum));
-            std::memcpy(&maximum, &maxBits, sizeof(maximum));
-            encoded = !(encoded >= minimum) ? minimum : encoded > maximum ? maximum : encoded;
-            uint32_t bits;
-            std::memcpy(&bits, &encoded, sizeof(bits));
-            packed |= (bits & (k < 3 ? 0x3FFu : 3u)) << (10 * k);
-        }
+        const uint32_t packed = packNormPacked32(align16(tangent));
         std::memcpy(destination, &packed, sizeof(packed));
     } else {
         // Unlike the vector paths, memcpy uses the exact (possibly unaligned) pointers.
         std::memcpy(destination, tangent, buffer->tangentSize);
+    }
+}
+
+// @ 0x82156A40
+extern "C" void pg_6A40_w(void* vertexBuffer, uint32_t index, const float* normal) {
+    auto* buffer = static_cast<PgVertexBuffer*>(vertexBuffer);
+    auto* format = reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(buffer->formatAddress));
+    if ((*format & 0x8) == 0) {
+        return;
+    }
+    if (buffer->mapped == 0) {
+        pg_7578_g(buffer);
+    }
+
+    format = reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(buffer->formatAddress));
+    const uint32_t offset = buffer->stride * index + buffer->normalOffset;
+    auto* destination = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(buffer->dataAddress + offset));
+    // Big-endian halfword at +4 of the format: bits 9-11 hold the normal's type.
+    const uint16_t normalType = reinterpret_cast<const uint16_t*>(format)[2];
+    if (((normalType >> 9) & 7) == 5) {
+        const uint32_t packed = packNormPacked32(align16(normal));
+        std::memcpy(destination, &packed, sizeof(packed));
+    } else {
+        std::memcpy(destination, normal, buffer->normalSize);
     }
 }
