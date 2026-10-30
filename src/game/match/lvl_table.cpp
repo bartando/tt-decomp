@@ -45,7 +45,153 @@ float flushVmx(float value) {
     return value;
 }
 
+LvlTableVector loadClothVector(const LvlTableVector* address) {
+    return *reinterpret_cast<const LvlTableVector*>(reinterpret_cast<uintptr_t>(address) & ~uintptr_t(15));
+}
+
+LvlTableVector clothSubtract(const LvlTableVector& a, const LvlTableVector& b) {
+    LvlTableVector result;
+    for (int lane = 0; lane < 4; ++lane)
+        result.lane[lane] = flushVmx(flushVmx(a.lane[lane]) - flushVmx(b.lane[lane]));
+    return result;
+}
+
+// The permutes form zxy*yzx - yzx*zxy, the reverse of a conventional cross.
+LvlTableVector clothReverseCross(const LvlTableVector& a, const LvlTableVector& b) {
+    LvlTableVector result;
+    for (int lane = 0; lane < 4; ++lane) {
+        const int y = lane == 3 ? 3 : (lane + 1) % 3;
+        const int z = lane == 3 ? 3 : (lane + 2) % 3;
+        const float first = flushVmx(flushVmx(a.lane[z]) * flushVmx(b.lane[y]));
+        const float second = flushVmx(flushVmx(a.lane[y]) * flushVmx(b.lane[z]));
+        result.lane[lane] = flushVmx(-flushVmx(second - first));
+    }
+    return result;
+}
+
+float clothFaceDistance(const ClothMeshFace* face, const LvlTableVector* vertices,
+                        const LvlTableVector& position) {
+    LvlTableVector normal = loadClothVector(&face->normal);
+    for (float& lane : normal.lane)
+        lane = flushVmx(lane);
+    const LvlTableVector a = loadClothVector(vertices + face->vertices[0]);
+    return flushVmx(dot(normal, clothSubtract(position, a), 3));
+}
+
+// Returns 0xFFFF when the projection is inside the triangle.
+uint32_t clothFaceEdge(const ClothMeshFace* face, const LvlTableVector* vertices,
+                       const LvlTableVector& position, float distance) {
+    LvlTableVector normal = loadClothVector(&face->normal);
+    for (float& lane : normal.lane)
+        lane = flushVmx(lane);
+    const LvlTableVector a = loadClothVector(vertices + face->vertices[0]);
+    const LvlTableVector b = loadClothVector(vertices + face->vertices[1]);
+    const LvlTableVector c = loadClothVector(vertices + face->vertices[2]);
+    LvlTableVector relative = clothSubtract(position, a);
+    for (int lane = 0; lane < 4; ++lane) {
+        const float product = flushVmx(flushVmx(normal.lane[lane]) * distance);
+        relative.lane[lane] = flushVmx(-flushVmx(product - relative.lane[lane]));
+    }
+    const LvlTableVector ab = clothSubtract(b, a);
+    const LvlTableVector ac = clothSubtract(c, a);
+    const LvlTableVector bc = clothSubtract(c, b);
+    const float edge0 = flushVmx(dot(normal, clothReverseCross(ab, relative), 3));
+    const float edge1 = flushVmx(0.0f - flushVmx(dot(normal, clothReverseCross(ac, relative), 3)));
+    const float edge2 = flushVmx(dot(normal, clothReverseCross(bc, clothSubtract(relative, ab)), 3));
+    if (!(edge0 > 0.0f || edge1 > 0.0f || edge2 > 0.0f))
+        return 0xFFFF;
+    // Preserve the strict comparisons, including their tie/unordered choices.
+    const uint32_t edge = edge0 > edge2 ? (edge0 > edge1 ? 0 : 2) : (edge2 > edge1 ? 1 : 2);
+    return edge;
+}
+
+bool clothAboveMesh(float distance, const LvlTableVector* expansion) {
+    const LvlTableVector limit = loadClothVector(expansion);
+    bool above = true;
+    for (int lane = 0; lane < 4; ++lane)
+        above &= flushVmx(maskLane(distance, lbl_82619BE0[lane], lbl_82619BD0[lane]))
+                 > flushVmx(maskLane(limit.lane[lane], lbl_82619BE0[lane]));
+    return above;
+}
+
 } // namespace
+
+// @ 0x82339240
+void clothCollideMesh(const ClothMeshCollisionView* self, const ClothMeshBoundView* bound,
+                      const LvlTableVector* reduction, const LvlTableVector* expansion, uint32_t mode) {
+    const ClothMeshFace* faces = bound->faces;
+    const LvlTableVector* vertices = bound->vertices;
+    const int32_t end = self->particleCount;
+    LvlTableVector* positions = self->positions;
+    const LvlTableVector* previous = self->previousPositions;
+    uint16_t* cache = self->cachedFaces[0];
+    for (int32_t particle = self->firstMovableParticle; particle < end; ++particle) {
+        for (int attempts = 8; attempts > 0; --attempts) {
+            const uint16_t currentIndex = cache[particle];
+            if (currentIndex == 0xFFFF)
+                break;
+            const ClothMeshFace* current = faces + currentIndex;
+            const LvlTableVector position = loadClothVector(positions + particle);
+            const float distance = clothFaceDistance(current, vertices, position);
+            const uint32_t edge = clothFaceEdge(current, vertices, position, distance);
+            const bool above = clothAboveMesh(distance, expansion);
+            const ClothMeshFace* contact = current;
+            if (edge != 0xFFFF) {
+                const uint16_t nextIndex = current->neighbours[edge];
+                if (nextIndex == 0xFFFF)
+                    break;
+                contact = faces + nextIndex;
+                const float nextDistance = clothFaceDistance(contact, vertices, position);
+                if (clothAboveMesh(nextDistance, expansion)) {
+                    if (above)
+                        break;
+                    cache[particle] = nextIndex;
+                    continue;
+                }
+                const uint32_t nextEdge = clothFaceEdge(contact, vertices, position, nextDistance);
+                if (nextEdge != 0xFFFF) {
+                    // The original consults the CURRENT face's adjacency here,
+                    // even though the edge was selected on the next face.
+                    if (above && current->neighbours[nextEdge] == currentIndex)
+                        break;
+                    cache[particle] = nextIndex;
+                    continue;
+                }
+                if (!above && !(distance >= -0.05f)) {
+                    cache[particle] = current->neighbours[0];
+                    break;
+                }
+                cache[particle] = nextIndex;
+            } else {
+                if (above)
+                    break;
+                if (!(distance >= -0.05f)) {
+                    cache[particle] = current->neighbours[0];
+                    break;
+                }
+            }
+
+            // Both paths use the FIRST face's distance, even for a contact on
+            // its neighbour. Reduction/expansion and previous position are live
+            // loads, so an earlier response may change later inputs via aliasing.
+            const LvlTableVector shrink = loadClothVector(reduction);
+            const LvlTableVector padding = loadClothVector(expansion);
+            LvlTableVector step;
+            for (int lane = 0; lane < 4; ++lane) {
+                const float extent = flushVmx(flushVmx(padding.lane[lane]) - flushVmx(shrink.lane[lane]));
+                const float depth = flushVmx(extent - distance);
+                const float zero = flushVmx(lbl_82606750[lane]);
+                step.lane[lane] = depth != depth || zero != zero ? depth + zero
+                                      : (depth > zero ? depth : zero);
+            }
+            const LvlTableVector normal = loadClothVector(&contact->normal);
+            const LvlTableVector origin = loadClothVector(previous + particle);
+            lvlTable_7008_2h(reinterpret_cast<const LvlTableMotionView*>(self), positions + particle,
+                             mode, normal, step, origin);
+            break;
+        }
+    }
+}
 
 // @ 0x82337008
 void lvlTable_7008_2h(const LvlTableMotionView* self, LvlTableVector* position, uint32_t mode,

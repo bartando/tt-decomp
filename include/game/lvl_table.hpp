@@ -127,3 +127,52 @@ static_assert(offsetof(ClothCapsuleBoundView, axisDirection) == 0xB0);
 void clothCollideCapsule(const ClothCapsuleCollisionView* self, const ClothCapsuleBoundView* bound,
                          uint32_t group, const LvlTableVector* reduction,
                          const LvlTableVector* expansion, uint32_t mode);
+
+// Triangle-mesh collision views inferred from the type-3/type-12 bound dispatch.
+// Face indices are cached per particle; 0xFFFF is the absent-face sentinel.
+struct ClothMeshFace {
+    LvlTableVector normal;                 // +0x00
+    uint16_t vertices[3];                  // +0x10
+    uint8_t _pad16[2];
+    uint16_t neighbours[3];                // +0x18
+    uint8_t _pad1E[2];
+};
+
+struct ClothMeshBoundView {
+    uint8_t _pad00[0x74];
+    const LvlTableVector* vertices;        // +0x74
+    uint8_t _pad78[4];
+    const ClothMeshFace* faces;            // +0x7C
+};
+
+struct ClothMeshCollisionView {
+    uint8_t _pad00[8];
+    int32_t firstMovableParticle;          // +0x08
+    uint8_t _pad0C[0x10];
+    LvlTableVector* positions;             // +0x1C
+    uint16_t particleCount;                // +0x20
+    uint8_t _pad22[2];
+    const LvlTableVector* previousPositions; // +0x24
+    uint8_t _pad28[4];
+    uint16_t* const* cachedFaces;          // +0x2C, first cache is used
+};
+
+static_assert(sizeof(ClothMeshFace) == 0x20);
+static_assert(offsetof(ClothMeshFace, vertices) == 0x10);
+static_assert(offsetof(ClothMeshFace, neighbours) == 0x18);
+#if UINTPTR_MAX == UINT32_MAX
+static_assert(offsetof(ClothMeshBoundView, vertices) == 0x74);
+static_assert(offsetof(ClothMeshBoundView, faces) == 0x7C);
+static_assert(offsetof(ClothMeshCollisionView, firstMovableParticle) == 0x08);
+static_assert(offsetof(ClothMeshCollisionView, positions) == 0x1C);
+static_assert(offsetof(ClothMeshCollisionView, particleCount) == 0x20);
+static_assert(offsetof(ClothMeshCollisionView, previousPositions) == 0x24);
+static_assert(offsetof(ClothMeshCollisionView, cachedFaces) == 0x2C);
+#endif
+
+// @ 0x82339240, formerly pongCreatureInst_9240_2hr (inferred name).
+// Ordinary pointer ABI: r3=self, r4=bound, r5=reduction, r6=expansion, r7=mode.
+// The response callee needs the internal VMX bridge documented above. All vector
+// loads round their address down to 16 bytes, including unaligned array bases.
+void clothCollideMesh(const ClothMeshCollisionView* self, const ClothMeshBoundView* bound,
+                      const LvlTableVector* reduction, const LvlTableVector* expansion, uint32_t mode);
