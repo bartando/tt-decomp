@@ -402,6 +402,10 @@ float g_hitVectorFlip = 1.0f;
 
 uint32_t g_swingCountFlag = 0;
 uint8_t g_swingInFlightFlag = 0;  // @ 0x8260633C  the asm only does lbz/stb
+int32_t g_playerPoseEaseMode = 0;  // @ 0x82606330
+uint8_t g_playerPoseChannelBlend = 0;  // @ 0x82606334
+// Two 80-byte slot records, populated at runtime; the boot image is all zero.
+uint8_t g_playerSlotPoseData[160] = {0};  // @ 0x82619990
 float g_swingPhaseThreshold = 0.0f;
 const char** g_shotTypeNames = NULL;
 const char* g_szServeStartedTypeName = "ServeStarted";
