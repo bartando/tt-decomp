@@ -138,7 +138,8 @@ public:
     virtual void MarkDirty();  // @ 0x823FB760 | size: 0x44
     virtual void SetVisible();  // @ 0x823FB150 | size: 0xC
     void EnumerateMembers() override;  // @ 0x823FED18 | size: 0xD0
-    virtual void FindOrCreateChildByDepth();  // @ 0x823FC908 | size: 0x144
+    virtual swfINSTANCE* FindOrCreateChildByDepth(uint32_t depth = 0, uint32_t character = 0,
+                                                 void* definition = nullptr);  // @ 0x823FC908 | size: 0x144
     int GetMemberCount() override;  // @ 0x823FB160 | size: 0x28
     int VisitMembers() override;  // @ 0x823FBF98 | size: 0x28
     bool GetMember(const char* name, void* result) override;  // @ 0x823FB970 | size: 0x624

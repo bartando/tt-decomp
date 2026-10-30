@@ -180,7 +180,8 @@ struct swfINSTANCE {
     virtual void MarkDirty();  // [4] @ 0x823fb760
     virtual void SetVisible();  // [5] @ 0x823fb150
     virtual void EnumerateMembers();  // [6] @ 0x823fed18
-    virtual void FindOrCreateChildByDepth();  // [7] @ 0x823fc908
+    virtual swfINSTANCE* FindOrCreateChildByDepth(uint32_t depth = 0, uint32_t character = 0,
+                                                 void* definition = nullptr);  // [7] @ 0x823fc908
     virtual int GetMemberCount();  // [8] @ 0x823fb160
     virtual int VisitMembers();  // [9] @ 0x823fbf98
     virtual bool GetMember(const char* name, void* result);  // [10] @ 0x823fb970
