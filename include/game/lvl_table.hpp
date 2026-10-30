@@ -50,3 +50,26 @@ void lvlTable_7008_2h(const LvlTableMotionView* self, LvlTableVector* position, 
 // points is rounded down to 16-byte alignment; output may equal indices.
 uint32_t lvlTable_7D28_2h(int32_t count, const LvlTableVector* points, const uint32_t* indices,
                         uint32_t* output, const LvlTableVector& distanceLimitSq, const LvlTableVector& origin);
+
+// Partial cloth-controller view consumed by 0x823D85B8; names are inferred.
+struct LvlTableConstraintView {
+    uint8_t _pad00[0xC];
+    const uint32_t* particleIndices;      // +0x0C
+    uint8_t _pad10[0x20];
+    const LvlTableVector* responseBase;   // +0x30
+    const LvlTableVector* restLength;     // +0x34
+    const LvlTableVector* responseScale;  // +0x38
+};
+
+#if UINTPTR_MAX == UINT32_MAX
+static_assert(offsetof(LvlTableConstraintView, particleIndices) == 0x0C);
+static_assert(offsetof(LvlTableConstraintView, responseBase) == 0x30);
+static_assert(offsetof(LvlTableConstraintView, restLength) == 0x34);
+static_assert(offsetof(LvlTableConstraintView, responseScale) == 0x38);
+#endif
+
+// Original internal ABI: r3=self, r4=constraint, r5=positions, v1=anchor.
+// Marshal v1 into the explicit reference (r6 in the portable entry). All vector
+// array bases are rounded down to 16 bytes, matching lvx/stvx addressing.
+void lvlTable_85B8_2hr(const LvlTableConstraintView* self, uint32_t constraint,
+                       LvlTableVector* positions, const LvlTableVector& anchor);
