@@ -156,31 +156,35 @@ void crAnimDofVector3::CopyFrom(void* sourceAnimDof) {
 // Similar to Blend but takes another DOF object as source instead of evaluating channels.
 // ─────────────────────────────────────────────────────────────────────────────
 void crAnimDofVector3::BlendFrom(void* sourceAnimDof, float blendFactor) {
-    // Early exit if blend factor is too small
-    if (blendFactor <= 0.0f) {
+    if (!(blendFactor > 0.001f)) {
         return;
     }
-    
-    // Get source vector via virtual call to slot 14
+
     void** vtable = *reinterpret_cast<void***>(sourceAnimDof);
     typedef float* (*GetVectorFunc)(void*);
-    GetVectorFunc getVectorFn = reinterpret_cast<GetVectorFunc>(vtable[14]);
-    float* sourceVec = getVectorFn(sourceAnimDof);
-    
-    // Get current vector
+    float* sourceVec = reinterpret_cast<GetVectorFunc>(vtable[14])(sourceAnimDof);
     float* currentVec = reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(this) + 16);
-    
-    // Perform blending
-    if (blendFactor < 1.0f) {
-        // Lerp: current + (source - current) * blend
-        currentVec[0] += (sourceVec[0] - currentVec[0]) * blendFactor;
-        currentVec[1] += (sourceVec[1] - currentVec[1]) * blendFactor;
-        currentVec[2] += (sourceVec[2] - currentVec[2]) * blendFactor;
+
+    if (blendFactor < 0.999f) {
+        // VMX flushes subnormal operands and results, and rounds the product first.
+        auto flush = [](float value) {
+            uint32_t bits;
+            __builtin_memcpy(&bits, &value, sizeof(bits));
+            if ((bits & 0x7f800000u) == 0) {
+                bits &= 0x80000000u;
+                __builtin_memcpy(&value, &bits, sizeof(value));
+            }
+            return value;
+        };
+        const float factor = flush(blendFactor);
+        for (int i = 0; i < 4; ++i) {
+            float current = flush(currentVec[i]);
+            float difference = flush(flush(sourceVec[i]) - current);
+            volatile float product = difference * factor;
+            currentVec[i] = flush(flush(product) + current);
+        }
     } else {
-        // Full blend - just copy source
-        currentVec[0] = sourceVec[0];
-        currentVec[1] = sourceVec[1];
-        currentVec[2] = sourceVec[2];
+        __builtin_memcpy(currentVec, sourceVec, 16);
     }
 }
 
