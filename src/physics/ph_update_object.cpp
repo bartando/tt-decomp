@@ -27,6 +27,7 @@
  */
 
 #include "ph_physics.hpp"
+#include "rage/mat44.hpp"
 
 // ── Global Declarations ─────────────────────────────────────────────────────
 
@@ -71,11 +72,6 @@ extern void pongDrawBucket_AddEntry(void* bucket, void* renderable,
 // Submits a shadow-casting object to the shadow map system
 extern void pongShadowMap_F010_g(void* shadowMap, void* drawable,
     const void* transform, void* context); // @ 0x8213F010
-
-// Applies a locomotion/skinning matrix transform to a 4×4 matrix
-// Multiplies the input matrix by a 4×3 transform to apply skeletal animation
-extern void LocomotionStateAnim_3AD8_g(void* matrix,
-    void* animTransform); // @ 0x820C3AD8
 
 /**
  * phUpdateObject::ReleaseFrame(flags) — vtable slot 0
@@ -377,7 +373,7 @@ void phUpdateObject::UpdateDrawable(void* frameData, uint32_t flags) {
         __builtin_memcpy(matrix, frameData, sizeof(matrix));
         uint8_t* animation = static_cast<uint8_t*>(g_animState);
         if (animation[24])
-            LocomotionStateAnim_3AD8_g(matrix, animation + 32);
+            rage::mat44ComposeAffineInPlace(matrix, animation + 32);
         reinterpret_cast<UpdateFn>((*static_cast<void***>(m_pDrawable))[5])(
             m_pDrawable, matrix, flags, m_visFlags, 0);
     }

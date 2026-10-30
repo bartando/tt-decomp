@@ -19,7 +19,7 @@ def draw(ctx):
 
 CALLS = {
     "_RtlCheckStack12": run(transparent=True),
-    "LocomotionStateAnim_3AD8_g": model(transform, args=("r3", "r4"), deref={"r3": 64, "r4": 64}),
+    "mat44ComposeAffineInPlace": model(transform, args=("r3", "r4"), deref={"r3": 64, "r4": 64}),
     "drawable.vfn_5": model(draw, args=("r3", "r4", "r5", "r6", "r7")),
 }
 
