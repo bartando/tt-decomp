@@ -37,6 +37,8 @@ static_assert(__builtin_offsetof(pongLightState, count) == 0x210, "light count o
 pongLightState* pongLightState_CopyLights(pongLightState* dst, const pongLightState* src); // @ 0x8213E110
 void pongLightState_Apply(const pongLightState* state);  // @ 0x82154320
 
+void pongRender_ResetState(int32_t pass);  // @ 0x82225590
+
 // Structs that carry the game's vtable as an explicit `vtable` member list
 // their slots as plain (non-virtual) methods: a C++ virtual would add a hidden
 // vptr in front of `vtable` and shift every member by 4.
