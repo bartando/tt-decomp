@@ -571,6 +571,10 @@ extern "C" {
                                     uint32_t entryId,
                                     uint32_t flags);        // @ 0x8215AF90
     extern uint32_t g_grmShaderInstance_previous;          // @ 0x825EBC44
+    extern uint32_t g_grmShaderInstance_activeEntry;       // @ 0x825EBC48
+    // Same object as grc_data.cpp's g_grcRenderObjects, which is declared too
+    // small: Select reads word 4.
+    extern uint32_t g_grmShaderInstance_context[5];        // @ 0x82617E60
 
     // SDA-resident globals used by the grmShaderFx runtime.
     extern uint32_t g_grmShaderFx_activeState;      // @ 0x825EBA68
@@ -675,8 +679,8 @@ void grmShaderInstance_Unbind(uint32_t instance) {
 
 // @ 0x8215AE90
 void grmShaderInstance_Select(uint32_t /* context */, uint32_t entryId) {
-    auto* context = reinterpret_cast<uint32_t*>(0x82617E60u);
-    auto& activeEntry = *reinterpret_cast<uint32_t*>(0x825EBC48u);
+    uint32_t* context = g_grmShaderInstance_context;
+    uint32_t& activeEntry = g_grmShaderInstance_activeEntry;
     const uint32_t previous = g_grmShaderInstance_previous;
     if (previous != 0) {
         if (previous == context[0] && entryId == activeEntry) {

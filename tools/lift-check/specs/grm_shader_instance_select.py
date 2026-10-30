@@ -5,6 +5,11 @@ FUNCTION = "grmShaderInstance_Select"
 ADDRESS = 0x8215AE90
 SOURCE = "src/rage/rage_grm.cpp"
 TRIALS = 1000
+EXTERNS = {
+    "g_grmShaderInstance_previous": 0x825EBC44,
+    "g_grmShaderInstance_activeEntry": 0x825EBC48,
+    "g_grmShaderInstance_context": 0x82617E60,
+}
 CALLS = {
     "grmShaderInstance_Unbind": stub(ret="void", args=("r3",)),
     "rage_8C48": stub(ret="void", args=("r3", "r4")),
