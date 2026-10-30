@@ -762,8 +762,7 @@ bool parStreamInXml::ReadFloat(const char* name, float* value) {
     // text-to-float pipeline for every "<x>123.4</x>"-shaped XML payload
     // plus the mid-array element reader. Involves buffer refill, whitespace
     // run skip, sign/decimal/exponent scan, and fallback to the lbl_8202D110
-    // default-float constant on parse failure. Lift deferred: needs pairing
-    // with fiAsciiTokenizer_2628_g FP classification state machine.
+    // default-float constant on parse failure. Lift deferred.
     (void)name; (void)value;
     return false;
 }
@@ -929,7 +928,7 @@ bool parStreamOutXml::BeginArray(const char* name, uint32_t* count) {
  *   2 : int16     — "%hd" with big-endian swap
  *   3 : uint16    — "%hu" with big-endian swap
  *   4 : int8      — "%hhd"
- *   5 : float     — "%g" via fiAsciiTokenizer_2628_g
+ *   5 : float     — "%g"
  *   6 : uint8/bool — "%s" ("true"/"false") or raw byte
  *   7 : Vector2   — "%g %g"
  *   8 : Vector3   — "%g %g %g"
@@ -939,8 +938,7 @@ bool parStreamOutXml::BeginArray(const char* name, uint32_t* count) {
  * All paths emit indentation via util_WriteIndentation, separator CRLF,
  * and terminate with fiAsciiTokenizer_CloseElement. Lift deferred — the
  * baseline EndObject fall-through is sound for non-array close but will
- * drop the typed payload tail. Revisit when fiAsciiTokenizer_2628_g
- * gains its real FP-classification body.
+ * drop the typed payload tail.
  */
 void parStreamOutXml::EndArray() {
     EndObject();

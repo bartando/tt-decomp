@@ -20,6 +20,7 @@
 uint32_t _fp_set_fpscr_bits(uint32_t desired, uint32_t mask);  // @ 0x82436530
 int crt_fp_classify(double value);  // @ 0x824357A8
 double crt_fp_adjust_exponent(uint32_t unused, int delta, double value);  // @ 0x82435770
+double crt_fp_round(double value);  // @ 0x82436B30
 double crt_fp_sqrt(double value);  // @ 0x82436528
 double crt_fp_quiet_nan(int operation, uint32_t unused, uint32_t control, double value);  // @ 0x82436260
 // flags in r3, operation in r4, saved control in r7; value/result in f1/f2.
@@ -201,6 +202,55 @@ double crt_cos(double x) {
     }
     const double result = shifted - kSinCos.maxArg >= 0.0 ? kTrigNaN : c;
     return ax == kSinCos.zero ? static_cast<double>(kSinCos.one) : result;
+}
+
+// @ 0x82432628 — CRT tan, formerly misidentified as a tokenizer.
+double crt_tan(double x) {
+    constexpr uint32_t MASK = 0xC007FEFFu;
+    const uint32_t control = _fp_set_fpscr_bits(0xF8, MASK);
+    if ((Bits(x) & 0x7FF0000000000000ull) == 0x7FF0000000000000ull) {
+        const int kind = crt_fp_classify(x);
+        if (kind == 3) {
+            return crt_fp_quiet_nan(32, 0, control, x);
+        }
+        return crt_fp_exception(8, 32, 0, 0, control, x,
+                                kind > 0 && kind <= 2 ? kTrigNaN : x + 1.0);
+    }
+    if (x == 0.0) {
+        _fp_set_fpscr_bits(control, MASK);
+        return x;
+    }
+    if (__builtin_fabs(x) > 0x1.1c5831add62e4p+28) {
+        return crt_fp_exception(40, 32, 0, 0, control, x, kTrigNaN);
+    }
+    const double n = crt_fp_round(x * 0x1.45f306dc9c883p-1);
+    const double r1 = -Fma(0x1.921fb54400000p+0, n, -x);
+    const double r = -Fma(0x1.0b4611a600000p-34, n, -r1);
+    double numerator = r;
+    double denominator = 1.0;
+    if (__builtin_fabs(r) < 0x1.6a09e667f3bcdp-27) {
+        if ((Bits(r) & 0x7FF0000000000000ull) == 0 && r != 0.0) {
+            const double adjusted = crt_fp_adjust_exponent(0, 1536, r);
+            return crt_fp_exception(18, 32, 0, 0, control, x, adjusted);
+        }
+    } else {
+        const double z = r * r;
+        double p = -Fma(z, 0x1.2bab72ea2c724p-16, -0x1.c0e82a63baadfp-9);
+        double q = Fma(z, 0x1.0b774f07678e9p-21, -0x1.46f6499094841p-12);
+        p = Fma(p, z, -0x1.112b5e54d0900p-3);
+        q = Fma(q, z, 0x1.a479ea17e2159p-6);
+        p = Fma(p, z, 1.0);
+        q = Fma(q, z, -0x1.ddeb047fbd9d5p-2);
+        numerator = p * r;
+        denominator = Fma(q, z, 1.0);
+    }
+    const double result = (ConvertTruncate(__builtin_fabs(n)) & 1) != 0
+        ? denominator / -numerator : numerator / denominator;
+    if ((control & 8) == 0) {
+        return crt_fp_exception(16, 32, 0, 0, control, x, result);
+    }
+    _fp_set_fpscr_bits(control, MASK);
+    return result;
 }
 
 // @ 0x82430FE0 — atan2(y, x) (phBoundCapsule_0FE0_g)
