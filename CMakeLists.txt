@@ -75,6 +75,7 @@ set(SOURCES
     src/rage/audio/xact_sound.cpp
     src/rage/audio/xaudio_effect_buffer.cpp
     src/rage/audio/xaudio_effect.cpp
+    src/rage/audio/xaudio_resampler.cpp
     src/rage/core/fsmMachine.c
     src/rage/core/game_loop.c
     src/rage/core/hsm.cpp
