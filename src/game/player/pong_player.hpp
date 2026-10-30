@@ -97,6 +97,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <cstddef>
 
 // @ 0x821C9C00 — resolve a match player slot to its gdCharacter data.
 // The incoming match pointer is unused; player selection is global.
@@ -126,7 +127,35 @@ struct pongTimingSubState {
 struct pongRecoveryState;
 struct pongAnimState;
 struct pongCreatureState;
-struct pongSwingData;
+// Swing record: offsets recovered from 0x820D42E0 and 0x820C73E8.
+// Only observed fields are named. The target is a full stvx (four lanes).
+struct pongSwingData {
+    uint8_t _pad00[0x24];
+    int32_t m_swingType;             // +0x024
+    uint8_t _pad28[0x98];
+    void* m_pStrengthSource;         // +0x0C0, vtable slot 10 returns strength
+    uint8_t _padC4[0x8C];
+    void* m_pCreature;               // +0x150, pose at creature+0xA4
+    uint8_t _pad154;
+    uint8_t m_bAlternateTriggered; // +0x155, alternate-input flag
+    uint8_t m_bTriggered;            // +0x156
+    uint8_t _pad157;
+    float m_swingStrength;           // +0x158
+    uint8_t _pad15C[4];
+    float m_swingVec[4];             // +0x160, includes w
+    uint8_t _pad170[16];
+    float m_baseDirection[4];        // +0x180
+};
+#if UINTPTR_MAX == 0xFFFFFFFFu
+static_assert(offsetof(pongSwingData, m_pStrengthSource) == 0xC0);
+static_assert(offsetof(pongSwingData, m_pCreature) == 0x150);
+static_assert(offsetof(pongSwingData, m_bAlternateTriggered) == 0x155);
+static_assert(offsetof(pongSwingData, m_bTriggered) == 0x156);
+static_assert(offsetof(pongSwingData, m_swingStrength) == 0x158);
+static_assert(offsetof(pongSwingData, m_swingVec) == 0x160);
+static_assert(offsetof(pongSwingData, m_baseDirection) == 0x180);
+static_assert(sizeof(pongSwingData) == 0x190);
+#endif
 struct pongPlayerState;
 struct vec3 {
     float x, y, z;
@@ -440,3 +469,8 @@ extern void pongPlayer_AE10_g(void* slotsBase, int32_t slotId,
 extern void pongPlayer_4438_fw(void* transObj);                      // UpdateTransitionBlend @ 0x82384438
 extern void pongPlayer_D6C8_fw(void* animTransObj);                  // ResetAnimTransitionState @ 0x8239D6C8
 extern void pongPlayer_06A0_g(float* outVec, pongPlayer* player);   // ComputeSwingTargetDelta @ 0x821906A0
+
+// r4 is unused by 42E0; the outputs are r5/r6, not r4/r5.
+extern "C" void pongPlayer_42E0_g(pongSwingData*, void* unused, float*, vec3*, float); // @ 0x820D42E0
+extern "C" uint32_t pongPlayer_73E8_g(pongPlayer*, float); // @ 0x820C73E8
+extern "C" vec3* pongPlayer_AB48_g(void* out, void* bound); // @ 0x820CAB48

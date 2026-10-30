@@ -55,31 +55,12 @@ extern void* g_pButtonStateTable;        // button state table (int32_t array)
 extern const float g_kOneMinusAlpha;     // constant
 // pongPlayer_ClampSwingToBounds: r3=playerState ptr, r4=swingVec, r5=uint8_t suppressFlip
 extern void pongPlayer_ClampSwingToBounds(void* playerState, vec3* swingVec, uint8_t suppressFlip);
-// pongPlayer_GetRacketPosition: r3=out vec3, r4=physBound — both saved in prologue
-extern void pongPlayer_GetRacketPosition(vec3* out, void* physBound);
 // pongPlayer_SelectSwingTarget: returns int; r3=playerState, r4=int, r5=swingStr*, r6=targetDir*, r7=int
 extern int  pongPlayer_SelectSwingTarget(void* playerState, int r4, vec3* swingStrength, vec3* targetDir, int r5);
-// pongPlayer_ProcessSwingInput: r3=this, f1=float  (confirmed from call site)
-extern void pongPlayer_ProcessSwingInput(pongPlayer* p, float f);
-// pongPlayer_ComputeSwingStrength: r3=swingData, r5=outStrength, r6=outTarget, f1=alpha
-extern void pongPlayer_ComputeSwingStrength(void* swingData, vec3* outStrength, vec3* outTarget, float alpha);
 extern void game_D468(void* obj, vec3* v);               // geometry helper
 extern bool pongPlayer_IsLocoStateReady(void* locoState);          // loco check
 extern int  io_Input_poll_9D68(void* inputObj);           // 0=active input
 extern void pongLerpQueue_Update(void* queue);            // lerp queue update
-
-struct pongSwingData {
-    uint32_t vtable_ptr;  // +0   (32-bit game ptr kept as uint32 for layout)
-    uint8_t  _pad1[337];  // +4..+340
-    uint8_t  _pad341;     // +341
-    uint8_t  m_bTriggered;   // +342  byte flag — 1 = swing triggered
-    uint8_t  _pad343;     // +343
-    float    m_swingStrength; // +344  swing power
-    uint8_t  _pad348[4];  // +348..+351
-    float    m_swingVec[3]; // +352  target vec3
-};
-
-
 
 extern void game_CD20(void* recoveryState);          // flush recovery @ 0x820DCD20
 extern void crAnimBlenderState_Init(void* animSubState);  // reset phase-blocked @ 0x8224C810
@@ -649,11 +630,11 @@ void pongPlayer::ProcessSwingDecision(int r4, int r5,
 
         if (!inputActive) {
             // Input button is down — read the current input vector.
-            pongPlayer_ComputeSwingStrength(m_pPlayerState->m_pSwingData,
-                              &swingStrength, &targetDir, g_kOneMinusAlpha);
+            pongPlayer_42E0_g(m_pPlayerState->m_pSwingData, m_pPlayerState,
+                              &swingStrength.x, &targetDir, g_kOneMinusAlpha);
         } else {
             // No input — predict target position from physics.
-            pongPlayer_GetRacketPosition(&targetDir, m_pPhysicsBound);
+            pongPlayer_AB48_g(&targetDir, m_pPhysicsBound);
         }
     }
 
@@ -668,19 +649,15 @@ void pongPlayer::ProcessSwingDecision(int r4, int r5,
         bool inputActive2 = !io_Input_poll_9D68(g_pInputObj);
 
         if (!inputActive2) {
-            pongPlayer_ComputeSwingStrength(m_pPlayerState->m_pSwingData,
-                              &swingStrength, &targetDir, g_kOneMinusAlpha);
+            pongPlayer_42E0_g(m_pPlayerState->m_pSwingData, m_pPlayerState,
+                              &swingStrength.x, &targetDir, g_kOneMinusAlpha);
 
             // Mark swing triggered on swing data; clear swing active flag.
             pongSwingData* sd = m_pPlayerState->m_pSwingData;
             sd->m_swingStrength  = swingStrength.x;  // float at +344
             sd->m_bTriggered     = 1;                // byte at +342
-            // NOTE: pongSwingData at +352 is m_swingVec (float[3]) per the
-            //       struct definition near the top of this file. Use the typed
-            //       field directly now that the layout is anchored.
-            sd->m_swingVec[0] = targetDir.x;
-            sd->m_swingVec[1] = targetDir.y;
-            sd->m_swingVec[2] = targetDir.z;
+            // The original stvx copies w as well as xyz.
+            __builtin_memcpy(sd->m_swingVec, &targetDir, sizeof(targetDir));
 
             m_bSwingActive = 0;
             SetSwingActiveState(false);
@@ -711,7 +688,7 @@ void pongPlayer::ProcessSwingDecision(int r4, int r5,
 
     if (result == 5) {
         // Swing committed — start the animation and mark active.
-        pongPlayer_ProcessSwingInput(this, g_kZero);
+        pongPlayer_73E8_g(this, g_kZero);
         return;
     }
 
@@ -5018,20 +4995,6 @@ void pongPlayer_AddToSyncedFloatClamped(void* syncRec, float delta, uint32_t bit
  *       into two player records; full lift still requires 7CC0_g and 05A8_g.
  */
 extern "C" void pongPlayer_9EC8_g(void* /*this*/);
-
-/**
- * pongPlayer_AB48_g @ 0x820CAB48 | size: 0x130 (304 bytes)
- *
- * SIMD (vmx128) vector-math helper.  Reads a v3 at (arg1+0x70)+0xA4+148
- * through two vtable indirections, falls through to a scalar fallback that
- * calls game_AF18 (court-bounds sample), then blends the two via
- * pongMatchSettings_GetCourtBounds and clamps the output into out[0..3].
- *
- * TODO(researched): game_AF18 still needs validation. A proper vec4 typedef is already partially
- *       in place (the `vec3` struct with _pad float), but the multi-precision
- *       SIMD refinement steps need a dedicated AltiVec lift. Deferred.
- */
-extern "C" void pongPlayer_AB48_g(void* outVec, void* playerLike);
 
 /**
  * pongPlayer_94F8_wrh @ 0x820D94F8 | size: 0xE4 (228 bytes)
