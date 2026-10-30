@@ -8,8 +8,59 @@
 #endif
 
 extern "C" const float lbl_8202D110; // @ 0x8202D110
+extern "C" {
+extern const uint32_t lbl_82619BE0[4]; // @ 0x82619BE0 — xyz mask
+extern const uint32_t lbl_82619BD0[4]; // @ 0x82619BD0 — homogeneous w = 1
+extern const float lbl_82606740[4];    // @ 0x82606740 — zero vector
+extern const uint32_t g_boxFaceIndices[24]; // @ 0x825D4A90
+}
 
 namespace rage {
+
+// These names describe the actual helpers, rather than their capsule/animation auto-names.
+extern void buildBoxCorners(float (*out)[4], const float* center, const float* size); // @ 0x82147EF8
+extern void invertAffineInPlace(float (*matrix)[4]); // @ 0x820D7B30
+// LTCG leaves the output in r8, with unused integer slots r4..r7.
+extern void buildClipFrustumPlanes(void* context, uint32_t, uint32_t, uint32_t, uint32_t,
+                                   float (*planes)[4], float nearClip, float farClip,
+                                   float fov, float aspect, float offset); // @ 0x821480C0
+
+namespace {
+
+float flushClipVmx(float value) {
+    uint32_t bits;
+    __builtin_memcpy(&bits, &value, sizeof(bits));
+    if ((bits & 0x7F800000u) == 0) {
+        bits &= 0x80000000u;
+        __builtin_memcpy(&value, &bits, sizeof(value));
+    }
+    return value;
+}
+
+float clipHomogeneousLane(float value, unsigned lane) {
+    uint32_t bits;
+    __builtin_memcpy(&bits, &value, sizeof(bits));
+    bits = (bits & lbl_82619BE0[lane]) | lbl_82619BD0[lane];
+    __builtin_memcpy(&value, &bits, sizeof(value));
+    return value;
+}
+
+void transformClipPoint(float* point, const float (*matrix)[4]) {
+    float homogeneous[4];
+    for (unsigned lane = 0; lane < 4; ++lane)
+        homogeneous[lane] = clipHomogeneousLane(point[lane], lane);
+    for (unsigned axis = 0; axis < 3; ++axis) {
+        // vmsum4fp128 accumulates all four products before rounding to float.
+        double sum = 0.0;
+        for (unsigned row = 0; row < 4; ++row)
+            sum += static_cast<double>(flushClipVmx(homogeneous[row])) * flushClipVmx(matrix[row][axis]);
+        point[axis] = flushClipVmx(static_cast<float>(sum));
+    }
+    // The original merge instructions put the input x, not homogeneous w, here.
+    point[3] = homogeneous[0];
+}
+
+} // namespace
 
 // @ 0x82147A88
 void clipPolygonToPlane(void* /*context*/, int32_t vertexCount, const float (*vertices)[4],
@@ -116,6 +167,74 @@ void clipPolygonToFrustum(void* context, int32_t /*unusedCount*/, const float (*
             __builtin_memcpy(scratch, output, static_cast<unsigned>(count) * sizeof(scratch[0]));
         }
     }
+}
+
+// clipAabbToFrustum @ 0x821481D8 | size: 0x42C
+// Inferred name: called by the active-camera wrapper at 0x82148608 and the camera
+// fitting path at 0x82148CD8. The generated name phBoundCapsule_81D8_g is misleading.
+bool clipAabbToFrustum(void* context, float (*box)[4], const float (*cameraToWorld)[4],
+                       uint32_t /*r6*/, uint32_t /*r7*/, uint32_t /*r8*/, uint32_t /*r9*/,
+                       const float* referencePoint, float nearClip, float farClip, float fov, float aspect) {
+    bool empty = true;
+    for (unsigned lane = 0; lane < 4; ++lane) {
+        uint32_t bits;
+        __builtin_memcpy(&bits, &box[1][lane], sizeof(bits));
+        bits &= lbl_82619BE0[lane];
+        float extent;
+        __builtin_memcpy(&extent, &bits, sizeof(extent));
+        empty &= flushClipVmx(extent) == 0.0f;
+    }
+    if (empty)
+        return false; // Unlike rejection below, an empty input is left untouched.
+
+    alignas(16) float corners[8][4];
+    buildBoxCorners(corners, box[0], box[1]);
+    alignas(16) float worldToCamera[4][4];
+    __builtin_memcpy(worldToCamera, cameraToWorld, sizeof(worldToCamera));
+    invertAffineInPlace(worldToCamera);
+    for (unsigned corner = 0; corner < 8; ++corner)
+        transformClipPoint(corners[corner], worldToCamera);
+
+    alignas(16) float planes[6][4];
+    // fsel chooses the 0.1 default for unordered input as well as values above 0.1.
+    const float selectedNear = 0.1f - nearClip >= 0.0f ? nearClip : 0.1f;
+    buildClipFrustumPlanes(context, 0, 0, 0, 0, planes, selectedNear, farClip, fov, aspect, 0.0f);
+    float minimum[3] = {__FLT_MAX__, __FLT_MAX__, __FLT_MAX__};
+    float maximum[3] = {-__FLT_MAX__, -__FLT_MAX__, -__FLT_MAX__};
+    int32_t totalCount = 0;
+    for (unsigned face = 0; face < 6; ++face) {
+        alignas(16) float quad[4][4];
+        for (unsigned vertex = 0; vertex < 4; ++vertex)
+            __builtin_memcpy(quad[vertex], corners[g_boxFaceIndices[face * 4 + vertex]], sizeof(quad[vertex]));
+        int32_t count = 0;
+        alignas(16) float clipped[16][4];
+        clipPolygonToFrustum(context, 4, quad, &count, clipped, planes, referencePoint);
+        totalCount += count;
+        for (int32_t vertex = 0; vertex < count; ++vertex) {
+            transformClipPoint(clipped[vertex], cameraToWorld);
+            for (unsigned axis = 0; axis < 3; ++axis) {
+                const float value = clipped[vertex][axis];
+                // fcmpu + blt/bgt updates on equality and unordered comparisons.
+                if (!(minimum[axis] < value)) minimum[axis] = value;
+                if (!(maximum[axis] > value)) maximum[axis] = value;
+            }
+        }
+    }
+    if (totalCount == 0) {
+        for (unsigned vector = 0; vector < 3; ++vector)
+            __builtin_memcpy(box[vector], lbl_82606740, sizeof(box[vector]));
+        return false;
+    }
+    for (unsigned axis = 0; axis < 3; ++axis) {
+        const float lo = flushClipVmx(minimum[axis]);
+        const float hi = flushClipVmx(maximum[axis]);
+        box[1][axis] = flushClipVmx(hi - lo);
+        const float sum = flushClipVmx(lo + hi);
+        box[0][axis] = flushClipVmx(sum * 0.5f);
+    }
+    // The original writes indeterminate stack words to center.w/size.w on success.
+    // Preserve those padding lanes; the auxiliary vector is untouched on success.
+    return true;
 }
 
 } // namespace rage
