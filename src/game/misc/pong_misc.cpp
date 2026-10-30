@@ -3228,7 +3228,7 @@ exit_final:
 // External graphics helpers
 extern "C" void* rage_A980(void* pDevice);  // @ 0x8235A980 - get/refresh device pointer
 extern "C" void* grc_A088(void* pDevice, int paramA, int paramB); // @ 0x8235A088 - alloc shader constant block
-extern "C" void game_37B0(void* pDevice, int32_t x, int32_t y, int32_t w, int32_t h); // @ 0x823537B0 - set viewport
+extern "C" void grcDevice_SetScissorRect(void* device, int32_t left, int32_t top, int32_t right, int32_t bottom);
 extern "C" void grc_CFD8(void* pDevice, float f1, uint32_t r5, uint32_t r6,
                           void* r7, uint32_t r8, uint32_t r9);  // @ 0x8235CFD8 - dispatch shader pass
 
@@ -3356,7 +3356,7 @@ extern "C" void CCalMoviePlayer_SetupShaderConstants(void* pDevice) {
     int32_t w = (int32_t)((dimB * 2) & 0xFFFFFFFE) >> 17;
     int32_t h = (int32_t)(((dimB >> 15) & 0xFFFE0000) >> 17);
 
-    game_37B0(pDevice, y, x, h, w);
+    grcDevice_SetScissorRect(pDevice, y, x, h, w);
 }
 
 /**
