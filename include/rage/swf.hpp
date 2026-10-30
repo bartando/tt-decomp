@@ -241,9 +241,13 @@ public:
  * Generic Flash object. Base for display list objects that can be
  * instantiated and placed on the stage.
  */
-class swfOBJECT : public swfBASE {
+class swfOBJECT {
 public:
-    virtual ~swfOBJECT();
+    // Retail has one deleting-destructor slot. A C++ virtual destructor would
+    // add a second slot under Itanium and displace Render from retail slot 1.
+    virtual void Destroy(uint32_t flags) = 0;
+    virtual void Render(const void* transform, int mode) = 0;
+    ~swfOBJECT();
 };
 
 /**
@@ -254,7 +258,7 @@ public:
  */
 class swfSPRITE : public swfOBJECT {
 public:
-    virtual ~swfSPRITE();
+    ~swfSPRITE();
 };
 
 /**
@@ -265,7 +269,7 @@ public:
  */
 class swfFONT : public swfOBJECT {
 public:
-    virtual ~swfFONT();
+    ~swfFONT();
 };
 
 /**
@@ -276,7 +280,7 @@ public:
  */
 class swfTEXT : public swfOBJECT {
 public:
-    virtual ~swfTEXT();
+    ~swfTEXT();
 };
 
 /**
@@ -287,7 +291,7 @@ public:
  */
 class swfEDITTEXT : public swfOBJECT {
 public:
-    virtual ~swfEDITTEXT();
+    ~swfEDITTEXT();
 };
 
 /**
@@ -298,7 +302,13 @@ public:
  */
 class swfSHAPE : public swfOBJECT {
 public:
-    virtual ~swfSHAPE();
+    ~swfSHAPE();
+    void Render(const void* transform, int mode) override; // @ 0x82406C58
+
+    uint32_t resourceId;                 // +0x04
+    swfShapeFillState* fills;             // +0x08, 40-byte entries
+    const uint64_t* strokes;              // +0x0C, width +0, ARGB +4
+    const uint32_t* commands;             // +0x10
 };
 
 /**
@@ -309,7 +319,7 @@ public:
  */
 class swfBUTTON : public swfOBJECT {
 public:
-    virtual ~swfBUTTON();
+    ~swfBUTTON();
 };
 
 /**
@@ -320,7 +330,7 @@ public:
  */
 class swfBITMAP : public swfOBJECT {
 public:
-    virtual ~swfBITMAP();
+    ~swfBITMAP();
 };
 
 /**

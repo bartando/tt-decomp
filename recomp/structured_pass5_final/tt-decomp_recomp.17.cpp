@@ -36485,8 +36485,8 @@ loc_82362A60:
 	return;
 }
 
-__attribute__((alias("__imp__rage_2A68"))) PPC_WEAK_FUNC(rage_2A68);
-PPC_FUNC_IMPL(__imp__rage_2A68) {
+__attribute__((alias("__imp__grcPatchVertexFetchInstructions"))) PPC_WEAK_FUNC(grcPatchVertexFetchInstructions);
+PPC_FUNC_IMPL(__imp__grcPatchVertexFetchInstructions) {
 	PPC_FUNC_PROLOGUE();
 	uint32_t var_r25 = 0;
 	uint32_t var_r22 = 0;
@@ -37794,7 +37794,7 @@ PPC_FUNC_IMPL(__imp__rage_32F0) {
 		// stb r11,10433(r31)
 		PPC_STORE_U8(var_r31 + 10433, ctx.r11.u8);
 		// bl 0x82362a68
-		rage_2A68(ctx, base);
+		grcPatchVertexFetchInstructions(ctx, base);
 		// rlwinm r11,r29,2,0,29
 		ctx.r11.u64 = __builtin_rotateleft64(var_r29 | (var_r29 << 32), 2) & 0xFFFFFFFC;
 		// ld r10,12688(r31)
@@ -38176,7 +38176,7 @@ loc_82363678:
 	// mr r3,r31
 	ctx.r3.u64 = var_r31;
 	// bl 0x82362a68
-	rage_2A68(ctx, base);
+	grcPatchVertexFetchInstructions(ctx, base);
 	// lwz r3,40(r30)
 	ctx.r3.u64 = PPC_LOAD_U32(var_r30 + 40);
 	// lwz r11,600(r30)

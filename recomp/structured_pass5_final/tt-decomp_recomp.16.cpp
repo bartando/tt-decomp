@@ -2118,7 +2118,7 @@ loc_8231C46C:
 		// addi r3,r1,80
 		ctx.r3.s64 = ctx.r1.s64 + 80;
 		// bl 0x823fa688
-		phBoundCapsule_A688_g(ctx, base);
+		swfValueToFloat(ctx, base);
 		// lis r11,-32248
 		// lis r10,-32248
 		// addi r6,r1,80
@@ -2160,7 +2160,7 @@ loc_8231C46C:
 		// addi r3,r1,80
 		ctx.r3.s64 = ctx.r1.s64 + 80;
 		// bl 0x823fa688
-		phBoundCapsule_A688_g(ctx, base);
+		swfValueToFloat(ctx, base);
 		// fmuls f0,f1,f29
 		ctx.fpscr.disableFlushMode();
 		ctx.f0.f64 = double(float(ctx.f1.f64 * var_f29));
@@ -18342,7 +18342,7 @@ loc_82324450:
 	// addi r3,r1,80
 	ctx.r3.s64 = ctx.r1.s64 + 80;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// addi r31,r31,1
 	var_r31 = (uint32_t)(var_r31 + 1);
 	// stfs f1,0(r30)

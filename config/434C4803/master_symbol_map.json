@@ -241717,7 +241717,7 @@
       "size": 228
     },
     "0x82362a68": {
-      "name": "rage_2A68",
+      "name": "grcPatchVertexFetchInstructions",
       "type": "function",
       "section": ".text",
       "size": 1500
@@ -258751,7 +258751,7 @@
       "size": 24
     },
     "0x823fa688": {
-      "name": "phBoundCapsule_A688_g",
+      "name": "swfValueToFloat",
       "type": "function",
       "section": ".text",
       "size": 220
@@ -259543,7 +259543,7 @@
       "size": 824
     },
     "0x82406c58": {
-      "name": "swfSHAPE_vfn_1",
+      "name": "swfSHAPE_Render",
       "type": "function",
       "section": ".text",
       "size": 1600
@@ -355010,7 +355010,7 @@
     "phBoundBVH_2718": "0x82362718",
     "phBoundBVH_2858_p39": "0x82362858",
     "phBoundBVH_2980_p39": "0x82362980",
-    "rage_2A68": "0x82362a68",
+    "grcPatchVertexFetchInstructions": "0x82362a68",
     "SinglesNetworkClient_3048_p42": "0x82363048",
     "rage_32F0": "0x823632f0",
     "grc_3410": "0x82363410",
@@ -357845,7 +357845,7 @@
     "ph_A4C8": "0x823fa4c8",
     "SinglesNetworkClient_A5C8_g": "0x823fa5c8",
     "jumptable_823FA5F8": "0x823fa5f8",
-    "phBoundCapsule_A688_g": "0x823fa688",
+    "swfValueToFloat": "0x823fa688",
     "jumptable_823FA6B8": "0x823fa6b8",
     "util_A768_1": "0x823fa768",
     "jumptable_823FA7A4": "0x823fa7a4",
@@ -357977,7 +357977,7 @@
     "pongShadowMap_66C8_wrh": "0x824066c8",
     "pongShadowMap_6778_w": "0x82406778",
     "pongShadowMap_6920_w": "0x82406920",
-    "swfSHAPE_vfn_1": "0x82406c58",
+    "swfSHAPE_Render": "0x82406c58",
     "jumptable_82406D4C": "0x82406d4c",
     "swfCMD_7298_p45": "0x82407298",
     "swfCMD_7378_p45": "0x82407378",

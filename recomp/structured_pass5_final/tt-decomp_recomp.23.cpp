@@ -23243,8 +23243,8 @@ loc_823FA650:
 	return;
 }
 
-__attribute__((alias("__imp__phBoundCapsule_A688_g"))) PPC_WEAK_FUNC(phBoundCapsule_A688_g);
-PPC_FUNC_IMPL(__imp__phBoundCapsule_A688_g) {
+__attribute__((alias("__imp__swfValueToFloat"))) PPC_WEAK_FUNC(swfValueToFloat);
+PPC_FUNC_IMPL(__imp__swfValueToFloat) {
 	PPC_FUNC_PROLOGUE();
 	PPCRegister temp{};
 	// FRAME: size=96, manual
@@ -23770,7 +23770,7 @@ loc_823FAAB4:
 	return;
 loc_823FAAE4:
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// lfs f0,0(r31)
 	ctx.fpscr.disableFlushMode();
 	temp.u32 = PPC_LOAD_U32(var_r31 + 0);
@@ -26736,7 +26736,7 @@ loc_823FC208:
 		// mr r3,r30
 		ctx.r3.u64 = var_r30;
 		// bl 0x823fa688
-		phBoundCapsule_A688_g(ctx, base);
+		swfValueToFloat(ctx, base);
 		// li r7,1
 		ctx.r7.s64 = 1;
 		// stfs f1,112(r31)
@@ -26780,7 +26780,7 @@ loc_823FC260:
 		// mr r3,r30
 		ctx.r3.u64 = var_r30;
 		// bl 0x823fa688
-		phBoundCapsule_A688_g(ctx, base);
+		swfValueToFloat(ctx, base);
 		// li r5,1
 		ctx.r5.s64 = 1;
 		// stfs f1,116(r31)
@@ -26824,7 +26824,7 @@ loc_823FC2B8:
 		// mr r3,r30
 		ctx.r3.u64 = var_r30;
 		// bl 0x823fa688
-		phBoundCapsule_A688_g(ctx, base);
+		swfValueToFloat(ctx, base);
 		// li r11,1
 		ctx.r11.s64 = 1;
 		// stfs f1,104(r31)
@@ -26868,7 +26868,7 @@ loc_823FC310:
 		// mr r3,r30
 		ctx.r3.u64 = var_r30;
 		// bl 0x823fa688
-		phBoundCapsule_A688_g(ctx, base);
+		swfValueToFloat(ctx, base);
 		// li r7,1
 		ctx.r7.s64 = 1;
 		// stfs f1,108(r31)
@@ -27074,7 +27074,7 @@ loc_823FC4B4:
 		// mr r3,r30
 		ctx.r3.u64 = var_r30;
 		// bl 0x823fa688
-		phBoundCapsule_A688_g(ctx, base);
+		swfValueToFloat(ctx, base);
 		// lis r11,-32248
 		ctx.r11.s64 = -2113404928;
 		// lfd f2,-23712(r11)
@@ -29653,7 +29653,7 @@ PPC_FUNC_IMPL(__imp__phBoundCapsule_D888_g) {
 	// stw r11,4(r31)
 	PPC_STORE_U32(var_r31 + 4,/* phBoundCapsule::flags@+0x4 */ ctx.r11.u32);
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// bl 0x824301d8
 	phBoundCapsule_01D8_g(ctx, base);
 	// frsp f0,f1
@@ -29681,7 +29681,7 @@ PPC_FUNC_IMPL(__imp__phBoundCapsule_D8D0_g) {
 	// stw r11,4(r31)
 	PPC_STORE_U32(var_r31 + 4,/* phBoundCapsule::flags@+0x4 */ ctx.r11.u32);
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// bl 0x824302b0
 	phBoundCapsule_02B0_g(ctx, base);
 	// frsp f0,f1
@@ -29709,7 +29709,7 @@ PPC_FUNC_IMPL(__imp__phBoundCapsule_D918_g) {
 	// stw r11,4(r31)
 	PPC_STORE_U32(var_r31 + 4,/* phBoundCapsule::flags@+0x4 */ ctx.r11.u32);
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// bl 0x82432628
 	fiAsciiTokenizer_2628_g(ctx, base);
 	// frsp f0,f1
@@ -29737,7 +29737,7 @@ PPC_FUNC_IMPL(__imp__phBoundCapsule_D960_g) {
 	// stw r11,4(r31)
 	PPC_STORE_U32(var_r31 + 4,/* phBoundCapsule::flags@+0x4 */ ctx.r11.u32);
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// bl 0x82430ef8
 	phBoundCapsule_0EF8_g(ctx, base);
 	// frsp f0,f1
@@ -29765,7 +29765,7 @@ PPC_FUNC_IMPL(__imp__phBoundCapsule_D9A8_g) {
 	// stw r11,4(r31)
 	PPC_STORE_U32(var_r31 + 4,/* phBoundCapsule::flags@+0x4 */ ctx.r11.u32);
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// bl 0x82430e90
 	phBoundCapsule_0E90_g(ctx, base);
 	// frsp f0,f1
@@ -29793,7 +29793,7 @@ PPC_FUNC_IMPL(__imp__phBoundCapsule_D9F0_g) {
 	// stw r11,4(r31)
 	PPC_STORE_U32(var_r31 + 4,/* phBoundCapsule::flags@+0x4 */ ctx.r11.u32);
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// bl 0x82430e88
 	phBoundCapsule_0E88_g(ctx, base);
 	// frsp f0,f1
@@ -29821,7 +29821,7 @@ PPC_FUNC_IMPL(__imp__phBoundCapsule_DA38_g) {
 	// stw r11,4(r31)
 	PPC_STORE_U32(var_r31 + 4,/* phBoundCapsule::flags@+0x4 */ ctx.r11.u32);
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// bl 0x824301d0
 	phBoundCapsule_01D0_g(ctx, base);
 	// frsp f0,f1
@@ -34852,14 +34852,14 @@ loc_82400244:
 	// addi r3,r31,88
 	ctx.r3.s64 = (int64_t)(int32_t)var_r31 + 88;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// addi r3,r31,80
 	ctx.r3.s64 = (int64_t)(int32_t)var_r31 + 80;
 	// fmr f31,f1
 	ctx.fpscr.disableFlushMode();
 	var_f31 = ctx.f1.f64;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// lwz r11,-6580(r28)
 	ctx.r11.u64 = PPC_LOAD_U32(var_r28 + -6580);
 	// fadds f13,f1,f31
@@ -34989,14 +34989,14 @@ loc_82400350:
 	// addi r3,r31,80
 	ctx.r3.s64 = (int64_t)(int32_t)var_r31 + 80;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// addi r3,r31,88
 	ctx.r3.s64 = (int64_t)(int32_t)var_r31 + 88;
 	// fmr f31,f1
 	ctx.fpscr.disableFlushMode();
 	var_f31 = ctx.f1.f64;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// lwz r11,-6580(r28)
 	ctx.r11.u64 = PPC_LOAD_U32(var_r28 + -6580);
 	// fsubs f12,f31,f1
@@ -35047,7 +35047,7 @@ loc_824003B0:
 	// add r3,r11,r29
 	ctx.r3.u64 = ctx.r11.u64 + var_r29;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// lwz r11,-6580(r28)
 	ctx.r11.u64 = PPC_LOAD_U32(var_r28 + -6580);
 	// fmr f31,f1
@@ -35080,7 +35080,7 @@ loc_824003F0:
 	// add r3,r11,r29
 	ctx.r3.u64 = ctx.r11.u64 + var_r29;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// lwz r11,-6580(r28)
 	ctx.r11.u64 = PPC_LOAD_U32(var_r28 + -6580);
 	// fmuls f11,f1,f31
@@ -35131,7 +35131,7 @@ loc_82400450:
 	// add r3,r11,r29
 	ctx.r3.u64 = ctx.r11.u64 + var_r29;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// lwz r11,-6580(r28)
 	ctx.r11.u64 = PPC_LOAD_U32(var_r28 + -6580);
 	// fmr f31,f1
@@ -35164,7 +35164,7 @@ loc_82400490:
 	// add r3,r11,r29
 	ctx.r3.u64 = ctx.r11.u64 + var_r29;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// lwz r11,-6580(r28)
 	ctx.r11.u64 = PPC_LOAD_U32(var_r28 + -6580);
 	// fcmpu cr6,f31,f29
@@ -35231,7 +35231,7 @@ loc_82400510:
 	// add r3,r11,r29
 	ctx.r3.u64 = ctx.r11.u64 + var_r29;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// lwz r11,-6580(r28)
 	ctx.r11.u64 = PPC_LOAD_U32(var_r28 + -6580);
 	// fmr f31,f1
@@ -35264,7 +35264,7 @@ loc_82400550:
 	// add r3,r11,r29
 	ctx.r3.u64 = ctx.r11.u64 + var_r29;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// fsubs f9,f31,f1
 	ctx.fpscr.disableFlushMode();
 	ctx.f9.f64 = double(float(var_f31 - ctx.f1.f64));
@@ -35324,7 +35324,7 @@ loc_824005C4:
 	// add r3,r11,r29
 	ctx.r3.u64 = ctx.r11.u64 + var_r29;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// lwz r11,-6580(r28)
 	ctx.r11.u64 = PPC_LOAD_U32(var_r28 + -6580);
 	// fmr f31,f1
@@ -35357,7 +35357,7 @@ loc_82400604:
 	// add r3,r11,r29
 	ctx.r3.u64 = ctx.r11.u64 + var_r29;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// fcmpu cr6,f1,f31
 	ctx.fpscr.disableFlushMode();
 	// mr r11,r19
@@ -38093,14 +38093,14 @@ loc_82401B70:
 	// mr r3,r27
 	ctx.r3.u64 = var_r27;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// mr r3,r30
 	ctx.r3.u64 = var_r30;
 	// fmr f31,f1
 	ctx.fpscr.disableFlushMode();
 	var_f31 = ctx.f1.f64;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// lwz r11,-6580(r28)
 	ctx.r11.u64 = PPC_LOAD_U32(var_r28 + -6580);
 	// fadds f8,f1,f31
@@ -38342,14 +38342,14 @@ loc_82401D58:
 	// mr r3,r26
 	ctx.r3.u64 = var_r26;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// mr r3,r27
 	ctx.r3.u64 = var_r27;
 	// fmr f31,f1
 	ctx.fpscr.disableFlushMode();
 	var_f31 = ctx.f1.f64;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// fcmpu cr6,f31,f1
 	ctx.fpscr.disableFlushMode();
 	// mr r11,r19
@@ -38598,14 +38598,14 @@ loc_82401F64:
 	// mr r3,r26
 	ctx.r3.u64 = var_r26;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// mr r3,r27
 	ctx.r3.u64 = var_r27;
 	// fmr f31,f1
 	ctx.fpscr.disableFlushMode();
 	var_f31 = ctx.f1.f64;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// fcmpu cr6,f31,f1
 	ctx.fpscr.disableFlushMode();
 	// mr r11,r19
@@ -39317,7 +39317,7 @@ loc_824024D8:
 	// add r3,r11,r29
 	ctx.r3.u64 = ctx.r11.u64 + var_r29;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// lwz r11,-6580(r28)
 	ctx.r11.u64 = PPC_LOAD_U32(var_r28 + -6580);
 	// fadds f7,f1,f30
@@ -39368,7 +39368,7 @@ loc_82402538:
 	// add r3,r11,r29
 	ctx.r3.u64 = ctx.r11.u64 + var_r29;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// lwz r11,-6580(r28)
 	ctx.r11.u64 = PPC_LOAD_U32(var_r28 + -6580);
 	// fsubs f6,f1,f30
@@ -39618,14 +39618,14 @@ loc_82402724:
 	// mr r3,r26
 	ctx.r3.u64 = var_r26;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// mr r3,r27
 	ctx.r3.u64 = var_r27;
 	// fmr f31,f1
 	ctx.fpscr.disableFlushMode();
 	var_f31 = ctx.f1.f64;
 	// bl 0x823fa688
-	phBoundCapsule_A688_g(ctx, base);
+	swfValueToFloat(ctx, base);
 	// fcmpu cr6,f31,f1
 	ctx.fpscr.disableFlushMode();
 	// mr r11,r19
@@ -46621,7 +46621,7 @@ loc_82405B80:
 	// bne cr6,0x82405b9c
 	if (ctx.r8.s32 == 0) {
 		// bl 0x823fa688
-		phBoundCapsule_A688_g(ctx, base);
+		swfValueToFloat(ctx, base);
 		// fmuls f11,f1,f31
 		ctx.fpscr.disableFlushMode();
 		ctx.f11.f64 = double(float(ctx.f1.f64 * var_f31));
@@ -46661,7 +46661,7 @@ loc_82405B80:
 		// bne cr6,0x82405c08
 		if (ctx.r8.s32 == 0) {
 			// bl 0x823fa688
-			phBoundCapsule_A688_g(ctx, base);
+			swfValueToFloat(ctx, base);
 			// fmuls f10,f1,f31
 			ctx.fpscr.disableFlushMode();
 			ctx.f10.f64 = double(float(ctx.f1.f64 * var_f31));
@@ -48926,8 +48926,8 @@ loc_82406C24:
 	return;
 }
 
-__attribute__((alias("__imp__swfSHAPE_vfn_1"))) PPC_WEAK_FUNC(swfSHAPE_vfn_1);
-PPC_FUNC_IMPL(__imp__swfSHAPE_vfn_1) {
+__attribute__((alias("__imp__swfSHAPE_Render"))) PPC_WEAK_FUNC(swfSHAPE_Render);
+PPC_FUNC_IMPL(__imp__swfSHAPE_Render) {
 	PPC_FUNC_PROLOGUE();
 	uint32_t var_r18 = 0;
 	uint32_t var_r31 = 0;
