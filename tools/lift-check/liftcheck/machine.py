@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import struct
 from dataclasses import dataclass, field
+from typing import Callable
 
 from unicorn import (UC_ARCH_PPC, UC_HOOK_BLOCK, UC_HOOK_CODE, UC_HOOK_INTR, UC_HOOK_MEM_UNMAPPED,
                      UC_HOOK_MEM_WRITE, UC_MEM_FETCH_UNMAPPED, UC_MEM_WRITE_UNMAPPED,
@@ -97,6 +98,7 @@ class RunFrame:
     return_pc: int
     lift_sp: int | None = None
     lift_lr: int | None = None
+    on_return: Callable[[], None] | None = None
 
 
 class Machine:
@@ -333,7 +335,7 @@ class Machine:
                 return True
         return False
 
-    def run_callee(self, bounds):
+    def run_callee(self, bounds, on_return=None):
         """Allow this invocation's body, without hiding subsequent calls to its entry.
 
         Xenon callees own a caller-provided argument area above r1. A SysV caller
@@ -342,6 +344,7 @@ class Machine:
         self.prescan(*bounds)
         lr = self.spr_lr_ctr(8)
         frame = RunFrame(bounds, lr)
+        frame.on_return = on_return
         if self.side == "lift" and not self.run_frames:
             frame.lift_sp, frame.lift_lr = self.gpr(1), lr
             frame.return_pc = RUN_RETURN
@@ -359,6 +362,8 @@ class Machine:
             return
         while self.run_frames and addr == self.run_frames[-1].return_pc:
             frame = self.run_frames.pop()
+            if frame.on_return is not None:
+                frame.on_return()
             if frame.lift_sp is not None:
                 self.set_gpr(1, frame.lift_sp)
                 uc.reg_write(P.UC_PPC_REG_LR, frame.lift_lr)

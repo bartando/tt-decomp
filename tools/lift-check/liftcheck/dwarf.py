@@ -231,25 +231,25 @@ def field_path(t: TypeInfo | None, off: int) -> str:
     return ".".join(parts).replace(".[", "[")
 
 
-def arg_registers(sig: Signature) -> list[tuple[str, TypeInfo]]:
-    """Registers the 32-bit SysV ABI (and Xenon, for these types) uses for each parameter."""
+def arg_registers(sig: Signature, abi="xenon", *, limited=True) -> list[tuple[str, TypeInfo]]:
+    """Argument registers. Xenon uses one GPR per integer; SysV aligns uint64 pairs."""
     gpr, fpr, out = 3, 1, []
     if sig.ret.kind in ("struct", "array") and sig.ret.size:
         gpr = 4                             # hidden return-buffer pointer in r3
     for p in sig.params:
         t = p.type
         if t.kind == "float":
-            if fpr <= 8:
+            if not limited or fpr <= 8:
                 out.append((f"f{fpr}", t))
             fpr += 1
-        elif t.kind == "int" and t.size == 8:
+        elif abi == "ppc32" and t.kind == "int" and t.size == 8:
             if gpr % 2 == 0:
                 gpr += 1
-            if gpr <= 9:
+            if not limited or gpr <= 9:
                 out.append((f"r{gpr}:r{gpr + 1}", t))
             gpr += 2
         else:
-            if gpr <= 10:
+            if not limited or gpr <= 10:
                 out.append((f"r{gpr}", t))
             gpr += 1
     return out

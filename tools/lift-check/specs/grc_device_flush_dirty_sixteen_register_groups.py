@@ -2,13 +2,13 @@
 
 Callers supply nonzero masks and aligned, disjoint source and command buffers.
 Overflow arguments and the returned cursor are checked; its own packet emission
-is modeled. The adapter maps Xenon's single-GPR uint64 argument to PPC32's pair.
+is modeled.
 """
 from liftcheck.spec import *
 
-FUNCTION = "liftcheck_dirty_sixteen_adapter"
+FUNCTION = "grcDevice_FlushDirtySixteenRegisterGroups"
 ADDRESS = 0x82362858
-SOURCE = "tools/lift-check/specs/grc_device_flush_dirty_sixteen_register_groups_adapter.cpp"
+SOURCE = "src/graphics/grc_gpu_resources.cpp"
 TRIALS = 500
 RET = None
 

@@ -6,8 +6,6 @@ Reported by the agents using it. Each was worked around in a spec; fix in the to
   string itself compares as text).
 - Callees whose call chain goes through a register (vtables, function pointers) are
   clobbered in full; where LTCG keeps registers across one, `preserves=` or `run()`.
-- 64-bit arguments need a hand-written register adapter (see README); `t.args` and the
-  call comparison could split/join Xenon's single-GPR uint64 themselves.
 
 Reported while the tool was being reworked; recheck against the current version:
 

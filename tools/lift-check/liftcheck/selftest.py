@@ -38,9 +38,19 @@ EXPECT = [
     ("crt_asin", "PASS", ()),                    # original core on a Xenon caller frame
     ("crt_acos", "PASS", ()),
     ("rage_clip_polygon_to_frustum", "PASS", ()), # repeated run() calls stay in the trace
+    ("misc_tristrip_join_strips", "PASS", ()),   # subclass's partial-cache deref survives
+    ("player_cancel_swing", "PASS", ()),        # subclass's transparent flag survives
+    ("grc_device_flush_dirty_register_group", "PASS", ()),
+    ("grc_device_flush_dirty_six_register_groups", "PASS", ()),
+    ("grc_device_flush_dirty_sixteen_register_groups", "PASS", ()),
+    ("grc_device_flush_dirty_state", "PASS", ()),
 ]
 
 MUTATIONS = [
+    ("grc_device_flush_dirty_state", "lose upper bits of an outgoing uint64 argument",
+     [("device, dirty(0x10), 0x4000,", "device, (uint32_t)dirty(0x10), 0x4000,")]),
+    ("grc_device_flush_dirty_state", "change the integer following a uint64 argument",
+     [("device, dirty(0x10), 0x4000,", "device, dirty(0x10), 0x4001,")]),
     ("rage_clip_polygon_to_frustum", "keep clipping after an empty result (extra run() calls)",
      [("        if (count == 0) {\n            return;\n        }", "/* omitted empty-result return */")]),
     ("sysmem_simple_allocator_free", "skip forward coalescing",
@@ -253,6 +263,13 @@ def main(argv=None) -> int:
     for line in call_errors:
         print(f"     {line}")
     bad += bool(call_errors)
+
+    from .calltests import wide_regressions
+    wide_errors = wide_regressions()
+    print(f"{'ok  ' if not wide_errors else 'FAIL'} uint64 entry/call/return ABI regressions")
+    for line in wide_errors:
+        print(f"     {line}")
+    bad += bool(wide_errors)
 
     packed_errors = _normpacked32()
     print(f"{'ok  ' if not packed_errors else 'FAIL'} vpkd3d128/vupkd3d128 NORMPACKED32 regression")

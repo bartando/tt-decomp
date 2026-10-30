@@ -67,11 +67,11 @@ into the repo.
 `tools/lift-check/lift-check all [--jobs N] [--filter PREFIX] [--trials N] [-v]` runs every
 spec (skipping `_`-prefixed helpers and files without a `FUNCTION`) in parallel, prints each
 one's status line as it finishes and a summary listing the non-PASS ones, and exits 1 unless
-all pass (about 45 s for 180 specs at 8 jobs). `-v` adds the context lines of failures.
+all pass. `-v` adds the context lines of failures.
 
 `tools/lift-check/lift-check selftest` runs Xenia's instruction tests through the
-emulator, the marker scan on a made-up TU, the example specs, and mutated lifts that must
-all fail (about 40 s).
+emulator, small PPC programs exercising call tracing and ABI boundaries, the marker scan
+on a made-up TU, the example specs, and mutated lifts that must all fail.
 
 ### Spec reference
 
@@ -85,10 +85,15 @@ all fail (about 40 s).
   `t.w32(t.sp + 0x54, v)` writes the caller's frame (stack arguments) over the random fill.
   `t.args(v1=[x, y, z, w])` sets a vector register's four float32 lanes in memory
   order (v0..v127), for internal functions whose inputs use VMX registers.
-  A `uint64_t` argument arrives in one GPR on Xenon but in a register pair in the
-  PPC32 lift; point `FUNCTION`/`SOURCE` at a small adapter TU that `#include`s the
-  lift and reshuffles the registers in a naked function
-  (`specs/grc_device_flush_dirty_register_group_adapter.cpp`).
+  Integer arguments up to 64 bits use Xenon registers: `t.args(r4=mask)` supplies
+  all 64 bits of a `uint64_t` in r4. The checker uses the declaration to split it
+  into the PPC32 lift's aligned pair and move following arguments automatically.
+  Callee traces, `args=`/`deref=` overrides and policies also use Xenon registers;
+  `ctx.r(n)` reads the low word and `ctx.r64(n)` reads all 64 bits on either side.
+  Calls using `run()` translate back to Xenon and convert 64-bit returns to the
+  lift's r3/r4 pair. Stubs and models can return a 64-bit integer via `ctx.ret(r3=v)`
+  when the declaration returns one. All these integer arguments must fit in
+  r3..r10 in both ABIs; a signature requiring stack translation reports BUILD.
   Unset registers are random; `r1` is a fresh stack, `r13` a zeroed block.
 - `CALLS`, keyed by symbol name, address or fake-function name:
   - `stub(ret=None|int|float|"void"|fn(ctx), out={"r4": size}, args=("r3", "f1"),
@@ -102,7 +107,7 @@ all fail (about 40 s).
     args=None, deref=None)` (execute the original callee, on both sides; argument and
     pointee overrides work as with `stub`; `transparent` leaves it out of the trace,
     for a helper the lift calls and the original inlines), `model(fn, args=, deref=,
-    preserves=)` (Python; `ctx.r(3)`, `ctx.read/write`, `ctx.ret(r3=, f1=)`, `ctx.side`;
+    preserves=)` (Python; `ctx.r(3)`, `ctx.r64(4)`, `ctx.read/write`, `ctx.ret(r3=, f1=)`, `ctx.side`;
     a failed `assert` in it is a FAIL on the lift side, a SPEC problem on the original's),
     `fail()`.
   - memcpy, memmove, memset, strlen and strcmp are Python models and stay out of the call
@@ -191,9 +196,11 @@ all fail (about 40 s).
   layer (`src/xam`, `src/crt`: SDL, pthread, sockets). `shim/` covers the libc/libstdc++
   subset the sources use; extend it rather than the sources. Patches (`Options.patches`,
   the self-test) apply to the TU only, so a mutated struct has to be defined in the .cpp.
-- **ABI**: SysV ppc32 and Xenon agree for ints, pointers and floats in registers. Structs by
-  value, 64-bit ints in register pairs (compared, but stubs only return them in r3) and
-  varargs aren't modelled.
+- **ABI**: Register integer arguments are translated between Xenon's single GPRs and
+  SysV ppc32's aligned 64-bit pairs, including following arguments and 64-bit returns.
+  Stack-passed 64-bit arguments, structs by value and varargs aren't modelled. The
+  `run()` stack bridge reserves the Xenon caller area; stack-passed arguments across
+  that bridge are not translated.
 - **Data the lift defines** (a global with an `// @` address) is the lift's own copy, not the
   image's. Writes to it show up as divergences.
 - **Callee signatures** come from the lift; an indirect call through a fake vtable compares
