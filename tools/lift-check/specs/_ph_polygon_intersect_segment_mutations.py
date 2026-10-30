@@ -16,7 +16,7 @@ MUTATIONS = (
     ("wrong distance sign", "= -endDistance;", "= endDistance;"),
     ("wrong hit type", "out + 66) = 2;", "out + 66) = 3;"),
     ("omit hit flag", "out[68] = 1;", "out[68] = 0;"),
-    ("return false for hit", "    return 1;\n}\n\n// Sphere contact", "    return 0;\n}\n\n// Sphere contact"),
+    ("return false for hit", "    return 1;\n}\n\n// One-sided segment/triangle test", "    return 0;\n}\n\n// One-sided segment/triangle test"),
 )
 
 
