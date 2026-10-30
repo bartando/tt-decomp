@@ -1,19 +1,14 @@
 // Crowd animation playback. Names below are descriptive, inferred from the
 // crowd-manager tick at 0x8238AE10 and the resource constructor at 0x82386918.
 #include "fx_effects.hpp"
+#include "../anim/locomotion.hpp"
 #include "../rage/animation/rage_anim.hpp"
 
 extern uint32_t g_prngState[2]; // @ 0x825CA2C8 (seed, carry)
 extern float lbl_825CAEB8[];    // @ 0x825CAEB8 (sysTimeManager; +8 is delta time)
 
-// The original ignores r4; retain that slot so the frame is passed in r5.
-extern void LocomotionStateAnim_88E0_g(void* clip, void* unusedR4,
-                                      rage::crAnimFrame* frame,
-                                      uint32_t integralFrames, uint32_t flags,
-                                      float time); // @ 0x822488E0
 extern void LocomotionStateAnim_6E50_w(fxCrowdAnimPlayback* playback, float* phase,
                                       void* animation, uint32_t advanceState); // @ 0x82386E50
-extern void LocomotionStateAnim_BB98(void*, void*, float, uint32_t, uint32_t); // @ 0x8224BB98
 
 struct fxCrowdAnimPlaybackClip {
     uint8_t unknown00[20];

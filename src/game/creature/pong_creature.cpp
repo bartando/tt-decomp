@@ -8,6 +8,7 @@
  */
 
 #include "pong_creature.hpp"
+#include "../../anim/locomotion.hpp"
 #include "globals.h"
 #include "game/pong_strings.hpp"
 #include <cstring>
@@ -386,59 +387,32 @@ float pongBlendLookAtDriver::CalculateBlendFactor() {
 
 /**
  * LocomotionStateAnim::FindAnimationByID @ 0x8224BEF8 | size: 0x9C
- * 
- * Binary search through the animation array to find an animation entry
- * matching the given 24-bit ID (constructed from high 16 bits + low 8 bits).
- * 
- * The animation array is sorted by ID, allowing efficient O(log n) lookup.
- * Each entry stores its ID as: (byte_at_offset_5 << 16) | uint16_at_offset_6
- * 
- * @param animID_high Upper 16 bits of animation ID
- * @param animID_low Lower 8 bits of animation ID (typically 0)
- * @return Pointer to animation entry if found, nullptr otherwise
+ * Binary-search the frame's sorted channel pointers. r4 supplies the type
+ * byte and r5 the uint16 ID; upper argument bits are discarded.
  */
-void* LocomotionStateAnim::FindAnimationByID(uint16_t animID_high, uint8_t animID_low) {
-    // Get animation count from offset +12
-    uint16_t animCount = (uint16_t)this->field_0x000c;
-
-    if (animCount == 0) {
+void* LocomotionStateAnim::FindAnimationByID(uint32_t type, uint32_t id) {
+    auto* bytes = reinterpret_cast<uint8_t*>(this);
+    const unsigned animCount = *reinterpret_cast<uint16_t*>(bytes + 12);
+    if (animCount == 0)
         return nullptr;
-    }
 
-    // Get animation array pointer from offset +8
-    void** animArray = (void**)this->field_0x0008;
-    
-    // Construct 24-bit search key: (animID_high << 16) | animID_low
-    uint32_t searchKey = ((uint32_t)animID_high << 16) | animID_low;
-    
-    // Binary search
+    auto* animArray = *reinterpret_cast<void***>(bytes + 8);
+    const uint32_t searchKey = ((type & 0xFF) << 16) | (id & 0xFFFF);
     int low = 0;
-    int high = animCount - 1;
-    
+    int high = static_cast<int>(animCount) - 1;
     while (low <= high) {
-        int mid = (low + high) / 2;
-        
-        // Get animation entry at mid index
+        const int mid = (low + high) / 2;
         void* entry = animArray[mid];
-        
-        // Extract 24-bit ID from entry: (byte_at_5 << 16) | uint16_at_6
-        uint8_t idHigh = *(uint8_t*)((char*)entry + 5);
-        uint16_t idLow = *(uint16_t*)((char*)entry + 6);
-        uint32_t entryKey = ((uint32_t)idHigh << 16) | idLow;
-        
-        if (entryKey == searchKey) {
-            // Found exact match
+        auto* channel = static_cast<uint8_t*>(entry);
+        const uint32_t entryKey = (uint32_t(channel[5]) << 16)
+            | *reinterpret_cast<uint16_t*>(channel + 6);
+        if (entryKey == searchKey)
             return entry;
-        } else if (entryKey > searchKey) {
-            // Search lower half
+        if (entryKey > searchKey)
             high = mid - 1;
-        } else {
-            // Search upper half
+        else
             low = mid + 1;
-        }
     }
-    
-    // Not found
     return nullptr;
 }
 
@@ -1380,13 +1354,15 @@ void pongCreatureInst::StoreVCallResultAtField446(void* arg) {  // 9180_p42
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * LocomotionStateAnim::ForwardToVfn7 @ 0x8224BB98 | size: 0x10
+ * LocomotionStateAnim_BB98 @ 0x8224BB98 | size: 0x10
  *
- * Tail-calls vtable slot 7 on self. Forwards a notification/update
- * to the state's concrete implementation.
+ * Tail-calls the channel's slot-7 blend operation, forwarding source,
+ * weight and both integer arguments unchanged.
  */
-void LocomotionStateAnim::ForwardToVfn7() {  // BB98
-    VCALL(this, 7, void(*)(void*))(this);
+void LocomotionStateAnim_BB98(void* entry, void* source, float weight,
+                             uint32_t unusedR5, uint32_t flags) {  // BB98
+    VCALL(entry, 7, void(*)(void*, void*, float, uint32_t, uint32_t))(
+        entry, source, weight, unusedR5, flags);
 }
 
 /**
@@ -2593,7 +2569,6 @@ extern void util_B9A8(void* dst, void* quat, void* axis);
 // the skeleton from r5 and never read r4; callers leave junk there.
 extern void LocomotionStateAnim_C128_g(void* entry, void* unusedR4, void* skeleton, float weight);
 extern void LocomotionStateAnim_C288_g(void* entry, void* unusedR4, void* skeleton, float weight);
-extern void LocomotionStateAnim_BEF8_g(void* self, uint16_t animID_high, uint8_t animID_low);
 extern void LocomotionStateAnim_C358_g(void* animList, int p1, int p2, int p3, float* outVec);
 
 /**

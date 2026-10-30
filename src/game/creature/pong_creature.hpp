@@ -222,13 +222,12 @@ struct LocomotionStateAnim {
     void Update();
 
     // ── implemented methods ──
-    void* FindAnimationByID(uint16_t animID_high, uint8_t animID_low);  // @ 0x8224BEF8
+    void* FindAnimationByID(uint32_t type, uint32_t id);  // @ 0x8224BEF8
     bool SetupAnimationPair(uint16_t animID1, uint16_t animID2, void* param);  // @ 0x8224C418
     void CopyAnimationData();       // @ 0x8214C8F8
     void ProcessAnimationList(void* animationList);  // @ 0x82380540
     float CalculateBlendFactor(void* timingData);  // @ 0x820C1910
     void UpdateAnimationState(void* outputState);  // @ 0x82380268
-    void ForwardToVfn7();  // @ 0x8224BB98
     int CountActiveAnimLayers();  // @ 0x820DBA60
     void SetGlobalInstance(void* newInstance);  // @ 0x820C34E8
     void SetMatrix(const void* srcMatrix);  // @ 0x820D7B30

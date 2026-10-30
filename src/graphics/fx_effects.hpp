@@ -45,8 +45,8 @@ struct fxAmbient {
     virtual void BindHolderAlias();                    // [3] @ 0x823879E0 — alias of vfn_2
     virtual void* Tick(void* unused, void* ctx);       // [4] @ 0x82387AE0 — tail-call LocomotionStateAnim_FAB0_w when enabled
     virtual void* TickAlias(void* unused, void* ctx);  // [5] @ 0x82387B08 — alias of vfn_4
-    virtual void Play(void* bundle);                   // [6] @ 0x82387B30 — prime anim, iterate animList, call LocomotionStateAnim_C128_g / _C288_g
-    virtual void PlayAlias(void* bundle);              // [7] @ 0x82387C08 — alias of vfn_6
+    virtual void Play(void* bundle, float time);       // [6] @ 0x82387B30 — prime anim, iterate animList, call LocomotionStateAnim_C128_g / _C288_g
+    virtual void PlayAlias(void* bundle, float time);  // [7] @ 0x82387C08 — alias of vfn_6
 
     // ── non-virtual helpers from pass5 ──
     static void RequestStreamSlot(int requestedSlot);  // @ 0x82112B00 (fxAmbient_2B00_h)
