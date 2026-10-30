@@ -13,11 +13,14 @@ struct PgVertexBuffer {
     uint8_t pad0C[0x0C];
     uint32_t stagingAddress;            // +0x18: one vertex's data, no stride (pg_6B20_g)
     uint32_t dataAddress;               // +0x1C: CPU mapping, refreshed by pg_7578_g
-    uint8_t pad20[0x03];
+    uint8_t positionOffset;             // +0x20
+    uint8_t pad21[0x02];
     uint8_t normalOffset;               // +0x23
     uint8_t pad24[0x0A];
     uint8_t tangentOffset;              // +0x2E
-    uint8_t pad2F[0x39];
+    uint8_t pad2F[0x2D];
+    uint32_t positionSize;              // +0x5C
+    uint8_t pad60[0x08];
     uint32_t normalSize;                // +0x68: bytes for the raw-copy format
     uint8_t pad6C[0x28];
     uint32_t tangentSize;               // +0x94: bytes for the raw-copy format
@@ -30,8 +33,10 @@ struct PgVertexBuffer {
 };
 
 static_assert(offsetof(PgVertexBuffer, stagingAddress) == 0x18);
+static_assert(offsetof(PgVertexBuffer, positionOffset) == 0x20);
 static_assert(offsetof(PgVertexBuffer, normalOffset) == 0x23);
 static_assert(offsetof(PgVertexBuffer, tangentOffset) == 0x2E);
+static_assert(offsetof(PgVertexBuffer, positionSize) == 0x5C);
 static_assert(offsetof(PgVertexBuffer, normalSize) == 0x68);
 static_assert(offsetof(PgVertexBuffer, tangentSize) == 0x94);
 static_assert(offsetof(PgVertexBuffer, stride) == 0xD4);
@@ -242,4 +247,19 @@ extern "C" float* pg_5BD8_g(float* out, void* vertexBuffer) {
     }
     std::memcpy(const_cast<float*>(align16(out)), result, sizeof(result));
     return out;
+}
+
+// @ 0x821569C0
+extern "C" void grc_69C0(void* vertexBuffer, uint32_t index, const void* position) {
+    auto* buffer = static_cast<PgVertexBuffer*>(vertexBuffer);
+    auto* format = reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(buffer->formatAddress));
+    if ((*format & 0x1) == 0) {
+        return;
+    }
+    if (buffer->mapped == 0) {
+        pg_7578_g(buffer);
+    }
+    const uint32_t offset = buffer->stride * index + buffer->positionOffset;
+    std::memcpy(reinterpret_cast<void*>(static_cast<uintptr_t>(buffer->dataAddress + offset)), position,
+                buffer->positionSize);
 }
