@@ -49,6 +49,11 @@ struct swfFontAtlas;
 // Draw one atlas glyph at the text pen position using the current SWF transform.
 void swfDrawFontGlyph(const swfFontAtlas* atlas, float x, float y, float scale, int glyphIndex);
 
+// SWF stroke coordinates/width are in twips. UVs use the unoffset point.
+void swfEmitLineVertexOffsetX(float x, float y, float offset);
+void swfEmitLineVertexOffsetY(float x, float y, float offset);
+void swfDrawLine(float x0, float y0, float x1, float y1, float width);
+
 /**
  * swfValueType — ActionScript value type constants
  *

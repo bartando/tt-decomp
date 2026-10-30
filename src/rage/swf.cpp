@@ -75,6 +75,7 @@ extern float g_swfPixelScaleX;    // @ 0x82602824
 extern float g_swfPixelScaleY;    // @ 0x8260283C
 extern void (*g_swfBindFontTexture)(void* texture); // @ 0x82602820
 extern void* g_binkVideoPlayer;   // @ 0x825EB988 — graphics device (legacy global name)
+extern void fxEmitVertex2D(float x, float y); // @ 0x82406010
 
 // @ 0x823FA768
 extern "C" const char* util_A768_1(const void* value, void* buffer, int maxLen) {
@@ -156,6 +157,13 @@ struct swfGlyphRenderState {
 };
 extern swfGlyphRenderState g_swfGlyphRenderState; // @ 0x82606120
 
+struct swfLineRenderState {
+    float uvMatrix[6]; // a, b, c, d, tx, ty
+    float matrix[6];
+};
+extern swfLineRenderState g_swfLineRenderState; // @ 0x8260613C
+extern const float g_swfTwipsToPixels; // @ 0x820290F0
+
 namespace {
 struct swfGlyphVertex {
     float position[3];
@@ -230,6 +238,102 @@ void swfDrawFontGlyph(const swfFontAtlas* atlas, float x, float y, float scale, 
         device[0] = device[13652 / 4];
     }
     g_fxCountOnly = 0;
+}
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC pop_options
+#endif
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("fp-contract=off")
+#endif
+// Formerly pongShadowMap_6620_wrh: UVs follow the centerline, while position
+// moves along X before the display transform. Keep each fmuls/fadds rounding.
+// @ 0x82406620
+void swfEmitLineVertexOffsetX(float x, float y, float offset) {
+#if defined(__clang__)
+#pragma clang fp contract(off)
+#endif
+    const float sx = x * g_swfTwipsToPixels;
+    const float sy = y * g_swfTwipsToPixels;
+    const float shiftedX = std::fma(offset, g_swfTwipsToPixels, sx);
+    const float* uv = g_swfLineRenderState.uvMatrix;
+    const float uProduct = uv[0] * sx;
+    const float vProduct = uv[1] * sx;
+    g_fxVertexU = std::fma(uv[2], sy, uProduct) + uv[4];
+    g_fxVertexV = std::fma(uv[3], sy, vProduct) + uv[5];
+    const float* m = g_swfLineRenderState.matrix;
+    const float xProduct = m[0] * shiftedX;
+    const float yProduct = m[1] * shiftedX;
+    const float screenY = (std::fma(m[3], sy, yProduct) + m[5]) * g_swfPixelScaleY;
+    const float screenX = (std::fma(m[2], sy, xProduct) + m[4]) * g_swfPixelScaleX;
+    fxEmitVertex2D(screenX, screenY);
+}
+
+// Formerly pongShadowMap_66C8_wrh; the Y-offset counterpart of the above.
+// @ 0x824066C8
+void swfEmitLineVertexOffsetY(float x, float y, float offset) {
+#if defined(__clang__)
+#pragma clang fp contract(off)
+#endif
+    const float sx = x * g_swfTwipsToPixels;
+    const float sy = y * g_swfTwipsToPixels;
+    const float shiftedY = std::fma(offset, g_swfTwipsToPixels, sy);
+    const float* uv = g_swfLineRenderState.uvMatrix;
+    const float* m = g_swfLineRenderState.matrix;
+    const float xProduct = m[0] * sx;
+    const float yProduct = m[1] * sx;
+    const float uProduct = uv[0] * sx;
+    const float vProduct = uv[1] * sx;
+    const float transformedY = std::fma(m[3], shiftedY, yProduct);
+    const float transformedX = std::fma(m[2], shiftedY, xProduct);
+    g_fxVertexU = std::fma(uv[2], sy, uProduct) + uv[4];
+    g_fxVertexV = std::fma(uv[3], sy, vProduct) + uv[5];
+    const float screenY = (transformedY + m[5]) * g_swfPixelScaleY;
+    const float screenX = (transformedX + m[4]) * g_swfPixelScaleX;
+    fxEmitVertex2D(screenX, screenY);
+}
+
+// Formerly pongShadowMap_6778_w. SWF shape opcodes 1 (polyline) and 6
+// (independent segments) at 0x82406D6C/0x82406DDC pass endpoints and stroke width.
+// Six vertices form a triangle fan with an axis-aligned cap at each endpoint.
+// These descriptive names are inferred, not recovered debug symbols.
+// @ 0x82406778
+void swfDrawLine(float x0, float y0, float x1, float y1, float width) {
+#if defined(__clang__)
+#pragma clang fp contract(off)
+#endif
+    const float halfWidth = width * 0.5f;
+    const float remainingWidth = width - halfWidth;
+    const float dx = x1 - x0;
+    const float dy = y1 - y0;
+    const float absX = std::fabs(dx);
+    const float absY = std::fabs(dy);
+    rage_2A78(5, 6);
+    if (absX > absY) {
+        swfEmitLineVertexOffsetY(x0, y0, -halfWidth);
+        swfEmitLineVertexOffsetY(x1, y1, -halfWidth);
+        swfEmitLineVertexOffsetX(x1, y1, x1 > x0 ? remainingWidth : -remainingWidth);
+        swfEmitLineVertexOffsetY(x1, y1, remainingWidth);
+        swfEmitLineVertexOffsetY(x0, y0, remainingWidth);
+        swfEmitLineVertexOffsetX(x0, y0, x0 < x1 ? -halfWidth : halfWidth);
+    } else {
+        // Equality and unordered comparisons both take this path on Xenon.
+        swfEmitLineVertexOffsetX(x0, y0, -halfWidth);
+        swfEmitLineVertexOffsetY(x0, y0, y0 < y1 ? -halfWidth : halfWidth);
+        swfEmitLineVertexOffsetX(x0, y0, remainingWidth);
+        swfEmitLineVertexOffsetX(x1, y1, remainingWidth);
+        swfEmitLineVertexOffsetY(x1, y1, y1 > y0 ? remainingWidth : -remainingWidth);
+        swfEmitLineVertexOffsetX(x1, y1, -halfWidth);
+    }
+    if (g_fxVertexCursor != 0) {
+        g_fxVertexCursor = 0;
+        g_fxCountOnly = 0;
+        auto* device = static_cast<uint32_t*>(g_binkVideoPlayer);
+        device[0] = device[13652 / 4];
+    } else {
+        g_fxCountOnly = 0;
+    }
 }
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC pop_options
