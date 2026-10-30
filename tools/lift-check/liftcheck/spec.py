@@ -31,6 +31,7 @@ class Trial:
 
     def __init__(self, rng: random.Random, symbols, dwarf=None):
         self.rng = rng
+        self.index = 0  # zero-based trial number; also stable for --only reruns
         self.syms = symbols
         self.dwarf = dwarf
         self.arena = bytearray()

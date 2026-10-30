@@ -342,6 +342,7 @@ class Checker:
     def make_trial(self, n: int) -> tuple[Trial, dict, list]:
         rng = random.Random(self.opts.seed * 1_000_003 + n)
         t = Trial(rng, self.syms, dwarf=self._dwarf())
+        t.index = n
         regs = {"gpr": [rng.getrandbits(32) for _ in range(32)],
                 "fpr": [f32_rounds(rng.uniform(-1e3, 1e3)) for _ in range(32)],
                 "ctr": rng.getrandbits(32), "cr": 0, "gpr64": {}}
