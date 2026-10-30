@@ -26,9 +26,13 @@ def main():
         ("vertex count", "g_fxVertexCount += 4", "g_fxVertexCount += 3"),
         ("corner arithmetic", "(u + r) + center[axis]", "u + (r + center[axis])"),
     ]
+    # Only mutate fxDrawBillboardQuad; fxEmitVertex2D below shares some lines.
+    start = source.index("void fxDrawBillboardQuad(")
+    end = source.index("\n}\n", start)
+    body = source[start:end]
     for name, old, new in mutations:
-        assert source.count(old) == 1, f"mutation anchor changed: {name}"
-        mutated = source.replace(old, new, 1)
+        assert body.count(old) == 1, f"mutation anchor changed: {name}"
+        mutated = source[:start] + body.replace(old, new, 1) + source[end:]
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             rc = Checker(spec, Options(trials=100, seed=1, patches=((include, mutated),))).run()
