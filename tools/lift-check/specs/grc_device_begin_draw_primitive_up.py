@@ -98,7 +98,8 @@ def inputs(t):
     _fail_vertices = rng.randrange(5) == 0
     # Returned memory is filled by the caller, so this function never dereferences it.
     _vertex_address = rng.choice([t.alloc(16, "vertices"), 0x80001000, 0xA0001000,
-                                  0x8FF00000, 0x90000000, 0xBFF00000, 0xFFF00000])
+                                  0x8FF00000, 0x90000000, 0xBFF00000, 0xDFF00000,
+                                  0xE0001000, 0xEFF00000, 0xFFF00000])
     count, stride = rng.choice([(3, 28), (rng.randrange(1, 1000), 36),
                                 (0, 0), (1, 1), (65535, 1020), (65536, 1024),
                                 (0xFFFFFFFF, 0xFFFFFFFF), (t.u32(), t.u32())])
