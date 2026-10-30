@@ -26,7 +26,7 @@ extern void rage_free(void* ptr);
 // (pcrCreature forward-declared in pong_player.hpp)
 
 // NOTE: pongPlayer_UpdateLocomotionState is the semantic alias for
-// pongPlayer_C678_g @ 0x820CC678 (see SECTION 59 forward + stub at end of file).
+// pongPlayer_C678_g @ 0x820CC678 (player_animation_state.cpp).
 // It is called from D228 to sync locomotion anim list + body-data state each frame.
 extern void pongPlayer_UpdateLocomotionState(pongPlayer* state);  // @ 0x820CC678
 
@@ -5113,10 +5113,8 @@ extern "C" int pongPlayer_BF18_g(void* /*self*/, int /*a*/, vec3* /*b*/,
                                    vec3* /*c*/, int /*d*/) { return 0; }
 
 // pongPlayer_C678_g @ 0x820CC678 | size: 0xBB0 (2992 bytes)
-// UpdateLocomotionState — 3KB monster; stub pending a dedicated subdivision pass.
-// C678_g is the binary-address symbol; UpdateLocomotionState is the semantic
-// alias used by pongPlayer::Process at line 307.
-extern "C" void pongPlayer_C678_g(pongPlayer* /*state*/) {}
+// Pose assembly and locomotion crossfade live in player_animation_state.cpp.
+extern "C" void pongPlayer_C678_g(pongPlayer* state);
 void pongPlayer_UpdateLocomotionState(pongPlayer* state) {
     pongPlayer_C678_g(state);
 }
