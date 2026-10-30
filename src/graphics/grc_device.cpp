@@ -8,6 +8,7 @@
  *   - grcDevice_setSamplerMinFilter @ 0x82355418 — Xenos texture fetch state
  *   - grcDevice_setSamplerMagFilter @ 0x823555A8 — Xenos texture fetch state
  *   - grcDevice_setSamplerMaxAnisotropy @ 0x82355828 — Xenos texture fetch state
+ *   - grcDevice_setSamplerLodBias       @ 0x82355948 — Xenos texture fetch state
  *   - grcDevice_SetTexture          @ 0x82359940 — bind a texture to a fetch slot
  *   - grcDevice_ReserveCommandSpace @ 0x82359E80 — carve space out of the command ring
  *
@@ -187,6 +188,7 @@ void grcDevice_shutdownAlt(void)
 }
 
 extern const uint32_t g_grcAnisoFilterTable[17];  // @ 0x82065D10
+extern const float g_grcLodBiasScale;             // @ 0x82079AF0
 
 // @ 0x82355418
 void grcDevice_setSamplerMinFilter(void* device, uint32_t sampler, uint32_t filter) {
@@ -272,6 +274,33 @@ void grcDevice_setSamplerMaxAnisotropy(void* device, uint32_t sampler, uint32_t 
         *reinterpret_cast<uint64_t*>(state + 32) |= dirtyBit;
     }
     state[12020u + sampler] = static_cast<uint8_t>(anisotropy);
+}
+
+// The bias arrives as raw float bits (a D3D-style sampler state DWORD) and is
+// stored as fetch dword 4's 10-bit fixed-point lod_bias.
+// @ 0x82355948
+void grcDevice_setSamplerLodBias(void* device, uint32_t sampler, uint32_t biasBits) {
+    uint8_t* state = static_cast<uint8_t*>(device);
+    uint32_t* fetch = reinterpret_cast<uint32_t*>(state + (sampler + 48u) * 24u);
+    float bias;
+    __builtin_memcpy(&bias, &biasBits, sizeof bias);
+    float scaled = bias * g_grcLodBiasScale;
+
+    // fctidz saturates (NaN gives INT64_MIN); stfiwx keeps the low word.
+    uint32_t fixed;
+    if (scaled != scaled || scaled <= -0x1p63f) {
+        fixed = 0;
+    } else if (scaled >= 0x1p63f) {
+        fixed = 0xFFFFFFFFu;
+    } else {
+        fixed = static_cast<uint32_t>(static_cast<int64_t>(scaled));
+    }
+    fetch[4] = (fetch[4] & ~0x003FF000u) | ((fixed << 12) & 0x003FF000u);
+
+    // srd uses seven shift bits and returns zero for shifts 64..127.
+    uint32_t shift = sampler & 127u;
+    uint64_t dirtyBit = shift < 64u ? (UINT64_C(0x8000000000000000) >> shift) : 0;
+    *reinterpret_cast<uint64_t*>(state + 32) |= dirtyBit;
 }
 
 extern "C" void grcTexture_ReleaseResource(void* texture); // @ 0x82352708
