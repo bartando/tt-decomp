@@ -16,6 +16,11 @@
 // @ 0x8202D110 (.rdata)
 extern "C" const float g_grcRenderTargetDefaultLOD = 0.0f;
 
+// @ 0x82065D10 (.rdata) — max anisotropy (0..16) to Xenos aniso_filter encoding
+extern const uint32_t g_grcAnisoFilterTable[17] = {
+    0, 0, 2, 2, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5
+};
+
 // @ 0x82035300 (.rdata)
 extern "C" const char g_invalidTextureTypeMsg[61] = "Bad resource type %d in grcTextureFactoryXenon::PlaceTexture";
 
