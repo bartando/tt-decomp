@@ -1,4 +1,4 @@
-"""CRT acos entry thunk into the shared asin/acos core (the core is a stub).
+"""CRT acos entry thunk into the shared asin/acos core (original code on both sides).
 
 Inputs span [-1, 1], its edges, just outside it, and special values.
 """
@@ -7,7 +7,7 @@ from liftcheck.spec import *
 FUNCTION = "crt_acos"
 ADDRESS = 0x82430E90
 SOURCE = "src/rage/math/ph_math.cpp"
-CALLS = {0x82430BA8: stub(args=("r4", "f1"))}  # selector and x; result passes through
+CALLS = {0x82430BA8: run(args=("r4", "f1"))}  # r3 is an unused ABI placeholder
 
 
 def inputs(t):

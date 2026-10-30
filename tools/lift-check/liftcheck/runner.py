@@ -242,11 +242,7 @@ class Checker:
                 if r is None:
                     m.fault = Fault("exception", addr, f"run() policy: no size for 0x{target:08X}")
                     raise Stop()
-                if r not in m.home:
-                    m.home.append(r)
-                    m.prescan(*r)
-                if target != addr:
-                    m.uc.reg_write(_PC, target)
+                m.run_callee(r)
                 return
             # clobber what the callee may clobber, the same way on both sides: every
             # volatile register, or for a leaf only those it writes (MSVC's LTCG callers

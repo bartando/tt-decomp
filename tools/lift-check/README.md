@@ -98,8 +98,9 @@ all fail (about 40 s).
     from the declaration where it has them, so a variadic `r6` can be added) and limits the
     pointee comparison to them; `deref` compares what a register points at;
     `preserves=("r8", "f1")` keeps registers the callee leaves alone.
-  - `returns(v)`, `alloc(size_reg="r3")` (fresh zeroed heap block), `run(transparent=False)`
-    (execute the original callee, on both sides; `transparent` leaves it out of the trace,
+  - `returns(v)`, `alloc(size_reg="r3")` (fresh zeroed heap block), `run(transparent=False,
+    args=None, deref=None)` (execute the original callee, on both sides; argument and
+    pointee overrides work as with `stub`; `transparent` leaves it out of the trace,
     for a helper the lift calls and the original inlines), `model(fn, args=, deref=,
     preserves=)` (Python; `ctx.r(3)`, `ctx.read/write`, `ctx.ret(r3=, f1=)`, `ctx.side`;
     a failed `assert` in it is a FAIL on the lift side, a SPEC problem on the original's),
@@ -159,6 +160,9 @@ all fail (about 40 s).
   the symbol map; the lift's own code). The save/restore helpers just run. Both sides get
   the same scripted or random return for the n-th call to a target, and the same clobbered
   volatile registers.
+  A `run()` range is active only for that invocation: repeat calls, nested calls and
+  tail calls are traced each time. Original code called from a compiled lift gets a
+  separate Xenon caller argument area so its spills cannot overwrite the lift's frame.
 - **Comparison.** Bytes written outside the stack, with floats in `ctype`/`wf32` words and
   float arguments compared to `FTOL` relative to max(1, |a|, |b|); ints exactly. Pointer
   arguments into the stack compare as `<stack>` (also untyped ones: calls without a

@@ -28,6 +28,7 @@ STACK_LO, STACK_HI = 0x70000000, 0x70100000
 STACK_TOP = 0x700F0000            # r1 at entry; the space above is the caller's frame
 FAKE_BASE, FAKE_SIZE = 0x7E000000, 0x10000
 SENTINEL = FAKE_BASE + FAKE_SIZE - 0x10
+RUN_RETURN = FAKE_BASE + 0x40       # original callee -> compiled lift ABI bridge
 # Unicorn's XER register ignores QEMU's separate CA bit, so a CA computed in Python
 # goes in through `mtxer` in this trampoline (r0 parked in the scratch page).
 TRAMP = FAKE_BASE
@@ -90,6 +91,14 @@ class SideResult:
     instructions: int = 0
 
 
+@dataclass
+class RunFrame:
+    bounds: tuple[int, int]
+    return_pc: int
+    lift_sp: int | None = None
+    lift_lr: int | None = None
+
+
 class Machine:
     def __init__(self, image: bytes, lift, symbols, helper_ranges):
         self.image = image
@@ -131,6 +140,8 @@ class Machine:
         # filled per run
         self.side = ""
         self.home: list[tuple[int, int]] = []
+        self.run_frames: list[RunFrame] = []
+        self._run_entry = None
         self.dispatch = None
         self.writes: dict = {}
         self.calls: list = []
@@ -316,13 +327,47 @@ class Machine:
         uc.reg_write(P.UC_PPC_REG_PC, addr + 4)
 
     def _in_home(self, addr):
-        for lo, hi in self.home:
+        ranges = [self.run_frames[-1].bounds] if self.run_frames else self.home
+        for lo, hi in ranges:
             if lo <= addr < hi:
                 return True
         return False
 
+    def run_callee(self, bounds):
+        """Allow this invocation's body, without hiding subsequent calls to its entry.
+
+        Xenon callees own a caller-provided argument area above r1. A SysV caller
+        may keep its saved LR there, so give original code a separate caller frame.
+        """
+        self.prescan(*bounds)
+        lr = self.spr_lr_ctr(8)
+        frame = RunFrame(bounds, lr)
+        if self.side == "lift" and not self.run_frames:
+            frame.lift_sp, frame.lift_lr = self.gpr(1), lr
+            frame.return_pc = RUN_RETURN
+            self.set_gpr(1, frame.lift_sp - 0x80)
+            self.uc.reg_write(P.UC_PPC_REG_LR, RUN_RETURN)
+        self.run_frames.append(frame)
+        # Restart at the entry even when already there: prescan may have added
+        # instruction hooks, and the entry block must be allowed exactly once.
+        self._run_entry = bounds[0]
+        self.uc.reg_write(P.UC_PPC_REG_PC, bounds[0])
+
     def _on_block(self, uc, addr, size, _):
-        if self._in_home(addr) or TRAMP <= addr <= TRAMP_END:
+        if addr == self._run_entry:
+            self._run_entry = None
+            return
+        while self.run_frames and addr == self.run_frames[-1].return_pc:
+            frame = self.run_frames.pop()
+            if frame.lift_sp is not None:
+                self.set_gpr(1, frame.lift_sp)
+                uc.reg_write(P.UC_PPC_REG_LR, frame.lift_lr)
+                uc.reg_write(P.UC_PPC_REG_PC, frame.lift_lr)
+                return
+        # An entry is always a call, including recursion into the active range.
+        if self.run_frames and addr == self.run_frames[-1].bounds[0]:
+            pass
+        elif self._in_home(addr) or TRAMP <= addr <= TRAMP_END:
             return
         if addr == SENTINEL:
             uc.emu_stop()
@@ -341,6 +386,8 @@ class Machine:
         uc = self.uc
         self.side = side
         self.home = list(home)
+        self.run_frames = []
+        self._run_entry = None
         self.dispatch = dispatch
         self.writes = {}
         self.calls = []

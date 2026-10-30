@@ -35,9 +35,14 @@ EXPECT = [
     ("lc_drill_strings", "PASS", ()),             # const char* by content, any length
     ("lc_world_bound_static_init", "PASS", ()),   # the static initializers have run
     ("sysmem_simple_allocator_free", "PASS", ()),
+    ("crt_asin", "PASS", ()),                    # original core on a Xenon caller frame
+    ("crt_acos", "PASS", ()),
+    ("rage_clip_polygon_to_frustum", "PASS", ()), # repeated run() calls stay in the trace
 ]
 
 MUTATIONS = [
+    ("rage_clip_polygon_to_frustum", "keep clipping after an empty result (extra run() calls)",
+     [("        if (count == 0) {\n            return;\n        }", "/* omitted empty-result return */")]),
     ("sysmem_simple_allocator_free", "skip forward coalescing",
      [("if ((next->flags & 0x10) == 0) {", "if (false) {")]),
     ("sysmem_simple_allocator_free", "skip backward coalescing",
@@ -241,6 +246,13 @@ def main(argv=None) -> int:
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv or [])
     bad = 0
+
+    from .calltests import regressions
+    call_errors = regressions()
+    print(f"{'ok  ' if not call_errors else 'FAIL'} run() repeat/nested/tail-call regressions")
+    for line in call_errors:
+        print(f"     {line}")
+    bad += bool(call_errors)
 
     packed_errors = _normpacked32()
     print(f"{'ok  ' if not packed_errors else 'FAIL'} vpkd3d128/vupkd3d128 NORMPACKED32 regression")

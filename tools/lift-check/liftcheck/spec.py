@@ -287,9 +287,10 @@ class run(Policy):
     """Runs the callee's original code (both sides run the same thing). transparent:
     leave it out of the call trace (a helper the lift calls and the original inlines)."""
 
-    def __init__(self, transparent=False):
-        if transparent:
-            self.transparent = True
+    def __init__(self, transparent=False, args=None, deref=None):
+        self.transparent = transparent
+        self.args = args
+        self.deref = deref or {}
 
     def handle(self, ctx):
         return "run"
