@@ -62,3 +62,28 @@ extern "C" int grcViewport_ClassifySphere(const void* viewport, const float* sph
     }
     return 2;
 }
+
+// Transform a world-space sphere center and test it against the viewport's
+// four side planes and near/far bounds. Returns 2 for intersection, 0 outside.
+// The optional output receives the view-space z even when the sphere is outside.
+// The four unused integer slots preserve Xenon's r8 placement for viewZ under ppc32 SysV.
+// @ 0x82153BF8
+extern "C" int grcViewport_IntersectSphere(const void* viewport, float x, float y, float z,
+                                           float radius, uint32_t, uint32_t, uint32_t, uint32_t, float* viewZ) {
+    const auto* vp = static_cast<const uint8_t*>(viewport);
+    const auto at = [vp](unsigned offset) { return *reinterpret_cast<const float*>(vp + offset); };
+    const float vx = __builtin_fmaf(at(0x220), z, __builtin_fmaf(at(0x200), x, at(0x210) * y)) + at(0x230);
+    const float vy = __builtin_fmaf(at(0x224), z, __builtin_fmaf(at(0x204), x, at(0x214) * y)) + at(0x234);
+    const float vz = __builtin_fmaf(at(0x228), z, __builtin_fmaf(at(0x208), x, at(0x218) * y)) + at(0x238);
+    if (viewZ) {
+        *viewZ = vz;
+    }
+
+    const float p0 = __builtin_fmaf(at(0x380), vz, at(0x37C) * vy);
+    const float p1 = __builtin_fmaf(at(0x378), vz, at(0x374) * vy);
+    const float p2 = __builtin_fmaf(at(0x370), vz, at(0x36C) * vx);
+    const float p3 = __builtin_fmaf(at(0x368), vz, at(0x364) * vx);
+    return radius - p0 >= 0.0f && radius - p1 >= 0.0f && radius - p2 >= 0.0f &&
+           radius - p3 >= 0.0f && at(0x344) - (vz - radius) >= 0.0f &&
+           (vz + radius) - at(0x340) >= 0.0f ? 2 : 0;
+}
