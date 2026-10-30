@@ -27,6 +27,9 @@ struct cmPort {
     int32_t     m_type;         // +0x04  port type (1=direct, 2=node)
 };
 
+// @ 0x822621B0 — reads the bool byte without normalizing nonzero values.
+extern "C" uint8_t cmPort_GetBool(void* port);
+
 // ── cmCondEntry — 16-byte condition/value port pair ─────────────────────────
 struct cmCondEntry {
     cmPort      condPort;       // +0x00  condition port (evaluated as bool)

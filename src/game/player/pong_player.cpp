@@ -5395,17 +5395,11 @@ extern float g_inputScoreByPlayer[];                                  // alias o
 // 0x82027A30 = "Player %d is queueing a swing"
 // 0x82027A50 = "Player %d is dequeueing a swing"
 
-// vec3 helper globals for BoundVector/IsInCourtBox (8740_wrh / 8E28_2h).
-// Signed-zero mask, floating +0.0 vector, and the 4 court-corner vec3s used
-// by IsInCourtBox live adjacent to each other in .data:
-//   +0x82607210  upper-outer   (vec3; 8E28 uses as max-outer)
-//   +0x82607220  upper-inner   (8E28 uses as max-inner)
-//   +0x82607230  lower-inner   (8E28 uses as min-inner)
-//   +0x82607240  lower-outer   (8E28 uses as min-outer)
+// Runtime bounds set by 0x820E8CD8 and read by IsInTableAvoidanceVolume.
 extern const vec3 g_kCourtBoxOuterMin;  // @ 0x82607210
-extern const vec3 g_kCourtBoxInnerMin;  // @ 0x82607220
+extern const vec3 g_kCourtBoxOuterMax;  // @ 0x82607220
 extern const vec3 g_kCourtBoxInnerMax;  // @ 0x82607230
-extern const vec3 g_kCourtBoxOuterMax;  // @ 0x82607240
+extern const vec3 g_kCourtBoxInnerMin;  // @ 0x82607240
 
 // Sign-mask / compare helpers (8740_wrh).
 extern const uint32_t g_kFloatSignMask[4];  // @ 0x82619BE0 — 0x7FFFFFFF × 4
@@ -5913,55 +5907,37 @@ extern "C" bool pongPlayer_8740_wrh(const vec3* pos, const vec3* boundMin,
 
 
 // ---------------------------------------------------------------------------
-// pongPlayer_8E28_2h  @ 0x820E8E28 | size: 0x144 (324 bytes)
+// pongPlayer_IsInTableAvoidanceVolume @ 0x820E8E28 | size: 0x144 (324 bytes)
 //
-// Two-tier in-volume test: checks whether the input 3D position lies within
-// the inner court box [kCourtBoxInnerMin, kCourtBoxInnerMax], and if not,
-// whether it falls in the "angled gap" between the inner and outer box
-// (by linear interpolation on Y based on the X fraction between bounds).
-//
-// Returns:
-//   1  if P is fully inside the INNER box.
-//   ~1 in the angled-extension region (special-case return via "li r11,1").
-//   0  otherwise.
-//
-// The bso-cr6 paths in the scaffold are NaN-propagation; under IEEE-754 any
-// NaN coordinate fails the comparisons and falls through to the outer test.
+// Accepts the inclusive inner AABB, or the outer AABB below a Y/Z slope:
+//   y <= outerMax.y * (z - outerMax.z) / (outerMin.z - outerMax.z).
+// The slope runs from outerMax.y at outerMin.z to zero at outerMax.z.
+// A flat outer Z range uses 1.0f (0x8202D108). Ordered comparisons reject
+// NaNs in the box being tested; an unordered inner bound can still fall
+// through to a valid outer test. Both nearby candidate searches
+// (0x820E9890 / 0x820E9AB8) reject points inside this table avoidance
+// volume before their distance checks.
 // ---------------------------------------------------------------------------
-extern "C" bool pongPlayer_8E28_2h(const vec3* pos) {
-    // Tier 1 — strict inner box.
-    if (pos->x > g_kCourtBoxInnerMax.x && pos->x >= g_kCourtBoxInnerMin.x &&
+extern "C" bool pongPlayer_IsInTableAvoidanceVolume(const vec3* pos) {
+    if (pos->x <= g_kCourtBoxInnerMax.x && pos->x >= g_kCourtBoxInnerMin.x &&
         pos->y <= g_kCourtBoxInnerMax.y && pos->y >= g_kCourtBoxInnerMin.y &&
         pos->z <= g_kCourtBoxInnerMax.z && pos->z >= g_kCourtBoxInnerMin.z) {
         return true;
     }
 
-    // Tier 2 — angled extension using the OUTER bounds.  Both X checks
-    // must be inside [outerMin.x, outerMax.x]; then Y is clamped into the
-    // interpolated wedge between innerMax.y and 0 as X moves from outerMax
-    // toward innerMax.
-    if (!(pos->x > g_kCourtBoxOuterMax.x)) return false;
-    if (pos->x < g_kCourtBoxOuterMin.x)    return false;
-
-    if (pos->y > g_kCourtBoxOuterMax.y) return false;
-    if (pos->y < g_kCourtBoxOuterMin.y) return false;
-
-    if (pos->z > g_kCourtBoxOuterMax.z) return false;
-    if (pos->z < g_kCourtBoxOuterMin.z) return false;
-
-    // Angled-wedge Y test: interpolate upper bound between outer and inner
-    // as X crosses the gap.  When the two bounds coincide, fall back to
-    // g_kFloatConst_D108 (the court's zero-timer float constant) to avoid
-    // divide-by-zero — matches the PPC scaffold at loc_820E8F44.
-    float xRange    = g_kCourtBoxInnerMax.x - g_kCourtBoxOuterMax.x;
-    float interpFrac;
-    if (xRange == 0.0f) {
-        interpFrac = g_kFloatConst_D108;
-    } else {
-        float xOffset = pos->x - g_kCourtBoxOuterMax.x;
-        interpFrac = xOffset / xRange;
+    if (!(pos->x <= g_kCourtBoxOuterMax.x && pos->x >= g_kCourtBoxOuterMin.x &&
+          pos->y <= g_kCourtBoxOuterMax.y && pos->y >= g_kCourtBoxOuterMin.y &&
+          pos->z <= g_kCourtBoxOuterMax.z && pos->z >= g_kCourtBoxOuterMin.z)) {
+        return false;
     }
-    float maxY = g_kCourtBoxInnerMax.y * interpFrac;
+
+    float fraction = g_kFloatConst_D108;
+    if (g_kCourtBoxOuterMax.z != g_kCourtBoxOuterMin.z) {
+        const float offset = pos->z - g_kCourtBoxOuterMax.z;
+        const float range = g_kCourtBoxOuterMin.z - g_kCourtBoxOuterMax.z;
+        fraction = offset / range;
+    }
+    const float maxY = g_kCourtBoxOuterMax.y * fraction;
     return pos->y <= maxY;
 }
 

@@ -133,13 +133,13 @@ TT_DATA_ALIAS("g_phBoundAABBTemplate", "g_identityVector");
 extern "C" alignas(16) uint8_t g_kCourtBoxOuterMin[32] = {};
 
 // @ 0x82607220 (.data) — a 16-byte object in the image (zero); room for host pointer widths
-extern "C" alignas(16) uint8_t g_kCourtBoxInnerMin[32] = {};
+extern "C" alignas(16) uint8_t g_kCourtBoxOuterMax[32] = {};
 
 // @ 0x82607230 (.data) — a 16-byte object in the image (zero); room for host pointer widths
 extern "C" alignas(16) uint8_t g_kCourtBoxInnerMax[32] = {};
 
 // @ 0x82607240 (.data) — a 16-byte object in the image (zero); room for host pointer widths
-extern "C" alignas(16) uint8_t g_kCourtBoxOuterMax[32] = {};
+extern "C" alignas(16) uint8_t g_kCourtBoxInnerMin[32] = {};
 
 // @ 0x8261A3D0 (.data)
 extern "C" alignas(16) uint8_t g_ballSplashArray[832] = {};
