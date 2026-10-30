@@ -66,7 +66,6 @@ extern "C" void pongCreatureInst_Cleanup(void* obj);  // @ 0x822C8FD0
 extern "C" void LocomotionStateAnim_SetSpeed(void* obj, float speed);
 extern "C" void LocomotionStateAnim_ApplySpeed(void* obj);
 extern "C" void LocomotionStateAnim_InitCapsuleImpl(void* obj, float radius, const void* center);
-extern "C" void LocomotionStateAnim_SetMatrixImpl(void* obj, const void* matrix);
 extern "C" void* LocomotionState_FindFirstActive(void* list);
 extern "C" void* LocomotionStateAnim_FindAnim(void* obj);
 extern "C" void LocomotionStateAnim_ComputeOffset(void* obj, void* outVec);
@@ -2311,15 +2310,6 @@ void LocomotionStateAnim::SetGlobalInstance(void* newInstance) {  // 34E8_p46
     if (newInstance) rage_AddRef(newInstance);
     g_locomotionAnimInstance = newInstance;
     if (oldInstance) rage_Release(oldInstance);
-}
-
-/**
- * LocomotionStateAnim::SetMatrix @ 0x820D7B30 | size: 0x60
- *
- * Copies a 4×4 matrix (64 bytes) and forwards to the internal setter.
- */
-void LocomotionStateAnim::SetMatrix(const void* srcMatrix) {  // 7B30_g
-    LocomotionStateAnim_SetMatrixImpl(this, srcMatrix);
 }
 
 /**

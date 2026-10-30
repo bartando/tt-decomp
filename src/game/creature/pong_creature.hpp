@@ -231,7 +231,6 @@ struct LocomotionStateAnim {
     void ForwardToVfn7();  // @ 0x8224BB98
     int CountActiveAnimLayers();  // @ 0x820DBA60
     void SetGlobalInstance(void* newInstance);  // @ 0x820C34E8
-    void SetMatrix(const void* srcMatrix);  // @ 0x820D7B30
     bool DispatchAnimEvent(void* eventArg);  // @ 0x820DEEC8
     void GetAnimPosition(void* outPosition);  // @ 0x820CB800
     void AccumulateOffset(void* accumulator);  // @ 0x8223BDB0
