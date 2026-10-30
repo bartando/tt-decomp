@@ -716,23 +716,21 @@ void grcTextureFactoryString_FF68(rage::grcTextureFactoryString* pObj, const cha
 // grcTextureFactoryXenon_EFE8  [@ 0x8214EFE8]
 // size: 0xA0 (160 bytes)
 //
-// Applies texture transform state from a grcTextureFactoryXenon device.
-// Copies 6 float values (24 bytes) from device+12808 into a local buffer,
-// then conditionally flips the Y/V coordinates (subtracts from 1.0f) when
-// g_grcFormatId matches the sentinel 0x1A220197. Finally dispatches the
-// transform data to grcDevice_SetViewport for GPU submission.
+// Binds a colour render target, then reapplies the current viewport (+0x3208).
+// Its first four words are integer x/y/width/height, followed by float min/max Z.
+// The format sentinel 0x1A220197 reverses both depth bounds before submission.
 // ─────────────────────────────────────────────────────────────────────────────
 extern void* g_grcTextureDevice __asm__("_g_binkVideoPlayer");   // @ 0x825EB988, defined in globals.c
 extern uint32_t g_grcFormatId;     // @ 0x825C9030
-extern void rage_6290(void* pDevice, void* pSrc, void* pParam);
+extern "C" void grcDevice_SetRenderTarget(void* device, uint32_t slot, void* surface); // @ 0x82356290
 extern "C" void grcDevice_SetViewport(void* device, const void* viewport);  // @ 0x82355ED0
 
 // @ 0x8214EFE8
-void grcTextureFactoryXenon_EFE8(void* pDevice, void* pSrc, void* pParam)
+void grcTextureFactoryXenon_EFE8(uint32_t slot, void* surface)
 {
-    rage_6290(g_grcTextureDevice, pSrc, pParam);
+    grcDevice_SetRenderTarget(g_grcTextureDevice, slot, surface);
 
-    // Copy 6 floats (24 bytes) from device+0x3208 into local buffer
+    // Preserve all six viewport words; only the final two are used as floats.
     // TODO: replace magic offset 0x3208 once grcTextureDevice layout is known
     static const uint32_t kTransformDataOffset = 0x3208;  // 12808 decimal
     float transformData[6];
@@ -742,10 +740,10 @@ void grcTextureFactoryXenon_EFE8(void* pDevice, void* pSrc, void* pParam)
         transformData[i] = pSrcFloats[i];
     }
 
-    // Conditional V-flip for specific format
+    // Conditional depth reversal for this format.
     if (g_grcFormatId == 0x1A220197) {
-        transformData[4] = 1.0f - transformData[4];   // flip V offset
-        transformData[5] = 1.0f - transformData[5];   // flip V scale
+        transformData[4] = 1.0f - transformData[4];
+        transformData[5] = 1.0f - transformData[5];
     }
 
     grcDevice_SetViewport(g_grcTextureDevice, transformData);
