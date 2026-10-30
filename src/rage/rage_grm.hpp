@@ -384,6 +384,12 @@ struct rmcDrawableBase {
     void**      vtable;           // +0x00
 };
 
+// Draw the selected LOD's model list from the drawable's embedded group (+0x10).
+// Descriptive name: shared by rmcDrawable and fragDrawable draw slots 5/6/7.
+void rmcDrawable_DrawLodModels(void* lodGroup, void* shaderGroup, const float* transforms,
+                               void* drawContext, uint32_t lod, const uint32_t* const* modelMask,
+                               uint32_t skinned, void* skinContext); // @ 0x8225D8A0
+
 // ── rage::rmcTypeFileParser  [vtable @ 0x82050078] ──────────────────────────
 struct rmcTypeFileParser {
     void**      vtable;           // +0x00

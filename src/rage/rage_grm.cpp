@@ -36,7 +36,80 @@ extern "C" void   xe_main_thread_init_0038();                // @ 0x820C0038
 extern "C" void* g_rageDescriptorHead __asm__("_g_tls_base");  // r13+0: the thread's TLS block (globals.c g_tls_base)
 extern "C" rage::grmShaderFactory* g_grmShaderFactory_instance; // @ 0x82606374
 
+extern "C" void* g_pCurrentViewport;                // @ 0x825EBAA0
+extern "C" const float g_identityMatrixRef[16];     // @ 0x825CB800
+extern uint8_t lbl_8260633D;                        // @ 0x8260633D
+extern float lbl_82619D20[16];                      // @ 0x82619D20
+extern float lbl_82619D60[16];                      // @ 0x82619D60
+// Despite its auto-name, this sets the current viewport's model matrices.
+extern "C" void pongShadowMap_38C0_g(void* viewport, const float* world,
+                                     const float* composite); // @ 0x821538C0
+extern "C" void fragDrawable_D798_wrh(const float* transform, const float* view,
+                                       const float* projection); // @ 0x8225D798
+extern "C" void fragDrawable_19C8_h(void* model, void* shaderGroup,
+                                    void* drawContext, uint32_t lod); // @ 0x820F19C8
+extern "C" void fragDrawable_1C00_fw(void* model, void* shaderGroup, const float* transforms,
+                                     uint32_t filter, void* drawContext, uint32_t lod); // @ 0x820F1C00
+extern "C" void fragDrawable_1D80_wrh(void* model, void* skinContext, void* shaderGroup,
+                                      const float* transforms, uint32_t filter,
+                                      void* drawContext, uint32_t lod); // @ 0x820F1D80
+
 namespace rage {
+
+// @ 0x8225D8A0 | size: 0x1E8 (original auto-name: fragDrawable_D8A0)
+// Callers pass drawable+0x10, not the drawable itself. The group has four
+// model-list pointers at +0x30. Each list is an atArray-style pointer/u16 count.
+// Models use +0x13 as an unsigned transform/mask index, +0x15 for the skinned
+// path and +0x18 to request identity for a rigid model. Cache -1 is identity;
+// -2 forces the first model to install its matrix even when its index is zero.
+void rmcDrawable_DrawLodModels(void* lodGroup, void* shaderGroup, const float* transforms,
+                               void* drawContext, uint32_t lod, const uint32_t* const* modelMask,
+                               uint32_t skinned, void* skinContext) {
+    struct ModelList {
+        uint8_t** models;
+        uint16_t count;
+    };
+    auto* lists = reinterpret_cast<ModelList**>(static_cast<uint8_t*>(lodGroup) + 0x30);
+    ModelList* list = lists[lod];
+    int currentTransform = -2;
+    for (uint32_t i = 0; i < list->count; ++i) {
+        uint8_t* model = list->models[i];
+        if (model == nullptr) {
+            continue;
+        }
+        const uint32_t transformIndex = model[0x13];
+        if (modelMask != nullptr &&
+            (((*modelMask)[transformIndex >> 5] & (1u << (transformIndex & 31))) == 0)) {
+            continue;
+        }
+        if (model[0x15] != 0) {
+            if (currentTransform != -1) {
+                pongShadowMap_38C0_g(g_pCurrentViewport, g_identityMatrixRef, g_identityMatrixRef);
+                currentTransform = -1;
+            }
+            // Xenon stores r9 with stb, so only its low byte selects the path.
+            if (static_cast<uint8_t>(skinned) != 0) {
+                fragDrawable_1D80_wrh(model, skinContext, shaderGroup, transforms,
+                                      model[0x10], drawContext, lod);
+            } else {
+                fragDrawable_1C00_fw(model, shaderGroup, transforms, model[0x10], drawContext, lod);
+            }
+        } else {
+            const int wantedTransform = model[0x18] != 0 ? -1 : static_cast<int>(transformIndex);
+            if (currentTransform != wantedTransform) {
+                const float* matrix = wantedTransform == -1 ? g_identityMatrixRef : transforms + transformIndex * 16;
+                pongShadowMap_38C0_g(g_pCurrentViewport, matrix, matrix);
+                currentTransform = wantedTransform;
+            }
+            // This update occurs for every rigid draw, including cache hits and
+            // identity draws, and always uses the model's indexed transform.
+            if (lbl_8260633D != 0) {
+                fragDrawable_D798_wrh(transforms + transformIndex * 16, lbl_82619D20, lbl_82619D60);
+            }
+            fragDrawable_19C8_h(model, shaderGroup, drawContext, lod);
+        }
+    }
+}
 
 // ── rage::spdApical ───────────────────────────────────────────────────────────
 
