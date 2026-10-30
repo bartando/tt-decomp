@@ -89,11 +89,12 @@ int crAnimDofVector3::GetChannelCount() {
 // ─────────────────────────────────────────────────────────────────────────────
 // crAnimDofVector3::Evaluate()  [vtable slot 4 @ 0x820C47A0]
 // 
-// Evaluates animation channels and stores the result in the output vector.
-// Delegates to helper function for channel evaluation.
+// Evaluates the channel set passed in r5 into this DOF's own value at +0x10.
 // ─────────────────────────────────────────────────────────────────────────────
-void crAnimDofVector3::Evaluate(void* animContext, float time, float* outVector) {
-    EvaluateChannels(animContext, time, outVector);
+// @ 0x820C47A0
+void crAnimDofVector3::Evaluate(void* animContext, float time, void* channels) {
+    static_cast<crAnimDofVector3*>(channels)->EvaluateChannels(
+        animContext, time, reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(this) + 0x10));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

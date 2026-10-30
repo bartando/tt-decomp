@@ -407,7 +407,7 @@ struct crAnimDofVector3 {
     void ScalarDtor(int flags); // [1] @ 0x8224c7e0
     void* GetValue();           // [2] @ 0x820c46f0
     int GetChannelCount();      // [3] @ 0x820c4be8
-    void Evaluate(void* animContext, float time, float* outVector); // [4] @ 0x820c47a0
+    void Evaluate(void* animContext, float time, void* channels); // [4] @ 0x820c47a0
     void Blend(void* animContext, float blendFactor, float* outVector); // [5] @ 0x820c47b0
     void CopyFrom(void* sourceAnimDof);        // [6] @ 0x820c4850
     void BlendFrom(void* sourceAnimDof, float blendFactor); // [7] @ 0x820c4898
