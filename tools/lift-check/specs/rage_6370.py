@@ -11,17 +11,14 @@ Upload callees are void stubs: compare all argument registers and the initialize
 16-byte vector, not the callees' implementations. Packed signed counts 2..4 are
 checked as arguments only: the original initializes just one vector of its stack
 buffer, so any additional callee reads would consume indeterminate stack bytes.
-VS/PS float destinations may overlap each other, as in the original. Exclude
-only the emulator's private XER-trampoline r0 spill (machine.py _TRAMP_CODE),
-which srad writes on the original side. No game memory or float tolerance is
-excluded; copies and conversions compare exactly.
+VS/PS float destinations may overlap each other, as in the original. No memory
+or float tolerance is excluded; copies and conversions compare exactly.
 """
 from liftcheck.spec import *
 
 FUNCTION = "rage_6370"
 ADDRESS = 0x82446370
 SOURCE = "src/rage/rage_grm.cpp"
-IGNORE = [(0xFFFF8000, 4)]  # emulator-private scratch, not a game write
 
 CALLS = {
     name: stub(ret="void", args=("r3", "r4", "r5", "r6"), deref={"r5": 16})
