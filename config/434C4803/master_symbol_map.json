@@ -226123,13 +226123,13 @@
       "size": 300
     },
     "0x8227d898": {
-      "name": "phUpdateObject_vfn_5",
+      "name": "phUpdateObject_RenderShadow",
       "type": "function",
       "section": ".text",
       "size": 200
     },
     "0x8227d960": {
-      "name": "phUpdateObject_vfn_1",
+      "name": "phUpdateObject_CommitTransform",
       "type": "function",
       "section": ".text",
       "size": 168
@@ -352413,8 +352413,8 @@
     "rage_D220": "0x8227d220",
     "phUpdateObject_vfn_3": "0x8227d5b0",
     "phUpdateObject_vfn_4": "0x8227d768",
-    "phUpdateObject_vfn_5": "0x8227d898",
-    "phUpdateObject_vfn_1": "0x8227d960",
+    "phUpdateObject_RenderShadow": "0x8227d898",
+    "phUpdateObject_CommitTransform": "0x8227d960",
     "phUpdateObject_vfn_0": "0x8227da08",
     "phUpdateObject_vfn_6": "0x8227da40",
     "crAnimDofFloat_DB78": "0x8227db78",

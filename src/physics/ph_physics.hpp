@@ -84,7 +84,7 @@ struct phMaterialMgrImpl {
 //
 // Base class for objects that participate in per-frame physics updates.
 // Maintains a double-buffered transform array indexed by the global frame
-// counter (g_phFrameIndex @ 0x825C4898).
+// counters (render: 0x825C4898; rollback: 0x826065DC).
 //
 // Struct layout (confirmed from scaffold analysis):
 //   +0x00  vtable pointer
@@ -99,6 +99,7 @@ struct phMaterialMgrImpl {
 //   +0x64  m_pDrawable2     — secondary drawable (offset 100)
 //   +0x68  m_pTransformSrc  — fallback transform source (offset 104)
 //   +0x6C  m_pCollider      — articulated collider reference (offset 108)
+//   +0x70  m_scale          — four-lane componentwise basis scale
 //   +0x80  m_pFrameBuffer   — double-buffered frame array base (offset 128)
 //   +0x85  m_bActive        — activity flag (offset 133)
 struct phUpdateObject {
@@ -119,7 +120,7 @@ struct phUpdateObject {
     void*       m_pTransformSrc;  // +0x68  Fallback transform source pointer
     void*       m_pCollider;      // +0x6C  Articulated collider reference
 
-    uint8_t     _pad0x70[16];     // +0x70
+    float       m_scale[4];       // +0x70  componentwise basis scale (including w)
 
     void*       m_pFrameBuffer;   // +0x80  Double-buffered per-frame array base
     uint8_t     _pad0x84[1];      // +0x84
@@ -131,13 +132,14 @@ struct phUpdateObject {
     void Destroy(int flags);                          // [2] @ 0x820C41E8  scalar deleting destructor
     void Reset(void* world, void* scene);             // [3] @ 0x8227D5B0  world sync / init
     void AddToRenderBucket(bool skipVisTest);         // [4] @ 0x8227D768
-    void RenderShadow(float shadowScale);             // [5] @ 0x8227D898
+    void RenderShadow(void* context, float shadowScale);             // [5] @ 0x8227D898
     void UpdateDrawable(void* frameData, uint32_t flags);    // [6] @ 0x8227DA40
 };
 
 static_assert(sizeof(void*) != 4 || offsetof(phUpdateObject, m_pData) == 0x14, "phUpdateObject layout");
 static_assert(sizeof(void*) != 4 || offsetof(phUpdateObject, m_pDrawable) == 0x60, "phUpdateObject layout");
 static_assert(sizeof(void*) != 4 || offsetof(phUpdateObject, m_pCollider) == 0x6C, "phUpdateObject layout");
+static_assert(sizeof(void*) != 4 || offsetof(phUpdateObject, m_scale) == 0x70, "phUpdateObject layout");
 static_assert(sizeof(void*) != 4 || offsetof(phUpdateObject, m_pFrameBuffer) == 0x80, "phUpdateObject layout");
 
 namespace rage {

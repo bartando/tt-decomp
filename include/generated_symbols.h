@@ -13767,8 +13767,8 @@ PPC_EXTERN_IMPORT(phSpringAninmatedAttachment_vfn_5); // 0x82421B98
 PPC_EXTERN_IMPORT(phUpdateObject_vfn_2); // 0x820C41E8
 PPC_EXTERN_IMPORT(phUpdateObject_vfn_3); // 0x8227D5B0
 PPC_EXTERN_IMPORT(phUpdateObject_vfn_4); // 0x8227D768
-PPC_EXTERN_IMPORT(phUpdateObject_vfn_5); // 0x8227D898
-PPC_EXTERN_IMPORT(phUpdateObject_vfn_1); // 0x8227D960
+PPC_EXTERN_IMPORT(phUpdateObject_RenderShadow); // 0x8227D898
+PPC_EXTERN_IMPORT(phUpdateObject_CommitTransform); // 0x8227D960
 PPC_EXTERN_IMPORT(phUpdateObject_vfn_0); // 0x8227DA08
 PPC_EXTERN_IMPORT(phUpdateObject_vfn_6); // 0x8227DA40
 
