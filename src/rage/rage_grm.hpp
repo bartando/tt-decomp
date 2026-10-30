@@ -268,7 +268,7 @@ struct grmShaderFx {
     //     snaps the global variant index, decides between a raw-param path
     //     (r6==0 → per-pass entry from techniqueData[] at offset +64)
     //     and a direct-call path (r6!=0 → use caller-supplied VA), then
-    //     tail-calls the inner draw routine grmShaderFx_AF90_w.
+    //     tail-calls the inner draw routine grmShaderInstance_Bind.
     void Dispatch(uint32_t passIndex,
                           uint32_t callerContext,
                           uint32_t directEntry);     // [6] @ 0x820efa08  size 0xdc

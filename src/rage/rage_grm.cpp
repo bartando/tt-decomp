@@ -567,9 +567,10 @@ extern "C" {
     void     rage_A1F8(uint32_t target, uint32_t registry); // @ 0x8215A1F8
     void     rage_F340(uint32_t self);                      // @ 0x820EF340
     void     grcDevice_FlushRenderState();                 // @ 0x8215B138
-    void     grmShaderFx_AF90_w(uint32_t effectSlot,
-                                uint32_t paramA,
-                                uint32_t paramB);           // @ 0x8215AF90
+    uint32_t grmShaderInstance_Bind(uint32_t effectSlot,
+                                    uint32_t entryId,
+                                    uint32_t flags);        // @ 0x8215AF90
+    extern uint32_t g_grmShaderInstance_previous;          // @ 0x825EBC44
 
     // SDA-resident globals used by the grmShaderFx runtime.
     extern uint32_t g_grmShaderFx_activeState;      // @ 0x825EBA68
@@ -645,6 +646,41 @@ void grmShaderInstance_Unbind(uint32_t instance) {
     *reinterpret_cast<uint32_t*>(self + 520) = 0;
 }
 
+// @ 0x8215AF90
+uint32_t grmShaderInstance_Bind(uint32_t effectSlot, uint32_t entryId, uint32_t flags) {
+    auto* slot = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(effectSlot));
+    auto* instance = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(*slot));
+    const uint32_t index = (entryId >> 18) & 0x3FFF;
+    auto* entries = *reinterpret_cast<uint32_t**>(instance + 512);
+    auto* entry = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(entries[index]));
+    const uint32_t result = entry[1];
+
+    if (g_grmShaderInstance_previous != 0) {
+        const uint32_t previous = g_grmShaderInstance_previous;
+        auto* old = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(previous));
+        const uint32_t saved = *reinterpret_cast<uint32_t*>(old + 532);
+        *reinterpret_cast<uint32_t*>(old + 532) = 0;
+        *reinterpret_cast<uint32_t*>(old + 540) = saved;
+        grmShaderInstance_Unbind(previous);
+        g_grmShaderInstance_previous = 0;
+    }
+
+    instance = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(*slot));
+    g_grmShaderFx_activeInstance = *slot;
+    const uint32_t dirtyFlags = (flags & 0xFF) != 0 ? 3 : 0;
+    entries = *reinterpret_cast<uint32_t**>(instance + 512);
+    const uint32_t selected = entries[index];
+    *reinterpret_cast<uint32_t*>(instance + 692) = dirtyFlags;
+    *reinterpret_cast<uint32_t*>(instance + 540) = 0;
+    if (dirtyFlags != 0) {
+        std::memset(reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(instance) + 320) & ~uintptr_t(15)), 0, 16);
+        std::memset(reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(instance) + 384) & ~uintptr_t(127)), 0, 128);
+    }
+    *reinterpret_cast<uint32_t*>(instance + 520) = entryId;
+    *reinterpret_cast<uint32_t*>(instance + 516) = selected;
+    return result;
+}
+
 namespace rage {
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -695,7 +731,7 @@ static inline uint32_t grmShaderFx_registryEntry(uint16_t shaderId) {
  * the current frame-counter into the per-shader snapshot slot at +44,
  * resolves the active variant index, conditionally flushes the render
  * state (when the flush-latch or force-reset flag is set), and then
- * delegates to grmShaderFx_AF90_w.
+ * delegates to grmShaderInstance_Bind.
  *
  * Two call shapes:
  *   directEntry != 0  → use the caller-supplied entry pointer
@@ -727,7 +763,7 @@ void grmShaderFx::Dispatch(uint32_t passIndex,
     // the inner draw routine along with the effect object at +16.
     const uint32_t effectSlot = reinterpret_cast<uintptr_t>(self + 16);
     if (directEntry != 0) {
-        grmShaderFx_AF90_w(effectSlot, directEntry, callerContext);
+        grmShaderInstance_Bind(effectSlot, directEntry, callerContext);
         return;
     }
 
@@ -738,7 +774,7 @@ void grmShaderFx::Dispatch(uint32_t passIndex,
         *reinterpret_cast<uint32_t**>(self + 64);
     const uint32_t flatIndex = (variantIndex << 2) + passIndex;
     const uint32_t passEntry = techniqueData[flatIndex];
-    grmShaderFx_AF90_w(effectSlot, passEntry, callerContext);
+    grmShaderInstance_Bind(effectSlot, passEntry, callerContext);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
