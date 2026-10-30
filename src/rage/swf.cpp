@@ -164,6 +164,92 @@ inline swfINSTANCE* SwfNextSibling(const swfINSTANCE* instance) {
 }
 }  // namespace
 
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC push_options
+#pragma GCC optimize("fp-contract=off")
+#endif
+// @ 0x82407C60
+void swfSetTransformMatrix(void* transform, const float* matrix) {
+#if defined(__clang__)
+#pragma clang fp contract(off)
+#endif
+    extern double swfAsin(double value);  // @ 0x82430E88
+    extern void swfMakeRotationMatrix(float* out, float degrees);  // @ 0x823FA2A0
+    extern void swfConcatMatrix(float* out, const float* child, const float* parent);  // @ 0x823FA1E0
+    extern float g_swfMinShear;  // @ 0x825C90C8 — shared -0.01 tolerance
+    extern float g_swfMaxShear;  // @ 0x825C8078 — shared +0.01 tolerance
+
+    // r3 is the swfINSTANCE's embedded transform (instance + 8), not the instance.
+    char* state = static_cast<char*>(transform);
+    for (int i = 0; i < 6; ++i) {
+        std::memcpy(state + 4 * i, matrix + i, sizeof(float));
+    }
+    float& rotation = *reinterpret_cast<float*>(state + 0x48);
+    rotation = 0.0f;
+    float working[6];
+    std::memcpy(working, matrix, sizeof(working));
+
+    float c;
+    float d;
+    for (;;) {
+        c = working[2];
+        d = working[3];
+        // Preserve both normalizations and the single-precision fmadds. Each
+        // product outside the explicit fma rounds before the following operation.
+        float negativeC = -c;
+        const float dSquared = d * d;
+        float lengthSquared = std::fma(negativeC, negativeC, dSquared);
+        float inverseLength = lengthSquared == 0.0f ? 0.0f : 1.0f / std::sqrt(lengthSquared);
+        float normalizedD = inverseLength * d;
+        negativeC = inverseLength * negativeC;
+        const float normalizedDSquared = normalizedD * normalizedD;
+        lengthSquared = std::fma(negativeC, negativeC, normalizedDSquared);
+        inverseLength = lengthSquared == 0.0f ? 0.0f : 1.0f / std::sqrt(lengthSquared);
+        normalizedD = inverseLength * normalizedD;
+        const float normalizedC = inverseLength * negativeC;
+        const float sine = -std::fma(normalizedD, 0.0f, -normalizedC);
+        const float radians = static_cast<float>(swfAsin(sine));
+        const float degrees = radians * 57.2957763671875f;  // 0x82079B44
+        rotation = rotation + degrees;
+        // PPC bge tests !LT, so an unordered (NaN) angle also exits the loop.
+        if (!(degrees > 1.0e-6f) && !(degrees < -1.0e-6f)) {
+            break;
+        }
+        float undoRotation[6];
+        swfMakeRotationMatrix(undoRotation, -degrees);
+        float previous[6];
+        std::memcpy(previous, working, sizeof(previous));
+        swfConcatMatrix(working, previous, undoRotation);
+    }
+
+    *reinterpret_cast<float*>(state + 0x58) = working[0] * 100.0f;
+    *reinterpret_cast<float*>(state + 0x5C) = d * 100.0f;
+    float* residual = reinterpret_cast<float*>(state + 0x70);
+    residual[1] = working[1];
+    residual[2] = c;
+    residual[3] = 1.0f;
+    residual[0] = 1.0f;
+    // The original leaves residual[4..5] intact and includes them in concat.
+    if (c < g_swfMinShear || c > g_swfMaxShear || working[1] < g_swfMinShear ||
+        working[1] > g_swfMaxShear) {
+        float halfRotation[6];
+        swfMakeRotationMatrix(halfRotation, rotation * 0.5f);
+        float previous[6];
+        std::memcpy(previous, residual, sizeof(previous));
+        swfConcatMatrix(residual, previous, halfRotation);
+    }
+    // Load both before either store: matrix can point inside the transform.
+    const float translationX = matrix[4];
+    const float translationY = matrix[5];
+    *reinterpret_cast<float*>(state + 0x50) = translationX;
+    *reinterpret_cast<float*>(state + 0x54) = translationY;
+    state[0x8D] = 1;
+    phBoundCapsule_B018_g(transform);
+}
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC pop_options
+#endif
+
 // ===========================================================================
 // swfBASE — Base class for all SWF objects
 // ===========================================================================
