@@ -13,6 +13,8 @@ extern const float lbl_82619BF0[4];    // @ 0x82619BF0 — estimate sentinel, fi
 extern const float lbl_82606750[4];    // @ 0x82606750 — replacement for the sentinel
 extern const float lbl_825CB7C0[4];    // @ 0x825CB7C0 — (1, 1, 1, 0)
 extern const float lbl_825CB7D0[4];    // @ 0x825CB7D0 — (0.5, 0.5, 0.5, 0)
+extern const float lbl_8262F650[4];    // @ 0x8262F650 — parallel-axis threshold, filled at startup
+extern const float lbl_825D0930[4];    // @ 0x825D0930 — (1e-6, 1e-6, 1e-6, 0)
 }
 
 namespace {
@@ -115,6 +117,150 @@ bool clothAboveMesh(float distance, const LvlTableVector* expansion) {
 }
 
 } // namespace
+
+// @ 0x82338D28 | size: 0x358 | formerly pongCreatureInst_8D28_wrh
+// Inferred name: called between cloth constraint iterations at 0x8234198C and
+// 0x823419BC. Translate BOTH edge endpoints away from a capsule's infinite axis;
+// the neighbouring particle-collision passes handle the capsule endcaps.
+void clothCollideEdges(const ClothEdgeCollisionView* self) {
+    if (!self->instance)
+        return;
+    const ClothEdgeBound* composite = self->instance->owner->bound;
+    LvlTableVector* positions = self->positions;
+    if (composite->type != 9 || self->rangeWordCount == 0)
+        return;
+
+    const uint32_t rangeCount = (static_cast<uint32_t>(self->rangeWordCount) + 2) / 3;
+    // These registers survive between ranges. Their first values in the original
+    // come from uninitialized stack scratch; valid initial ranges use type 1/13.
+    LvlTableVector axisStart{}, axis{}, radius{};
+    const auto add = [](float a, float b) { return flushVmx(flushVmx(a) + flushVmx(b)); };
+    const auto sub = [](float a, float b) { return flushVmx(flushVmx(a) - flushVmx(b)); };
+    const auto mul = [](float a, float b) { return flushVmx(flushVmx(a) * flushVmx(b)); };
+    const auto reciprocal = [&](float value, float one) {
+        const float estimate = flushVmx(1.0f / flushVmx(value));
+        const float error = flushVmx(-sub(mul(estimate, value), one));
+        return add(mul(estimate, error), estimate);
+    };
+    const auto dot3 = [](LvlTableVector a, LvlTableVector b) {
+        for (int lane = 0; lane < 3; ++lane) {
+            a.lane[lane] = flushVmx(a.lane[lane]);
+            b.lane[lane] = flushVmx(b.lane[lane]);
+        }
+        return flushVmx(dot(a, b, 3));
+    };
+
+    for (uint32_t range = 0; range < rangeCount; ++range) {
+        const float margin = self->margin;
+        const ClothEdgeBound* bound = composite->children[self->ranges[range].boundIndex & 0x3FFFFFFFu];
+        const auto* bytes = reinterpret_cast<const uint8_t*>(bound);
+        const auto loadBound = [&](uint32_t offset) {
+            return loadClothVector(reinterpret_cast<const LvlTableVector*>(bytes + offset));
+        };
+        const bool tapered = bound->type == 13;
+        if (bound->type == 1) {
+            const LvlTableVector baseRadius = loadBound(0x70);
+            axisStart = loadBound(0x90);
+            axis = loadBound(0xB0);
+            for (int lane = 0; lane < 4; ++lane)
+                radius.lane[lane] = add(baseRadius.lane[lane], margin);
+        } else if (tapered) {
+            axisStart = loadBound(0xC0);
+            axis = loadBound(0xE0);
+        }
+
+        const ClothEdge* edges = self->edges;
+        const int32_t first = self->ranges[range].firstEdge;
+        const int32_t end = self->ranges[range].endEdge;
+        if (first >= end)
+            continue;
+        const float axisSq = dot3(axis, axis);
+        uint32_t cursor = static_cast<uint32_t>(first);
+        uint32_t remaining = static_cast<uint32_t>(end) - cursor;
+        do {
+            // slwi discards the upper two bits, including for negative cursors.
+            const int32_t indexSlot = static_cast<int32_t>(cursor << 2) / 4;
+            const uint32_t edgeIndex = self->edgeIndices[indexSlot];
+            const ClothEdge edge = edges[edgeIndex & 0x1FFFFFFFu];
+            auto* firstPosition = reinterpret_cast<LvlTableVector*>(
+                (reinterpret_cast<uintptr_t>(positions) + ((edge.firstParticle << 4) & 0xFFFFFFFFu)) & ~uintptr_t(15));
+            auto* secondPosition = reinterpret_cast<LvlTableVector*>(
+                (reinterpret_cast<uintptr_t>(positions) + ((edge.secondParticle << 4) & 0xFFFFFFFFu)) & ~uintptr_t(15));
+            const LvlTableVector point = *firstPosition;
+            const LvlTableVector relative = clothSubtract(point, axisStart);
+            const LvlTableVector delta = clothSubtract(*secondPosition, point);
+            const float relativeAxis = dot3(relative, axis);
+            const float axisEdge = dot3(axis, delta);
+            const float edgeSq = dot3(delta, delta);
+            const float relativeEdge = dot3(relative, delta);
+            const float denominator = sub(mul(edgeSq, axisSq), mul(axisEdge, axisEdge));
+            const float edgeNumerator = sub(mul(axisEdge, relativeAxis), mul(axisSq, relativeEdge));
+            const float axisNumerator = sub(mul(edgeSq, relativeAxis), mul(axisEdge, relativeEdge));
+            LvlTableVector onAxis, onEdge;
+            for (int lane = 0; lane < 4; ++lane) {
+                const uint32_t mask = lbl_82619BE0[lane];
+                const float one = lbl_825CB7C0[lane];
+                const float zero = lbl_82606750[lane];
+                const float marker = lbl_82619BD0[lane];
+                const float threshold = maskLane(zero, mask, marker);
+                const bool parallel = flushVmx(threshold)
+                                      > flushVmx(maskLane(sub(denominator, lbl_8262F650[lane]), mask));
+                const float inverseDenominator = reciprocal(denominator, one);
+                float edgeParameter = parallel ? zero : mul(edgeNumerator, inverseDenominator);
+                const float axisParameter = parallel ? mul(relativeEdge, reciprocal(axisEdge, one))
+                                                     : mul(axisNumerator, inverseDenominator);
+                onAxis.lane[lane] = add(mul(axis.lane[lane], axisParameter), axisStart.lane[lane]);
+                if (flushVmx(threshold) > flushVmx(maskLane(edgeParameter, mask)))
+                    edgeParameter = zero;
+                const float upperTest = maskLane(sub(edgeParameter, one), mask);
+                if (!(flushVmx(threshold) > flushVmx(upperTest)))
+                    edgeParameter = one;
+                onEdge.lane[lane] = add(mul(delta.lane[lane], edgeParameter), point.lane[lane]);
+            }
+            if (tapered) {
+                LvlTableVector midpoint;
+                for (int lane = 0; lane < 4; ++lane)
+                    midpoint.lane[lane] = add(point.lane[lane], mul(delta.lane[lane], lbl_825CB7D0[lane]));
+                const LvlTableVector start = loadBound(0xC0);
+                const LvlTableVector direction = loadBound(0xE0);
+                const LvlTableVector slope = loadBound(0xA0);
+                const LvlTableVector baseRadius = loadBound(0x70);
+                const float projection = dot3(direction, clothSubtract(midpoint, start));
+                for (int lane = 0; lane < 4; ++lane)
+                    radius.lane[lane] = add(sub(baseRadius.lane[lane], mul(slope.lane[lane], projection)), margin);
+            }
+
+            const LvlTableVector normal = clothSubtract(onEdge, onAxis);
+            const float distanceSq = dot3(normal, normal);
+            const float estimate = flushVmx(static_cast<float>(1.0 / std::sqrt(static_cast<double>(distanceSq))));
+            LvlTableVector correction;
+            for (int lane = 0; lane < 4; ++lane) {
+                const uint32_t mask = lbl_82619BE0[lane];
+                const float one = lbl_825CB7C0[lane];
+                const float zero = lbl_82606750[lane];
+                const float marker = lbl_82619BD0[lane];
+                const float y = estimate == flushVmx(lbl_82619BF0[lane]) ? zero : estimate;
+                const float error = flushVmx(-sub(mul(distanceSq, mul(y, y)), one));
+                const float inverse = add(mul(error, mul(lbl_825CB7D0[lane], y)), y);
+                const float length = mul(distanceSq, inverse);
+                const float smallTest = maskLane(lbl_825D0930[lane], mask, marker);
+                const bool small = flushVmx(smallTest) > flushVmx(maskLane(length, mask));
+                const float direction = small ? zero : mul(normal.lane[lane], reciprocal(length, one));
+                const float excess = sub(radius.lane[lane], length);
+                const float threshold = maskLane(zero, mask, marker);
+                const float penetration = flushVmx(threshold) > flushVmx(maskLane(excess, mask)) ? zero : excess;
+                correction.lane[lane] = mul(direction, penetration);
+                firstPosition->lane[lane] = add(point.lane[lane], correction.lane[lane]);
+            }
+            // Reload AFTER the first store: a self-edge receives the correction
+            // twice, and later edges see every preceding endpoint update.
+            const LvlTableVector second = *secondPosition;
+            for (int lane = 0; lane < 4; ++lane)
+                secondPosition->lane[lane] = add(second.lane[lane], correction.lane[lane]);
+            ++cursor;
+        } while (--remaining != 0);
+    }
+}
 
 // @ 0x82340900 | size: 0x4B8 | formerly pongCreatureInst_0900
 // Called from cloth simulation at 0x82341600 and 0x82341A50, after the sibling
