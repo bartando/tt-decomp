@@ -1672,89 +1672,46 @@ bool swfContext_IsGlobalSlot13AltMode() {
 
 /**
  * swfCONTEXT_ProcessContextTree @ 0x823FCA50 | size: 0x118
- * 
- * Recursive context processing function. Checks context state flags,
- * calls virtual methods, and manages a context stack. Recursively
- * processes child contexts in a linked list.
+ * Dispatch this node and then visit its children in sibling order.
  */
 void swfCONTEXT_ProcessContextTree(swfCONTEXT* ctx) {
-    // External declarations
-    extern void* g_currentSwfContext;  // @ 0x8260281C (SDA offset 10268)
-    extern uint8_t g_contextStack[128];  // @ 0x82604C68 (SDA offset 19560)
-    
-    // Check flag at offset +173
-    uint8_t flag173 = *((uint8_t*)((char*)ctx + 173));
-    if (flag173 == 0) {
-        return;
-    }
-    
-    // Check nested object at offset +176
-    void* nestedObj = *((void**)((char*)ctx + 176));
-    bool shouldCallVirtual = true;
-    
-    if (nestedObj != nullptr) {
-        uint8_t nestedFlag = *((uint8_t*)((char*)nestedObj + 170));
-        if (nestedFlag != 0) {
-            shouldCallVirtual = false;
-        }
-    }
-    
-    // Call virtual method slot 6 on object at offset +4 (a swfINSTANCE).
-    // Slot 6 on swfINSTANCE is EnumerateMembers; in ProcessContextTree the
-    // original binary reads the return value as a uint8_t — treat as bool.
-    // The declared signature in rage_swf.hpp is `void EnumerateMembers()`,
-    // but the binary leaves r3 populated from the internal walker so the
-    // caller re-interprets it as a bool — we keep the explicit vtable
-    // indirection to preserve the sampled return value.
-    uint8_t callResult = 0;
-    if (shouldCallVirtual) {
-        swfINSTANCE* obj = *((swfINSTANCE**)((char*)ctx + 4));
-        void** vtable = *((void***)obj);
-        typedef uint8_t (*VirtualFn)(swfINSTANCE*);
-        callResult = ((VirtualFn)vtable[6])(obj);
-    }
-    
-    // If virtual call returned non-zero, push context onto stack
-    if (callResult != 0) {
-        // Access global context stack
-        int* stackCount = (int*)((char*)g_contextStack + 128 - 1052);
-        
-        if (*stackCount < 32) {
-            // Check if this context is the current global context
-            if (g_currentSwfContext == ctx) {
-                // Store previous stack top
-                int* prevTop = (int*)((char*)g_contextStack + 128 - 4);
-                *prevTop = *stackCount;
-            }
-            
-            // Push context onto stack
-            int index = *stackCount;
-            void** stackArray = (void**)g_contextStack;
-            stackArray[index] = ctx;
-            (*stackCount)++;
-        }
-    } else {
-        // If this is the current global context, call virtual slot 3.
-        // On swfINSTANCE slot 3 is PrevFrame() but the original binary
-        // passes (ctx, 2, 1) — indicating the real signature is a
-        // different dispatch (likely ClipEvent / state transition) on
-        // a derived display-list node. Keep explicit vtable indirection.
-        if (g_currentSwfContext == ctx) {
-            swfINSTANCE* obj = *((swfINSTANCE**)((char*)ctx + 4));
-            void** vtable = *((void***)obj);
-            typedef void (*VirtualFn3)(swfINSTANCE*, void*, int, int);
-            ((VirtualFn3)vtable[3])(obj, ctx, 2, 1);
+    extern void* g_currentSwfContext;          // @ 0x8260281C
+    extern int32_t g_swfContextStackCount;     // @ 0x8260484C
+    extern int32_t g_swfContextStackFocusIndex; // @ 0x82604C64
+    extern void* g_swfContextStack[32];        // @ 0x82604C68
 
-            // Clear global context
-            g_currentSwfContext = nullptr;
+    char* node = reinterpret_cast<char*>(ctx);
+    uint8_t result = 0;
+    if (*reinterpret_cast<uint8_t*>(node + 173)) {
+        void* nested = *reinterpret_cast<void**>(node + 176);
+        if (!nested || !*(reinterpret_cast<uint8_t*>(nested) + 170)) {
+            void* object = *reinterpret_cast<void**>(node + 4);
+            void** vtable = *reinterpret_cast<void***>(object);
+            // The caller tests only r3's low byte; the callee need not zero-extend it.
+            using ProbeFn = uint32_t (*)(void*);
+            result = static_cast<uint8_t>(reinterpret_cast<ProbeFn>(vtable[6])(object));
         }
     }
-    
-    // Recursively process child contexts (linked list at offset +180/+184)
-    void* childCtx = *((void**)((char*)ctx + 180));
-    while (childCtx != nullptr) {
-        swfCONTEXT_ProcessContextTree((swfCONTEXT*)childCtx);
-        childCtx = *((void**)((char*)childCtx + 184));
+
+    if (result && g_swfContextStackCount < 32) {
+        int32_t index = g_swfContextStackCount;
+        if (g_currentSwfContext == ctx) {
+            g_swfContextStackFocusIndex = index;
+        }
+        g_swfContextStack[index] = ctx;
+        g_swfContextStackCount = index + 1;
+    } else if (g_currentSwfContext == ctx) {
+        void* object = *reinterpret_cast<void**>(node + 4);
+        void** vtable = *reinterpret_cast<void***>(object);
+        using TransitionFn = void (*)(void*, swfCONTEXT*, int, int);
+        reinterpret_cast<TransitionFn>(vtable[3])(object, ctx, 2, 1);
+        g_currentSwfContext = nullptr;
+    }
+
+    auto* child = *reinterpret_cast<swfCONTEXT**>(node + 180);
+    while (child) {
+        swfCONTEXT_ProcessContextTree(child);
+        child = *reinterpret_cast<swfCONTEXT**>(reinterpret_cast<char*>(child) + 184);
     }
 }
 
