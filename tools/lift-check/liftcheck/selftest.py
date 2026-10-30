@@ -23,6 +23,7 @@ TOSS_W_FIX = ("velocity._pad = (hitPoint._pad - ball->position._pad) * invTime;"
               "velocity._pad = 0.0f;")
 
 EXPECT = [
+    ("pg_6c00_w", "PASS", ()),
     ("strip_vertex_cache_access", "PASS", ()),
     ("stl_string_append", "PASS", ()),
     ("pong_player_toss_serve_ball", "PASS|FAIL:_pad", ()),
@@ -36,6 +37,14 @@ EXPECT = [
 ]
 
 MUTATIONS = [
+    ("pg_6c00_w", "invert tangent handedness",
+     [("lbl_82606750[k] > dot", "lbl_82606750[k] < dot")]),
+    ("pg_6c00_w", "pack components at 9-bit intervals",
+     [("<< (10 * k);", "<< (9 * k);")]),
+    ("pg_6c00_w", "skip mapping refresh",
+     [("        pg_7578_g(buffer);", "        /* omitted mapping */")]),
+    ("pg_6c00_w", "keep VMX subnormals",
+     [("            bits &= 0x80000000u;", "            /* omitted VMX flush */")]),
     ("strip_vertex_cache_access", "flip the pass comparison",
      [("if (m_pass[i] != pass) {", "if (m_pass[i] == pass) {")]),
     ("strip_vertex_cache_access", "wrap m_next at 17 instead of 18",
@@ -107,6 +116,42 @@ MARKER_EXPECT = [
 ]
 
 
+def _normpacked32() -> list[str]:
+    """ReXGlue format=2/mask=1/shift=0, including reversed host lane placement.
+
+    First three vectors are Xenia's uint_2101010_0..2 instruction tests. Extra
+    cases pin NaN clamping, exact endpoints, aliasing and preserved lanes.
+    """
+    from .vmx import Unsupported, VectorUnit
+    cases = [
+        ([0xB8FF8000, 0xB8FF8000, 0xC04001FF, 0x4E9A5A5A], 0xE0180601),
+        ([0x42C80000, 0xC2C80000, 0x40400000, 0x3F800000], 0x000805FF),
+        ([0x3F000000, 0xBF000000, 0x3F800000, 0], 0x20180601),
+        ([0x7FC00000, 0x7F800000, 0xFF800000, 0x7FC00000], 0x2017FE01),
+        ([0x404001FF, 0x403FFE01, 0x40400000, 0x40400003], 0xC00805FF),
+    ]
+    errors = []
+    for source, expected in cases:
+        for alias in (False, True):
+            v = VectorUnit(None)
+            v.v[3] = source[:]
+            v.v[4] = [0xCDCDCDCD] * 4
+            # Actual instruction encoding: vpkd3d128 v4/v3,v3,2,1,0.
+            word = 0x18891E10 if not alias else 0x18691E10
+            v.execute(word, 0)
+            want = (source[:3] if alias else [0xCDCDCDCD] * 3) + [expected]
+            if v.v[3 if alias else 4] != want:
+                errors.append(f"normpacked32 {source!r}, alias={alias}: wrong result")
+    # Other forms must still fail explicitly, never silently use this model.
+    for word in (0x18811E10, 0x188A1E10, 0x18891E50):
+        try:
+            VectorUnit(None).execute(word, 0)
+            errors.append(f"normpacked32 accepted unsupported form 0x{word:08X}")
+        except Unsupported:
+            pass
+    return errors
+
+
 def _markers() -> list[str]:
     import tempfile
 
@@ -157,6 +202,12 @@ def main(argv=None) -> int:
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv or [])
     bad = 0
+
+    packed_errors = _normpacked32()
+    print(f"{'ok  ' if not packed_errors else 'FAIL'} vpkd3d128 NORMPACKED32 regression")
+    for line in packed_errors:
+        print(f"     {line}")
+    bad += bool(packed_errors)
 
     if not args.no_isa:
         from .isatest import DEFAULT_TESTS

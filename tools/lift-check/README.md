@@ -49,6 +49,7 @@ into the repo.
    ```sh
    tools/lift-check/lift-check stl_string_append            # 200 trials, seed 1
    tools/lift-check/lift-check my_spec --trials 2000 --seed 7 --ftol 1e-6
+   tools/lift-check/lift-check pg_6c00_w --trials 10000 --seed 7
    ```
 
 3. Read the first line. Exit code in brackets.
@@ -163,8 +164,10 @@ all fail (about 40 s).
 
 ## Limits
 
-- **VMX128 D3D packing** (`vpkd3d128`, `vupkd3d128`) and AltiVec ops outside the common set
-  (vmsum*, vmul*, vsum*, pixel packs) report `unsupported`.
+- **VMX128 D3D packing**: `vpkd3d128` supports only NORMPACKED32 (format=2, mask=1,
+  shift=0), as used by `pg_6C00_w`, matching ReXGlue's `build_vpkd3d128`, including
+  NaN clamping and preserving untouched lanes. Other forms, `vupkd3d128`, and AltiVec
+  ops outside the common set (vmsum*, vmul*, vsum*, pixel packs) report `unsupported`.
 - **Estimates aren't Xenon's**: vrefp, vrsqrtefp, vexptefp and vlogefp give the true value,
   fres and frsqrte the G4's estimate. Lifts that divide where the original estimates differ
   by a few ulps, hence `FTOL`. The VMX multiply-adds round the product (non-fused), per
@@ -190,6 +193,14 @@ all fail (about 40 s).
   `vmaddfp128 v10, v0, v8, v3`); lift-check names VMX128 words itself in its reports.
 
 ## Findings so far
+
+- `pg_6C00_w` (0x82156C00), `specs/pg_6c00_w.py`: checks absent tangents, handedness
+  with supplied/fetched bitangents, packed 2:10:10:10 and raw copies, including mapping
+  changes, address rounding/wrap, aliases, subnormals, NaNs and saturation. `pg_7578_g` and
+  `util_5B08` are boundary models, not additional lifts. The normal/sign vectors at
+  0x82619BD0 / 0x82606750 / 0x82619BE0 come from the game's static initializers.
+  The TU is not in the native executable's CMake source list: the two callees and
+  vectors at 0x82619BD0 / 0x82619BE0 still need native definitions before linking it.
 
 - `pongPlayer_TossServeBall` (0x821934A0) fails: the lift computes the impulse's w lane
   as `(hit.w - pos.w) / t * mass`, but the asm's reciprocal comes from the `(1, 1, 1, 0)`
