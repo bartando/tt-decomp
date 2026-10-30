@@ -258,8 +258,10 @@ generated code for these functions matches the asm):
   their `.u64`/`.s64` aliases, so values written through those read as 0 (f25/f24 in
   0x82406778). Phase D also moves `fcmpu` past a later write to the compared register.
 - A census of the final scaffold finds about 230 affected functions (~1.4%): 190 with
-  mixed FPR storage, 40 with wrong loop guards. The cause is the text-level cleanup
-  passes, not the PPC decoder.
+  mixed FPR storage, 40 with wrong loop guards. Delayed compares are far more common:
+  2,221 sites in 1,558 functions (9.2%) test an operand overwritten since the original
+  compare (static signatures, not each confirmed). The cause is the text-level cleanup
+  passes, not the PPC decoder; treat this output as a hint only.
 
 ## Disassembly caveat
 
