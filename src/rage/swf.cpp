@@ -36,7 +36,6 @@ extern "C" {
     float swfINSTANCE_F0D8_w(void* instance, float* outMin);  // @ 0x823FF0D8 — display height, optional minimum
     void* util_B188(void* slots, int index);  // @ 0x823FB188
     uint8_t util_0068(void* record);  // @ 0x821E0068 — button released this frame
-    void phBoundCapsule_B018_g(void* transform);  // @ 0x823FB018 — rebuild SWF affine transform
     int _snprintf(char* buffer, size_t count, const char* format, ...);  // @ 0x820C0B40
     extern void* g_sda_6404;  // @ 0x82606404 — shared texture lookup owner
 }
@@ -103,6 +102,29 @@ extern void* g_swfScriptArrayPool;   // @ SDA offset 19552
 extern const char* g_str_swf_unsupportedMethod;  // @ 0x82075054, defined in pong_strings.cpp
 
 namespace rage {
+
+// @ 0x823FB018
+void swfRebuildTransform(void* transform) {
+    extern void swfMakeRotationMatrix(float* out, float degrees);  // @ 0x823FA2A0
+    extern void swfConcatMatrix(float* out, const float* child, const float* parent);  // @ 0x823FA1E0
+    extern float g_swfMaxShear;  // @ 0x825C8078 — shared 0.01 scale factor
+    char* state = static_cast<char*>(transform);
+    float* values = reinterpret_cast<float*>(state);
+    float rotation[6];
+    swfMakeRotationMatrix(rotation, values[19] == 0.0f ? values[18] : values[19]);
+    const bool useBaseScale = values[24] == 100.0f && values[25] == 100.0f;
+    float scale[6] = {
+        values[useBaseScale ? 22 : 24] * g_swfMaxShear, 0.0f, 0.0f,
+        values[useBaseScale ? 23 : 25] * g_swfMaxShear, 0.0f, 0.0f
+    };
+    float combined[6];
+    swfConcatMatrix(combined, values + 28, rotation);
+    swfConcatMatrix(rotation, scale, combined);
+    std::memcpy(state, rotation, sizeof(rotation));
+    values[4] = values[26] + values[20];
+    values[5] = values[27] + values[21];
+    state[0x8D] = 0;
+}
 
 namespace {
 constexpr int SWF_INTERN_BUFFER_SIZE = 1024;
@@ -244,7 +266,7 @@ void swfSetTransformMatrix(void* transform, const float* matrix) {
     *reinterpret_cast<float*>(state + 0x50) = translationX;
     *reinterpret_cast<float*>(state + 0x54) = translationY;
     state[0x8D] = 1;
-    phBoundCapsule_B018_g(transform);
+    swfRebuildTransform(transform);
 }
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC pop_options
@@ -1774,7 +1796,7 @@ extern "C" void pg_D078_g(void* instance) {
         const float maxY = minY + height;
 
         float* matrix = reinterpret_cast<float*>(object + 8);
-        phBoundCapsule_B018_g(matrix);
+        rage::swfRebuildTransform(matrix);
         // Keep fmuls rounding before each fmadds, and the final translation
         // addition separate. Ordered comparisons also reject all NaN bounds.
         const float leftProduct = matrix[0] * minX;
