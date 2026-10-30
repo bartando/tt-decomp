@@ -54,6 +54,11 @@ struct swfShapeFillState;
 uint32_t swfDrawShapeTriangles(const swfSHAPE* shape, const void* command,
                                const void* transform, const swfShapeFillState* fill);
 
+// SWF stroke coordinates/width are in twips. UVs use the unoffset point.
+void swfEmitLineVertexOffsetX(float x, float y, float offset);
+void swfEmitLineVertexOffsetY(float x, float y, float offset);
+void swfDrawLine(float x0, float y0, float x1, float y1, float width);
+
 /**
  * swfValueType — ActionScript value type constants
  *
