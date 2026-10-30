@@ -416,7 +416,7 @@
     },
     "14": {
       "addr": "0x823d8cd0",
-      "symbol": "crAnimDofVector3_vfn_14",
+      "symbol": "crAnimDofVector3_GetVector",
       "slot": 14,
       "source": "vfn_symbol"
     },

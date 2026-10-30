@@ -410,24 +410,27 @@ struct crAnimDofQuaternion {
 
 // ── rage::crAnimDofVector3  [vtable @ 0x82027B9C] ──────────────────────────
 struct crAnimDofVector3 {
-    void**      vtable;           // +0x00
+    // Native vptr is the guest vtable at +0; one declaration per guest slot.
+    virtual void Destroy();                 // [0]
 
     // ── virtual methods ──
-    void ScalarDtor(int flags); // [1] @ 0x8224c7e0
-    void* GetValue();           // [2] @ 0x820c46f0
-    int GetChannelCount();      // [3] @ 0x820c4be8
-    void Evaluate(void* animContext, float time, void* channels); // [4] @ 0x820c47a0
-    void Blend(void* animContext, float blendFactor, float* outVector); // [5] @ 0x820c47b0
-    void CopyFrom(void* sourceAnimDof);        // [6] @ 0x820c4850
-    void BlendFrom(void* sourceAnimDof, float blendFactor); // [7] @ 0x820c4898
-    void ScaleFrom(void* sourceAnimDof, float scaleFactor); // [8] @ 0x820c4948
-    void ThresholdFrom(void* sourceAnimDof, float threshold); // [9] @ 0x820c49d0
-    void ScaleInPlace(float scaleFactor);      // [10] @ 0x820c4a38
-    void Reset();              // [11] @ 0x820c4a60
-    void TransformBy(void* transformAnimDof);  // [12] @ 0x820c4a78
-    void Normalize();          // [13] @ 0x820c4af8
-    void vfn_14();             // [14] @ 0x823d8cd0
-    void SetValue(const float* sourceVec);     // [17] @ 0x820c4b10
+    virtual void ScalarDtor(int flags); // [1] @ 0x8224c7e0
+    virtual void* GetValue();           // [2] @ 0x820c46f0
+    virtual int GetChannelCount();      // [3] @ 0x820c4be8
+    virtual void Evaluate(void* animContext, float time, void* channels); // [4] @ 0x820c47a0
+    virtual void Blend(void* animContext, float blendFactor, float* outVector); // [5] @ 0x820c47b0
+    virtual void CopyFrom(void* sourceAnimDof);        // [6] @ 0x820c4850
+    virtual void BlendFrom(void* sourceAnimDof, float blendFactor); // [7] @ 0x820c4898
+    virtual void ScaleFrom(void* sourceAnimDof, float scaleFactor); // [8] @ 0x820c4948
+    virtual void ThresholdFrom(void* sourceAnimDof, float threshold); // [9] @ 0x820c49d0
+    virtual void ScaleInPlace(float scaleFactor);      // [10] @ 0x820c4a38
+    virtual void Reset();              // [11] @ 0x820c4a60
+    virtual void TransformBy(void* transformAnimDof);  // [12] @ 0x820c4a78
+    virtual void Normalize();          // [13] @ 0x820c4af8
+    virtual float* GetVector();              // [14] @ 0x823D8CD0
+    virtual void vfn_15();                   // [15]
+    virtual void vfn_16();                   // [16]
+    virtual void SetValue(const float* sourceVec);     // [17] @ 0x820c4b10
 
     // ── non-virtual helper methods ──
     void EvaluateChannels(void* animContext, float time, float* outVector);

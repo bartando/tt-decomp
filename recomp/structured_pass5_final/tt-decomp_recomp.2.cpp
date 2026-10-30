@@ -25855,7 +25855,7 @@ loc_82113544:
 	}
 loc_82113568:
 	// bl 0x8223f840
-	util_F840(ctx, base);
+	PackClampedColorARGB8(ctx, base);
 	// lbz r10,18(r26)
 	ctx.r10.u64 = PPC_LOAD_U8(var_r26 + 18);
 	// lwz r31,0(r3)

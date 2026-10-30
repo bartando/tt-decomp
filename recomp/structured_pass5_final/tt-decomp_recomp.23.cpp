@@ -68155,7 +68155,7 @@ PPC_FUNC_IMPL(__imp__fxBallSpinTex_0328_h) {
 	temp.f32 = float(ctx.f6.f64);
 	PPC_STORE_U32(ctx.r1.u32 + 108, temp.u32);
 	// bl 0x8223f840
-	util_F840(ctx, base);
+	PackClampedColorARGB8(ctx, base);
 	// mr r11,r3
 	ctx.r11.u64 = ctx.r3.u64;
 	// fmr f6,f28

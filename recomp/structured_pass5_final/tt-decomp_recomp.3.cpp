@@ -105585,7 +105585,7 @@ loc_82156554:
 		// addi r3,r1,84
 		ctx.r3.s64 = ctx.r1.s64 + 84;
 		// bl 0x8223f840
-		util_F840(ctx, base);
+		PackClampedColorARGB8(ctx, base);
 		// lbz r11,36(r27)
 		ctx.r11.u64 = PPC_LOAD_U8(var_r27 + 36);
 		// addi r4,r1,84
