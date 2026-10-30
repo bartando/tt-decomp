@@ -61,3 +61,60 @@ void swfSetClipEvents(void* instance, uint32_t events, uint32_t records, int32_t
         list = taken;
     }
 }
+
+extern uint32_t g_swfMemberNodePool; // @ 0x82604C54
+extern uint32_t g_swfPriorityMemberNames[13]; // @ 0x825C2D30
+extern uint32_t g_swfPriorityMemberHashes[13]; // @ 0x82604CE8
+extern uint8_t g_swfPriorityMemberHashesReady; // @ 0x826066C8
+
+uint32_t* swfFindMember(void* list, const char* name); // @ 0x823FB3B8
+uint32_t swfHashMemberName(const char* name); // @ 0x8223A868
+
+// Set the two-word value, inserting a pooled node if its name hash is absent.
+// Priority hashes go at the head; other new members go at the tail.
+// @ 0x823FB258
+void swfSetMember(void* list, const char* name, const uint32_t* value) {
+    auto* existing = swfFindMember(list, name);
+    if (existing != nullptr) {
+        existing[0] = value[0];
+        existing[1] = value[1];
+        return;
+    }
+
+    auto* pool = at<SwfNodePool>(g_swfMemberNodePool);
+    const uint32_t node = pool->freeHead;
+    const uint32_t nextFree = *at<uint32_t>(node);
+    --pool->freeCount;
+    pool->freeHead = nextFree;
+    if (node != 0) {
+        auto* fields = at<uint32_t>(node);
+        fields[0] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(name));
+        fields[1] = value[0];
+        fields[3] = 0;
+        fields[2] = value[1];
+        fields[4] = swfHashMemberName(name);
+    }
+
+    auto* ends = static_cast<uint32_t*>(list);
+    if (ends[0] == 0) {
+        ends[1] = node;
+        ends[0] = node;
+        return;
+    }
+    if (!g_swfPriorityMemberHashesReady) {
+        for (int i = 0; i < 13; ++i) {
+            g_swfPriorityMemberHashes[i] = swfHashMemberName(at<const char>(g_swfPriorityMemberNames[i]));
+        }
+        g_swfPriorityMemberHashesReady = 1;
+    }
+    const uint32_t hash = at<uint32_t>(node)[4];
+    for (int i = 0; i < 13; ++i) {
+        if (hash == g_swfPriorityMemberHashes[i]) {
+            at<uint32_t>(node)[3] = ends[0];
+            ends[0] = node;
+            return;
+        }
+    }
+    at<uint32_t>(ends[1])[3] = node;
+    ends[1] = node;
+}
