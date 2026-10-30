@@ -113,7 +113,7 @@ extern "C" void util_F7E8(const uint8_t* code, void* target, void* context,
         return static_cast<uint8_t>(status);
     };
     auto setMember = [&](void* object, const SwfVmValue* key, const SwfVmValue* value) {
-        reinterpret_cast<void (*)(void*, const SwfVmValue*, const SwfVmValue*)>(vfn(object, 11))(
+        reinterpret_cast<uint32_t (*)(void*, const SwfVmValue*, const SwfVmValue*)>(vfn(object, 11))(
             object, key, value);
     };
     auto allocateObject = [&](bool array) {

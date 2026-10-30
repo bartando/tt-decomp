@@ -40,7 +40,7 @@ struct swfACTIONFUNC {
     virtual int GetMemberCount();  // [8] @ 0x823ff2a8
     virtual int VisitMembers();  // [9] @ 0x823ff3c0
     virtual bool GetMember(const char* name, void* result);  // [10] @ 0x823ff2f0
-    virtual void SetMember(const char* name, void* value);  // [11] @ 0x823ff4a0
+    virtual uint32_t SetMember(const char* name, void* value);  // [11] @ 0x823ff4a0
     virtual void DeleteMember(const char* name);  // [12] @ 0x823ff4b8
     virtual void Invoke(const char* methodName, void* args, int argCount, void* outResult);  // [13] @ 0x823ff4d0
     virtual void Execute(void* args, int argCount, void* caller, int flags);  // [14] @ 0x823ff590
@@ -174,7 +174,7 @@ struct swfINSTANCE {
 
     // ── virtual methods ──
     virtual ~swfINSTANCE();                  // [0] @ 0x823fb600
-    virtual void GotoFrame(uint16_t targetFrame, uint8_t skipActions); // [1] @ 0x823fb7a8
+    virtual void GotoFrame(uint32_t targetFrame, uint32_t skipActions); // [1] @ 0x823fb7a8
     virtual void NextFrame(void* context);  // [2] @ 0x823fb8a0
     virtual void PrevFrame();  // [3] @ 0x823fb920
     virtual void MarkDirty();  // [4] @ 0x823fb760
@@ -185,7 +185,7 @@ struct swfINSTANCE {
     virtual int GetMemberCount();  // [8] @ 0x823fb160
     virtual int VisitMembers();  // [9] @ 0x823fbf98
     virtual bool GetMember(const char* name, void* result);  // [10] @ 0x823fb970
-    virtual void SetMember(const char* name, void* value);  // [11] @ 0x823fc1a8
+    virtual uint32_t SetMember(const char* name, void* value);  // [11] @ 0x823fc1a8
     virtual void DeleteMember(const char* name);  // [12] @ 0x823fc798
     virtual void Invoke(const char* methodName, void* args, int argCount, void* outResult);  // [13] @ 0x823fe500
 };
@@ -205,7 +205,7 @@ struct swfSCRIPTARRAY {
     // ── virtual methods ──
     virtual ~swfSCRIPTARRAY();                  // [0] @ 0x823ff218
     virtual bool GetMember(const char* name, void* result);  // [10] @ 0x823feb48
-    virtual void SetMember(const char* name, void* value);  // [11] @ 0x823fec38
+    virtual uint32_t SetMember(const char* name, void* value);  // [11] @ 0x823fec38
 };
 
 // ── rage::swfSCRIPTOBJECT  [vtable @ 0x82074D14] ──────────────────────────
@@ -221,7 +221,7 @@ struct swfSCRIPTOBJECT {
     virtual int GetMemberCount();  // [8] @ 0x823f8b48
     virtual int VisitMembers();  // [9] @ 0x823fc1a0
     virtual bool GetMember(const char* name, void* result);  // [10] @ 0x823fbfc0
-    virtual void SetMember(const char* name, void* value);  // [11] @ 0x823fc8a8
+    virtual uint32_t SetMember(const char* name, void* value);  // [11] @ 0x823fc8a8
     virtual void DeleteMember(const char* name);  // [12] @ 0x823fc848
     virtual void Invoke(const char* methodName, void* args, int argCount, void* outResult);  // [13] @ 0x823fea28
 };

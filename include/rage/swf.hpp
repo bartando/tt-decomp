@@ -104,7 +104,9 @@ public:
     virtual int GetMemberCount();  // @ 0x823F8B48 | size: 0x24
     virtual int VisitMembers();  // @ 0x823FC1A0 | size: 0x8
     virtual bool GetMember(const char* name, void* result);  // @ 0x823FBFC0 | size: 0x1DC
-    virtual void SetMember(const char* name, void* value);  // @ 0x823FC8A8 | size: 0x5C
+    // Slot-11 status is consumed at 0x823F959C and 0x823F9798 after
+    // virtual calls at 0x823F9598 and 0x823F9794; preserve all 32 bits.
+    virtual uint32_t SetMember(const char* name, void* value);  // @ 0x823FC8A8 | size: 0x5C
     virtual void DeleteMember(const char* name);  // @ 0x823FC848 | size: 0x60
     virtual void Invoke(const char* methodName, void* args, int argCount, void* outResult);  // @ 0x823FEA28 | size: 0x120
 
@@ -149,7 +151,7 @@ public:
 class swfINSTANCE : public swfSCRIPTOBJECT {
 public:
     virtual ~swfINSTANCE();  // @ 0x823FB600 | size: 0x70
-    virtual void GotoFrame(uint16_t targetFrame, uint8_t skipActions);  // @ 0x823FB7A8 | size: 0xF8
+    virtual void GotoFrame(uint32_t targetFrame, uint32_t skipActions);  // @ 0x823FB7A8 | size: 0xF8
     virtual void NextFrame(void* context);  // @ 0x823FB8A0 | size: 0x7C
     virtual void PrevFrame();  // @ 0x823FB920 | size: 0x50
     virtual void MarkDirty();  // @ 0x823FB760 | size: 0x44
@@ -160,7 +162,7 @@ public:
     int GetMemberCount() override;  // @ 0x823FB160 | size: 0x28
     int VisitMembers() override;  // @ 0x823FBF98 | size: 0x28
     bool GetMember(const char* name, void* result) override;  // @ 0x823FB970 | size: 0x624
-    void SetMember(const char* name, void* value) override;  // @ 0x823FC1A8 | size: 0x5F0
+    uint32_t SetMember(const char* name, void* value) override;  // @ 0x823FC1A8 | size: 0x5F0
     void DeleteMember(const char* name) override;  // @ 0x823FABC0 | size: 0xE8
     void Invoke(const char* methodName, void* args, int argCount, void* outResult) override;  // @ 0x823FE500 | size: 0x3D0
 };
@@ -184,7 +186,7 @@ public:
     int GetMemberCount() override;  // @ 0x823FF2A8 | size: 0x44
     int VisitMembers() override;  // @ 0x823FF3C0 | size: 0xDC
     bool GetMember(const char* name, void* result) override;  // @ 0x823FF2F0 | size: 0xCC
-    void SetMember(const char* name, void* value) override;  // @ 0x823FF4A0 | size: 0x14
+    uint32_t SetMember(const char* name, void* value) override;  // @ 0x823FF4A0 | size: 0x14
     void DeleteMember(const char* name) override;  // @ 0x823FF4B8 | size: 0x14
     void Invoke(const char* methodName, void* args, int argCount, void* outResult) override;  // @ 0x823FF4D0
     virtual void Execute(void* args, int argCount, void* thisArg, int flags);  // [14] @ 0x823FF590 — AS function call entry
@@ -209,7 +211,7 @@ class swfSCRIPTARRAY : public swfSCRIPTOBJECT {
 public:
     virtual ~swfSCRIPTARRAY();  // @ 0x823FF218 | size: 0x8C
     bool GetMember(const char* name, void* result) override;  // @ 0x823FEB48 | size: 0xF0
-    void SetMember(const char* name, void* value) override;  // @ 0x823FEC38 | size: 0x70
+    uint32_t SetMember(const char* name, void* value) override;  // @ 0x823FEC38 | size: 0x70
 };
 
 /**

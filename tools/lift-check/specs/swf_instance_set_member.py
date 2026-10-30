@@ -10,10 +10,6 @@ Limits: keys are non-null direct strings or finite acyclic chunk chains; text
 values fit the original 256-byte local buffer; numeric values use byte-bool,
 int32, float32 or nonnumeric tags (no CRT string parsing). The pool has a free
 node. Callee internals other than conversions are outside this check.
-RET=None is deliberate:
-the shared C++ SetMember interface is void, but the original returns r3 (1 for
-builtins, the script's result otherwise). This ABI defect requires a coordinated
-base/override correction and is tracked in KNOWN_WRONG_LIFTS.md.
 """
 import struct
 
@@ -22,8 +18,8 @@ from liftcheck.spec import *
 FUNCTION = "rage::swfINSTANCE::SetMember"
 ADDRESS = 0x823FC1A8
 SOURCE = "src/rage/swf.cpp"
-TRIALS = 900
-RET = None
+TRIALS = 1000
+RET = "r3"
 
 PROPERTIES = (
     "_x", "_y", "_xscale", "_yscale", "text", "_alpha", "textColor",
