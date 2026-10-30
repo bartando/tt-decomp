@@ -139,6 +139,66 @@ bool LocomotionStateAnim::GetAnimTransform(void* outMatrix)
 
 // ── Free-function helpers (cross-unit externs) ──────────────────────────────
 
+namespace rage {
+float phBoundCapsule_01D0_g(float value); // @ 0x824301D0
+}
+
+// Convert the rotation in three 16-byte matrix rows to an (x, y, z, w) quaternion.
+// r3 is the 16-byte output, r4 the matrix; translation and row padding are unused.
+// @ 0x8223B218
+void LocomotionStateAnim_B218_g(float* out, const float* matrix) {
+    const float xx = matrix[0];
+    const float yy = matrix[5];
+    const float zz = matrix[10];
+    const float trace = (xx + yy) + zz;
+
+    // Select the largest candidate, keeping the PPC's tie and unordered rules.
+    // In particular, !(a >= b) includes NaNs, unlike a < b.
+    unsigned component;
+    if (trace >= xx) {
+        if (trace >= yy) {
+            component = trace >= zz ? 3 : 2;
+        } else {
+            component = yy >= zz ? 1 : 2;
+        }
+    } else if (xx >= yy) {
+        component = xx >= zz ? 0 : 2;
+    } else {
+        component = yy >= zz ? 1 : 2;
+    }
+
+    // The diagonal path is fmsubs followed by fadds, not 1 + diagonal - rest.
+    const float radicand = component == 3 ? trace + 1.0f
+        : (matrix[component * 5] * 2.0f - trace) + 1.0f;
+    const float dominant = rage::phBoundCapsule_01D0_g(radicand) * 0.5f;
+    out[component] = dominant;
+    const float scale = 0.25f / dominant;
+
+    // Preserve load/store order: the original also permits overlapping buffers.
+    switch (component) {
+    case 3:
+        out[0] = (matrix[6] - matrix[9]) * scale;
+        out[1] = (matrix[8] - matrix[2]) * scale;
+        out[2] = (matrix[1] - matrix[4]) * scale;
+        break;
+    case 0:
+        out[3] = (matrix[6] - matrix[9]) * scale;
+        out[1] = (matrix[4] + matrix[1]) * scale;
+        out[2] = (matrix[8] + matrix[2]) * scale;
+        break;
+    case 1:
+        out[3] = (matrix[8] - matrix[2]) * scale;
+        out[0] = (matrix[4] + matrix[1]) * scale;
+        out[2] = (matrix[9] + matrix[6]) * scale;
+        break;
+    case 2:
+        out[3] = (matrix[1] - matrix[4]) * scale;
+        out[0] = (matrix[8] + matrix[2]) * scale;
+        out[1] = (matrix[9] + matrix[6]) * scale;
+        break;
+    }
+}
+
 extern "C" void LocomotionStateAnim_AccumNode(void* self, void* node) { (void)self; (void)node; }
 extern "C" void LocomotionStateAnim_ApplySpeed(void* self) { (void)self; }
 extern "C" void LocomotionStateAnim_ComputeOffset(void* self, void* out) { (void)self; (void)out; }
