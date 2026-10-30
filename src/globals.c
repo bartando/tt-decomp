@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include "globals.h"
 #include "crt/startup_globals.h"
+#include "crt/thread_heap.h"
 #include "link/tt_alias.h"
 
 // ============================================================================
@@ -268,7 +269,7 @@ const uint32_t g_vectorComparisonMask[4] = {
 // CRT/Exit System Globals
 // ============================================================================
 
-uint8_t g_allocatorInitFlag = 0;
+uint32_t g_allocatorInitFlag = 0;
 int g_argc = 0;
 char** g_argv = NULL;
 char g_argv_buf[1024] = {0};
@@ -360,7 +361,7 @@ uint32_t g_shotType1_825C5F50 = 0;  // @ 0x825C5F50 (.data, 4 bytes)
 // ============================================================================
 
 void* g_mainThreadHandle = NULL;
-void* g_mainThreadXtf = NULL;
+struct XeTlsBlock g_mainThreadXtf = {0};
 void* g_threadpool_head = NULL;
 void* g_pgThreadInitGate = NULL;
 void* g_semIO = NULL;
@@ -804,14 +805,12 @@ const char* g_stateName_charView = "";     // @ 0x8205EF5C
 struct SwipePattern g_swipePatterns[17] = {{0}};  // @ 0x825D09A0
 
 // Network RTTI / type name strings
-const char g_szCreateMachineRTTI[]          = "";  // @ 0x825DEEB0
 const char g_szDataRequestTypeName[]        = "";  // @ 0x8206EA74
 const char g_szDataSendTypeName[]           = "";  // @ 0x8206EA88
 const char g_szDefaultError[]               = "";  // @ 0x82027423
 const char g_szInvalidError[]               = "";  // @ 0x8204EF04
 const char g_szMessageType[]                = "";  // @ 0x8205DFB0
 const char g_szNetworkDebugMsg[]            = "";  // @ 0x8205AE98
-const char g_szRageRTTI[]                   = "";  // @ 0x825DEECC
 const char g_szTopSpin[]                    = "";  // @ 0x8206CB54
 const char g_szTournamentCompleteTypeName[] = "";  // @ 0x8206EC40
 

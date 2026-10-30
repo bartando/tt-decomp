@@ -25,7 +25,7 @@ EXTERNS = {
     "gmPracticeTargetFx_Load": 0x82113DF8,
     "gmPracticeTargetSet_Load": 0x82113F20,
     "gmPracticeTargetWordArray_Init": 0x821B2A58,
-    "xe_EC88": 0x820DEC88,
+    "rage_Alloc": 0x820DEC88,
     "g_fiAssetManager": 0x825D0080,
     "g_fiTokenizer_vtable": 0x8205A594,
     "g_practiceTargetNumSets": 0x826063AC,

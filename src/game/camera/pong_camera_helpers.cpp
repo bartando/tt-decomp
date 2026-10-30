@@ -177,7 +177,7 @@ bool pongCameraMgr_3650_fw(pongCameraMgr* self, void* gameState, int mode) {
 // Camera-slot ring-buffer grow helper. Reads current size (half-word at
 // self+4) and capacity (half-word at self+6). When size == capacity it:
 //   1. computes a new capacity = (capacity + 16) * 24
-//   2. calls rage::xe_EC88 (realloc analogue) to acquire a new buffer
+//   2. calls rage_Alloc to acquire a new buffer
 //   3. zeros the new region
 //   4. copies existing entries (size entries, 24 bytes each) into the new buffer
 //   5. frees the old buffer (via atSingleton::Find_90D0 vtable slot 2)
@@ -208,9 +208,7 @@ void* pongCameraMgr_B9B0_g(void* self, int /*arg*/) {
         *pCapacity = static_cast<uint16_t>(newCapacity);
         uint32_t bytes = newCapacity * 24u;  // rlwinm *3,0,28
 
-        // Allocate a fresh buffer (engine uses xe_EC88 / pg_alloc).
-        // Without that import lifted yet, we fall back to a generic
-        // allocator: the engine heap-alloc shim used elsewhere.
+        // Allocate a fresh buffer through the current thread allocator.
         extern void* rage_Alloc(uint32_t);
         void* newBuf = rage_Alloc(bytes);
         if (newBuf) {

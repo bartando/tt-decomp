@@ -30,7 +30,7 @@ extern "C" void   ke_2160(uint32_t chunk);                   // @ 0x820F2160
 extern "C" void   fragDrawable_3010(rage::grmShaderGroup* group, // @ 0x820F3010
                                     rage::datResource& rsc);
 extern "C" void   grcSetup_vfn_2_CFD0_1(void* self);         // @ 0x8215CFD0
-extern "C" void   xe_main_thread_init_0038();                // @ 0x820C0038
+extern "C" void   sysMemAllocator_InitThreadHeap();                // @ 0x820C0038
 
 // SDA-resident globals (r13+0 chain / factory-singleton pointer).
 extern "C" void* g_rageDescriptorHead __asm__("_g_tls_base");  // r13+0: the thread's TLS block (globals.c g_tls_base)
@@ -387,7 +387,7 @@ grmShaderFactory* grmShaderFactory::ScalarDtor(int flags) {
  * factory; callers rely on them being baked in.
  * ═══════════════════════════════════════════════════════════════════════════ */
 uint32_t grmShaderFactoryStandard::Allocate40() {
-    xe_main_thread_init_0038();
+    sysMemAllocator_InitThreadHeap();
     auto* desc = reinterpret_cast<uint32_t*>(g_rageDescriptorHead);
     uint32_t allocator = desc[1];  // word-index 1 == byte offset 4
     using AllocFn = uint32_t (*)(uint32_t self, uint32_t size, uint32_t align);
@@ -1284,14 +1284,14 @@ struct grmU16Array {
     uint16_t capacity;
 };
 
-extern "C" void* xe_EC88(uint32_t size);  // @ 0x820DEC88
+extern "C" void* rage_Alloc(uint32_t size);  // @ 0x820DEC88
 extern "C" void* g_sda_base;
 
 // @ 0x82378040
 uint16_t* grmU16Array_AppendSlot(grmU16Array* array) {
     if (array->count == array->capacity) {
         array->capacity = static_cast<uint16_t>(array->capacity + 16);
-        auto* data = static_cast<uint16_t*>(xe_EC88(static_cast<uint32_t>(array->capacity) * 2));
+        auto* data = static_cast<uint16_t*>(rage_Alloc(static_cast<uint32_t>(array->capacity) * 2));
         for (uint32_t i = 0; i < array->count; ++i) {
             data[i] = array->data[i];
         }

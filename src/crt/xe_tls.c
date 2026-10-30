@@ -10,7 +10,6 @@
  * Functions implemented:
  *   XeTlsBlock_InitStack       — initialize thread stack descriptor
  *   XeTlsBlock_BindMainThread  — bind TLS block to main thread
- *   xe_main_thread_init        — main thread context setup (alias for sysMemAllocator_InitMainThread)
  *   XePhysicalAlloc_stub       — physical memory allocation
  *   xe_GetLoadContext           — get load context (2 overloads)
  *   game_CrtFatalExit_thunk    — CRT fatal exit handler
@@ -81,22 +80,6 @@ void XeTlsBlock_InitStack(void* pXtf, void* stackBase, uint32_t stackSize) {
 void XeTlsBlock_BindMainThread(void* ctx) {
     (void)ctx;
     /* No-op on host — thread context is managed by the OS */
-}
-
-/**
- * xe_main_thread_init @ 0x820C0038 | size: 0x88
- *
- * Initializes the main thread's memory allocator context.
- * This is an alias for sysMemAllocator_InitMainThread, which is
- * already implemented in crt/entry.c.
- *
- * On the host, the standard C library's malloc/free are always
- * available, so this is a no-op.
- */
-void xe_main_thread_init(void) {
-    /* The host's memory allocator is always ready.
-     * sysMemAllocator_InitMainThread in entry.c handles the
-     * Xbox 360-specific allocator context setup. */
 }
 
 /*=========================================================================

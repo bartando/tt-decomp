@@ -1066,25 +1066,6 @@ void net_6BA0_fw(void* self, void* header36, void* gamerBlob)
 }
 
 
-/**
- * rlEvent_Init @ 0x82430978 | size: 0x1cc (orig SinglesNetworkClient_0978_g)
- *
- * Cross-cast / dynamic-cast RTTI helper. Given a source object, a cast target
- * type descriptor and an optional offset, returns the adjusted pointer or
- * nullptr if the cast fails. Our partition only needs the degenerate case
- * where callers pass nullptr — which returns nullptr per the original.
- */
-void* rlEvent_Init(void* src, int /*unused*/, void* /*rtti1*/,
-                   void* /*rtti2*/, int /*flags*/)
-{
-    if (!src) return nullptr;
-    // Full dynamic-cast logic not required by our callers; they all handle
-    // the nullptr-return path correctly. Matches the orig `return 0`
-    // fallthrough on the rare case.
-    return nullptr;
-}
-
-
 // ══════════════════════════════════════════════════════════════════════════════
 // netStream / snBitStream low-level primitives
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1386,14 +1367,6 @@ void snSession_ProcessPendingConnections(void* session, void* dispatcher,
     int32_t count = *reinterpret_cast<int32_t*>(s + 84);
     *reinterpret_cast<int32_t*>(s + 84) = count - 1;
 }
-
-
-/**
- * rlEvent_Init — alias wrapper for callers that use the legacy name.
- * The recomp'd SinglesNetworkClient_0978_g (0x82430978) is an RTTI dynamic-cast
- * helper; callers in pong_network.cpp already handle the nullptr-return path.
- * (Primary symbol defined above.)
- */
 
 
 // ══════════════════════════════════════════════════════════════════════════════

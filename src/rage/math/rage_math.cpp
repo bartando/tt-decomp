@@ -15,13 +15,13 @@
 #include <cstring>
 
 extern "C" {
-    void  sysMemAllocator_InitMainThread(void);  // @ 0x820C0038
+    void  sysMemAllocator_InitThreadHeap(void);  // @ 0x820C0038
     void  rage_free(void* ptr);                  // @ 0x820C00C0
 }
 
 // Forward: RAGE heap allocator vtable slot 1 (Allocate)
 static void* rage_HeapAlloc(uint32_t size, uint32_t alignment) {
-    sysMemAllocator_InitMainThread();
+    sysMemAllocator_InitThreadHeap();
     extern void* g_pAllocatorBase;
     void** base = (void**)g_pAllocatorBase;
     void* allocator = base[1];

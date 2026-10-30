@@ -6,7 +6,7 @@ ADDRESS = 0x8222D278
 SOURCE = "src/rage/io/fiAsciiTokenizer.cpp"
 
 CALLS = {
-    "xe_EC88": alloc(size_reg="r3"),          # operator new
+    "rage_Alloc": alloc(size_reg="r3"),          # operator new
     "rage_free_00C0": stub(ret="void"),
 }
 

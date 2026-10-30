@@ -88,7 +88,7 @@ static void DestroyFsmMachineStorage(fsmMachine* machine)
 
 static mcMemcardControl::StateRecord* AllocateStateRecord(std::uintptr_t stateVtable)
 {
-    xe_main_thread_init();
+    sysMemAllocator_InitThreadHeap();
 
     auto* state = static_cast<mcMemcardControl::StateRecord*>(
         rage_malloc(sizeof(mcMemcardControl::StateRecord)));
@@ -103,7 +103,7 @@ static mcMemcardControl::StateRecord* AllocateStateRecord(std::uintptr_t stateVt
 
 static mcMemcardControl::ExtendedStateRecord* AllocateExtendedStateRecord(std::uintptr_t stateVtable)
 {
-    xe_main_thread_init();
+    sysMemAllocator_InitThreadHeap();
 
     auto* state = static_cast<mcMemcardControl::ExtendedStateRecord*>(
         rage_malloc(sizeof(mcMemcardControl::ExtendedStateRecord)));
@@ -119,7 +119,7 @@ static mcMemcardControl::ExtendedStateRecord* AllocateExtendedStateRecord(std::u
 
 static mcMemcardControl::SearchStateRecord* AllocateSearchStateRecord(std::uintptr_t stateVtable)
 {
-    xe_main_thread_init();
+    sysMemAllocator_InitThreadHeap();
 
     auto* state = static_cast<mcMemcardControl::SearchStateRecord*>(
         rage_malloc(sizeof(mcMemcardControl::SearchStateRecord)));
@@ -172,7 +172,7 @@ void mcMemcardControl::Init()
 {
     m_registeredStateCount = kMemcardStateCount;
 
-    xe_main_thread_init();
+    sysMemAllocator_InitThreadHeap();
     m_ppRegisteredStates = static_cast<mcMemcardState**>(
         rage_malloc(sizeof(mcMemcardState*) * kMemcardStateCount));
     if (m_ppRegisteredStates == nullptr) {
@@ -223,7 +223,7 @@ void mcMemcardControl::Init()
     if (factoryContext != nullptr) {
         m_typeRegistration.m_typeStorageSize = QueryFactoryObjectSize(factoryContext);
 
-        xe_main_thread_init();
+        sysMemAllocator_InitThreadHeap();
         m_typeRegistration.m_pTypeStorage = rage_malloc(m_typeRegistration.m_typeStorageSize);
 
         fiStreamBuf_Read_stub(factoryContext,

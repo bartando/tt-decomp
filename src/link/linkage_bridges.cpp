@@ -80,7 +80,7 @@ void rage_27C0(void* obj);                                           // rage_cor
 void sysCallback_Invoke(void* callback, int code);
 void sysMemAllocator_Free(void* ptr);
 void sysMemAllocator_PlatformFree(void* ptr, unsigned int flags);
-void sysMemAllocator_InitMainThread(void);                           // entry.c
+void sysMemAllocator_InitThreadHeap(void);                           // entry.c
 int rage_main_stub(void* startupParams, void* base);                 // main.c
 void* rage_AllocInternal(uint32_t size, uint32_t flags);             // heap.c
 void rage_free(void* ptr);                                           // heap.c
@@ -145,20 +145,11 @@ void rage_EA18(void* arrayBase, int mode) { c_linkage::grmShaderGroup_ArrayDtor6
 
 // ── Address-suffixed names for functions the port defines under another ─────
 
-// 0x820DEC88, operator new. pong_match.cpp, pong_network.cpp and
-// ph_physics.cpp call it xe_EC88; pong_network.cpp also calls it rage_Alloc
-// ("Memory allocator @ 0x820DEC88"), which the port defines.
-void* xe_EC88(uint32_t size) { return ::rage_Alloc(static_cast<unsigned int>(size)); }
-
 // 0x820C00C0. fiAsciiTokenizer.cpp, rage_grm.cpp, pong_network.cpp and
 // sysMemSimpleAllocator.cpp call it rage_free_00C0; heap.c defines it as
 // rage_free and notes the two were merged. (rage_grm.cpp declares the
 // argument uint32_t, which truncates a host pointer.)
 void rage_free_00C0(void* ptr) { c_linkage::rage_free(ptr); }
-
-// 0x820C0038 (gd_data.cpp: "sysMemAllocator_InitMainThread @ 0x820C0038").
-// pong_camera.cpp, rage_grm.cpp and atSingleton.cpp call it by its map name.
-void xe_main_thread_init_0038(void) { c_linkage::sysMemAllocator_InitMainThread(); }
 
 }  // extern "C"
 }  // namespace c_bridges
@@ -196,7 +187,7 @@ void sysMemAllocator_PlatformFree(void* ptr, int flags) {
 }
 
 // gd_data.cpp (C++) vs entry.c (C).
-void sysMemAllocator_InitMainThread() { c_linkage::sysMemAllocator_InitMainThread(); }
+void sysMemAllocator_InitThreadHeap() { c_linkage::sysMemAllocator_InitThreadHeap(); }
 
 // rage_core_utils.cpp (C++) vs main.c (C).
 int rage_main_stub(void* startupParams, void* base) { return c_linkage::rage_main_stub(startupParams, base); }
@@ -212,8 +203,8 @@ void* xam_singleton_init_8D60(void* arg) { return c_linkage::xam_singleton_init_
 
 // pong_states.cpp calls 0x820C0038 rage_AssertMainThread (C++);
 // rage_core_utils.cpp's C rage_AssertMainThread is an empty placeholder,
-// entry.c's sysMemAllocator_InitMainThread is the function.
-void rage_AssertMainThread() { c_linkage::sysMemAllocator_InitMainThread(); }
+// entry.c's sysMemAllocator_InitThreadHeap is the function.
+void rage_AssertMainThread() { c_linkage::sysMemAllocator_InitThreadHeap(); }
 
 // msg_msg_sink.cpp calls 0x820C01B8 (the tagged allocation XMemFree's
 // counterpart) rage_01B8 and rage_01B8_alloc; heap.c defines it as

@@ -1364,7 +1364,7 @@ extern RTTITypeDescriptor g_typeDescriptor_phInst;         // @ 0x825D2CB8  ".?A
 extern RTTITypeDescriptor g_typeDescriptor_pongBallInstance;  // @ 0x825D2CD4  ".?AVpongBallInstance@@"
 
 // ── Callees ─────────────────────────────────────────────────────────────────
-extern "C" void  sysMemAllocator_InitMainThread(void);                       // @ 0x820C0038
+extern "C" void  sysMemAllocator_InitThreadHeap(void);                       // @ 0x820C0038
 extern void      rage_free(void* ptr);                                        // @ 0x820C00C0
 extern "C" void  RegisterSerializedField(void* node, const char* name, void* field,
                                          void* fieldType, int flags);        // @ 0x821A8F58
@@ -1401,7 +1401,7 @@ inline AllocatorView* ThreadAllocator() {
 }
 
 inline void* RageNew(uint32_t size) {
-    sysMemAllocator_InitMainThread();
+    sysMemAllocator_InitThreadHeap();
     return ThreadAllocator()->Allocate(size, 16);
 }
 

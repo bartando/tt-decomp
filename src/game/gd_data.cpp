@@ -368,8 +368,8 @@ void* PostStateTransitionRequest(void* hsmContext, int stateIndex) {
  */
 void InitializePageGroup(void* pageGroup) {
     // Call thread initialization check
-    extern void sysMemAllocator_InitMainThread();
-    sysMemAllocator_InitMainThread();
+    extern void sysMemAllocator_InitThreadHeap();
+    sysMemAllocator_InitThreadHeap();
     
     // Cast to byte pointer for offset calculations
     uint8_t* pg = (uint8_t*)pageGroup;

@@ -110,7 +110,7 @@ void atArray_Clear(void* obj)
 // atArray<u32>::Realloc. The original inlines rage_free.
 // ─────────────────────────────────────────────────────────────────────────────
 
-extern "C" void* xe_EC88(uint32_t size);  // operator new
+extern "C" void* rage_Alloc(uint32_t size);  // operator new
 
 struct atArrayU32View {
     uint32_t* data;     // +0x00
@@ -126,7 +126,7 @@ void* datArray_Grow(void* obj, uint32_t newCapacity)
     uint32_t* data = nullptr;
     if (capacity > 0) {
         data = static_cast<uint32_t*>(
-            xe_EC88(newCapacity > 0x3FFFFFFFu ? 0xFFFFFFFFu : newCapacity * 4));
+            rage_Alloc(newCapacity > 0x3FFFFFFFu ? 0xFFFFFFFFu : newCapacity * 4));
     }
     const int32_t keep = capacity < array->count ? capacity : array->count;
     for (int32_t i = 0; i < keep; ++i) {
@@ -158,7 +158,7 @@ void* rage_strDuplicate(const char* text)
         ++size;
     }
     ++size;
-    void* copy = xe_EC88(size);
+    void* copy = rage_Alloc(size);
     return memcpy(copy, text, size);
 }
 
@@ -205,7 +205,7 @@ void* atSingletonPool_AllocEntry(uint32_t /*unused*/)
         const uint16_t capacity = static_cast<uint16_t>(pool.capacity + 16);
         pool.capacity = capacity;
         atRegistryEntry* fresh = nullptr;
-        uint32_t* block = static_cast<uint32_t*>(xe_EC88(capacity * 16u + 4));
+        uint32_t* block = static_cast<uint32_t*>(rage_Alloc(capacity * 16u + 4));
         if (block != nullptr) {
             block[0] = capacity;
             fresh = reinterpret_cast<atRegistryEntry*>(block + 1);

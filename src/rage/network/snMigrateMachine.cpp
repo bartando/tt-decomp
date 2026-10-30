@@ -9,6 +9,7 @@
  */
 
 #include <stdint.h>
+#include "crt/rtti.h"
 
 extern "C" void rage_free(void* ptr);  // @ 0x820C00C0 — heap free
 
@@ -66,8 +67,6 @@ extern void snSession_ForwardGuestMigrate(void* state, void* event);            
 extern void snMigrateMachine_ProcessMigrateEvent(void* client);                                 // @ 0x823F2720 — game-level migrate cleanup
 extern void snSession_AddNode(void* nodeList, void* node);     // @ 0x823EC068 — add node to session linked list
 extern void snMigrateAsGuest_OnCompleted(void* thisPtr);             // @ 0x823F2FD0 — migration completion handler
-extern void rlEvent_Init(void* evtObj, int p1, void* p2, void* p3, int p4); // @ 0x82430978 — broadcast init
-
 // Global event type IDs (loaded from .data)
 extern uint32_t g_evtType_AcquireHostSucceeded;  // @ 0x825D1AD4 (lis -32163, offset 6868)
 extern uint32_t g_evtType_AcquireHostFailed;     // @ 0x825D1AE0 (offset 6880)
@@ -390,7 +389,7 @@ void MigrateMachine_OnUpdate(void* thisPtr) {
     void* eventObj = *(void**)((char*)stateCtx + 0x0C);
 
     // Get session broadcast info
-    rlEvent_Init(eventObj, 0, nullptr, nullptr, 0);
+    RTDynamicCast(eventObj, 0, &g_typeDescriptor_hsmEvent, &g_typeDescriptor_EvtMigrateSession, 0);
 
     // Copy 9 dwords (36 bytes) from result+12 into self+48
     uint32_t* src = (uint32_t*)((char*)stateCtx + 0x0C);  // re-read after call
@@ -741,7 +740,7 @@ void snMigratingAsGuest_Migrating_OnEnter(void* thisPtr) {
     void* eventObj = *(void**)((char*)stateCtx + 0x0C);  // m_pChildState
 
     // Get session info via broadcast init
-    rlEvent_Init(eventObj, 0, nullptr, nullptr, 0);
+    RTDynamicCast(eventObj, 0, &g_typeDescriptor_hsmEvent, &g_typeDescriptor_EvtChangePresence, 0);
 
     // Get session handle and query XAM
     void* parent = *(void**)(self + 0x14);  // m_pParent

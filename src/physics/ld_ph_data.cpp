@@ -112,12 +112,5 @@ extern "C" uint32_t g_phCollisionSolver = 0;
 // @ 0x8271A7DC (.data) — 6 floats up to the next label, zero in the image
 extern "C" float g_phTableA[6] = {};
 
-// @ 0x8271B114 (.data) — 0xC4 bytes in the image, plus room for host pointer widths;
-// runtime-initialised by 0x820C0038
-extern "C" char g_mainThreadXtfStorage[256] = {};
-
-// @ 0x8271B1D8 (.data) — runtime-initialised by 0x820C0038 (bit 0 = XTF block set up)
-extern "C" uint32_t g_allocInitFlag = 0;
-
 // @ 0x82079C54 (.rdata) — minimum segment/triangle determinant
 extern "C" const float g_segmentTriangleMinArea = 0.00000762939453125f;

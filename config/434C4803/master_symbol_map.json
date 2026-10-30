@@ -187657,7 +187657,7 @@
       "size": 56
     },
     "0x820c0038": {
-      "name": "xe_main_thread_init_0038",
+      "name": "sysMemAllocator_InitThreadHeap",
       "type": "function",
       "section": ".text",
       "size": 136
@@ -190501,7 +190501,7 @@
       "size": 24
     },
     "0x820dec88": {
-      "name": "xe_EC88",
+      "name": "rage_Alloc",
       "type": "function",
       "section": ".text",
       "size": 80
@@ -263497,7 +263497,7 @@
       "size": 8
     },
     "0x82430978": {
-      "name": "SinglesNetworkClient_0978_g",
+      "name": "RTDynamicCast",
       "type": "function",
       "section": ".text",
       "size": 460
@@ -346002,7 +346002,7 @@
     "pdata@820B17E8": "0x820b17e8",
     "pdata@820B17F0": "0x820b17f0",
     "strlen": "0x820c0000",
-    "xe_main_thread_init_0038": "0x820c0038",
+    "sysMemAllocator_InitThreadHeap": "0x820c0038",
     "rage_free_00C0": "0x820c00c0",
     "thunk_rage_free": "0x820c0120",
     "__crt_main_entry": "0x820c0128",
@@ -346476,7 +346476,7 @@
     "pcrAnimEventMsg_s_vfn_22": "0x820deb28",
     "pcrAnimEvent_EB38": "0x820deb38",
     "jumptable_820DEB78": "0x820deb78",
-    "xe_EC88": "0x820dec88",
+    "rage_Alloc": "0x820dec88",
     "util_ECD8": "0x820decd8",
     "pongCreatureInst_EDC0_g": "0x820dedc0",
     "LocomotionStateAnim_EEC8": "0x820deec8",
@@ -358634,7 +358634,7 @@
     "game_05D0": "0x824305d0",
     "game_0768": "0x82430768",
     "except_data_82430978": "0x82430970",
-    "SinglesNetworkClient_0978_g": "0x82430978",
+    "RTDynamicCast": "0x82430978",
     "except_AB5C_2": "0x82430b44",
     "game_0B68_w": "0x82430b68",
     "fiAsciiTokenizer_0BA8_g": "0x82430ba8",

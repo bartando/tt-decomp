@@ -14,7 +14,7 @@
 
 extern void crAnimDof_BlendQuaternion(void* outQuat, void* context, float* value); // @ 0x820C44A0
 extern double crt_sqrt(double value); // @ 0x824301D0
-extern "C" void sysMemAllocator_InitMainThread(); // @ 0x820C0038
+extern "C" void sysMemAllocator_InitThreadHeap(); // @ 0x820C0038
 extern "C" void* xe_Alloc_EC88(uint32_t size); // @ 0x820DEC88
 extern uint32_t* g_sda_base; // @ 0x82600000
 
@@ -88,7 +88,7 @@ crAnimChannel* CreateFloatAnimChannel(void* /*dof*/, const float* samples,
     using DestroyFn = void (*)(crAnimChannel*, int32_t);
     using SizeFn = int32_t (*)(crAnimChannel*);
 
-    sysMemAllocator_InitMainThread();
+    sysMemAllocator_InitThreadHeap();
     void** thread = *reinterpret_cast<void***>(g_sda_base);
     void* allocator = thread[1];
     auto allocate = reinterpret_cast<AllocateFn>((*static_cast<void***>(allocator))[1]);

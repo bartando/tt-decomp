@@ -4,33 +4,19 @@
  *
  * The game's startup sequence:
  *   __crt_main_entry  (XEX entry, called by the loader)
- *       └─ sysMemAllocator_InitMainThread   (init main thread's XTF context)
+ *       └─ sysMemAllocator_InitThreadHeap   (init main thread's XTF context)
  *           └─ xe_alloc_thread_ctx_6CA8 (allocate physical thread stack/TLS)
  *       └─ rage_main_stub             (RAGE main loop)
  *
  * The SDA base register (r13) points to a global struct that holds the
- * active memory allocator context at offset +4. xe_main_thread_init sets
+ * active memory allocator context at offset +4. sysMemAllocator_InitThreadHeap sets
  * up the main thread's XTF (Xbox Thread Frame) structure so that the heap
  * and TLS allocator are online before game code runs.
  */
 
 #include <stdint.h>
 #include <stddef.h>
-
-/* ── XeTlsBlock — Xbox 360 Thread Frame descriptor ──────────────────
- * Minimal struct definition matching the fields accessed by entry.c.
- * Full layout TBD as more thread-management functions are decompiled. */
-struct XeTlsBlock {
-    void*    m_pVtable;      /* +0x00 */
-    void*    m_pStackAlign16; /* +0x04 */
-    void*    m_pStackRaw;    /* +0x08 */
-    uint8_t  m_padding0[68]; /* +0x0C */
-    uint32_t m_stackSz;      /* +0x50 */
-    uint8_t  m_padding1[103];/* +0x54 */
-    uint8_t  m_flags;        /* +0xB8 */
-    uint8_t  m_pad3[7];      /* +0xB9 */
-    uint8_t  m_physFlag;     /* +0xC0 */
-};
+#include "crt/thread_heap.h"
 
 /* ── Forward declarations ──────────────────────────────────────────── */
 int   rage_main_stub(void* parms, void* base);
@@ -45,12 +31,6 @@ void  rage_DebugLog(const char* fmt, ...);
 /* SDA-relative allocator context base — offset +4 holds the
  * active sysMemAllocator vtable pointer. @ 0x82600000 (SDA base) */
 extern uint32_t* g_sda_base;                    /* r13-relative */
-
-/* Main thread XTF descriptor @ 0x8271B114 */
-extern struct XeTlsBlock g_mainThreadXtf;
-
-/* Allocator initialization flag — bit 0 indicates already-initialized. */
-extern uint32_t g_allocatorInitFlag;            /* @ 0x8271B1D8 */
 
 static const uintptr_t kThreadCtxCtorVtable = 0x82038C4Cu;
 static const uintptr_t kThreadAllocFailFmt = 0x82038610u;
@@ -91,7 +71,7 @@ void xe_alloc_thread_ctx_6CA8(struct XeTlsBlock* pXtf, uint32_t stackSize, uint3
 /**
  * xe_get_thread_ctx_36E8 @ 0x825836E8 | size: 0x0C
  *
- * atexit callback registered by sysMemAllocator_InitMainThread. It forwards the
+ * atexit callback registered by sysMemAllocator_InitThreadHeap. It forwards the
  * process-global main-thread context object to XeTlsBlock_BindMainThread.
  */
 void xe_get_thread_ctx_36E8(void)
@@ -101,27 +81,27 @@ void xe_get_thread_ctx_36E8(void)
 
 
 /**
- * sysMemAllocator_InitMainThread @ 0x820C0038 | size: 0x88
+ * sysMemAllocator_InitThreadHeap @ 0x820C0038 | size: 0x88
  *
  * Initializes the main thread's XTF (Xbox Thread Frame) if it hasn't been
  * set up yet. Checks an init flag to guard against double-init. Registers
  * xe_get_thread_ctx_36E8() with atexit() so the context is finalized on exit.
  *
- * The SDA offset +4 holds a pointer to the active TLS block slot; this
- * function writes the main thread XTF address into slots +4 and +8.
+ * The r13 TLS root points to the allocator table; this function installs
+ * the default heap address into its active (+4) and saved (+8) slots.
  */
-void sysMemAllocator_InitMainThread(void)
+void sysMemAllocator_InitThreadHeap(void)
 {
-    uint32_t* allocCtx = (uint32_t*)(uintptr_t)g_sda_base[0];
-    if (allocCtx[1] == 0u) {
+    void** allocCtx = *(void***)g_sda_base;
+    if (allocCtx[1] == NULL) {
         if ((g_allocatorInitFlag & 1u) == 0u) {
             g_allocatorInitFlag |= 1u;
-            xe_alloc_thread_ctx_6CA8(&g_mainThreadXtf, 0x002C0000u, 0u);
+            xe_alloc_thread_ctx_6CA8(&g_mainThreadXtf, 0x02C00000u, 0u);
             atexit(xe_get_thread_ctx_36E8);
         }
 
-        allocCtx[1] = (uint32_t)(uintptr_t)&g_mainThreadXtf;
-        allocCtx[2] = (uint32_t)(uintptr_t)&g_mainThreadXtf;
+        allocCtx[1] = &g_mainThreadXtf;
+        allocCtx[2] = &g_mainThreadXtf;
     }
 }
 
@@ -137,6 +117,6 @@ void sysMemAllocator_InitMainThread(void)
  */
 void __crt_main_entry(void* pStartupParms, void* pBase)
 {
-    sysMemAllocator_InitMainThread();
+    sysMemAllocator_InitThreadHeap();
     (void)rage_main_stub(pStartupParms, pBase);
 }

@@ -25,12 +25,9 @@
 // External functions
 // ─────────────────────────────────────────────────────────────────────────────
 
-// TLS memory allocator initialization — ensures the per-thread allocator
-// table is set up before allocation.  Resolved to xe_main_thread_init_0038
-// (src/crt/entry.c) at 0x820C0038; the original binary has no symbol named
-// sysMemAllocator_InitMainThread — this extern is a forwarder alias.
-// @ 0x820C0038 (xe_main_thread_init_0038)
-extern "C" void sysMemAllocator_InitMainThread();
+// Install the default allocator in the current thread's TLS slots.
+// @ 0x820C0038
+extern "C" void sysMemAllocator_InitThreadHeap();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // External globals
@@ -87,7 +84,7 @@ void* Holder::GetSingleton()
 // ═══════════════════════════════════════════════════════════════════════════════
 void* Holder::AllocateAndInitialize()
 {
-    sysMemAllocator_InitMainThread();
+    sysMemAllocator_InitThreadHeap();
 
     // Get allocator from TLS — r13+0 → allocator table, entry at index 1
     void** pTLS = *(void***)g_tls_base;

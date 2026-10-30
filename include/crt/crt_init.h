@@ -7,9 +7,9 @@
 extern "C" {
 #endif
 
-// xe_main_thread_init_0038 @ 0x820C0038 (size: 0x88)
-// Thread/locale initialization stub
-void xe_main_thread_init_0038(void);
+// sysMemAllocator_InitThreadHeap @ 0x820C0038 (size: 0x88)
+// Install the default allocator in the current thread's TLS slots.
+void sysMemAllocator_InitThreadHeap(void);
 
 // _locale_register @ 0x820C02D0 (size: 0xA4)
 // Locale/heap registration with address range checking
