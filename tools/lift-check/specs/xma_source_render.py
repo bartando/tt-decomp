@@ -220,7 +220,7 @@ MUTATIONS = [
     ("miss the exact refill threshold", "available - consumed <= self->refillThreshold[i]",
      "available - consumed < self->refillThreshold[i]"),
     ("swallow a decoder error", "return result;", "return 0;"),
-    ("hold the source lock during completion", "release(self->lock);\n            using Fn",
+    ("hold the source lock during completion", "xaudioReleaseLock(self->lock);\n            using Fn",
      "/* source lock incorrectly held */\n            using Fn"),
 ]
 
