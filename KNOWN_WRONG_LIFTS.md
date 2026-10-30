@@ -175,8 +175,6 @@ unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, a
   suspect.
 - `pongDrawBucket_AddEntry` 0x822278D8 is declared `extern "C"` in `sg_physical.cpp` and with
   C++ linkage in `ph_update_object.cpp`.
-- `fragDrawable::ProcessGeometry` 0x820F1C00 is really grmModel's draw (its only caller is
-  rmcDrawable at 0x8225D9E4).
 - phUpdateObject slot 1 still has a FIXME body.
 - `msgMsgSink_84C0_gen` is fixed but unverified: lift-check can't run `mtmsrd`.
 - `gd_data_strings.hpp`: the `g_str_*` are probably arrays declared as pointers at wrong

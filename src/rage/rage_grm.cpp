@@ -10,6 +10,7 @@
 
 // Forward declarations for external functions
 namespace rage {
+// Legacy global names: draw-queue override and forced shader, respectively.
 extern uint32_t* g_iccProfilePtr;     // @ 0x825EB1D0  (defined in rage_core_utils.cpp)
 extern void*     g_currentGeometry;   // @ 0x82606350
 }
@@ -48,12 +49,10 @@ extern "C" void pongShadowMap_38C0_g(void* viewport, const float* world,
 extern "C" void fragDrawable_D798_wrh(const float* transform, const float* view,
                                        const float* projection); // @ 0x8225D798
 extern "C" void fragDrawable_19C8_h(void* model, void* shaderGroup,
-                                    void* drawContext, uint32_t lod); // @ 0x820F19C8
-extern "C" void fragDrawable_1C00_fw(void* model, void* shaderGroup, const float* transforms,
-                                     uint32_t filter, void* drawContext, uint32_t lod); // @ 0x820F1C00
+                                    uint32_t shaderFilter, uint32_t lod); // @ 0x820F19C8
 extern "C" void fragDrawable_1D80_wrh(void* model, void* skinContext, void* shaderGroup,
-                                      const float* transforms, uint32_t filter,
-                                      void* drawContext, uint32_t lod); // @ 0x820F1D80
+                                      const float* transforms, uint32_t matrixCount,
+                                      uint32_t shaderFilter, uint32_t lod); // @ 0x820F1D80
 
 namespace rage {
 
@@ -107,7 +106,7 @@ void grmDrawQueue_AddGeometry(void* state, void* shader, void* model, uint32_t g
 // path and +0x18 to request identity for a rigid model. Cache -1 is identity;
 // -2 forces the first model to install its matrix even when its index is zero.
 void rmcDrawable_DrawLodModels(void* lodGroup, void* shaderGroup, const float* transforms,
-                               void* drawContext, uint32_t lod, const uint32_t* const* modelMask,
+                               uint32_t shaderFilter, uint32_t lod, const uint32_t* const* modelMask,
                                uint32_t skinned, void* skinContext) {
     struct ModelList {
         uint8_t** models;
@@ -134,9 +133,10 @@ void rmcDrawable_DrawLodModels(void* lodGroup, void* shaderGroup, const float* t
             // Xenon stores r9 with stb, so only its low byte selects the path.
             if (static_cast<uint8_t>(skinned) != 0) {
                 fragDrawable_1D80_wrh(model, skinContext, shaderGroup, transforms,
-                                      model[0x10], drawContext, lod);
+                                      model[0x10], shaderFilter, lod);
             } else {
-                fragDrawable_1C00_fw(model, shaderGroup, transforms, model[0x10], drawContext, lod);
+                reinterpret_cast<grmModel*>(model)->Draw(static_cast<grmShaderGroup*>(shaderGroup),
+                                                        transforms, model[0x10], shaderFilter, lod);
             }
         } else {
             const int wantedTransform = model[0x18] != 0 ? -1 : static_cast<int>(transformIndex);
@@ -150,7 +150,7 @@ void rmcDrawable_DrawLodModels(void* lodGroup, void* shaderGroup, const float* t
             if (lbl_8260633D != 0) {
                 fragDrawable_D798_wrh(transforms + transformIndex * 16, lbl_82619D20, lbl_82619D60);
             }
-            fragDrawable_19C8_h(model, shaderGroup, drawContext, lod);
+            fragDrawable_19C8_h(model, shaderGroup, shaderFilter, lod);
         }
     }
 }
@@ -173,73 +173,42 @@ void spdApical::SetLodFadeEnd(float value) {
     unk_1C = value;
 }
 
-// ── rage::fragDrawable ────────────────────────────────────────────────────────
-
-/**
- * fragDrawable::ProcessGeometry
- * @ 0x820F1C00 | size: 0x17c
- *
- * Original symbol: fragDrawable_1C00_fw. Only caller: 0x8225D9E4 (rmcDrawable).
- * `this` looks like a grmModel (u16 shader indices at +0x0C, count at +0x16);
- * geometryContainer holds the shader array pointer at +8.
- *
- * For each index i whose shader passes the filter, either hands it to
- * 0x820F0AA0 (when the override at 0x825EB1D0 is set) or calls the shader's
- * slot 4 with an "end of run" flag that is set when the next index uses a
- * shader with a different id at +6. A forced shader (0x82606350) replaces the
- * lookup; if its flag bit 0 is set its type counts as 0.
- */
-void fragDrawable::ProcessGeometry(void* geometryContainer, void* param1, void* param2,
-                                   uint32_t filterType, void* param3) {
+// @ 0x820F1C00 | size: 0x17C (was fragDrawable_1C00_fw)
+// r6 is the matrix count; r7 is the shader filter. The only caller is
+// rmcDrawable_DrawLodModels at 0x8225D9E4. Re-lifted from .text.s.
+void grmModel::Draw(grmShaderGroup* shaderGroup, const float* transforms, uint32_t matrixCount,
+                    uint32_t shaderFilter, uint32_t lod) {
     if (m_geometryCount == 0) {
         return;
     }
-
-    void* statePtr    = g_iccProfilePtr;
-    void* currentGeom = g_currentGeometry;
-
-    for (int i = 0; i < m_geometryCount; i++) {
-        void* geom;
-        uint32_t geomType;
-        if (currentGeom != nullptr) {
-            geom = currentGeom;
-            uint16_t flags = *(uint16_t*)((uint8_t*)geom + 4);
-            geomType = (flags & 1) ? 0 : (flags >> 5) & 0x1F;
-        } else {
-            void** shaders = *(void***)((uint8_t*)geometryContainer + 8);
-            geom = shaders[m_pIndices[i]];
-            geomType = (*(uint16_t*)((uint8_t*)geom + 4) >> 5) & 0x1F;
-        }
-        if ((int32_t)geomType != (int32_t)filterType) {
+    void* drawQueue = g_iccProfilePtr;
+    auto* forcedShader = static_cast<grmShader*>(g_currentGeometry);
+    for (uint32_t i = 0; i < m_geometryCount; ++i) {
+        grmShader* shader = forcedShader != nullptr ? forcedShader :
+                            shaderGroup->m_pShaders[m_pShaderIndices[i]];
+        const uint32_t type = forcedShader != nullptr && (shader->m_flags & 1) != 0 ?
+                              0 : (shader->m_flags >> 5) & 31;
+        if (type != shaderFilter) {
             continue;
         }
-
-        if (statePtr != nullptr) {
-            grmDrawQueue_AddGeometry(statePtr, geom, this, i);
+        if (drawQueue != nullptr) {
+            // The real queue helper ignores r7 (lod) and preserves r3. Neither
+            // global is reloaded on this path, unlike the virtual draw below.
+            grmDrawQueue_AddGeometry(drawQueue, shader, this, i);
             continue;
         }
-
-        bool sameAsNext = true;
-        if (currentGeom == nullptr) {
-            if (i + 1 < m_geometryCount) {
-                void** shaders = *(void***)((uint8_t*)geometryContainer + 8);
-                void* nextGeom = shaders[m_pIndices[i + 1]];
-                sameAsNext = *(uint16_t*)((uint8_t*)geom + 6) ==
-                             *(uint16_t*)((uint8_t*)nextGeom + 6);
-            } else {
-                sameAsNext = false;
-            }
+        bool endOfRun = i + 1 == m_geometryCount;
+        if (!endOfRun && forcedShader == nullptr) {
+            grmShader* next = shaderGroup->m_pShaders[m_pShaderIndices[i + 1]];
+            endOfRun = shader->m_drawKey != next->m_drawKey;
         }
-        bool endOfRun = (i + 1 == m_geometryCount) || !sameAsNext;
-
-        typedef void (*GeomProcessFn)(void* geom, void* drawable, int index,
-                                      void* param1, void* param2, void* param3,
-                                      bool endOfRun);
-        GeomProcessFn processFn = (GeomProcessFn)(*(void***)geom)[4];
-        processFn(geom, this, i, param1, param2, param3, endOfRun);
-
-        currentGeom = g_currentGeometry;
-        statePtr    = g_iccProfilePtr;
+        using DrawFn = void (*)(grmShader*, grmModel*, uint32_t, const float*,
+                                uint32_t, uint32_t, bool);
+        auto draw = reinterpret_cast<DrawFn>(shader->vtable[4]);
+        draw(shader, this, i, transforms, matrixCount, lod, endOfRun);
+        forcedShader = static_cast<grmShader*>(g_currentGeometry);
+        drawQueue = g_iccProfilePtr;
+        // Count, index buffer and shader array can also change in slot 4.
     }
 }
 
@@ -254,7 +223,7 @@ void fragDrawable::ProcessGeometry(void* geometryContainer, void* param1, void* 
  * ═══════════════════════════════════════════════════════════════════════════ */
 grmModel* grmModel::ScalarDtor(int flags) {
     vtable = reinterpret_cast<void**>(0x8202F3B4u);
-    rage_free(m_pGeometry);
+    rage_free(m_pShaderIndices);
     vtable = reinterpret_cast<void**>(0x820276C4u);  // rage::datBase
     if (flags & 1) {
         rage_free(this);

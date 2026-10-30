@@ -24,10 +24,6 @@ void grmDrawQueue_AddGeometry(void* state, void* shader, void* model, uint32_t g
 // ── rage::fragDrawable  [vtable @ 0x82033094] ──────────────────────────
 struct fragDrawable {
     void**      vtable;           // +0x00
-    uint8_t     pad_04[0x08];     // +0x04
-    uint16_t*   m_pIndices;       // +0x0C  array of geometry indices
-    uint8_t     pad_10[0x06];     // +0x10
-    uint16_t    m_geometryCount;  // +0x16
 
     // ── virtual methods ──
     ~fragDrawable();                  // [0] @ 0x821242f0
@@ -47,10 +43,6 @@ struct fragDrawable {
     void vfn_14();  // [14] @ 0x8225c158
     void vfn_15();  // [15] @ 0x8225c238
     void vfn_16();  // [16] @ 0x82124540
-    
-    // ── non-virtual methods ──
-    void ProcessGeometry(void* geometryContainer, void* param1, void* param2, 
-                        uint32_t filterType, void* param3);  // @ 0x820F1C00
 };
 
 
@@ -106,18 +98,24 @@ struct grmEdgeModel {
 };
 
 // ── rage::grmModel  [vtable @ 0x8202F3B4, size 0x18 = 6 slots] ─────
-// Geometry/model container.  Holds a pointer to a heap-allocated
-// shader-group/geometry array at +0x0C; dtor frees that buffer and
+// Geometry/model container. Holds heap-allocated u16 shader indices at
+// +0x0C; dtor frees that buffer and
 // conditionally frees the object itself (scalar-dtor flag in r4 bit 0).
 struct grmModel {
     void**      vtable;           // +0x00
     uint8_t     pad_04[0x08];     // +0x04
-    void*       m_pGeometry;      // +0x0C  heap-allocated geometry buffer
+    uint16_t*   m_pShaderIndices; // +0x0C
+    uint8_t     m_matrixCount;    // +0x10
+    uint8_t     pad_11[0x05];     // +0x11
+    uint16_t    m_geometryCount;  // +0x16
 
     // ── virtual methods ──
-    // [0] scalar deleting destructor: free(m_pGeometry); vtable = rage::datBase
+    // [0] scalar deleting destructor: free(m_pShaderIndices); vtable = rage::datBase
     //     (0x820276C4); if (flags & 1) free(this); returns this.
     grmModel* ScalarDtor(int flags);                // [0] @ 0x820f0e78  size 0x6c
+
+    void Draw(grmShaderGroup* shaderGroup, const float* transforms, uint32_t matrixCount,
+              uint32_t shaderFilter, uint32_t lod); // @ 0x820F1C00
 };
 
 // ── rage::grmModelFactory  [vtable @ 0x8202F5A8] ──────────────────────────
@@ -176,6 +174,8 @@ struct grmSetup {
 // Base shader-binding object.
 struct grmShader {
     void**      vtable;           // +0x00
+    uint16_t    m_flags;          // +0x04: bit 0 forces filter 0 for an override
+    uint16_t    m_drawKey;        // +0x06: equal keys can share a draw run
 
     // ── virtual methods ──
     // [0] scalar deleting destructor: runs the destructor body at 0x820F52B0,
@@ -326,6 +326,8 @@ struct grmShaderFx {
 // ── rage::grmShaderGroup  [vtable @ 0x8202F528] ──────────────────────────
 struct grmShaderGroup {
     void**      vtable;           // +0x00
+    uint8_t     pad_04[0x04];     // +0x04
+    grmShader** m_pShaders;       // +0x08
 
     // ── virtual methods ──
     // [0] scalar deleting destructor: runs net_2228_h (the destructor body),
@@ -389,7 +391,7 @@ struct rmcDrawableBase {
 // Draw the selected LOD's model list from the drawable's embedded group (+0x10).
 // Descriptive name: shared by rmcDrawable and fragDrawable draw slots 5/6/7.
 void rmcDrawable_DrawLodModels(void* lodGroup, void* shaderGroup, const float* transforms,
-                               void* drawContext, uint32_t lod, const uint32_t* const* modelMask,
+                               uint32_t shaderFilter, uint32_t lod, const uint32_t* const* modelMask,
                                uint32_t skinned, void* skinContext); // @ 0x8225D8A0
 
 // ── rage::rmcTypeFileParser  [vtable @ 0x82050078] ──────────────────────────
@@ -446,8 +448,11 @@ struct spdShaft {
 
 } // namespace rage
 // Game layout (32-bit); the host build has 8-byte pointers.
-static_assert(sizeof(void*) != 4 || offsetof(rage::grmModel, m_pGeometry) == 0x0C, "grmModel layout");
+static_assert(sizeof(void*) != 4 || offsetof(rage::grmModel, m_pShaderIndices) == 0x0C, "grmModel layout");
 static_assert(sizeof(void*) != 4 || offsetof(rage::grmModelGeom, m_pGeometries) == 0x04, "grmModelGeom layout");
-static_assert(sizeof(void*) != 4 || offsetof(rage::fragDrawable, m_pIndices) == 0x0C, "fragDrawable layout");
-static_assert(sizeof(void*) != 4 || offsetof(rage::fragDrawable, m_geometryCount) == 0x16, "fragDrawable layout");
+static_assert(sizeof(void*) != 4 || offsetof(rage::grmModel, m_matrixCount) == 0x10, "grmModel layout");
+static_assert(sizeof(void*) != 4 || offsetof(rage::grmModel, m_geometryCount) == 0x16, "grmModel layout");
+static_assert(sizeof(void*) != 4 || offsetof(rage::grmShader, m_flags) == 0x04, "grmShader layout");
+static_assert(sizeof(void*) != 4 || offsetof(rage::grmShader, m_drawKey) == 0x06, "grmShader layout");
+static_assert(sizeof(void*) != 4 || offsetof(rage::grmShaderGroup, m_pShaders) == 0x08, "grmShaderGroup layout");
 static_assert(sizeof(void*) != 4 || offsetof(rage::spdApical, unk_10) == 0x10, "spdApical layout");

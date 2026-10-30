@@ -60,7 +60,7 @@ def inputs(t):
     transforms = t.alloc(256 * 64, "transforms")
     t.floats(transforms, 256 * 16, -10, 10)
     group = t.alloc(24, "shaderGroup")
-    context = t.alloc(16, "drawContext")
+    shader_filter = rng.choice([0, 1, 2, 31, 32, 255, rng.getrandbits(32)])
     skin = t.alloc(16, "skinContext")
     viewport = t.alloc(0x400, "viewport")
     alternate_viewport = t.alloc(0x400, "alternateViewport")
@@ -131,5 +131,5 @@ def inputs(t):
     t.w8(group + 20, rng.choice([0, 1, 2, 0x80]))
     # The assembly spills only the low byte of r9; high bits must be irrelevant.
     skinned = (rng.getrandbits(24) << 8) | rng.choice([0, 1, 2, 0x80, 0xFF])
-    t.args(r3=obj, r4=group, r5=transforms, r6=context, r7=lod,
+    t.args(r3=obj, r4=group, r5=transforms, r6=shader_filter, r7=lod,
            r8=0 if mask_kind == 0 else mask, r9=skinned, r10=skin)
