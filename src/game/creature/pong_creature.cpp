@@ -200,6 +200,13 @@ extern float* pongMover_ComputeRemoteVelocity(float* out, pongMover* mover); // 
 extern void pongMover_UpdateMovementState(pongMover* mover); // @ 0x820CA390
 extern void pongMover_AdjustVelocity(pongMover* mover, float* x, float* z); // @ 0x820CA488
 
+extern "C" {
+extern float g_kTransitionStep; // @ 0x825CAEC0
+extern void** g_pInputArrayTable; // @ 0x825EAB28
+extern uint8_t lbl_82606326; // @ 0x82606326 — enable velocity adjustment
+extern float lbl_825C9D64; // @ 0x825C9D64 — stationary speed/timer threshold
+}
+
 // Blend input and local/remote movement, mirror it for the court side, and
 // advance the stationary latch. +0x60 caches the creature's translation.
 // pongMover::UpdateVelocity (was phBoundCapsule_A080_g) @ 0x820CA080 | size: 0x30C
@@ -207,7 +214,7 @@ void pongMover::UpdateVelocity() {
     const auto* creature = static_cast<const uint8_t*>(m_pCreature);
     const auto* instance = *reinterpret_cast<const uint8_t* const*>(creature + 0xA4);
     memcpy(m_unk60, instance + 0x40, sizeof(m_unk60));
-    const float dt = *reinterpret_cast<const float*>(0x825CAEC0);
+    const float dt = g_kTransitionStep;
     if (m_flags & 2) {
         m_posZ -= dt;
         if (m_posZ <= 0.0f) m_flags &= 0xFD;
@@ -244,16 +251,16 @@ void pongMover::UpdateVelocity() {
     pongMover_UpdateMovementState(this);
     m_unk30 = x;
     m_unk34 = z;
-    if (*reinterpret_cast<const uint8_t*>(0x82606326))
+    if (lbl_82606326)
         pongMover_AdjustVelocity(this, &m_unk30, &m_unk34);
-    const float threshold = *reinterpret_cast<const float*>(0x825C9D64);
+    const float threshold = lbl_825C9D64;
     const float z2 = m_unk34 * m_unk34;
     const float length2 = __builtin_fmaf(m_unk30, m_unk30, z2);
     if (m_bIsMoving && length2 <= threshold)
         m_bHasTarget = (__builtin_fabsf(m_unk20) != 0.0f || __builtin_fabsf(m_unk24) != 0.0f);
     creature = static_cast<const uint8_t*>(m_pCreature);
     const uint32_t offset = *reinterpret_cast<const uint32_t*>(creature + 0xCC);
-    const auto* players = *reinterpret_cast<const uint8_t* const*>(0x825EAB28);
+    const auto* players = reinterpret_cast<const uint8_t*>(g_pInputArrayTable);
     const bool forward = players[offset + 0x40] != 0;
     m_unk38 = forward ? m_unk30 : -m_unk30;
     m_unk3C = forward ? m_unk34 : -m_unk34;
@@ -261,7 +268,7 @@ void pongMover::UpdateVelocity() {
         m_unk38 == 0.0f && m_unk3C == 0.0f) {
         float timer;
         memcpy(&timer, _unk80, sizeof(timer));
-        timer += *reinterpret_cast<const float*>(0x825CAEC0);
+        timer += g_kTransitionStep;
         memcpy(_unk80, &timer, sizeof(timer));
         if (timer > threshold) {
             timer = 0.0f;

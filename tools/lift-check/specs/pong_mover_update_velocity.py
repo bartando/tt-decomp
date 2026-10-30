@@ -17,6 +17,12 @@ ADDRESS = 0x820CA080
 SOURCE = "src/game/creature/pong_creature.cpp"
 TRIALS = 1200
 FP_CONTRACT = "off"
+EXTERNS = {
+    "g_kTransitionStep": 0x825CAEC0,
+    "g_pInputArrayTable": 0x825EAB28,
+    "lbl_82606326": 0x82606326,
+    "lbl_825C9D64": 0x825C9D64,
+}
 
 
 def _u(ctx, a):
@@ -92,20 +98,20 @@ def inputs(t):
     t.w32(creature + 0xA4, instance)
     offset = rng.choice((0, 0x50))
     t.w32(creature + 0xCC, offset)
-    t.w32(0x825EAB28, players)
+    t.w32(t.sym("g_pInputArrayTable"), players)
     t.w8(players + offset + 0x40, rng.choice((0, 1, 255)))
     flags = rng.randrange(256)
     t.w8(mover + 0x40, flags)
     dt = rng.choice((0., 1/60, 0.5, -0.25))
-    t.wf32(0x825CAEC0, dt)
+    t.wf32(t.sym("g_kTransitionStep"), dt)
     t.wf32(mover + 0x18, rng.choice((0., dt, dt - 2**-20, dt + 2**-20,
                                                    -1., 1., float("nan"))))
     t.wf32(mover + 0x48, rng.choice((0., 1., 5., -2., rng.uniform(0, 20))))
     t.w8(mover + 0x85, rng.choice((0, 1, 255)))
     t.w8(mover + 0x84, rng.randrange(256))
     t.wf32(mover + 0x80, rng.choice((0., 25., 25. - dt, 25. + dt, float("nan"))))
-    t.wf32(0x825C9D64, 25.)
-    t.w8(0x82606326, t.index % 2)
+    t.wf32(t.sym("lbl_825C9D64"), 25.)
+    t.w8(t.sym("lbl_82606326"), t.index % 2)
     t.w32(mover + 0xE0, 0)
     t.w8(mover + 0xE4, rng.choice((0, 0x10)))
     t.w8(mover + 0xE5, rng.randrange(2))
