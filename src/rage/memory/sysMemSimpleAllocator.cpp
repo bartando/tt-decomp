@@ -54,6 +54,131 @@ extern uint32_t g_activeLoggingAllocatorCount;  // @ 0x825EBD20
 
 namespace rage {
 
+extern "C" void rage_stricmp_6358(uint8_t* buf, uint32_t count);
+extern uint32_t g_sysMemAllocationTag;  // @ 0x825EBCE4
+
+// @ 0x82186E40
+void* sysMemSimpleAllocator::Allocate(uint32_t size) {
+    // Xbox ABI: heads at +0x0C, used bytes at +0x54, tag totals at +0x58,
+    // free bytes at +0x98. The scaffold's field names describe these incorrectly.
+    uint32_t* words = reinterpret_cast<uint32_t*>(this);
+    uint32_t* heads = words + 3;
+    struct Node {
+        uint32_t guard;
+        uint32_t size;
+        uint32_t physicalPrev;
+        uint32_t flags;
+        uint32_t freePrev;
+        uint32_t freeNext;
+    };
+    const auto nodeAt = [](uint32_t address) {
+        return reinterpret_cast<Node*>(static_cast<uintptr_t>(address));
+    };
+    const auto addressOf = [](const Node* node) {
+        return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(node));
+    };
+    const auto bucketFor = [](uint32_t blockSize) {
+        // srawi/addze implements signed division, including its truncation to zero.
+        int32_t bucket = static_cast<int32_t>(blockSize) / 16;
+        return bucket < 15 ? bucket : 15;
+    };
+
+    if (isLocked != 0) {
+        rage_debugLog("Attempting to allocate %u bytes on a locked heap", size);
+    }
+    ++allocCount;
+    if (allocCount == maxAllocCount) {
+        __builtin_trap();
+    }
+    if (allocCount == 0x04000000) {
+        rage_debugLog("Alloc id counter wrapped, may get false hits on leaks.");
+        allocCount = 1;
+    }
+
+    uint32_t alignedSize = ((size == 0 ? 1 : size) + 15) & ~15u;
+    if (alignedSize > largestAvailBlock) {
+        rage_debugLog("Not enough memory to allocate %u bytes", alignedSize);
+    }
+
+    Node* chosen = nullptr;
+    for (int32_t bucket = bucketFor(alignedSize); bucket < 16; ++bucket) {
+        uint32_t bestSize = 0xFFFFFFFFu;
+        for (Node* node = nodeAt(heads[bucket]); node != nullptr; node = nodeAt(node->freeNext)) {
+            if (node->guard != addressOf(node)) {
+                rage_debugLog("sysMemSimpleAllocator::Allocate - memory node at %p had guard word trashed!\n\n"
+                              "This usually means somebody overran an array between this Allocate call and the\n"
+                              "immediately previous Allocate or Free call.", node);
+            }
+            if (node->size == alignedSize) {
+                chosen = node;
+                break;
+            }
+            if (node->size > alignedSize && node->size < bestSize) {
+                chosen = node;
+                bestSize = node->size;
+            }
+        }
+        if (chosen != nullptr) {
+            break;
+        }
+    }
+    if (chosen == nullptr) {
+        using LargestFn = uint32_t (*)(sysMemSimpleAllocator*);
+        uint32_t largest = reinterpret_cast<LargestFn>(vtable[6])(this);
+        rage_debugLog("Not enough memory to allocate %u bytes (fragmented) (largest available block = %u bytes)",
+                      alignedSize, largest);
+        // Retail next reads null->flags (+0x0C). Keep that fault observable:
+        // a plain null dereference is UB and clang would delete this path's tail.
+        static_cast<void>(*reinterpret_cast<volatile uint32_t*>(static_cast<uintptr_t>(0x0C)));
+    }
+
+    chosen->flags = ((chosen->flags | 0x10u) & 0x3Fu) | (allocCount << 6);
+    int32_t bucket = bucketFor(chosen->size);
+    uint32_t prev = chosen->freePrev;
+    uint32_t next = chosen->freeNext;
+    if (prev != 0) {
+        nodeAt(prev)->freeNext = next;
+    } else {
+        heads[bucket] = next;
+    }
+    if (next != 0) {
+        nodeAt(next)->freePrev = prev;
+    }
+
+    // A remainder must hold a header and nonempty payload. +16 exactly stays whole.
+    if (chosen->size > alignedSize + 16) {
+        uint32_t remainderAddress = addressOf(chosen) + alignedSize + 16;
+        Node* remainder = nodeAt(remainderAddress);
+        remainder->guard = remainderAddress;
+        remainder->physicalPrev = addressOf(chosen);
+        remainder->flags = 0;
+        remainder->size = chosen->size - alignedSize - 16;
+        uint32_t following = remainderAddress + remainder->size + 16;
+        if (following < heapBase + heapSize && following != 0) {
+            nodeAt(following)->physicalPrev = remainderAddress;
+        }
+        chosen->size = alignedSize;
+
+        bucket = bucketFor(remainder->size);
+        remainder->freeNext = heads[bucket];
+        if (heads[bucket] != 0) {
+            nodeAt(heads[bucket])->freePrev = remainderAddress;
+        }
+        remainder->freePrev = 0;
+        heads[bucket] = remainderAddress;
+        largestAvailBlock -= 16;
+        words[0x54 / 4] += 16;
+    }
+
+    words[0x54 / 4] += chosen->size;
+    largestAvailBlock -= chosen->size;
+    chosen->flags = (chosen->flags & ~15u) | (g_sysMemAllocationTag & 15u);
+    words[0x58 / 4 + (chosen->flags & 15u)] += chosen->size;
+    uint8_t* payload = reinterpret_cast<uint8_t*>(chosen) + 16;
+    rage_stricmp_6358(payload, chosen->size);
+    return payload;
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 // slot 7: SetBreakAllocIndex  @ 0x82186D98  (8 bytes)
 //
