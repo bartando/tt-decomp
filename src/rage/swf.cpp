@@ -14,6 +14,8 @@
 #include <cstdlib>  // For strtol
 #include <cmath>    // For fused multiply-add
 
+void swfSetMember(void* list, const char* name, const uint32_t* value); // @ 0x823FB258
+
 void swfSetClipEvents(void* instance, uint32_t events, uint32_t records, int32_t count);  // @ 0x823FD320
 
 // External functions
@@ -32,7 +34,6 @@ extern "C" {
     void* swfSymtab_Lookup(void* symtab, const char* key);   // symtab key lookup
     void* swfInstanceConstruct(void* storage);  // @ 0x823FB570
     void rage_DebugLog(const char* msg, ...);    // debug log stub (no-op)
-    void swfSymtab_Insert(void* symtab, const char* key, void* value);  // symtab insert
     void swfSymtab_Delete(void* symtab, const char* key);   // symtab key delete
     void swfPopResult(void* dst);               // pop result from call stack
     int _stricmp(const char*, const char*);     // case-insensitive string compare
@@ -777,14 +778,15 @@ bool swfSCRIPTOBJECT::GetMember(const char* name, void* result) {
 /**
  * swfSCRIPTOBJECT::SetMember @ 0x823FC8A8 | size: 0x5C
  *
- * Sets a named property on this script object. Interns the name string,
- * then inserts the (name, value) pair into the SYMTAB member table at +4.
+ * Converts the tagged property name, inserts its value into the member
+ * table at +4, and returns status 1.
  */
-void swfSCRIPTOBJECT::SetMember(const char* name, void* value) {
+uint32_t swfSCRIPTOBJECT::SetMember(const char* name, void* value) {
     extern void* g_swfStringBuffer;  // @ 0x82604850
 
-    const char* internedName = swfInternString(name, &g_swfStringBuffer, SWF_INTERN_BUFFER_SIZE);
-    swfSymtab_Insert((char*)this + 4, internedName, value);
+    const char* internedName = util_A768_1(name, &g_swfStringBuffer, SWF_INTERN_BUFFER_SIZE);
+    swfSetMember((char*)this + 4, internedName, static_cast<const uint32_t*>(value));
+    return 1;
 }
 
 /**
@@ -1200,7 +1202,7 @@ void swfCMD_PlaceObject2ClipEvent::Execute(swfINSTANCE* parent) {
         Value name = {*reinterpret_cast<void**>(command + 0x2C), 1};
         Value value = {child, 5};
         auto** vtable = *reinterpret_cast<void***>(parent);
-        using SetMember = void (*)(swfINSTANCE*, const Value*, const Value*);
+        using SetMember = uint32_t (*)(swfINSTANCE*, const Value*, const Value*);
         reinterpret_cast<SetMember>(vtable[11])(parent, &name, &value);
         *reinterpret_cast<void**>(child + 0xBC) = *reinterpret_cast<void**>(command + 0x2C);
     }
@@ -1345,11 +1347,13 @@ void swfINSTANCE_ScalarDestructor(swfINSTANCE* obj, int flags) {
  * swfINSTANCE::GotoFrame @ 0x823FB7A8 | size: 0xF8
  *
  * Advances the timeline to target frame, executing frame commands along
- * the way. If the target is past the last frame, wraps to 0 and clears
- * all child instances' dirty flags. On each frame step, executes the
+ * the way. Out-of-range targets are ignored. Stepping past the last frame
+ * wraps to 0 and clears child flags at +0xAF. On each step, executes the
  * frame's command list (DoAction tags) if skipActions==0.
  */
-void swfINSTANCE::GotoFrame(uint16_t targetFrame, uint8_t skipActions) {
+void swfINSTANCE::GotoFrame(uint32_t targetFrame, uint32_t skipActions) {
+    targetFrame = static_cast<uint16_t>(targetFrame);
+    skipActions = static_cast<uint8_t>(skipActions);
     void* def = SwfGetDefinition(this);
     uint16_t totalFrames = SwfGetTotalFrames(def);
 
@@ -1414,7 +1418,10 @@ void swfINSTANCE::NextFrame(void* context) {
     uint8_t savedPlaying = isPlaying;
     isPlaying = 1;
 
-    this->GotoFrame(nextFrame, (uint8_t)(uintptr_t)context);
+    // Retail dispatches slot 1 and forwards the full context register.
+    using GotoFrameFn = void (*)(swfINSTANCE*, uint32_t, void*);
+    void** vtable = *reinterpret_cast<void***>(this);
+    reinterpret_cast<GotoFrameFn>(vtable[1])(this, nextFrame, context);
 
     isPlaying = savedPlaying;
 }
@@ -1542,12 +1549,11 @@ int swfINSTANCE::VisitMembers() {
  * Virtual function slot 11 - forwards to inner object's SetMember.
  * The inner object is stored at offset +7332.
  */
-void swfACTIONFUNC::SetMember(const char* name, void* value) {
-    // Forward to inner MovieClip's SetMember (virtual slot 11).
-    swfINSTANCE* innerObj = m_pInnerObject;
-    if (innerObj) {
-        innerObj->SetMember(name, value);
-    }
+uint32_t swfACTIONFUNC::SetMember(const char* name, void* value) {
+    swfINSTANCE* innerObj = *reinterpret_cast<swfINSTANCE**>(reinterpret_cast<char*>(this) + 0x1CA4);
+    using Setter = uint32_t (*)(swfINSTANCE*, const char*, void*);
+    void** vtable = *reinterpret_cast<void***>(innerObj);
+    return reinterpret_cast<Setter>(vtable[11])(innerObj, name, value);
 }
 
 /**
@@ -1690,8 +1696,7 @@ bool swfINSTANCE::GetMember(const char* name, void* result) {
 
 // swfINSTANCE slot 11 @ 0x823FC1A8: display writes and script fallback.
 // As in GetMember, name points to an 8-byte SWF value, not a C string.
-// The shared void interface loses the original status return (KNOWN_WRONG_LIFTS.md).
-void swfINSTANCE::SetMember(const char* name, void* value) {
+uint32_t swfINSTANCE::SetMember(const char* name, void* value) {
     extern void* g_swfStringBuffer;        // @ 0x82604850
     extern void* g_swfScriptObjectPool;    // @ 0x82604C60
     extern void* g_vtable_swfSCRIPTOBJECT; // @ 0x82074D14
@@ -1708,22 +1713,22 @@ void swfINSTANCE::SetMember(const char* name, void* value) {
     if (strcmp(property, "_x") == 0) {
         *reinterpret_cast<float*>(instance + 0x70) = swfValueToFloat(value);
         instance[0x95] = 1;
-        return;
+        return 1;
     }
     if (strcmp(property, "_y") == 0) {
         *reinterpret_cast<float*>(instance + 0x74) = swfValueToFloat(value);
         instance[0x95] = 1;
-        return;
+        return 1;
     }
     if (strcmp(property, "_xscale") == 0) {
         *reinterpret_cast<float*>(instance + 0x68) = swfValueToFloat(value);
         instance[0x95] = 1;
-        return;
+        return 1;
     }
     if (strcmp(property, "_yscale") == 0) {
         *reinterpret_cast<float*>(instance + 0x6C) = swfValueToFloat(value);
         instance[0x95] = 1;
-        return;
+        return 1;
     }
     if (strcmp(property, "text") == 0) {
         char buffer[256];
@@ -1731,7 +1736,7 @@ void swfINSTANCE::SetMember(const char* name, void* value) {
         void*& oldText = *reinterpret_cast<void**>(instance + 0x48);
         if (oldText) swfReleaseText(oldText, 1);
         oldText = swfCopyText(text);
-        return;
+        return 1;
     }
     if (strcmp(property, "_alpha") == 0) {
         // Xenon wraps the integer product before signed division by 100;
@@ -1739,53 +1744,53 @@ void swfINSTANCE::SetMember(const char* name, void* value) {
         uint32_t alpha = static_cast<uint32_t>(swfValueToInt(value));
         int32_t scaled = static_cast<int32_t>((alpha << 8) - alpha);
         instance[0x4F] = static_cast<uint8_t>(scaled / 100);
-        return;
+        return 1;
     }
     if (strcmp(property, "textColor") == 0) {
         uint32_t color = static_cast<uint32_t>(swfValueToInt(value));
         instance[0x4C] = static_cast<uint8_t>(color >> 16);
         instance[0x4D] = static_cast<uint8_t>(color >> 8);
         instance[0x4E] = static_cast<uint8_t>(color);
-        return;
+        return 1;
     }
     if (strcmp(property, "_rotation") == 0) {
         float angle = swfValueToFloat(value);
         *reinterpret_cast<float*>(instance + 0x54) =
             static_cast<float>(swfRotationRemainder(angle, 360.0));
         instance[0x95] = 1;
-        return;
+        return 1;
     }
     if (strcmp(property, "__texturename") == 0) {
         // This branch uses the payload directly, without converting the value.
         const swfValuePair* pair = static_cast<const swfValuePair*>(value);
         const char* texture = reinterpret_cast<const char*>(static_cast<uintptr_t>(pair->data));
         *reinterpret_cast<void**>(instance + 0x90) = swfFindTexture(g_sda_6404, texture);
-        return;
+        return 1;
     }
     if (strcmp(property, "__drawcallback") == 0) {
         *reinterpret_cast<int32_t*>(instance + 0x98) = swfValueToInt(value);
-        return;
+        return 1;
     }
     if (strcmp(property, "_seamFix") == 0) {
         instance[0x9C] = swfValueToInt(value) > 0;
-        return;
+        return 1;
     }
     if (strcmp(property, "onEnterFrame") == 0) {
         const swfValuePair* pair = static_cast<const swfValuePair*>(value);
         *reinterpret_cast<uint32_t*>(instance + 0xCC) = pair->type == 5 ? pair->data : 0;
-        return;
+        return 1;
     }
     if (strcmp(property, "onRelease") == 0) {
         const swfValuePair* pair = static_cast<const swfValuePair*>(value);
         *reinterpret_cast<uint32_t*>(instance + 0xD0) = pair->type == 5 ? pair->data : 0;
-        return;
+        return 1;
     }
 
     using DefinitionSetter = uint32_t (*)(void*, const char*, void*);
     void* definition = SwfGetDefinition(this);
     void** definitionVtable = *reinterpret_cast<void***>(definition);
     if (uint8_t(reinterpret_cast<DefinitionSetter>(definitionVtable[5])(definition, property, value))) {
-        return;
+        return 1;
     }
 
     void*& script = *reinterpret_cast<void**>(instance + 0xA0);
@@ -1805,7 +1810,7 @@ void swfINSTANCE::SetMember(const char* name, void* value) {
     // Unlike GetMember's fallback, assignment forwards the original tagged key.
     using ScriptSetter = uint32_t (*)(void*, const char*, void*);
     void** vtable = *reinterpret_cast<void***>(script);
-    reinterpret_cast<ScriptSetter>(vtable[11])(script, name, value);
+    return reinterpret_cast<ScriptSetter>(vtable[11])(script, name, value);
 }
 
 // slot 12 = DeleteMember (same as base — no special display property handling)
@@ -2011,13 +2016,22 @@ swfSCRIPTARRAY::~swfSCRIPTARRAY() {
 
 
 
-// swfSCRIPTARRAY overrides GetMember/SetMember for array-style access.
-// Both overrides @ 0x823FEB48 / 0x823FEC38 recognise numeric index keys
-// ("0", "1", ...) and "length", falling through to the script-object
-// base for everything else. Pending dedicated lift; base lookup still
-// handles string-named members correctly.
+// GetMember @ 0x823FEB48 remains a placeholder for array-style lookup.
 bool swfSCRIPTARRAY::GetMember(const char* name, void* result) { return swfSCRIPTOBJECT::GetMember(name, result); }
-void swfSCRIPTARRAY::SetMember(const char* name, void* value) { swfSCRIPTOBJECT::SetMember(name, value); }
+// Slot 11 converts the key to a signed index; it does not fall back to named members.
+uint32_t swfSCRIPTARRAY::SetMember(const char* name, void* value) {
+    extern int32_t swfValueToInt(const void* value); // @ 0x823FA5C8
+    int32_t index = swfValueToInt(name);
+    char* array = reinterpret_cast<char*>(this);
+    if (index >= *reinterpret_cast<uint16_t*>(array + 0x14)) return 0;
+    // Retail only checks the upper bound. Callers must provide storage for the index.
+    uintptr_t elements = *reinterpret_cast<uintptr_t*>(array + 0x10);
+    uint32_t* destination = reinterpret_cast<uint32_t*>(elements + static_cast<uintptr_t>(index) * 8);
+    const uint32_t* pair = static_cast<const uint32_t*>(value);
+    destination[0] = pair[0];
+    destination[1] = pair[1];
+    return 1;
+}
 
 
 // ===========================================================================
@@ -2500,6 +2514,5 @@ const char* swfInternString(const char* a, void* b, int c) {
 void swfPopResult(void* a) { (void)a; }
 void swfSymtab_Delete(void* a, const char* b) { (void)a; (void)b; }
 void swfSymtab_Enumerate(void* a) { (void)a; }
-void swfSymtab_Insert(void* a, const char* b, void* c) { (void)a; (void)b; (void)c; }
 void* swfSymtab_Lookup(void* a, const char* b) { (void)a; (void)b; return nullptr; }
 } // extern "C"
