@@ -34,6 +34,7 @@ extern "C" {
     float util_EF98(void* instance, int includeChildren);  // @ 0x823FEF98 — display width
     float swfINSTANCE_F0D8_w(void* instance, int includeChildren);  // @ 0x823FF0D8 — display height
     int _snprintf(char* buffer, size_t count, const char* format, ...);  // @ 0x820C0B40
+    extern void* g_sda_6404;  // @ 0x82606404 — shared texture lookup owner
 }
 
 // @ 0x823FA768
@@ -1144,14 +1145,124 @@ bool swfINSTANCE::GetMember(const char* name, void* result) {
     return reinterpret_cast<ScriptLookup>(vtable[10])(script, &key, result);
 }
 
-// slot 11 = SetMember (736 lines — handles _x, _y, _xscale, _yscale, _alpha,
-//          _rotation, _name, __texturename, __drawcallback, textColor, _visible, etc.)
+// swfINSTANCE slot 11 @ 0x823FC1A8: display writes and script fallback.
+// As in GetMember, name points to an 8-byte SWF value, not a C string.
+// The shared void interface loses the original status return (KNOWN_WRONG_LIFTS.md).
 void swfINSTANCE::SetMember(const char* name, void* value) {
-    // Full body @ 0x823FC1A8 (736 lines) mirrors GetMember on the write side:
-    // _x, _y, _xscale, _yscale, _alpha, _rotation, _name, __texturename,
-    // __drawcallback, textColor, _visible, etc. Pending dedicated lift;
-    // forwarding to the script-object base covers plain member writes.
-    swfSCRIPTOBJECT::SetMember(name, value);
+    extern void* g_swfStringBuffer;        // @ 0x82604850
+    extern void* g_swfScriptObjectPool;    // @ 0x82604C60
+    extern void* g_vtable_swfSCRIPTOBJECT; // @ 0x82074D14
+    extern float swfValueToFloat(const void* value); // @ 0x823FA688
+    extern int32_t swfValueToInt(const void* value); // @ 0x823FA5C8
+    extern void swfReleaseText(void* text, int freeStorage); // @ 0x823F8A38
+    extern void* swfCopyText(const char* text); // @ 0x823FABC0
+    extern void* swfFindTexture(void* dictionary, const char* name); // @ 0x82151990
+    extern double swfRotationRemainder(double angle, double period); // @ 0x82431D78
+
+    const char* property = util_A768_1(name, &g_swfStringBuffer, SWF_INTERN_BUFFER_SIZE);
+    char* instance = reinterpret_cast<char*>(this);
+
+    if (strcmp(property, "_x") == 0) {
+        *reinterpret_cast<float*>(instance + 0x70) = swfValueToFloat(value);
+        instance[0x95] = 1;
+        return;
+    }
+    if (strcmp(property, "_y") == 0) {
+        *reinterpret_cast<float*>(instance + 0x74) = swfValueToFloat(value);
+        instance[0x95] = 1;
+        return;
+    }
+    if (strcmp(property, "_xscale") == 0) {
+        *reinterpret_cast<float*>(instance + 0x68) = swfValueToFloat(value);
+        instance[0x95] = 1;
+        return;
+    }
+    if (strcmp(property, "_yscale") == 0) {
+        *reinterpret_cast<float*>(instance + 0x6C) = swfValueToFloat(value);
+        instance[0x95] = 1;
+        return;
+    }
+    if (strcmp(property, "text") == 0) {
+        char buffer[256];
+        const char* text = util_A768_1(value, buffer, sizeof(buffer));
+        void*& oldText = *reinterpret_cast<void**>(instance + 0x48);
+        if (oldText) swfReleaseText(oldText, 1);
+        oldText = swfCopyText(text);
+        return;
+    }
+    if (strcmp(property, "_alpha") == 0) {
+        // Xenon wraps the integer product before signed division by 100;
+        // the byte store wraps again, without clamping to [0, 255].
+        uint32_t alpha = static_cast<uint32_t>(swfValueToInt(value));
+        int32_t scaled = static_cast<int32_t>((alpha << 8) - alpha);
+        instance[0x4F] = static_cast<uint8_t>(scaled / 100);
+        return;
+    }
+    if (strcmp(property, "textColor") == 0) {
+        uint32_t color = static_cast<uint32_t>(swfValueToInt(value));
+        instance[0x4C] = static_cast<uint8_t>(color >> 16);
+        instance[0x4D] = static_cast<uint8_t>(color >> 8);
+        instance[0x4E] = static_cast<uint8_t>(color);
+        return;
+    }
+    if (strcmp(property, "_rotation") == 0) {
+        float angle = swfValueToFloat(value);
+        *reinterpret_cast<float*>(instance + 0x54) =
+            static_cast<float>(swfRotationRemainder(angle, 360.0));
+        instance[0x95] = 1;
+        return;
+    }
+    if (strcmp(property, "__texturename") == 0) {
+        // This branch uses the payload directly, without converting the value.
+        const swfValuePair* pair = static_cast<const swfValuePair*>(value);
+        const char* texture = reinterpret_cast<const char*>(static_cast<uintptr_t>(pair->data));
+        *reinterpret_cast<void**>(instance + 0x90) = swfFindTexture(g_sda_6404, texture);
+        return;
+    }
+    if (strcmp(property, "__drawcallback") == 0) {
+        *reinterpret_cast<int32_t*>(instance + 0x98) = swfValueToInt(value);
+        return;
+    }
+    if (strcmp(property, "_seamFix") == 0) {
+        instance[0x9C] = swfValueToInt(value) > 0;
+        return;
+    }
+    if (strcmp(property, "onEnterFrame") == 0) {
+        const swfValuePair* pair = static_cast<const swfValuePair*>(value);
+        *reinterpret_cast<uint32_t*>(instance + 0xCC) = pair->type == 5 ? pair->data : 0;
+        return;
+    }
+    if (strcmp(property, "onRelease") == 0) {
+        const swfValuePair* pair = static_cast<const swfValuePair*>(value);
+        *reinterpret_cast<uint32_t*>(instance + 0xD0) = pair->type == 5 ? pair->data : 0;
+        return;
+    }
+
+    using DefinitionSetter = uint32_t (*)(void*, const char*, void*);
+    void* definition = SwfGetDefinition(this);
+    void** definitionVtable = *reinterpret_cast<void***>(definition);
+    if (uint8_t(reinterpret_cast<DefinitionSetter>(definitionVtable[5])(definition, property, value))) {
+        return;
+    }
+
+    void*& script = *reinterpret_cast<void**>(instance + 0xA0);
+    if (!script) {
+        // The original requires a nonempty pool and reads the next link first.
+        char* pool = reinterpret_cast<char*>(g_swfScriptObjectPool);
+        void* object = *reinterpret_cast<void**>(pool + 12);
+        void* next = *reinterpret_cast<void**>(object);
+        --*reinterpret_cast<uint16_t*>(pool + 6);
+        *reinterpret_cast<void**>(pool + 12) = next;
+        *reinterpret_cast<void**>(object) = &g_vtable_swfSCRIPTOBJECT;
+        *reinterpret_cast<uint32_t*>(reinterpret_cast<char*>(object) + 8) = 0;
+        *reinterpret_cast<uint32_t*>(reinterpret_cast<char*>(object) + 4) = 0;
+        *reinterpret_cast<uint32_t*>(reinterpret_cast<char*>(object) + 12) = 0;
+        script = object;
+    }
+    // Unlike GetMember's fallback, assignment forwards the original tagged key.
+    using ScriptSetter = uint32_t (*)(void*, const char*, void*);
+    void** vtable = *reinterpret_cast<void***>(script);
+    reinterpret_cast<ScriptSetter>(vtable[11])(script, name, value);
 }
 
 // slot 12 = DeleteMember (same as base — no special display property handling)
