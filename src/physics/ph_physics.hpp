@@ -862,12 +862,10 @@ struct phBoundCapsule {
     int32_t ComputeFixedPointDotProduct();  // @ 0x824C35C8
     float GetRadius() const;
     void ScaleRadius(float scale);
-    void ComputeBounds(float scale, float* outMin, float* outMax);
     float ComputeExtent(float param1, float param2) const;
     void InitializeAxisAlignedX(float halfLength, float* outMatrix);
     void InitializeAxisAlignedY(float halfLength, float* outMatrix);
     void InitializeAxisAlignedZ(float halfLength, float* outMatrix);
-    void TransformByDirection(float halfLength, const float* direction, float* outMatrix);
     void SetMaterialIndex(uint32_t index);
     uint32_t GetMaterialIndex() const;
     float GetVolume() const;
@@ -877,7 +875,6 @@ struct phBoundCapsule {
     int CheckScaledValueSign() const;
     void SetupCapsuleFromState();
     float SumFloatArray(int count) const;
-    void RotateVectors();
     void RotateVectorsAlt();
     int NormalizeVector2D(float* outVec) const;
     void LookupTableValues(void* outValues);
@@ -892,7 +889,6 @@ struct phBoundCapsule {
     float CalculateVolume() const;
     void SetCentroidOffset(const float* offset);
     float GetBoundingDistance(const float* direction, uint8_t includeCenter) const;
-    void ValidateAndSetExtents(const float* matrix);
     void GetJointLimitsForAxis(uint32_t jointIndex, uint32_t axis, float* outMin, float* outMax);
 };
 
