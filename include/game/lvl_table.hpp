@@ -128,6 +128,38 @@ void clothCollideCapsule(const ClothCapsuleCollisionView* self, const ClothCapsu
                          uint32_t group, const LvlTableVector* reduction,
                          const LvlTableVector* expansion, uint32_t mode);
 
+// Type-13 bound consumed by 0x823389E8. Descriptive field names are inferred
+// from the endpoint tests and tapered-surface normal, not recovered symbols.
+struct ClothTaperedCapsuleBoundView {
+    uint8_t _pad00[8];
+    float broadRadius;                     // +0x08
+    uint8_t _pad0C[0x34];
+    LvlTableVector center;                 // +0x40
+    uint8_t _pad50[0x20];
+    LvlTableVector lowerRadius;            // +0x70
+    LvlTableVector upperRadius;            // +0x80
+    LvlTableVector upperProjection;        // +0x90
+    LvlTableVector slope;                  // +0xA0
+    LvlTableVector radialScale;            // +0xB0
+    LvlTableVector axisStart;              // +0xC0
+    uint8_t _padD0[0x10];
+    LvlTableVector axisDirection;          // +0xE0
+};
+static_assert(offsetof(ClothTaperedCapsuleBoundView, broadRadius) == 0x08);
+static_assert(offsetof(ClothTaperedCapsuleBoundView, center) == 0x40);
+static_assert(offsetof(ClothTaperedCapsuleBoundView, lowerRadius) == 0x70);
+static_assert(offsetof(ClothTaperedCapsuleBoundView, upperRadius) == 0x80);
+static_assert(offsetof(ClothTaperedCapsuleBoundView, upperProjection) == 0x90);
+static_assert(offsetof(ClothTaperedCapsuleBoundView, slope) == 0xA0);
+static_assert(offsetof(ClothTaperedCapsuleBoundView, radialScale) == 0xB0);
+static_assert(offsetof(ClothTaperedCapsuleBoundView, axisStart) == 0xC0);
+static_assert(offsetof(ClothTaperedCapsuleBoundView, axisDirection) == 0xE0);
+
+// Same ABI, controller layout, padding and VMX callee bridges as capsule above.
+void clothCollideTaperedCapsule(const ClothCapsuleCollisionView* self,
+                                const ClothTaperedCapsuleBoundView* bound, uint32_t group,
+                                const LvlTableVector* reduction, const LvlTableVector* expansion, uint32_t mode);
+
 // Packed 16-byte cloth distance constraint. Names are inferred from 0x82340900.
 struct ClothDistanceConstraint {
     uint16_t firstParticle;

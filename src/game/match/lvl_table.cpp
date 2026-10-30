@@ -479,6 +479,139 @@ void clothCollideCapsule(const ClothCapsuleCollisionView* self, const ClothCapsu
     }
 }
 
+// @ 0x823389E8 | size: 0x33C | formerly lvlTable_89E8
+// The callers select bound type 13; the varying radius and sloped normal
+// identify tapered-capsule cloth collision. This is an inferred name.
+void clothCollideTaperedCapsule(const ClothCapsuleCollisionView* self,
+                                const ClothTaperedCapsuleBoundView* bound, uint32_t group,
+                                const LvlTableVector* reduction, const LvlTableVector* expansion, uint32_t mode) {
+    const ClothParticleGroup& particles = self->groups[group & 0x1FFFFFFFu];
+    if (particles.count == 0)
+        return;
+
+    const auto aligned = [](const LvlTableVector* value) {
+        return reinterpret_cast<const LvlTableVector*>(reinterpret_cast<uintptr_t>(value) & ~uintptr_t(15));
+    };
+    const auto* boundBytes = reinterpret_cast<const uint8_t*>(bound);
+    const auto loadBound = [&](uint32_t offset) {
+        return *aligned(reinterpret_cast<const LvlTableVector*>(boundBytes + offset));
+    };
+    const LvlTableVector padding = *aligned(expansion);
+    const LvlTableVector lowerRadius = loadBound(0x70), upperRadius = loadBound(0x80);
+    const LvlTableVector upperProjection = loadBound(0x90), slope = loadBound(0xA0);
+    const LvlTableVector radialScale = loadBound(0xB0), axisStart = loadBound(0xC0);
+    LvlTableVector axis = loadBound(0xE0);
+    const LvlTableVector center = loadBound(0x40);
+    LvlTableVector lowerLimit, upperLimit, scaledLowerRadius, broadRadiusSq;
+    for (int lane = 0; lane < 4; ++lane) {
+        axis.lane[lane] = flushVmx(axis.lane[lane]);
+        const float lower = flushVmx(flushVmx(lowerRadius.lane[lane]) + flushVmx(padding.lane[lane]));
+        const float upper = flushVmx(flushVmx(upperRadius.lane[lane]) + flushVmx(padding.lane[lane]));
+        lowerLimit.lane[lane] = flushVmx(flushVmx(slope.lane[lane]) * lower);
+        upperLimit.lane[lane] = flushVmx(flushVmx(flushVmx(slope.lane[lane]) * upper)
+                                                + flushVmx(upperProjection.lane[lane]));
+        scaledLowerRadius.lane[lane] = flushVmx(flushVmx(radialScale.lane[lane]) * lower);
+        const float broad = flushVmx(flushVmx(bound->broadRadius) + flushVmx(padding.lane[lane]));
+        broadRadiusSq.lane[lane] = flushVmx(broad * broad);
+    }
+
+    LvlTableVector* positions = self->positions;
+    const LvlTableVector* previous = self->previousPositions;
+    const int32_t movableStart = self->firstMovableParticle;
+    const uint32_t* indices = particles.indices;
+    const uint32_t batchCount = (static_cast<uint32_t>(particles.count) + 31) & ~31u;
+    auto* candidates = static_cast<uint32_t*>(__builtin_alloca(batchCount * sizeof(uint32_t)));
+    const uint32_t candidateCount = lvlTable_7D28_2h(batchCount, positions, indices, candidates,
+                                                   broadRadiusSq, center);
+    auto* deltas = static_cast<LvlTableVector*>(__builtin_alloca(candidateCount * sizeof(LvlTableVector)));
+    auto* parameters = static_cast<LvlTableVector*>(__builtin_alloca(candidateCount * sizeof(LvlTableVector)));
+    uint32_t hitCount = 0;
+    // Snapshot every collision before responses modify any positions.
+    for (uint32_t cursor = 0; cursor < candidateCount; ++cursor) {
+        const uint32_t index = candidates[cursor];
+        if (cursor > 0 && index == indices[0])
+            continue;
+        const LvlTableVector point = aligned(positions)[index & 0x0FFFFFFFu];
+        LvlTableVector relative;
+        for (int lane = 0; lane < 4; ++lane)
+            relative.lane[lane] = flushVmx(flushVmx(point.lane[lane]) - flushVmx(axisStart.lane[lane]));
+        const float projection = flushVmx(dot(axis, relative, 3));
+        LvlTableVector delta, radius, normalScale, normalSlope;
+        for (int lane = 0; lane < 4; ++lane) {
+            const float zero = flushVmx(lbl_82606750[lane]);
+            const float lowerOffset = flushVmx(projection - lowerLimit.lane[lane]);
+            const bool belowLower = zero > lowerOffset;
+            const bool belowUpper = zero > flushVmx(projection - upperLimit.lane[lane]);
+            const float clamped = belowLower ? zero : (belowUpper ? projection : upperProjection.lane[lane]);
+            const float closest = flushVmx(flushVmx(flushVmx(axis.lane[lane]) * flushVmx(clamped))
+                                                   + flushVmx(axisStart.lane[lane]));
+            delta.lane[lane] = flushVmx(flushVmx(point.lane[lane]) - closest);
+            const float negativeOffset = flushVmx(0.0f - lowerOffset);
+            const float taperedRadius = flushVmx(flushVmx(negativeOffset * flushVmx(slope.lane[lane]))
+                                                         + scaledLowerRadius.lane[lane]);
+            radius.lane[lane] = belowLower ? lowerRadius.lane[lane]
+                                            : (belowUpper ? taperedRadius : upperRadius.lane[lane]);
+            normalScale.lane[lane] = belowLower ? lbl_825CB7C0[lane] : radialScale.lane[lane];
+            normalSlope.lane[lane] = belowLower ? lbl_82606750[lane] : slope.lane[lane];
+        }
+        const float distanceSq = flushVmx(dot(delta, delta, 3));
+        bool inside = true;
+        for (int lane = 0; lane < 4; ++lane) {
+            const float radiusSq = flushVmx(flushVmx(radius.lane[lane]) * flushVmx(radius.lane[lane]));
+            // xyz must be strictly inside; w is forced to the homogeneous 1>0.
+            inside &= flushVmx(maskLane(radiusSq, lbl_82619BE0[lane], lbl_82619BD0[lane]))
+                          > flushVmx(maskLane(distanceSq, lbl_82619BE0[lane]));
+        }
+        if (inside) {
+            deltas[hitCount] = delta;
+            // Two vmrghw instructions pack lane zero of each parameter.
+            parameters[hitCount] = {{distanceSq, normalScale.lane[0], radius.lane[0], normalSlope.lane[0]}};
+            candidates[hitCount++] = index;
+        }
+    }
+
+    for (uint32_t hit = 0; hit < hitCount; ++hit) {
+        const uint32_t index = candidates[hit];
+        if (static_cast<int32_t>(index) < movableStart)
+            continue;
+        const LvlTableVector packed = parameters[hit];
+        const float distanceSq = packed.lane[0];
+        const float estimate = flushVmx(static_cast<float>(1.0 / std::sqrt(static_cast<double>(distanceSq))));
+        const LvlTableVector reductionValue = *aligned(reduction);
+        LvlTableVector normal, step;
+        for (int lane = 0; lane < 4; ++lane) {
+            const float y = estimate == flushVmx(lbl_82619BF0[lane]) ? lbl_82606750[lane] : estimate;
+            const float square = flushVmx(flushVmx(y) * flushVmx(y));
+            const float halfY = flushVmx(flushVmx(lbl_825CB7D0[lane]) * flushVmx(y));
+            const float error = flushVmx(-flushVmx(flushVmx(distanceSq * square)
+                                                  - flushVmx(lbl_825CB7C0[lane])));
+            const float inverseLength = flushVmx(flushVmx(error * halfY) + flushVmx(y));
+            const float length = flushVmx(distanceSq * inverseLength);
+            const float axial = flushVmx(flushVmx(packed.lane[3]) * length);
+            normal.lane[lane] = flushVmx(flushVmx(flushVmx(axis.lane[lane]) * axial)
+                                                 + flushVmx(deltas[hit].lane[lane]));
+            const float scaledLength = flushVmx(length * flushVmx(packed.lane[1]));
+            const float excess = flushVmx(flushVmx(packed.lane[2]) - scaledLength);
+            const float penetration = flushVmx(excess - flushVmx(reductionValue.lane[lane]));
+            const float zero = flushVmx(lbl_82606750[lane]);
+            step.lane[lane] = penetration != penetration || zero != zero
+                                  ? penetration + zero : (penetration > zero ? penetration : zero);
+        }
+        // Unlike capsule collision, normalize the sloped normal with a second
+        // rsqrt estimate, without a Newton refinement or sentinel replacement.
+        const float normalSq = flushVmx(dot(normal, normal, 3));
+        const float inverseNormal = flushVmx(static_cast<float>(1.0 / std::sqrt(static_cast<double>(normalSq))));
+        LvlTableVector direction;
+        for (int lane = 0; lane < 4; ++lane)
+            direction.lane[lane] = flushVmx(flushVmx(normal.lane[lane]) * inverseNormal);
+        const uint32_t slot = index & 0x0FFFFFFFu;
+        auto* position = reinterpret_cast<LvlTableVector*>(reinterpret_cast<uintptr_t>(positions) + slot * 16u);
+        const LvlTableVector previousPosition = aligned(previous)[slot];
+        lvlTable_7008_2h(reinterpret_cast<const LvlTableMotionView*>(self), position,
+                         mode, direction, step, previousPosition);
+    }
+}
+
 // @ 0x823D85B8
 void lvlTable_85B8_2hr(const LvlTableConstraintView* self, uint32_t constraint,
                        LvlTableVector* positions, const LvlTableVector& anchor) {
