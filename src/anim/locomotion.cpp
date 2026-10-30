@@ -233,6 +233,52 @@ void LocomotionStateAnim_B218_g(float* out, const float* matrix) {
     }
 }
 
+// Apply a pose record to a channel: type 0 uses translation, type 1 rotation.
+// The incoming r4 is unused; retain it so the pose context stays in r5.
+// The channel's original class and virtual method names are not yet established.
+// @ 0x8224BBA8
+void LocomotionStateAnim_BBA8_g(void* channel, void* /*unused*/, const void* poseContext) {
+    const uint8_t* channelBytes = static_cast<const uint8_t*>(channel);
+    const uint8_t type = channelBytes[5];
+    const uint8_t* context = static_cast<const uint8_t*>(poseContext);
+    void* animData = *reinterpret_cast<void* const*>(context + 4);
+    if (type > 1) {
+        return;
+    }
+
+    const uint16_t animID = *reinterpret_cast<const uint16_t*>(channelBytes + 6);
+    uint16_t index;
+    if (!LocomotionStateAnim_04F0_g(animData, animID, &index)) {
+        return;
+    }
+
+    const uint8_t* data = static_cast<const uint8_t*>(animData);
+    const uint32_t flags = *reinterpret_cast<const uint32_t*>(data + 0x14);
+    const bool packed = (flags & 1) != 0;
+    const uint8_t* records = *reinterpret_cast<const uint8_t* const*>(context + 0x0C);
+    const uint8_t* record = records + index * 0x50;
+    using Reset = void (*)(void*);
+    using Apply = void (*)(void*, const float*);
+
+    if (type == 1) {
+        if (packed || (*reinterpret_cast<const uint32_t*>(record + 0x48) & 0x0F) != 0) {
+            alignas(16) float quaternion[4];
+            LocomotionStateAnim_B218_g(quaternion, reinterpret_cast<const float*>(record));
+            void** vtable = *static_cast<void***>(channel);
+            reinterpret_cast<Apply>(vtable[18])(channel, quaternion);
+            return;
+        }
+    } else if ((packed && animID == 0)
+               || (*reinterpret_cast<const uint32_t*>(record + 0x48) & 0x380) != 0) {
+        void** vtable = *static_cast<void***>(channel);
+        reinterpret_cast<Apply>(vtable[17])(channel, reinterpret_cast<const float*>(record + 0x30));
+        return;
+    }
+
+    void** vtable = *static_cast<void***>(channel);
+    reinterpret_cast<Reset>(vtable[13])(channel);
+}
+
 extern "C" void LocomotionStateAnim_AccumNode(void* self, void* node) { (void)self; (void)node; }
 extern "C" void LocomotionStateAnim_ApplySpeed(void* self) { (void)self; }
 extern "C" void LocomotionStateAnim_ComputeOffset(void* self, void* out) { (void)self; (void)out; }
