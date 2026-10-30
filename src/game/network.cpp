@@ -19,55 +19,6 @@ extern void snBitStream_ValidateWrite(void* ctx, void* base);
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SinglesNetworkClient::ComputeStringHash @ 0x8223A868 | size: 0x68
-//
-// Computes a case-insensitive hash of a null-terminated string.
-// Converts lowercase letters (a-z) to uppercase before hashing.
-// Uses a 4-bit left rotation with XOR avalanche for hash mixing.
-//
-// Algorithm:
-//   1. For each character, convert lowercase to uppercase
-//   2. Rotate hash left by 4 bits and add character value
-//   3. If top 4 bits are set, XOR them back in for avalanche effect
-//
-// Parameters:
-//   str - Null-terminated string to hash
-//
-// Returns:
-//   32-bit hash value
-// ─────────────────────────────────────────────────────────────────────────────
-uint32_t SinglesNetworkClient_ComputeStringHash(const char* str)
-{
-    if (!str || *str == '\0') {
-        return 0;
-    }
-    
-    uint32_t hash = 0;
-    
-    while (*str != '\0') {
-        char ch = *str++;
-        
-        // Convert lowercase to uppercase (a-z -> A-Z)
-        if (ch >= 'a' && ch <= 'z') {
-            ch = ch - 32;
-        }
-        
-        // Rotate hash left by 4 bits and add character
-        hash = (hash << 4) + ch;
-        
-        // Avalanche: if top 4 bits are set, XOR them back in
-        uint32_t topBits = hash & 0xF0000000;
-        if (topBits != 0) {
-            hash ^= (topBits >> 24);
-            hash ^= topBits;
-        }
-    }
-    
-    return hash;
-}
-
-
-// ─────────────────────────────────────────────────────────────────────────────
 // SinglesNetworkClient::GetDeviceString @ 0x82238600 | size: 0x74
 //
 // Retrieves a device-related string from the network client's device array.

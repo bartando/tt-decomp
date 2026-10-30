@@ -12,6 +12,7 @@ struct SwfVmValue {
 static_assert(sizeof(SwfVmValue) == 8);
 
 extern "C" {
+    extern const float g_swfZero; // @ 0x8202D110
     uint8_t swfValueToBoolean(const SwfVmValue* value);  // @ 0x823FA420
     uint8_t swfValueIsInteger(const SwfVmValue* value);  // @ 0x823FA4C8
     int32_t swfValueToInteger(const SwfVmValue* value);  // @ 0x823FA5C8
@@ -26,6 +27,21 @@ extern "C" {
     void* swfAllocateActionFunction(void* pool, uint32_t alignment);  // @ 0x824032F0
     void swfVmLog(const char* text, ...);  // @ 0x8240E6D0
     int32_t swfVmGetTimer();  // @ 0x82566F98
+}
+
+
+// @ 0x823FA420
+extern "C" uint8_t swfValueToBoolean(const SwfVmValue* value) {
+    switch (value->tag) {
+    case 2: return *reinterpret_cast<const uint8_t*>(&value->payload);
+    case 3: case 5: return value->payload != 0;
+    case 4: {
+        float number;
+        std::memcpy(&number, &value->payload, sizeof(number));
+        return number != g_swfZero;
+    }
+    default: return 0;
+    }
 }
 
 // @ 0x823FF7E8

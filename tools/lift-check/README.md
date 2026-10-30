@@ -119,8 +119,8 @@ on a made-up TU, the example specs, and mutated lifts that must all fail.
     the default return also keeps r3/f1 then. A call to a one-branch thunk (`b X`) is
     recorded, matched and handled as a call to X.
 - `EXTERNS`, `FTOL` (relative float tolerance, default 0), `TRIALS`, `RET` (`"r3"`, `"f1"`,
-  `None`; default from the lift's return type), `EXTRA_RANGES` (more code ranges that belong
-  to the original function), `IGNORE = [(addr, size), ...]` (left out of the memory diff).
+  `None`; default from the lift's return type), `EXTRA_RANGES` (additional half-open code ranges executed as part of
+  the original function), `IGNORE = [(addr, size), ...]` (left out of the memory diff).
 - `HOST = {"rage::rage_alloc_aligned": model(...)}`: helpers the lift calls that have no
   game address (host code standing in for something the original inlines). Each gets a
   fake address and its policy, usually a transparent model of the inlined code.

@@ -1656,60 +1656,6 @@ void pongNetMessageHolder::InitializeMessageArray()
 
 
 // ===========================================================================
-// SinglesNetworkClient::IsStateActive @ 0x823FA420 | size: 0xA8
-//
-// Checks if the network client is in an active state based on the state field.
-// Returns true/false depending on the current state value and additional checks.
-//
-// State meanings:
-//   0-1: Inactive states (return false)
-//   2:   Check vtable pointer as boolean
-//   3:   Check if vtable is non-null (return true if initialized)
-//   4:   Check if float at offset +0 equals zero constant
-//   5:   Check if vtable is non-null (return true if initialized)
-//   >5:  Invalid state (return false)
-// ===========================================================================
-bool SinglesNetworkClient::IsStateActive()
-{
-    // Load state from offset +4
-    uint32_t state = m_state;
-    
-    // If state > 5, return false
-    if (state > 5) {
-        return false;
-    }
-    
-    // Handle each state case
-    switch (state) {
-        case 0:
-        case 1:
-            // Inactive states
-            return false;
-            
-        case 2:
-            // Return vtable pointer as boolean (non-zero = true)
-            return (vtable != nullptr);
-            
-        case 3:
-        case 5:
-            // Check if vtable is initialized
-            return (vtable != nullptr);
-            
-        case 4: {
-            // Check if float at offset +0 (vtable location) equals zero constant
-            // Load zero constant from global @ 0x8202D110
-            extern const float g_zeroConstant;  // @ 0x8202D110
-            float value = *(float*)&vtable;  // Reinterpret vtable pointer as float
-            return (value != g_zeroConstant);
-        }
-            
-        default:
-            return false;
-    }
-}
-
-
-// ===========================================================================
 // SinglesNetworkClient::ProcessMessageQueue @ 0x823A87E8 | size: 0x150
 //
 // Processes all pending network messages in the message queue.
@@ -2775,77 +2721,6 @@ int SinglesNetworkClient::CompareFlags(const SinglesNetworkClient* other) const
     }
     
     return (thisFlags < otherFlags) ? -1 : 1;
-}
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SinglesNetworkClient::MemCopyAligned @ 0x82434520 | size: 0x28
-//
-// Optimized memory copy function that handles alignment and uses word-sized
-// copies when possible. This is a performance-critical function for network
-// packet handling.
-//
-// Algorithm:
-// 1. Copy bytes until destination is 4-byte aligned
-// 2. Copy 4-byte words for the bulk of the data
-// 3. Copy remaining bytes
-//
-// Parameters:
-//   dest - Destination buffer
-//   src - Source buffer
-//   size - Number of bytes to copy (size+1 actual bytes copied)
-// ─────────────────────────────────────────────────────────────────────────────
-void SinglesNetworkClient::MemCopyAligned(void* dest, const void* src, int size)
-{
-    uint8_t* dst = static_cast<uint8_t*>(dest);
-    const uint8_t* source = static_cast<const uint8_t*>(src);
-    int remaining = size + 1;
-    
-    // Phase 1: Copy bytes until destination is 4-byte aligned
-    while (remaining > 0 && (reinterpret_cast<uintptr_t>(dst) & 3) != 0) {
-        *dst++ = *source++;
-        remaining--;
-    }
-    
-    // Phase 2: Copy 4-byte words
-    int wordCount = remaining >> 2;
-    if (wordCount > 0) {
-        // Check if source is also 4-byte aligned for fast path
-        if ((reinterpret_cast<uintptr_t>(source) & 3) == 0) {
-            // Fast path: both aligned, use word copies
-            uint32_t* dst32 = reinterpret_cast<uint32_t*>(dst);
-            const uint32_t* src32 = reinterpret_cast<const uint32_t*>(source);
-            
-            for (int i = 0; i < wordCount; i++) {
-                *dst32++ = *src32++;
-            }
-            
-            dst = reinterpret_cast<uint8_t*>(dst32);
-            source = reinterpret_cast<const uint8_t*>(src32);
-        } else {
-            // Slow path: source unaligned, assemble words from bytes
-            uint32_t* dst32 = reinterpret_cast<uint32_t*>(dst);
-            
-            for (int i = 0; i < wordCount; i++) {
-                uint32_t word = (static_cast<uint32_t>(source[0]) << 24) |
-                               (static_cast<uint32_t>(source[1]) << 16) |
-                               (static_cast<uint32_t>(source[2]) << 8) |
-                               static_cast<uint32_t>(source[3]);
-                *dst32++ = word;
-                source += 4;
-            }
-            
-            dst = reinterpret_cast<uint8_t*>(dst32);
-        }
-        
-        remaining &= 3;
-    }
-    
-    // Phase 3: Copy remaining bytes
-    while (remaining > 0) {
-        *dst++ = *source++;
-        remaining--;
-    }
 }
 
 

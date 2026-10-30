@@ -194,3 +194,21 @@ void* memcpy(void* dst, const void* src, size_t count)
 
     return dst;
 }
+
+/* Forward-copy CRT entry point, returns the original destination. @ 0x82434520 */
+void* crtBlkmov(void* dst, const void* src, size_t count)
+{
+    volatile unsigned char* d = (volatile unsigned char*)dst;
+    const volatile unsigned char* s = (const volatile unsigned char*)src;
+    while (count && ((uintptr_t)d & 3)) {
+        *d++ = *s++;
+        --count;
+    }
+    while (count >= 4) {
+        unsigned char a = s[0], b = s[1], c = s[2], e = s[3];
+        d[0] = a; d[1] = b; d[2] = c; d[3] = e;
+        d += 4; s += 4; count -= 4;
+    }
+    while (count--) *d++ = *s++;
+    return dst;
+}

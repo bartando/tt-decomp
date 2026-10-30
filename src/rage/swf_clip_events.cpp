@@ -68,7 +68,18 @@ extern uint32_t g_swfPriorityMemberHashes[13]; // @ 0x82604CE8
 extern uint8_t g_swfPriorityMemberHashesReady; // @ 0x826066C8
 
 uint32_t* swfFindMember(void* list, const char* name); // @ 0x823FB3B8
-uint32_t swfHashMemberName(const char* name); // @ 0x8223A868
+// @ 0x8223A868
+uint32_t swfHashMemberName(const char* name) {
+    uint32_t hash = 0;
+    while (*name) {
+        int32_t ch = static_cast<int8_t>(*name++);
+        if (ch >= 'a' && ch <= 'z') ch -= 32;
+        hash = (hash << 4) + ch;
+        uint32_t high = hash & 0xF0000000u;
+        hash ^= high ^ (high >> 24);
+    }
+    return hash;
+}
 
 // Set the two-word value, inserting a pooled node if its name hash is absent.
 // Priority hashes go at the head; other new members go at the tail.

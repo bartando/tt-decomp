@@ -1233,7 +1233,7 @@ struct SinglesNetworkClient {
     // itself (fields at every byte, u64s at odd offsets), so no member sat
     // where the asm reads it. Only fields the lifts use are kept, at their
     // asm offsets; add more the same way.
-    uint32_t     m_state;            // +0x04  IsStateActive 0x823FA420, CompareFlags 0x82329E68
+    uint32_t     m_state;            // +0x04  CompareFlags 0x82329E68
     uint8_t      _pad08[0x0C];       // +0x08
     uint32_t     m_pNetworkSession;  // +0x14  CheckAllPlayersReady 0x82311098
     uint8_t      m_bAllPlayersReady; // +0x18  CheckAllPlayersReady: lbz/stb +0x18
@@ -1275,13 +1275,11 @@ struct SinglesNetworkClient {
     void* PopMessageFromQueue();
     int ProcessSessions();
     void ProcessPendingMessages();
-    bool IsStateActive();
     void ProcessMessageQueue();
     void SetGPURegister7();
     void SendToSocket(const void* buffer, int length, int flags, const void* destAddr, int addrlen, int extraParam);
     void ReceiveFromSocket(void* buffer, int length, int flags, void* srcAddr, int* addrlen, int extraParam);
     int CompareFlags(const SinglesNetworkClient* other) const;
-    void MemCopyAligned(void* dest, const void* src, int size);
     void InitializeTimingState();
     float GetTimingValue();
     void ForwardToAtSingleton(void* param1, void* param2);

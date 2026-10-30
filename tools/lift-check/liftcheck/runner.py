@@ -422,7 +422,7 @@ class Checker:
         m.heap_next = 0x48000000
         counts: dict = {}
         if side == "orig":
-            entry, home = self.addr, [self.orig_range]
+            entry, home = self.addr, [self.orig_range, *getattr(self.spec, "EXTRA_RANGES", ())]
         else:
             entry, home = self.lift.target.addr, list(self.lift_home)
             wide = {n: (v | 0xFFFFFFFF00000000) if v & 0x80000000 else v
