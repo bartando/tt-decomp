@@ -17,6 +17,10 @@
  *   - grcDevice_setSamplerLodBias       @ 0x82355948 — Xenos texture fetch state
  *   - grcDevice_SetViewport         @ 0x82355ED0 — clip and load the viewport transform
  *   - grcDevice_SetZEnable / SetStencilEnable @ 0x82354120/41F0 — RB_DEPTHCONTROL
+ *   - grcDevice_SetZWriteEnable     @ 0x82354170 — RB_DEPTHCONTROL
+ *   - grcDevice_SetColorWriteEnable @ 0x823547A0 — RB_COLOR_MASK for target 0
+ *   - grcDevice_SetAlphaTestEnable  @ 0x82353AA0 — RB_COLORCONTROL
+ *   - grcDevice_SetCullMode         @ 0x82353A30 — mode-control low bits (name inferred)
  *   - grcDevice_SetIndices          @ 0x82356210 — bind the index buffer
  *   - grcDevice_SetDepthStencilSurface @ 0x823565F8 — bind the depth surface
  *   - grcDevice_SetStreamSource     @ 0x82356118 — bind a vertex buffer to a stream
@@ -684,6 +688,45 @@ static void dropDeviceReference(uint8_t* state, uint32_t* resource) {
     if ((references & 0x00F800FFu) == 0) {
         grcTexture_ReleaseResource(resource);
     }
+}
+
+// Insert `value` into one register word and mark its dirty bits.
+static void setRegisterField(uint8_t* state, uint32_t offset, uint32_t value, uint32_t shift,
+                             uint32_t width, uint64_t dirty28, uint64_t dirty30) {
+    auto& reg = *reinterpret_cast<uint32_t*>(state + offset);
+    const uint32_t mask = ((1u << width) - 1u) << shift;
+    reg = (reg & ~mask) | ((value << shift) & mask);
+    *reinterpret_cast<uint64_t*>(state + 0x28) |= dirty28;
+    if (dirty30 != 0) {
+        *reinterpret_cast<uint64_t*>(state + 0x30) |= dirty30;
+    }
+}
+
+// @ 0x82353A30
+extern "C" void grcDevice_SetCullMode(void* device, uint32_t mode) {
+    setRegisterField(static_cast<uint8_t*>(device), 0x2D88, mode, 0, 3, UINT64_C(1) << 32, 0);
+}
+
+// @ 0x82353AA0
+extern "C" void grcDevice_SetAlphaTestEnable(void* device, uint32_t enable) {
+    setRegisterField(static_cast<uint8_t*>(device), 0x2D7C, enable, 3, 1, UINT64_C(1) << 35, 0x40);
+}
+
+// @ 0x82354170
+extern "C" void grcDevice_SetZWriteEnable(void* device, uint32_t enable) {
+    setRegisterField(static_cast<uint8_t*>(device), 0x2D74, enable, 2, 1, UINT64_C(1) << 37, 0);
+}
+
+// The mask only applies with a colour target bound; the request is kept for
+// the next bind.
+// @ 0x823547A0
+extern "C" void grcDevice_SetColorWriteEnable(void* device, uint32_t mask) {
+    uint8_t* state = static_cast<uint8_t*>(device);
+    *reinterpret_cast<uint32_t*>(state + 0x2EB4) = mask;
+    if (*reinterpret_cast<uint32_t*>(state + 0x30F8) == 0) {
+        mask = 0;
+    }
+    setRegisterField(state, 0x2D1C, mask, 0, 4, UINT64_C(1) << 59, 0);
 }
 
 // RB_DEPTHCONTROL lives at +0x2D74. Without a depth surface both switches
