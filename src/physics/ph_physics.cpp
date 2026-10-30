@@ -859,23 +859,17 @@ float ph_GetCapsuleRadius(void* capsule) {
 // ─────────────────────────────────────────────────────────────────────────────
 // ph_SinCos @ 0x820D04F0 | size: 0x60
 //
-// Computes two related capsule properties and stores them in output pointers.
-// Normalizes the first input, then applies a trigonometric transformation
-// to the second input.
-// ─────────────────────────────────────────────────────────────────────────────
-void ph_SinCos(float* outNormalized, float* outTransformed, float input1, float input2) {
-    float normalized = ph_Cosf(input1);
-    *outNormalized = normalized;
-    
-    float transformed = ph_Sinf(input2);
-    *outTransformed = transformed;
+// One double angle, cosine first and sine second, each rounded to float.
+extern double crt_cos(double angle); // @ 0x824302B0
+extern double crt_sin(double angle); // @ 0x824301D8
+void ph_SinCos(float* cosine, float* sine, double angle) {
+    *cosine = static_cast<float>(crt_cos(angle));
+    *sine = static_cast<float>(crt_sin(angle));
 }
 
 // Build a padded 3x3 X rotation from one double-precision angle.
 // ph_BuildRotationMatrixX (was phBoundCapsule_3F10_g) @ 0x820C3F10 | size: 0x84
 // The three padding words and any translation row remain untouched.
-extern double crt_cos(double angle); // @ 0x824302B0
-extern double crt_sin(double angle); // @ 0x824301D8
 void ph_BuildRotationMatrixX(float* matrix, double angle) {
     const float cosine = static_cast<float>(crt_cos(angle));
     const float sine = static_cast<float>(crt_sin(angle));

@@ -1,6 +1,8 @@
 #include "rage/mat33.hpp"
 #include <cstdint>
 
+extern void ph_SinCos(float* cosine, float* sine, double angle); // @ 0x820D04F0
+
 #if defined(__clang__)
 #pragma clang fp contract(off)
 #elif defined(__GNUC__)
@@ -85,6 +87,30 @@ void mat33RotationAxisAngle(float* out, const float* axis, double angle) {
                                                         : flushRotationVmx(vector[lane] * scale);
     }
     mat33RotationNormalizedAxis(out, normalized, angle);
+}
+
+// Former auto-name LocomotionStateAnim_8278_g. Row-vector XYZ Euler rotation.
+// @ 0x82118278 | size: 0x138
+void mat33FromEuler(float* out, const float* angles) {
+    float sx = 0.0f, cx = 1.0f;
+    float sy = 0.0f, cy = 1.0f;
+    float sz = 0.0f, cz = 1.0f;
+    if (angles[0] != 0.0f) ph_SinCos(&cx, &sx, angles[0]);
+    if (angles[1] != 0.0f) ph_SinCos(&cy, &sy, angles[1]);
+    if (angles[2] != 0.0f) ph_SinCos(&cz, &sz, angles[2]);
+    // Snapshot every angle before stores: the input may overlap the output.
+    const float czsy = cz * sy, szsy = sz * sy;
+    const float szcx = sz * cx, czcx = cz * cx;
+    const float szsx = sz * sx, czsx = cz * sx;
+    out[0] = cz * cy;
+    out[1] = sz * cy;
+    out[2] = -sy;
+    out[6] = cy * sx;
+    out[4] = __builtin_fmaf(czsy, sx, -szcx);
+    out[5] = __builtin_fmaf(szsy, sx, czcx);
+    out[10] = cy * cx;
+    out[8] = __builtin_fmaf(czsy, cx, szsx);
+    out[9] = __builtin_fmaf(szsy, cx, -czsx);
 }
 
 } // namespace rage

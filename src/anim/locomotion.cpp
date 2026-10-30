@@ -14,7 +14,6 @@
  *   LocomotionStateAnim::UpdateAnimation → vfn_6            @ 0x820E0C10 (size 0x1E8)
  *   LocomotionStateAnim::EvaluateAnimation → vfn_7          @ 0x820E0A10 (size 0x200)
  *   LocomotionStateAnim::GetAnimTransform → vfn_9           @ 0x820E0DF8 (size 0x0EC)
- *   LocomotionStateAnim_8278_g           → 0x82118278 (size 0x138) — matrix composition
  *   LocomotionStateAnim_88E0_g           → 0x822488E0 (size 0x214) — clip bundle dispatch
  *   LocomotionStateAnim_C8F8_g           → 0x8214C8F8 (size 0x0D0) — SIMD 48-byte block copy
  *   LocomotionStateAnim_BlendLocomotionAnims       → project-internal name (sub_table entry)
@@ -292,18 +291,6 @@ extern "C" void LocomotionStateAnim_InitCapsuleImpl(void* self, float radius, co
 }
 extern "C" void LocomotionStateAnim_ProcessNode(void* self, void* node) { (void)self; (void)node; }
 extern "C" void LocomotionStateAnim_SetSpeed(void* self, float speed) { (void)self; (void)speed; }
-
-/**
- * LocomotionStateAnim_8278_g  @ 0x82118278 | size 0x138
- *
- * Composes a 3x3 rotation from three Euler angles stored at out+{0,4,8}
- * and writes the expanded matrix rows to out+{0..40}.  Each axis is sent
- * through phBoundCapsule_04F0_g for sin/cos decomposition.
- */
-void LocomotionStateAnim_8278_g(void* eulers, void* outMatrix)
-{
-    (void)eulers; (void)outMatrix;
-}
 
 /**
  * LocomotionStateAnim_88E0_g @ 0x822488E0 | size 0x214

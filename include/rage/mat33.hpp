@@ -7,4 +7,7 @@ namespace rage {
 // Output and axis must be disjoint. The original accepts a double angle in f1.
 void mat33RotationAxisAngle(float* out, const float* axis, double angle);
 
+// XYZ Euler angles in radians; input may overlap output. Preserve row padding.
+void mat33FromEuler(float* out, const float* angles); // @ 0x82118278
+
 } // namespace rage
