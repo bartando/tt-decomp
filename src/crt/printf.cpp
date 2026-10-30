@@ -40,6 +40,7 @@ extern "C" {
     int crtFileDescriptor(CrtFile*); // @ 0x824367A0
     unsigned char* crtStandardStreams(); // @ 0x82433438
     void crtWriteChar(int, CrtFile*, int*); // @ 0x824347A0
+    int crtFlushChar(int, CrtFile*); // @ 0x824345C8
     void crtWriteBlock(const void*, int, CrtFile*, int*); // @ 0x82434838
     int crtIsLeadByte(int, CrtPrintLocale*); // @ 0x8243A348
     int crtWideCharToMultibyte(int*, unsigned char*, int, unsigned); // @ 0x8243A340
@@ -91,6 +92,26 @@ CrtIoEntry* printIoEntry(CrtFile* stream) {
     return &crtIoBlocks[block][index];
 }
 } // namespace
+
+// @ 0x824347A0 | size: 0x94
+extern "C" void crtWriteChar(int ch, CrtFile* stream, int* count) {
+    if (!(stream->flags & 0x40) || stream->base) {
+        const uint32_t remaining = static_cast<uint32_t>(stream->remaining) - 1;
+        stream->remaining = static_cast<int32_t>(remaining);
+        int result;
+        if (!(remaining & 0x80000000u)) {
+            *stream->cursor++ = static_cast<unsigned char>(ch);
+            result = static_cast<unsigned char>(ch);
+        } else {
+            result = crtFlushChar(static_cast<int8_t>(ch), stream);
+        }
+        if (result == -1) {
+            *count = -1;
+            return;
+        }
+    }
+    *count = static_cast<int32_t>(static_cast<uint32_t>(*count) + 1);
+}
 
 // @ 0x824348D0 | size: 0xB84
 extern "C" int crtOutput(CrtFile* stream, const char* format, void* /*locale*/,
