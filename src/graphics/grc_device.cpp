@@ -6,6 +6,8 @@
  *   - grcDevice_shutdown    @ 0x8214FA58 — Primary shutdown sequence
  *   - grcDevice_shutdownAlt @ 0x821540D0 — Alternate shutdown path
  *   - grcDevice_SetScissorRect @ 0x823537B0 — scissor commands, including tiled rendering
+ *   - grcDevice_SetAlphaBlendEnable / SetBlendOp / SetSrcBlend / SetDestBlend
+ *                                   @ 0x82353AE8/3B88/3C20/3CB8 — RB_BLENDCONTROL
  *   - grcDevice_setSamplerMinFilter @ 0x82355418 — Xenos texture fetch state
  *   - grcDevice_setSamplerMagFilter @ 0x823555A8 — Xenos texture fetch state
  *   - grcDevice_setSamplerMaxAnisotropy @ 0x82355828 — Xenos texture fetch state
@@ -278,6 +280,62 @@ extern "C" void grcDevice_SetScissorRect(void* device, int32_t left, int32_t top
 
 extern const uint32_t g_grcAnisoFilterTable[17];  // @ 0x82065D10
 extern const float g_grcLodBiasScale;             // @ 0x82079AF0
+
+// The color half of RB_BLENDCONTROL lives at +0x2CB8; +0x2CBC holds blending
+// enabled (bit 31) and separate alpha (bit 30). Without separate alpha the
+// alpha half copies the color factors, mapped from color to alpha variants.
+static void commitBlendControl(uint8_t* state, uint32_t control) {
+    auto word = [state](uint32_t offset) -> uint32_t& {
+        return *reinterpret_cast<uint32_t*>(state + offset);
+    };
+    if ((word(0x2CBC) & 0x40000000u) == 0) {
+        const uint32_t color = control & 0xFFFFu;
+        uint32_t alpha = (color & 0x1010u) | (color << 4);
+        alpha = ((alpha << 12) | (alpha >> 20)) & 0xFFFF0000u;
+        control = (alpha & ~0x10100000u) | color;
+    }
+    word(0x2D78) = control;
+    word(0x2D98) = control;
+    word(0x2D9C) = control;
+    word(0x2DA0) = control;
+    *reinterpret_cast<uint64_t*>(state + 0x28) |= UINT64_C(0x0000001000000000) | 0x1C000000u;
+}
+
+// Disabling writes ONE/ZERO/ADD for both halves but keeps the stored factors.
+// @ 0x82353AE8
+void grcDevice_SetAlphaBlendEnable(void* device, uint32_t enable) {
+    auto* state = static_cast<uint8_t*>(device);
+    auto& flags = *reinterpret_cast<uint32_t*>(state + 0x2CBC);
+    flags = (flags & 0x7FFFFFFFu) | (enable << 31);
+    if (enable == 0) {
+        commitBlendControl(state, 0x00010001u);
+        return;
+    }
+    commitBlendControl(state, *reinterpret_cast<uint32_t*>(state + 0x2CB8));
+}
+
+static void setBlendField(void* device, uint32_t value, uint32_t shift, uint32_t mask) {
+    auto* state = static_cast<uint8_t*>(device);
+    auto& control = *reinterpret_cast<uint32_t*>(state + 0x2CB8);
+    control = (control & ~mask) | ((value << shift) & mask);
+    if ((*reinterpret_cast<uint32_t*>(state + 0x2CBC) & 0x80000000u) != 0)
+        commitBlendControl(state, control);
+}
+
+// @ 0x82353B88
+void grcDevice_SetBlendOp(void* device, uint32_t op) {
+    setBlendField(device, op, 5, 0x000000E0u);
+}
+
+// @ 0x82353C20
+void grcDevice_SetSrcBlend(void* device, uint32_t blend) {
+    setBlendField(device, blend, 0, 0x0000001Fu);
+}
+
+// @ 0x82353CB8
+void grcDevice_SetDestBlend(void* device, uint32_t blend) {
+    setBlendField(device, blend, 8, 0x00001F00u);
+}
 
 // @ 0x82355418
 void grcDevice_setSamplerMinFilter(void* device, uint32_t sampler, uint32_t filter) {
