@@ -4,6 +4,7 @@
  */
 
 #include "fx_effects.hpp"
+#include "../anim/locomotion.hpp"
 #include "../rage/memory.hpp"
 #include "rage/mat33.hpp"
 #include "globals.h"
@@ -981,8 +982,6 @@ extern void  fxAmbAnimSet_F938_h(void* animSet, void* other,
                                  void** scratchSlot);                  // @ 0x8237F938 — fxAmbAnimSet bind/apply
 extern void  LocomotionStateAnim_FAB0_w(void* ctxObj, void* flags,
                                         void* embeddedBlock);          // @ 0x8237FAB0 — tail-call tick entry
-extern void  LocomotionStateAnim_88E0_g(void* ctx, void* arg,
-                                        void* cb0, int one, int zero); // @ 0x822488E0 — bundle prime
 extern void  LocomotionStateAnim_C128_g(void* entry, void* unusedR4, void* skeleton,
                                         float weight);                 // @ 0x8224C128 — base apply
 extern void  LocomotionStateAnim_C288_g(void* entry, void* unusedR4, void* skeleton,
@@ -1132,7 +1131,7 @@ void* fxAmbient_vfn_5(void* thisPtr, void* unused, void* ctx) {
  *   ->+4              — animList descriptor (+20: flag byte with low bit =
  *                       "full-weight applier"; +12: u16 count; +8: entry[]).
  */
-void fxAmbient_vfn_6(void* thisPtr, void* bundle) {
+void fxAmbient_vfn_6(void* thisPtr, void* bundle, float time) {
     char* self = (char*)thisPtr;
     if (*(uint8_t*)(self + 112) == 0) {
         return;
@@ -1142,7 +1141,7 @@ void fxAmbient_vfn_6(void* thisPtr, void* bundle) {
     void* primeCtx   = *(void**)(animSet + 36);          // +36 → fxAmbAnim*
     void* primeCb    = *(void**)((char*)primeCtx + 4);   // +4  → callback
 
-    LocomotionStateAnim_88E0_g(bundle, primeCb, ownerAnim, /*one=*/1, /*zero=*/0);
+    LocomotionStateAnim_88E0_g(bundle, nullptr, primeCb, 0, 1, time);
 
     void* descriptor = *(void**)((char*)primeCtx + 4);
     uint32_t flag = *(uint32_t*)((char*)descriptor + 20);
@@ -1164,8 +1163,8 @@ void fxAmbient_vfn_6(void* thisPtr, void* bundle) {
  * fxAmbient::PlayAlias (vtable slot 7) @ 0x82387C08
  * Alias of vfn_6 in binary.
  */
-void fxAmbient_vfn_7(void* thisPtr, void* bundle) {
-    fxAmbient_vfn_6(thisPtr, bundle);
+void fxAmbient_vfn_7(void* thisPtr, void* bundle, float time) {
+    fxAmbient_vfn_6(thisPtr, bundle, time);
 }
 
 /**

@@ -32,6 +32,8 @@
 #include "../game/creature/pong_creature.hpp"
 #include <cstdint>
 #include <cstring>
+#include <cmath>
+#include "locomotion.hpp"
 
 // Forward decls matching stubs.cpp / stubs_final.cpp for ABI compatibility.
 struct vec3;
@@ -305,16 +307,70 @@ void LocomotionStateAnim_8278_g(void* eulers, void* outMatrix)
 }
 
 /**
- * LocomotionStateAnim_88E0_g  @ 0x822488E0 | size 0x214
- *
- * Dispatches a clip bundle.  Reads clip-count at bundle+10, duration at
- * bundle+12, and iterates the clip-pointer table at arg+8.  For each
- * matching entry (hash lo/hi compare) invokes either vtable slot 4 (pattern
- * B) or slot 13 (full dispatch).  Returns true when every clip was visited.
+ * LocomotionStateAnim_88E0_g @ 0x822488E0 | size 0x214
+ * Merge the clip's sorted channels (+0x24/+0x28) into the frame's DOFs
+ * (+8/+12). Evaluate matches at a fractional or rounded sample position;
+ * optionally reset unmatched frame DOFs. r4 is unused. Both flags use only
+ * their low byte. The result says whether every frame DOF matched.
  */
-void LocomotionStateAnim_88E0_g(void* bundle, void* clipTable, float t, int mode, int opts)
+bool LocomotionStateAnim_88E0_g(void* bundle, void* unusedR4, void* frame,
+                               uint32_t integralFrames, uint32_t flags, float time)
 {
-    (void)bundle; (void)clipTable; (void)t; (void)mode; (void)opts;
+    (void)unusedR4;
+    auto* clip = static_cast<uint8_t*>(bundle);
+    auto* output = static_cast<uint8_t*>(frame);
+    const int sampleCount = *reinterpret_cast<uint16_t*>(clip + 10);
+    const float duration = *reinterpret_cast<float*>(clip + 12);
+    const float rate = static_cast<float>(sampleCount - 1) / duration;
+    float sample;
+    if ((integralFrames & 0xFF) != 0) {
+        const float rounded = std::fma(rate, time, 0.5f);
+        // Xenon's fctiwz saturates overflow and maps NaN to INT_MIN.
+        int32_t index;
+        if (!(rounded > -2147483648.0f))
+            index = INT32_MIN;
+        else if (rounded >= 2147483648.0f)
+            index = INT32_MAX;
+        else
+            index = static_cast<int32_t>(rounded);
+        sample = static_cast<float>(index);
+    } else {
+        sample = rate * time;
+    }
+
+    const unsigned frameCount = *reinterpret_cast<uint16_t*>(output + 12);
+    const unsigned clipCount = *reinterpret_cast<uint16_t*>(clip + 40);
+    unsigned clipIndex = 0;
+    unsigned matched = 0;
+    const bool resetUnmatched = (flags & 0xFF) != 0;
+    for (unsigned i = 0; i < frameCount; ++i) {
+        auto* entry = (*reinterpret_cast<uint8_t***>(output + 8))[i];
+        const uint32_t key = (uint32_t(entry[5]) << 16)
+            | *reinterpret_cast<uint16_t*>(entry + 6);
+        bool found = false;
+        while (clipIndex < clipCount) {
+            auto* channel = (*reinterpret_cast<uint8_t***>(clip + 36))[clipIndex];
+            const uint32_t channelKey = (uint32_t(channel[0]) << 16)
+                | *reinterpret_cast<uint16_t*>(channel + 2);
+            if (channelKey > key)
+                break;
+            ++clipIndex;
+            if (channelKey == key) {
+                using Evaluate = void (*)(void*, float);
+                auto* vtable = *reinterpret_cast<Evaluate**>(entry);
+                vtable[4](entry, sample);
+                ++matched;
+                found = true;
+                break;
+            }
+        }
+        if (!found && resetUnmatched) {
+            using Reset = void (*)(void*);
+            auto* vtable = *reinterpret_cast<Reset**>(entry);
+            vtable[13](entry);
+        }
+    }
+    return matched == frameCount;
 }
 
 extern void LocomotionStateAnim_AD30_g(float* dst, const float* quaternion); // @ 0x8223AD30
