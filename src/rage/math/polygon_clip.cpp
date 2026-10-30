@@ -7,6 +7,8 @@
 #pragma GCC optimize("fp-contract=off")
 #endif
 
+extern "C" const float lbl_8202D110; // @ 0x8202D110
+
 namespace rage {
 
 // @ 0x82147A88
@@ -54,6 +56,37 @@ void clipPolygonToPlane(void* /*context*/, int32_t vertexCount, const float (*ve
             __builtin_memcpy(output[(*outputCount)++], current, sizeof(current));
         }
         __builtin_memcpy(previous, current, sizeof(previous));
+    }
+}
+
+// @ 0x82147BF8
+void clipLineToPlane(void* /*context*/, int32_t vertexCount, const float (*vertices)[4],
+                     int32_t* outputCount, float (*output)[4], const float* plane) {
+    *outputCount = vertexCount;
+    float firstZ = vertices[0][2] * plane[2];
+    float firstYZ = __builtin_fmaf(vertices[0][1], plane[1], firstZ);
+    float firstDistance = __builtin_fmaf(vertices[0][0], plane[0], firstYZ) + plane[3];
+    float secondZ = vertices[1][2] * plane[2];
+    float secondYZ = __builtin_fmaf(vertices[1][1], plane[1], secondZ);
+    float secondDistance = __builtin_fmaf(plane[0], vertices[1][0], secondYZ) + plane[3];
+
+    bool firstInside = firstDistance <= lbl_8202D110;
+    bool secondInside = secondDistance <= lbl_8202D110;
+    if (!firstInside && !secondInside) {
+        *outputCount = 0;
+        return;
+    }
+    if (firstInside && secondInside) {
+        __builtin_memcpy(output, vertices, 2 * sizeof(*output));
+        return;
+    }
+    float fraction = firstDistance / (firstDistance - secondDistance);
+    for (int lane = 0; lane < 4; ++lane) {
+        float delta = vertices[1][lane] - vertices[0][lane];
+        float scaled = delta * fraction;
+        float intersection = vertices[0][lane] + scaled;
+        output[0][lane] = firstInside ? vertices[0][lane] : intersection;
+        output[1][lane] = secondInside ? vertices[1][lane] : intersection;
     }
 }
 
