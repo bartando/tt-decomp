@@ -46,6 +46,7 @@ set(SOURCES
     src/crt/memory.c
     src/crt/startup.c
     src/crt/string.c
+    src/crt/xe_thread.c
     src/crt/xe_tls.c
     src/globals.c
 

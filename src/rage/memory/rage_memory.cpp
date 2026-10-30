@@ -16,7 +16,7 @@
 extern "C" {
     void rage_free(void* ptr);
     void* sysMemAllocator_Allocate(void* ptr, size_t size);
-    uint8_t rage_FindSingleton(void* ptr);
+    uint32_t rage_FindSingleton(void* ptr);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

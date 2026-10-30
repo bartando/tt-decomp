@@ -332,7 +332,7 @@ extern void datResourceMgr_RemoveEntry(void* key);  // @ 0x820F8EE8
 extern void _locale_register(void* ptr, void* flags);  // @ 0x820C02D0
 
 /** Check whether a pointer falls within a tracked singleton interval. */
-extern "C" uint8_t rage_FindSingleton(void* ptr) {
+extern "C" uint32_t rage_FindSingleton(void* ptr) {
     uint32_t value = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(ptr));
     if (static_cast<int32_t>(value) >= 0)
         return 0;

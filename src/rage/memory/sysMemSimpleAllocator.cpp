@@ -58,7 +58,7 @@ extern "C" void rage_stricmp_6358(uint8_t* buf, uint32_t count);
 extern uint32_t g_sysMemAllocationTag;  // @ 0x825EBCE4
 
 // @ 0x82186E40
-void* sysMemSimpleAllocator::Allocate(uint32_t size) {
+void* sysMemSimpleAllocator::Allocate(uint32_t size, uint32_t /*alignment*/) {
     // Xbox ABI: heads at +0x0C, used bytes at +0x54, tag totals at +0x58,
     // free bytes at +0x98. The scaffold's field names describe these incorrectly.
     uint32_t* words = reinterpret_cast<uint32_t*>(this);
@@ -549,29 +549,14 @@ sysMemSimpleAllocator::~sysMemSimpleAllocator() {
     // reclaimed by the OS on shutdown.
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// sysMemSimpleAllocator::ScalarDtor (vfn_1) @ 0x82186DA0  (76 bytes)
-//
-// MSVC scalar deleting destructor thunk. Acquires init-lock, dispatches
-// to the non-virtual Allocate (the scaffold calls 0x82186E40 which is
-// the allocator body — this is the delete-on-behalf-of-derived variant
-// where r5 carries the flags), releases the lock.
-//
-// In the retail scaffold this tail-calls the allocator body to finalize
-// pending frees scheduled during destruction; we preserve that call.
-// ═══════════════════════════════════════════════════════════════════════
-void sysMemSimpleAllocator::ScalarDtor(int flags) {
+// sysMemSimpleAllocator::AllocateLocked (vfn_1) @ 0x82186DA0
+// Serialize the allocation body using the shared allocator lock.
+void* sysMemSimpleAllocator::AllocateLocked(uint32_t size, uint32_t alignment) {
     sysMemSimpleAllocator_SpinAcquire(&g_sysMemAllocatorInitLock);
-
-    // Retail dispatches through Allocate's finalize path — emulate as
-    // running the destructor body (no-op in retail) + optional free.
-    this->~sysMemSimpleAllocator();
-    if (flags & 1) {
-        rage_free_00C0(this);
-    }
-
-    __sync_synchronize();  // lwsync
+    void* result = Allocate(size, alignment);
+    __sync_synchronize();
     g_sysMemAllocatorInitLock = 0;
+    return result;
 }
 
 // Non-virtual Free body (788 bytes); the locking thunk follows below.

@@ -126,7 +126,7 @@ struct sysMemSimpleAllocator {
 
     // ── virtual methods ──
     ~sysMemSimpleAllocator();                  // [0] @ 0x82186c58
-    void ScalarDtor(int flags);                // [1] @ 0x82186da0
+    void* AllocateLocked(uint32_t size, uint32_t alignment); // [1] @ 0x82186da0
     void Free(void* ptr);                      // [2] @ 0x82187178
     void* GetBucketHead(uint32_t sizeClass);   // [4] @ 0x82187840  returns bucket[sizeClass] or overflowHead
     uint32_t GetLargestAvailBlock();            // [5] @ 0x82187838  returns largestAvailBlock
@@ -144,7 +144,7 @@ struct sysMemSimpleAllocator {
     bool IsAddressOwned(void* addr);           // [20] @ 0x82187558  checks addr in [heapBase, heapBase+heapSize)
 
     // ── non-virtual methods ──
-    void* Allocate(uint32_t size);  // @ 0x82186E40  allocates from free-list buckets
+    void* Allocate(uint32_t size, uint32_t alignment);  // @ 0x82186E40  allocates from free-list buckets
 };
 
 static_assert(sizeof(void*) != 4 || offsetof(sysMemSimpleAllocator, heapSize) == 0x4C, "sysMemSimpleAllocator layout");

@@ -57,7 +57,7 @@ unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, a
 - The `pg_6F48`/`6C40`/`6F10`/`B850`/`C3B8` group are Xbox thread/event wrappers (ResumeThread,
   SetEvent, CloseHandle, SuspendThread, WaitForSingleObject); they need a per-thread
   last-error and a kernel layer the port doesn't have.
-- Bridges that forward to ported bodies, not lifts: `rage_free` → `free()`, `xe_EC88` → host
+- Bridges that forward to ported bodies, not lifts: `xe_EC88` → host
   malloc, `util_PackColorRGBA`, `fiAsciiTokenizer_Destroy` → host `free()` (0x82433310 is the
   CRT's free; unverifiable). Verified forwards: `hsmEvent_Init` → `snEvent_Construct`,
   `netStream_ReadS16` → `datBitBuffer` `ReadSigned<s16>`.
@@ -193,7 +193,7 @@ unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, a
 - `msgMsgSink_84C0_gen` is fixed but unverified: lift-check can't run `mtmsrd`.
 - `gd_data_strings.hpp`: the `g_str_*` are probably arrays declared as pointers at wrong
   addresses (`g_str_gdTier_unknownNodeType` was; it's the string at 0x82042844).
-- `_crt_tls_fiber_setup` (0x82566B78) is GetCurrentThreadId.
+- `_crt_tls_fiber_setup` (0x82566B78) is GetCurrentThreadId; legacy callers still treat its ID as a fiber context.
 - `sysMemAllocator_Free` is marked with two addresses (0x82186228, 0x820C00C0);
   `rage::ReleaseSingleton` resolves to 0x8204E6FC.
 - `~pongNetMessageHolder` stores no vtables and doesn't free.

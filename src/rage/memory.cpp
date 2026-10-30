@@ -13,7 +13,7 @@ extern void grcDevice_Shutdown(void *obj);
 extern void MmFreePhysicalMemory(uint32_t flags, void *address);
 extern void *rage_strDuplicate(const char *str);
 extern void datArray_Grow(void *array, uint32_t newCapacity);
-extern uint8_t rage_FindSingleton(void *ptr);
+extern uint32_t rage_FindSingleton(void *ptr);
 extern void *g_allocator_ptr;
 void datArray_DestroyGeneric(uint8_t *arrayData);
 

@@ -92,6 +92,7 @@ class Checker:
         self.host = {name: HOST_BASE + 0x10 * k for k, name in enumerate(getattr(self.spec, "HOST", {}))}
         externs = dict(getattr(self.spec, "EXTERNS", None) or {})
         externs.update(self.host)
+        self.syms.by_name.update(externs)
         self.lift = build_lift(self.repo, self.syms, source, self.spec.FUNCTION, orig_addr=self.addr,
                                workdir=workdir, opt=opts.opt, patches=tuple(opts.patches),
                                externs_override=externs,

@@ -24,7 +24,7 @@ extern "C" {
  *
  * C-linkage alias: rage_FindSingleton
  */
-uint8_t rage_FindSingleton(void* ptr);
+uint32_t rage_FindSingleton(void* ptr);
 
 #ifdef __cplusplus
 }  /* extern "C" */
