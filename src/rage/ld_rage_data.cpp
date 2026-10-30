@@ -125,8 +125,11 @@ TT_DATA_ALIAS_AT("g_grmShaderFx_defaultVariant", "g_grmShaderFx_forcedVariantId"
 // @ 0x825EBA9C (.data) — runtime-initialised by 0x82153ED0
 extern "C" void* g_pGrcDeviceAlt = nullptr;
 
-// @ 0x825EBBD8 (.data) — runtime-initialised; the variant lookups read word 1
-extern "C" alignas(16) uint32_t g_grmShaderFx_variantTable[2] = {};
+// @ 0x825EBBD8 (.data) — 92-byte pending render state; variant lookups read word 1
+extern "C" alignas(16) uint32_t g_grmShaderFx_variantTable[23] = {};
+
+// @ 0x825EBB80 (.data) — applied render state, preceding the pending state above
+extern "C" alignas(16) uint32_t g_swfAppliedRenderState[22] = {};
 
 // @ 0x825EBC40 (.data) — runtime-initialised
 extern "C" void* g_pGrcTextureCache = nullptr;
