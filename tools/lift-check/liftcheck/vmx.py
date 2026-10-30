@@ -759,7 +759,10 @@ def _unpack(src_bits, high, signed=True):
     def go(B):
         src = get(B)
         part = src[: n // 2] if high else src[n // 2:]
-        return put([(_signed(x, src_bits) if signed else x) for x in part])
+        # Registers hold unsigned lane bit patterns, even after sign extension.
+        # In particular, vcfsx must not sign-extend a negative Python int again.
+        mask = (1 << (src_bits * 2)) - 1
+        return put([(_signed(x, src_bits) if signed else x) & mask for x in part])
     return go
 
 

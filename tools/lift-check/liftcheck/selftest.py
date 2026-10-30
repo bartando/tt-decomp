@@ -260,6 +260,28 @@ def _matches(status, line, expect):
     return False
 
 
+def _signed_unpack() -> list[str]:
+    """Signed halfword unpack followed by float conversion (PCM16 resampling)."""
+    import struct
+    from .isatest import assemble
+    from .vmx import VectorUnit, from_halves
+
+    errors = []
+    samples = [-32768, -1, 0, 32767, -2, -32767, 1, 16384]
+    for name, expected in [("vupkhsh", samples[:4]), ("vupklsh", samples[4:])]:
+        v = VectorUnit(None)
+        v.v[2] = from_halves(samples)
+        unpack, convert = assemble([f"{name} v1, v2", "vcfsx v3, v1, 15"])
+        v.execute(unpack, 0)
+        if v.v[1] != [x & 0xffffffff for x in expected]:
+            errors.append(f"{name}: unpack did not produce 32-bit lane patterns: {v.v[1]}")
+        v.execute(convert, 4)
+        want = [struct.unpack(">I", struct.pack(">f", x / 32768))[0] for x in expected]
+        if v.v[3] != want:
+            errors.append(f"{name} + vcfsx: got {v.v[3]}, expected {want}")
+    return errors
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="lift-check selftest")
     ap.add_argument("--isa", action="store_true", help="only the instruction tests")
@@ -288,6 +310,12 @@ def main(argv=None) -> int:
     for line in packed_errors:
         print(f"     {line}")
     bad += bool(packed_errors)
+
+    unpack_errors = _signed_unpack()
+    print(f"{'ok  ' if not unpack_errors else 'FAIL'} signed VMX unpack/float conversion regression")
+    for line in unpack_errors:
+        print(f"     {line}")
+    bad += bool(unpack_errors)
 
     if not args.no_isa:
         from .isatest import DEFAULT_TESTS
