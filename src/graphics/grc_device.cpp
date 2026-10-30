@@ -18,6 +18,7 @@
  *   - grcDevice_SetViewport         @ 0x82355ED0 — clip and load the viewport transform
  *   - grcDevice_SetIndices          @ 0x82356210 — bind the index buffer
  *   - grcDevice_SetStreamSource     @ 0x82356118 — bind a vertex buffer to a stream
+ *   - grcDevice_SetRenderTarget     @ 0x82356290 — bind a colour surface to a target slot
  *   - grcDevice_SetPixelShaderConstantF @ 0x82356A70 — upload pixel shader constants 0..19
  *   - grcDevice_BeginDrawPrimitiveUP @ 0x82357630 — queue a draw and allocate its vertices
  *   - grcGpuBuffer_Release          @ 0x82356CF0 — drop a reference, free on the last
@@ -712,6 +713,83 @@ extern "C" void grcDevice_SetStreamSource(void* device, uint32_t stream, void* b
     binding[1] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(buffer));
     binding[0] = offset;
     state[0x3190 + stream] = static_cast<uint8_t>(stride >> 2);
+}
+
+extern "C" void grc_36E8(void* device, void* surface); // @ 0x823536E8
+
+// Bind a colour surface (slots 0..3), update its packed format and colour-write
+// mask, and refresh the tiled-target flag for slot 0. Unlike texture/stream binds,
+// the old reference is released BEFORE the new one is acquired, even on a rebind.
+// The surface's colour-info word lives at +52; its format is bits 19:16.
+// @ 0x82356290 | size: 0x368 (872 bytes)
+extern "C" void grcDevice_SetRenderTarget(void* device, uint32_t slot, void* surface) {
+    auto* state = static_cast<uint8_t*>(device);
+    const auto field = [state](uint32_t offset) -> uint32_t& {
+        return *reinterpret_cast<uint32_t*>(state + offset);
+    };
+    auto* previous = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(field(12536 + slot * 4u)));
+    constexpr uint32_t kReference = 0x80000;
+    if (previous != nullptr) {
+        const uint32_t references = previous[0] - kReference;
+        previous[1] = field(10396);
+        previous[0] = references;
+        if ((references & 0x00F800FFu) == 0) {
+            grcTexture_ReleaseResource(previous);
+        }
+    }
+    field(12536 + slot * 4u) = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(surface));
+
+    if (surface != nullptr) {
+        auto* header = static_cast<uint32_t*>(surface);
+        header[0] += kReference;
+        // RB_COLOR0_INFO is followed by another register before COLOR1..3_INFO.
+        const uint32_t colorRegister = slot == 0 ? 0 : slot + 1u;
+        const uint32_t colorOffset = (2865u + colorRegister) * 4u;
+        field(colorOffset) = header[13];
+        const uint32_t dirtyIndex = 0x20123u + colorRegister;
+        const uint32_t shift = dirtyIndex & 127u;
+        auto& dirty = *reinterpret_cast<uint64_t*>(state + 16 + (dirtyIndex >> 16) * 8u);
+        const uint64_t dirtyBit = shift < 64 ? UINT64_C(0x8000000000000000) >> shift : 0;
+        dirty |= dirtyBit;
+
+        const uint32_t mode = field(12144 + slot * 4u);
+        const uint32_t format = (header[13] >> 16) & 15u;
+        // The original tests the upper halfword, then adjusts these four formats
+        // according to the per-target mode. Preserve its bitwise selection for
+        // raw mode values too (slw masks to six bits, yielding zero for 32..63).
+        const uint32_t formatShift = (mode * 2u) & 63u;
+        const uint32_t formatTest = formatShift < 32 ? 2u << formatShift : 0;
+        if ((format == 2 || format == 3 || format == 10 || format == 12) &&
+            (formatTest & format) == 0) {
+            const uint32_t modeMask = mode - 1u;
+            const uint32_t adjusted = (((format + 3u) * 2u) & ~modeMask) |
+                                      (((format >> 1) - 3u) & modeMask);
+            const uint32_t formatBits = (adjusted & 15u) << 16;
+            header[13] = (header[13] & ~0x000F0000u) | formatBits;
+            field(colorOffset) = (field(colorOffset) & ~0x000F0000u) | formatBits;
+            dirty |= dirtyBit;
+        }
+    }
+
+    if (slot == 0) {
+        void* sizeSurface = surface != nullptr ? surface :
+            reinterpret_cast<void*>(static_cast<uintptr_t>(field(12552)));
+        if (sizeSurface != nullptr) {
+            grc_36E8(device, sizeSurface);
+        }
+        bool tiled = field(12960) == 0 && (state[10432] & 0x10) != 0;
+        for (uint32_t i = 0; tiled && i < 5; ++i) {
+            const uint32_t target = field(12536 + i * 4u);
+            tiled = target == 0 || target == field(12976 + i * 4u);
+        }
+        state[10432] = static_cast<uint8_t>((state[10432] & ~4u) | (tiled ? 4u : 0u));
+    }
+    if (slot < 4) {
+        const uint32_t writeMask = field(12536 + slot * 4u) != 0 ? field(11956 + slot * 4u) : 0;
+        const uint32_t shift = slot * 4u;
+        field(11548) = (field(11548) & ~(15u << shift)) | ((writeMask & 15u) << shift);
+        *reinterpret_cast<uint64_t*>(state + 40) |= UINT64_C(0x0800000000000000);
+    }
 }
 
 // Bind `texture` (its header holds a fetch constant at +0x10..+0x24) to fetch
