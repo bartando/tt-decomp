@@ -16,6 +16,8 @@
 
 // External functions
 extern "C" {
+    extern const char lbl_82074EF0[];  // @ 0x82074EF0
+    void swfCMD_PlaceObject2ClipEvent_D3E8(void* instance, int event, const char* name);  // @ 0x823FD3E8
     void rage_free(void* ptr);                  // @ 0x820C00C0 — canonical heap free (see src/crt/heap.c)
     void swfContext_Cleanup(void* ctx);         // @ 0x823F9B80 — cleanup stub (no-op in final binary)
     uint8_t atSingleton_Find(void* ptr);        // @ 0x820F90D0 — singleton registry lookup, returns nonzero if found
@@ -661,6 +663,43 @@ swfFILE::~swfFILE() {
 
     if (resourceArray) {
         rage_free(resourceArray);
+    }
+}
+
+
+// @ 0x82403628
+void swfFILE::AdvanceDefinitionFrame(swfINSTANCE* instance) {
+    auto* file = reinterpret_cast<uint8_t*>(this);
+    auto* state = reinterpret_cast<uint8_t*>(instance);
+    *reinterpret_cast<swfINSTANCE**>(file + 0x10) = instance;
+
+    const bool playing = state[0xAA] != 0;
+    if (playing) {
+        swfCMD_PlaceObject2ClipEvent_D3E8(instance, 2, lbl_82074EF0);
+    }
+
+    auto* frames = *reinterpret_cast<uint8_t**>(file + 0x0C);
+    uint16_t frame = *reinterpret_cast<uint16_t*>(state + 0xA4);
+    void* command = *reinterpret_cast<void**>(frames + frame * 8 + 4);
+    while (command) {
+        void** vtable = *reinterpret_cast<void***>(command);
+        using CommandFn = void (*)(void*, swfINSTANCE*);
+        reinterpret_cast<CommandFn>(vtable[playing ? 1 : 3])(command, instance);
+        command = *reinterpret_cast<void**>(static_cast<uint8_t*>(command) + 0x0C);
+    }
+
+    if (state[0xAC]) {
+        state[0xAA] = 0;
+        state[0xAC] = 0;
+    }
+    if (state[0xAB]) {
+        state[0xAB] = 0;
+        state[0xAA] = 1;
+    }
+    if (state[0xAA]) {
+        void** vtable = *reinterpret_cast<void***>(instance);
+        using AdvanceFn = void (*)(swfINSTANCE*, int);
+        reinterpret_cast<AdvanceFn>(vtable[2])(instance, 0);
     }
 }
 

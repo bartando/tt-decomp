@@ -17,6 +17,8 @@
 
 namespace rage {
 
+struct swfINSTANCE;
+
 // ── rage::swfACTIONFUNC  [vtable @ 0x82075314] ──────────────────────────
 struct swfACTIONFUNC {
     void**      vtable;           // +0x00
@@ -154,7 +156,7 @@ struct swfFILE {
 
     // ── virtual methods ──
     virtual ~swfFILE();                  // [0] @ 0x823f8be0
-    virtual void AdvanceDefinitionFrame();  // [2] @ 0x82403628
+    virtual void AdvanceDefinitionFrame(swfINSTANCE* instance);
     virtual float FindExportFrame(float frameRate, const char* labelName, void* context);  // [10] @ 0x823f9dc8
 };
 
