@@ -120,6 +120,8 @@ def needs_assist(w: int) -> bool:
             return True
         if xo10 == 598:                             # sync (L=1 lwsync, L=2 ptesync)
             return True
+        if xo10 == 178:                             # mtmsrd (only L=1 supported)
+            return True
         if xo10 in (19, 144) and (w >> 20) & 1:     # mfocrf / mtocrf
             return True
         return False
@@ -398,6 +400,15 @@ class Assist:
             return "cmpld"
         if xo10 == 598:
             return "sync"
+        if xo10 == 178:
+            if not w & 0x10000:
+                raise Unsupported("mtmsrd L=0 (full machine-state changes)")
+            # PowerPC Operating Environment Architecture Book III v2.01:
+            # L=1 copies only MSR[48] (EE) and MSR[62] (RI).
+            # No asynchronous interrupts are injected by this emulator.
+            mask = 0x8002
+            cpu.set_msr((cpu.msr() & ~mask) | (cpu.gpr(rt) & mask))
+            return "mtmsrd"
         if xo10 == 19:      # mfocrf
             cpu.set_gpr64(rt, cpu.cr())
             return "mfocrf"

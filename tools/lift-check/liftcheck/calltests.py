@@ -74,6 +74,38 @@ def _sides(c, args=None):
     return t, regs, results
 
 
+def msr_regressions():
+    """Run native mfmsr around assisted mtmsrd, including an atomic store."""
+    errors = []
+    # mfmsr r6; mtmsrd r3,1; mfmsr r7; lwarx r8,0,r4;
+    # mtmsrd r6,1; stwcx. r5,0,r4; mfcr r9; mfmsr r10; blr
+    words = [0x7CC000A6, 0x7C610164, 0x7CE000A6, 0x7D002028,
+             0x7CC10164, 0x7CA0212D, 0x7D200026, 0x7D4000A6, 0x4E800020]
+    for source in (0, 2, 0x8000, 0x8002, 0xffffffff):
+        try:
+            c = _fixture(words, words, {})
+            _, _, results = _sides(c, {3: source, 4: ARENA_BASE, 5: 0x12345678})
+            for result in results:
+                before, after, restored = (result.gpr[n] for n in (6, 7, 10))
+                assert after == (before & ~0x8002) | (source & 0x8002), "wrong EE/RI mask"
+                assert restored == before, "saved MSR did not restore"
+                assert result.gpr[9] & 0x20000000, "stwcx lost its reservation"
+                assert all(ARENA_BASE + i in result.writes for i in range(4)), "missing atomic write"
+                assert bytes(result.final[ARENA_BASE + i] for i in range(4)) == bytes.fromhex('12345678'), "wrong atomic value"
+        except Exception as e:
+            errors.append(f'mtmsrd source {source:#x}: {e}')
+    try:
+        c = _fixture([0x7C600164, 0x4E800020], [0x4E800020], {})
+        t = Trial(random.Random(1), c.syms)
+        t.stack_fill = bytes(0x9000)
+        regs = {'gpr': [0] * 32, 'fpr': [0.] * 32, 'ctr': 0, 'cr': 0}
+        result = c.run_side('orig', t, regs, [[0] * 4 for _ in range(128)], 0)
+        assert result.fault and result.fault.kind == 'unsupported', "L=0 silently accepted"
+    except Exception as e:
+        errors.append(f'mtmsrd L=0: {e}')
+    return errors
+
+
 def regressions():
     a, b = IMAGE_BASE + 0x100, IMAGE_BASE + 0x200
     # The stack store intentionally overlaps a SysV caller's saved LR unless
