@@ -8,6 +8,7 @@
  *   - grcDevice_setSamplerMinFilter @ 0x82355418 — Xenos texture fetch state
  *   - grcDevice_setSamplerMagFilter @ 0x823555A8 — Xenos texture fetch state
  *   - grcDevice_SetTexture          @ 0x82359940 — bind a texture to a fetch slot
+ *   - grcDevice_ReserveCommandSpace @ 0x82359E80 — carve space out of the command ring
  *
  * Note: grcDevice_beginScene lives in grc_render.cpp alongside grcDevice_clear.
  */
@@ -309,4 +310,99 @@ extern "C" void grcDevice_SetTexture(void* device, uint32_t slot, void* texture)
             grcTexture_ReleaseResource(previous);
         }
     }
+}
+
+extern "C" void grcDevice_CommitCommandSpace(void* device, uint32_t end, uint32_t sequence); // @ 0x82359DC0
+
+// Reserve space in the device's command ring (all fields are 32-bit addresses):
+// +14004/+14008 ring start/end, +14012 minimum block, +14016 cursor in the
+// current segment, +14020 wrap sequence, +14024 secondary cursor, +14028 its
+// limit, +13536/+13540 the GPU's read fence and the sequence it belongs to.
+// `aligned` (bit 0 of flags) asks for `*size` bytes at `alignment` without
+// wrapping; otherwise the block is 32-byte aligned, at least the ring minimum,
+// and *size is set to what was reserved. Returns 0 if the GPU still owns the space.
+// @ 0x82359E80
+extern "C" uint32_t grcDevice_ReserveCommandSpace(void* /*unused*/, void* device, uint32_t flags,
+                                                  uint32_t* size, uint32_t alignment) {
+    uint8_t* state = static_cast<uint8_t*>(device);
+    const auto field = [state](uint32_t offset) -> uint32_t& {
+        return *reinterpret_cast<uint32_t*>(state + offset);
+    };
+    uint32_t words = *size >> 2;
+    uint32_t cursor = field(14016);
+
+    if ((flags & 1) != 0) {
+        if (cursor == 0) {
+            cursor = field(4) + 52;
+        }
+        const uint32_t mask = ~(alignment - 1);
+        const uint32_t sequence = field(14020);
+        const uint32_t bytes = words * 4;
+        uint32_t start = (cursor + alignment - 1) & mask;
+        uint32_t end = bytes + start;
+        if (end <= field(14008)) {
+            if (const uint32_t fence = field(13536); fence != 0) {
+                const int32_t lag = static_cast<int32_t>(field(13540) - sequence);
+                if (lag == -1 || (lag == 0 && fence < end)) {
+                    return 0;
+                }
+            }
+            field(14016) = end;
+            grcDevice_CommitCommandSpace(device, end, sequence);
+            return start;
+        }
+        start = (field(14024) + alignment - 1) & mask;
+        end = bytes + start;
+        if (const uint32_t fence = field(13536); fence != 0) {
+            const int32_t lag = static_cast<int32_t>(field(13540) - sequence - 1);
+            if (lag == -1 || (lag == 0 && fence < end)) {
+                return 0;
+            }
+        }
+        if (end > field(14028)) {
+            return 0;
+        }
+        field(14024) = end;
+        grcDevice_CommitCommandSpace(device, end, sequence + 1);
+        return start;
+    }
+
+    if (cursor == 0) {
+        cursor = field(0) + 4;
+    }
+    uint32_t base = (cursor + 31) & ~31u;
+    if (words == 0) {
+        words = 52;
+    }
+    uint32_t blockWords = field(14012) >> 2;
+    if (words > blockWords) {
+        blockWords = words;
+    }
+    const uint32_t blockBytes = blockWords * 4;
+    uint32_t end = blockBytes + base;
+    if (end > field(14008)) {
+        end = field(14008);
+    }
+    if (static_cast<int32_t>(end - base) >> 2 < static_cast<int32_t>(words)) {
+        base = (field(14024) + 31) & ~31u;
+        const uint32_t sequence = field(14020) + 1;
+        end = blockBytes + base;
+        field(14024) = field(14004);
+        field(14020) = sequence;
+        state[10434] |= 16;
+    }
+    if (const uint32_t fence = field(13536); fence != 0) {
+        const uint32_t fenceSequence = field(13540);
+        const uint32_t sequence = field(14020);
+        const int32_t lag = static_cast<int32_t>(fenceSequence - sequence);
+        if (lag == -1 || (lag == 0 && fence < end)) {
+            end = fence;
+            if (sequence != fenceSequence || static_cast<int32_t>(end - base) >> 2 < static_cast<int32_t>(words)) {
+                return 0;
+            }
+        }
+    }
+    grcDevice_CommitCommandSpace(device, end, field(14020));
+    *size = static_cast<uint32_t>((static_cast<int32_t>(end - base) >> 2) << 2);
+    return base;
 }
