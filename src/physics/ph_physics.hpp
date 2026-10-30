@@ -132,7 +132,7 @@ struct phUpdateObject {
     void Reset(void* world, void* scene);             // [3] @ 0x8227D5B0  world sync / init
     void AddToRenderBucket(bool skipVisTest);         // [4] @ 0x8227D768
     void RenderShadow(float shadowScale);             // [5] @ 0x8227D898
-    void Cleanup(void* frameData, uint32_t flags);    // [6] @ 0x8227DA40
+    void UpdateDrawable(void* frameData, uint32_t flags);    // [6] @ 0x8227DA40
 };
 
 static_assert(sizeof(void*) != 4 || offsetof(phUpdateObject, m_pData) == 0x14, "phUpdateObject layout");

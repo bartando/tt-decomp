@@ -424,9 +424,9 @@ extern void pongPlayer_AddToSyncedFloatClamped(void* syncRec, float delta, uint3
 
 // ── Batch 10 function declarations ──────────────────────────────────────
 extern void pongPlayer_E640_g(void* gridSubObj);                     // ClearSwingSlotGrid @ 0x8219E640
-extern void pongPlayer_E590_g(float* lerpFactors, uint8_t flip,
+extern void pongPlayer_InterpolateCourtGridPosition(float* lerpFactors, uint32_t flip,
                                float* outPos, float* boundsA,
-                               float* boundsB, float* offset);       // InterpolateGridPosition @ 0x8219E590
+                               float* boundsB, float* offset);       // InterpolateCourtGridPosition @ 0x8219E590
 extern void pongPlayer_3628_g(pongPlayer* player, uint8_t flip);     // SetServeSideFlip @ 0x82193628
 extern bool pongPlayer_6050_p46(int32_t swingType);                  // IsSwingType @ 0x821D6050
 extern void pongPlayer_0F10_g(void* stateObj, float* outSign,

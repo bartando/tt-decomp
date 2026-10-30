@@ -250,34 +250,45 @@ bool pongCameraMgr::PostLoadProperties(uint32_t value) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// pongCameraMgr::GetAspectRatio()  @ 0x82143E98
-// Calculates aspect ratio from camera dimensions
+// grcViewport::GetAspectRatio() @ 0x82143E98
+// An explicit aspect wins. Otherwise derive it from the viewport/window sizes.
 // ─────────────────────────────────────────────────────────────────────────────
-float pongCameraMgr::GetAspectRatio() const {
-    extern float g_floatOne;  // @ 0x8202D108 + 8
-    
-    float verticalFOV = m_verticalFOV;    // +0x33C
+float grcViewport::GetAspectRatio() const {
+    extern const float lbl_8202D108; // @ 0x8202D108 (1.0f)
+    extern const float lbl_8202D110; // @ 0x8202D110 (0.0f)
+    if (m_aspect != lbl_8202D110)
+        return m_aspect;
+    if (m_viewportScaleY == lbl_8202D110)
+        return lbl_8202D108;
+    float width = static_cast<float>(m_windowWidth) * m_viewportScaleX;
+    float height = static_cast<float>(m_windowHeight) * m_viewportScaleY;
+    return width / height;
+}
 
-    // Check if vertical FOV is zero (using constant comparison)
-    if (verticalFOV == g_floatOne) {
-        float horizontalFOV = m_horizontalFOV;  // +0x324
+// grcViewport::UpdateScreenMatrix @ 0x82152EE0 | size: 0x190
+// Quantize the normalized rectangle to pixels before halving it. Arithmetic
+// right shifts round odd (including negative) sizes down, unlike integer / 2.
+void grcViewport::UpdateScreenMatrix() {
+    extern uint32_t g_nScreenWidth;  // @ 0x825C9014
+    extern uint32_t g_nScreenHeight; // @ 0x825C9018
+    extern const float lbl_8202D108;  // @ 0x8202D108
+    extern const float lbl_8202D110;  // @ 0x8202D110
+    int32_t width = static_cast<int32_t>(g_nScreenWidth);
+    int32_t height = static_cast<int32_t>(g_nScreenHeight);
+    if (m_windowWidth == width && m_windowHeight == height)
+        return;
 
-        if (horizontalFOV != g_floatOne) {
-            // Calculate aspect ratio from viewport dimensions
-            int32_t viewportWidth = m_viewportWidth;    // +0x330
-            int32_t viewportHeight = m_viewportHeight;  // +0x334
-            float baseWidth = m_baseWidth;              // +0x320
-            
-            // aspect = (viewportWidth * baseWidth) / (viewportHeight * horizontalFOV)
-            float widthRatio = (float)viewportWidth * baseWidth;
-            float heightRatio = (float)viewportHeight * horizontalFOV;
-            return widthRatio / heightRatio;
-        }
-    }
-    
-    // Default to 1.0 if FOV is zero
-    extern float g_floatZero;  // @ 0x8202D108
-    return g_floatZero;
+    int32_t x = static_cast<int32_t>(m_normalizedRect[0] * static_cast<float>(width));
+    int32_t y = static_cast<int32_t>(m_normalizedRect[1] * static_cast<float>(height));
+    int32_t w = static_cast<int32_t>(m_normalizedRect[2] * static_cast<float>(width));
+    int32_t h = static_cast<int32_t>(m_normalizedRect[3] * static_cast<float>(height));
+    m_screenMtx.a = {static_cast<float>(w >> 1), lbl_8202D110, lbl_8202D110, lbl_8202D110};
+    m_screenMtx.b = {lbl_8202D110, static_cast<float>(-h >> 1), lbl_8202D110, lbl_8202D110};
+    // This function never writes the third row.
+    m_screenMtx.d = {static_cast<float>((w >> 1) + x),
+                    static_cast<float>((h >> 1) + y), m_screenDepth, lbl_8202D108};
+    m_windowWidth = width;
+    m_windowHeight = height;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1573,7 +1584,6 @@ bool pongCameraMgr::CheckAllCameraQueries(void* gameState, float f1, float f2) {
 // ─────────────────────────────────────────────────────────────────────────────
 extern void sysMemAllocator_Free(void* ptr);                        // @ 0x820C00C0
 extern void atSingleton_9420(void* obj);                      // @ 0x821A9420
-extern void pongCameraMgr_3E98_g(void* obj);                  // @ 0x82143E98 (GetAspectRatio)
 extern void phBoundCapsule_3598_g(void* obj);                  // @ 0x82153598 — grcViewport: projection from +0x338..+0x344
 extern uint8_t pongCameraMgr_C450_g(void* node);              // @ 0x8220C450
 extern bool pongCameraMgr_7EA8_g(void* mgr, void* state, int flag); // @ 0x82167EA8
@@ -1813,7 +1823,7 @@ void pongCameraMgr_6280_g(void* selfPtr) {
     float fovX = activeCamera->m_fovX;                           // +0x340
 
     // Get aspect ratio (result returned in f1)
-    pongCameraMgr_3E98_g(activeCamera);
+    float aspect = reinterpret_cast<grcViewport*>(activeCamera)->GetAspectRatio();
 
     // Compute destination slot: self->m_slotsBase + g_phFrameIndex * 912
     pongCameraMgr* slotsBase = (pongCameraMgr*)self->m_slotsBase;  // +0x18
@@ -1823,8 +1833,7 @@ void pongCameraMgr_6280_g(void* selfPtr) {
 
     destSlot->m_fovParam = activeCamera->m_fovParam;             // +0x338
     destSlot->m_activeFlag = 1;                                  // +0x360
-    // f1 holds aspect ratio from pongCameraMgr_3E98_g
-    // destSlot->m_verticalFOV = aspectResult;  // stored by caller convention
+    reinterpret_cast<grcViewport*>(dest)->m_aspect = aspect;
     destSlot->m_fovX = fovX;
     destSlot->m_fovY = fovY;
 
