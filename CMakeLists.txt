@@ -71,6 +71,7 @@ set(SOURCES
     src/rage/audio/aud_instance_update.cpp
     src/rage/audio/rage_audio.cpp
     src/rage/audio/xma_source.cpp
+    src/rage/audio/xact_sound.cpp
     src/rage/core/fsmMachine.c
     src/rage/core/game_loop.c
     src/rage/core/hsm.cpp
