@@ -17,8 +17,8 @@ extern "C" {
  * Thread and CRT initialization
  */
 
-/* XDK thread context setup - called at 0x820C03AC */
-int xe_main_thread_init(void);
+/* Install the default thread allocator @ 0x820C0038. */
+void sysMemAllocator_InitThreadHeap(void);
 
 /*
  * RAGE core object system

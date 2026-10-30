@@ -2576,7 +2576,7 @@ void pongCameraMgr_3638_2h(void* dest) {
 // it into the camera sample machine bank on the owner.
 // ─────────────────────────────────────────────────────────────────────────────
 
-extern "C" void xe_main_thread_init_0038();
+extern "C" void sysMemAllocator_InitThreadHeap();
 extern "C" void* atFreeList_Alloc(void* bankBase, uint32_t entrySize);
 
 extern float g_cameraSampleInitFloat1;  // .rdata @ 0x82079B4C
@@ -2584,7 +2584,7 @@ extern float g_cameraSampleInitFloat2;  // .rdata @ 0x8202D110
 
 void* pongCameraMgr_9DE8_g(void* owner, uint32_t param1, uint32_t /*unused*/,
                             uint8_t param2, uint32_t param3) {
-    xe_main_thread_init_0038();
+    sysMemAllocator_InitThreadHeap();
 
     // Navigate SDA to get allocator: SDA[0] → globalPtr → globalPtr+4 → allocator
     extern void* g_sdaBase;     // r13+0: the thread's TLS block, not a global
@@ -2746,7 +2746,7 @@ void camViewCS::Update() {
 // Base-class OnEnter forwarded-to at the tail of slot 4.
 extern void gmLogic_OnEnter(void* self);
 
-// rage memory allocator (xe_main_thread_init_0038 @ 0x820C0038 maps to the SDA
+// rage memory allocator (sysMemAllocator_InitThreadHeap @ 0x820C0038 maps to the SDA
 // allocator object loaded from r13+0 — the vtable slot 1 invoked afterwards is
 // rage::sysMemAllocator::Allocate(size, align)).
 extern void* rage_sysMemAllocator_Get();

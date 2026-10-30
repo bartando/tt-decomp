@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include "globals.h"
 #include "crt/startup_globals.h"
+#include "crt/thread_heap.h"
 #include "link/tt_alias.h"
 
 // ============================================================================
@@ -268,7 +269,7 @@ const uint32_t g_vectorComparisonMask[4] = {
 // CRT/Exit System Globals
 // ============================================================================
 
-uint8_t g_allocatorInitFlag = 0;
+uint32_t g_allocatorInitFlag = 0;
 int g_argc = 0;
 char** g_argv = NULL;
 char g_argv_buf[1024] = {0};
@@ -360,7 +361,7 @@ uint32_t g_shotType1_825C5F50 = 0;  // @ 0x825C5F50 (.data, 4 bytes)
 // ============================================================================
 
 void* g_mainThreadHandle = NULL;
-void* g_mainThreadXtf = NULL;
+struct XeTlsBlock g_mainThreadXtf = {0};
 void* g_threadpool_head = NULL;
 void* g_pgThreadInitGate = NULL;
 void* g_semIO = NULL;

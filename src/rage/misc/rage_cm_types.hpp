@@ -360,7 +360,7 @@ static bool cmApproachOperator_VectorApproach(
 
 // Engine heap functions (forward declarations — defined in rage allocator)
 extern void  rage_free(void* ptr);                              // @ 0x820C00C0
-extern void* rage_alloc_aligned(uint32_t size, uint32_t align);// via sysMemAllocator_InitMainThread + vcall[1]
+extern void* rage_alloc_aligned(uint32_t size, uint32_t align);// via sysMemAllocator_InitThreadHeap + vcall[1]
 
 /**
  * cmSwitch — multi-way conditional node (switch/case statement).

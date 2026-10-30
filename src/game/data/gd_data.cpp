@@ -15,7 +15,7 @@ extern void rage_free(void* ptr);
 extern void datResourceMgr_RemoveEntry(void* obj);                    // @ 0x820F8EE8 - Object cleanup
 extern void sysMemAllocator_PlatformFree(void* obj, uint32_t flags);    // @ 0x82566C20 - Free/release with flags
 extern void sysMemAllocator_Free(void* ptr);                            // @ 0x82186228 - TLS allocator free
-extern void sysMemAllocator_InitMainThread(void);          // @ 0x820C0038 - Main thread init
+extern void sysMemAllocator_InitThreadHeap(void);          // @ 0x820C0038 - Main thread init
 
 namespace rage {
     void  ReleaseSingleton(void* obj);               // @ 0x821A9420
@@ -630,7 +630,7 @@ void RegisterSerializedField(void* obj,
  */
 gdPropData* xe_13E8_1(void) {
     // Ensure main thread heap is initialized
-    sysMemAllocator_InitMainThread();
+    sysMemAllocator_InitThreadHeap();
     
     // Get the active allocator from SDA context
     // The SDA base (r13) points to a context struct where offset +4 holds the allocator pointer

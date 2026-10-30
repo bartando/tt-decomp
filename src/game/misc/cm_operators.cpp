@@ -13,7 +13,7 @@
 #include <string.h>
 
 // Forward declarations
-extern "C" void sysMemAllocator_InitMainThread(void);
+extern "C" void sysMemAllocator_InitThreadHeap(void);
 
 // External vtable addresses
 extern "C" const void* rage_cmIntegrate_vtable;  // @ 0x82054934
@@ -41,7 +41,7 @@ extern uint32_t* g_sda_base;  // @ 0x82600000 (r13)
 void* cmWorldRefreshableCtor_Destructor()
 {
     // Initialize main thread context if not already done
-    sysMemAllocator_InitMainThread();
+    sysMemAllocator_InitThreadHeap();
     
     // Get allocator context from SDA base
     // SDA offset 0 points to allocator context struct
@@ -320,7 +320,7 @@ void cmLookup_GetBool_3entry(void* self, bool* outResult) {
 // These are virtual method overrides on the 113 cmOperatorCtor vtable
 // instantiations. Each allocates memory via the TLS allocator (slot 1)
 // and tail-calls the class-specific init/constructor function.
-// Pattern: sysMemAllocator_InitMainThread() → get allocator → Allocate(size, 16)
+// Pattern: sysMemAllocator_InitThreadHeap() → get allocator → Allocate(size, 16)
 //          → if non-null, call init → return constructed object or nullptr
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -343,7 +343,7 @@ typedef void* (*AllocFn)(void* self, uint32_t size, uint32_t alignment);
  * Used by all cmOperatorCtor factory functions below.
  */
 static void* cmOperatorCtor_Allocate(uint32_t size) {
-    sysMemAllocator_InitMainThread();
+    sysMemAllocator_InitThreadHeap();
     // r13 word 0 is the thread block; its +4 is the current allocator, a C++
     // object whose vtable slot 1 is Allocate(size, align).
     void** thread = *reinterpret_cast<void***>(g_sda_base);

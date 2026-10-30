@@ -6,7 +6,7 @@ ADDRESS = 0x82177B60
 SOURCE = "src/rage/data/dat_parser_fields.cpp"
 
 CALLS = {
-    "xe_EC88": alloc(size_reg="r3"),
+    "rage_Alloc": alloc(size_reg="r3"),
 }
 
 REC = 0x58

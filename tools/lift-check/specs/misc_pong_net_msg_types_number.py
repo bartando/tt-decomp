@@ -11,7 +11,7 @@ OWNER = {}
 
 CALLS = {
     0x82238D60: stub(ret=lambda ctx: OWNER["addr"]),   # xam_singleton_init_8D60
-    0x820DEC88: alloc(size_reg="r3"),                  # xe_EC88
+    0x820DEC88: alloc(size_reg="r3"),                  # rage_Alloc
     0x82431950: run(),                                  # qsort
     0x82238F28: run(),                                  # its comparator
 }

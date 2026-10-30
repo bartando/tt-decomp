@@ -59,7 +59,7 @@ extern void* vtable_gdUnlockConditionMultiBounce;    /* 0x8204B244 */
 extern void* vtable_gdCSActionCharVisibleData;       /* 0x82077D1C */
 
 /* Main-thread heap init + SDA context root (used by every allocator call) */
-extern void sysMemAllocator_InitMainThread(void);  /* @ 0x820C0038 */
+extern void sysMemAllocator_InitThreadHeap(void);  /* @ 0x820C0038 */
 extern uint32_t* g_sda_base;                       /* SDA base (r13) */
 
 /* ─── rage::sysMemAllocator typed virtual interface ─────────────────────────
@@ -83,7 +83,7 @@ typedef struct SdaAllocCtx {
 
 /* Resolve the per-thread main allocator and call its virtual Allocate(). */
 static inline void* xe_alloc_aligned(uint32_t size, uint32_t alignment) {
-    sysMemAllocator_InitMainThread();
+    sysMemAllocator_InitThreadHeap();
     SdaAllocCtx* ctx = *(SdaAllocCtx**)&g_sda_base[0];
     sysMemAllocator* a = ctx->allocator;
     return a->vtable->Allocate(a, size, alignment);

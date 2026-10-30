@@ -5864,7 +5864,7 @@ void pongNetMessageHolder_vfn_1_2148_1(pongNetMessageHolder* holder) {
         return;
     }
 
-    // 32-byte sub-object allocation via xe_EC88 / rage_Alloc.
+    // 32-byte sub-object allocation via rage_Alloc.
     auto* item = static_cast<uint8_t*>(rage_Alloc(32));
     if (item == nullptr) {
         holder->m_pInternalArray = nullptr;
@@ -6138,16 +6138,16 @@ uint32_t pongNetMessageHolder_AAC8_w(pongNetMessageHolder* holder,
 // Batch 2 — pongNetMessageHolder array/buffer management helpers
 //
 // Each function follows the engine's "resize/reset dynamic buffer" pattern:
-//   1. Optionally free the existing array at +0 (xe_EC88/rage_free_00C0 release)
-//   2. Allocate a new array sized N * stride via xe_EC88 (size = N*stride + 4)
+//   1. Optionally free the existing array at +0 (rage_free_00C0 release)
+//   2. Allocate a new array sized N * stride via rage_Alloc (size = N*stride + 4)
 //   3. Initialise each slot (zero-fill, default-template, or ctor per element)
 //   4. Update bookkeeping fields (count @+4, capacity @+8)
 //
-// xe_EC88 signature: void* xe_EC88(uint32_t size_bytes). Returns block or 0.
+// rage_Alloc signature: void* rage_Alloc(uint32_t size_bytes). Returns block or 0.
 // Max-size guard bgt/-1: if (n > OVERFLOW_MAX) size = -1  (causes alloc fail).
 ////////////////////////////////////////////////////////////////////////////////
 
-extern "C" void* xe_EC88(uint32_t size);
+extern "C" void* rage_Alloc(uint32_t size);
 extern "C" void  rage_free_00C0(void* p);
 extern "C" void  rage_EA18(void* p, int flags);
 extern "C" void  util_E988(void* p, int flags);
@@ -6184,7 +6184,7 @@ void pongNetMessageHolder_D1D8_w(void* self_v, uint32_t newCount) {
     self[2] = newCount;
     // Overflow guard: ensure newCount*64+4 fits in signed range.
     uint32_t bytes = (newCount <= 0x03FFFFFFu) ? (newCount * 64u) + 4u : 0xFFFFFFFFu;
-    uint8_t* block = static_cast<uint8_t*>(xe_EC88(bytes));
+    uint8_t* block = static_cast<uint8_t*>(rage_Alloc(bytes));
     if (block == nullptr) {
         return;
     }
@@ -6228,7 +6228,7 @@ void pongNetMessageHolder_F698_w(void* self_v, int32_t newCap) {
         } else {
             bytes = 0xFFFFFFFFu;
         }
-        uint8_t* block = static_cast<uint8_t*>(xe_EC88(bytes));
+        uint8_t* block = static_cast<uint8_t*>(rage_Alloc(bytes));
         if (block != nullptr) {
             *reinterpret_cast<int32_t*>(block) = newCap;
             newArr = block + 4;
@@ -6268,7 +6268,7 @@ void pongNetMessageHolder_F698_w(void* self_v, int32_t newCap) {
 // pongNetMessageHolder_FF30_w @ 0x8212FF30 | size: 0x118
 //
 // Copy-construct a pongNetMessageHolder array from another. src->count is
-// read at src+4; a new buffer is xe_EC88'd and each 20-byte slot is copied
+// read at src+4; a new buffer is rage_Alloc'd and each 20-byte slot is copied
 // via pongNetMessageHolder_FE60_w. Mirror of _F698_w but without releasing
 // prior storage (assumes dst is fresh / not yet owning memory).
 // ───────────────────────────────────────────────────────────────────────────
@@ -6289,7 +6289,7 @@ void pongNetMessageHolder_FF30_w(void* dst_v, void* src_v) {
         } else {
             bytes = 0xFFFFFFFFu;
         }
-        uint8_t* block = static_cast<uint8_t*>(xe_EC88(bytes));
+        uint8_t* block = static_cast<uint8_t*>(rage_Alloc(bytes));
         if (block != nullptr) {
             *reinterpret_cast<int32_t*>(block) = n;
             newArr = block + 4;
@@ -6327,7 +6327,7 @@ void pongNetMessageHolder_21A8_w(void* self_v, int32_t newCap) {
     if (newCap > 0) {
         uint32_t g = static_cast<uint32_t>(newCap);
         uint32_t bytes = (g <= 0x0FFFFFFFu) ? (g * 16u) + 4u : 0xFFFFFFFFu;
-        uint8_t* block = static_cast<uint8_t*>(xe_EC88(bytes));
+        uint8_t* block = static_cast<uint8_t*>(rage_Alloc(bytes));
         if (block != nullptr) {
             *reinterpret_cast<int32_t*>(block) = newCap;
             newArr = block + 4;
@@ -6383,7 +6383,7 @@ void pongNetMessageHolder_A838_w(void* self_v, uint32_t count) {
         return;
     }
     uint32_t bytes = (count <= 0x04444444u) ? (count * 60u) + 4u : 0xFFFFFFFFu;
-    uint8_t* block = static_cast<uint8_t*>(xe_EC88(bytes));
+    uint8_t* block = static_cast<uint8_t*>(rage_Alloc(bytes));
     if (block == nullptr) {
         self->count = static_cast<uint16_t>(count);
         self->arr   = nullptr;
@@ -6470,7 +6470,7 @@ void pongNetMessageHolder_DEE0_w(void* self_v, void* src_v) {
         // which matches the fallback behaviour in the scaffold.
         int32_t cap = 0;
         if (src->capacity != 0 && cap < scratch) {
-            xe_EC88(0);  // placeholder — real code calls xe_EC88 with size
+            rage_Alloc(0);  // placeholder — real code calls rage_Alloc with size
             rage_free_00C0(nullptr);
         }
         ((VCall_Resize)self->vtable[11])(self_v, storage, cap, scratch);
@@ -6518,7 +6518,7 @@ void pongNetMessageHolder_2940_w(void* self_v, void* src_v) {
         if (canResize && src->reqCount < cap) {
             uint32_t g = static_cast<uint32_t>(cap);
             uint32_t bytes = (g <= 0x3FFFFFFFu) ? (g * 4u) + 4u : 0xFFFFFFFFu;
-            newArr = static_cast<uint32_t*>(xe_EC88(bytes));
+            newArr = static_cast<uint32_t*>(rage_Alloc(bytes));
             if (src->listHead != nullptr) {
                 rage_free_00C0(src->listHead);
             }
@@ -6565,7 +6565,7 @@ void pongNetMessageHolder_2B50_w(void* self_v, void* src_v) {
         } else {
             bytes = 0xFFFFFFFFu;
         }
-        newArr = static_cast<uint8_t*>(xe_EC88(bytes));
+        newArr = static_cast<uint8_t*>(rage_Alloc(bytes));
         if (newArr != nullptr) {
             // zero-init (cap*360)/4 dwords
             const uint32_t dwords = (static_cast<uint32_t>(cap) * 360u) / 4u;
@@ -6616,7 +6616,7 @@ void pongNetMessageHolder_74F8_w(void* self_v, void* src_v) {
         } else {
             bytes = 0xFFFFFFFFu;
         }
-        newArr = static_cast<uint8_t*>(xe_EC88(bytes));
+        newArr = static_cast<uint8_t*>(rage_Alloc(bytes));
         if (*src->listHead != 0) {
             rage_free_00C0(reinterpret_cast<void*>(*src->listHead));
         }
@@ -6695,7 +6695,7 @@ void pongNetMessageHolder_8B80_w(void) {
             uint32_t bytes = (count <= 0xFFFFFFFFu / sizeof(Node*))
                                  ? count * static_cast<uint32_t>(sizeof(Node*))
                                  : 0xFFFFFFFFu;
-            owner->arr = static_cast<Node**>(xe_EC88(bytes));
+            owner->arr = static_cast<Node**>(rage_Alloc(bytes));
         } else {
             owner->arr = nullptr;
         }
@@ -6739,14 +6739,14 @@ void pongNetMessageHolder_8B80_w(void) {
 //   * vfn_2_*    : sub-object cleanup — reset internal array slots to the
 //                  pongNetMessageHolderBase vtable then rage_free().
 //   * vfn_1_*    : lazy pool allocator — allocate a fixed-size block via
-//                  xe_EC88 (rage_Alloc), initialise header + per-slot
+//                  rage_Alloc, initialise header + per-slot
 //                  linked-list indices, stash the pointer into m_pInternalArray.
 //   * *_h        : pool constructor that also instantiates a sub-coordinator
 //                  (PongNetRoundRobinCoordinator) inside the spectator-drop
 //                  holder, then rewrites the derived vtable to the base.
 // ═══════════════════════════════════════════════════════════════════════════
 
-// xe_EC88 and pongNetMessageHolder_vfn_2_3670_1 are already declared/defined earlier in this TU.
+// rage_Alloc and pongNetMessageHolder_vfn_2_3670_1 are already declared/defined earlier in this TU.
 extern void PongNetRoundRobinCoordinator_00E0_g(void* coordBase);  // @ 0x822100E0
 extern void pongNetMessageHolder_vfn_2_0928_1(pongNetMessageHolder* holder);  // @ 0x823C0928 — sub-obj reset
 
@@ -6872,7 +6872,7 @@ void pongNetMessageHolder_vfn_1_4258_1(pongNetMessageHolder* self) {
     if (self->m_pInternalArray != nullptr) {
         return;
     }
-    uint8_t* buf = static_cast<uint8_t*>(xe_EC88(32));
+    uint8_t* buf = static_cast<uint8_t*>(rage_Alloc(32));
     if (buf == nullptr) {
         self->m_pInternalArray = nullptr;
         return;
@@ -6899,7 +6899,7 @@ void pongNetMessageHolder_vfn_1_2FA0_1(pongNetMessageHolder* self) {
     if (self->m_pInternalArray != nullptr) {
         return;
     }
-    uint8_t* buf = static_cast<uint8_t*>(xe_EC88(96));
+    uint8_t* buf = static_cast<uint8_t*>(rage_Alloc(96));
     if (buf == nullptr) {
         self->m_pInternalArray = nullptr;
         return;
@@ -6939,7 +6939,7 @@ void pongNetMessageHolder_vfn_1_03D0_1(pongNetMessageHolder* self) {
     if (self->m_pInternalArray != nullptr) {
         return;
     }
-    uint8_t* buf = static_cast<uint8_t*>(xe_EC88(336));
+    uint8_t* buf = static_cast<uint8_t*>(rage_Alloc(336));
     if (buf == nullptr) {
         self->m_pInternalArray = nullptr;
         return;

@@ -1985,7 +1985,7 @@ void pongNetMessageHolder_DeallocateInternalMessageRelayPool(void* self) {
 // ═════════════════════════════════════════════════════════════════════════════
 // pongNetMessageHolder — additional vfn_1 (alloc+construct) / vfn_2 (destroy+free)
 // lazy pool allocation slots. Each vfn_1 checks holder->pool (+0x8), and if null
-// allocates via rage_Alloc (xe_EC88 tail-call) then delegates to a ctor that
+// allocates via rage_Alloc (rage_Alloc tail-call) then delegates to a ctor that
 // fills the pool layout. The paired vfn_2 walks the pool writing the
 // PongNetMessage base vtable sentinel into each entry's +0 slot, then frees.
 // ═════════════════════════════════════════════════════════════════════════════

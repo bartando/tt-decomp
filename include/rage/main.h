@@ -23,7 +23,7 @@ int rage_main(int argc, char **argv);
 int rage_run(void);
 
 /* Initialization functions called by main */
-void xe_main_thread_init(void);
+void sysMemAllocator_InitThreadHeap(void);
 void rage_game_obj_init(void);
 void rage_subsystem_init(void);
 void grcDevice_init(void);

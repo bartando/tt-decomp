@@ -11151,7 +11151,7 @@ void phBound::CopyFrom(const phBound* src) {
 // Per-shape allocator dispatch.  Given a phBound type id (the low byte
 // of `m_nBoundType` at +0x04 of a populated phBound), allocate the
 // correctly-sized derived object via the RAGE pool allocator
-// (xe_EC88 ≈ operator new), then hand off to the shape-specific
+// (rage_Alloc ≈ operator new), then hand off to the shape-specific
 // constructor helper.
 //
 // Type table (indexed by switch(r3) in the scaffold):
@@ -11169,7 +11169,7 @@ void phBound::CopyFrom(const phBound* src) {
 // Returns nullptr on OOM or unknown/reserved type.  Called exclusively by
 // phBound::Clone (slot 35).
 // ─────────────────────────────────────────────────────────────────────────────
-extern "C" void* xe_EC88(uint32_t size);                        // operator new shim @ 0x820DEC88
+extern "C" void* rage_Alloc(uint32_t size);                        // operator new shim @ 0x820DEC88
 extern "C" void  ph_54C8(phBound* self, float radius);          // phBoundSphere ctor
 extern "C" void  ph_2E08(phBound* self);                        // phBoundCapsule ctor
 extern "C" void  ph_7450(phBound* self, const float* extents);  // phBoundBox ctor (reads 3 floats)
@@ -11189,17 +11189,17 @@ phBound* phBound::AllocateByType(uint8_t boundType) {
     phBound* bound = nullptr;
     switch (boundType) {
         case 0: {  // phBoundSphere — ctor takes initial radius = 1.0f
-            bound = static_cast<phBound*>(xe_EC88(144));
+            bound = static_cast<phBound*>(rage_Alloc(144));
             if (bound != nullptr) ph_54C8(bound, 1.0f);
             break;
         }
         case 1: {  // phBoundCapsule
-            bound = static_cast<phBound*>(xe_EC88(208));
+            bound = static_cast<phBound*>(rage_Alloc(208));
             if (bound != nullptr) ph_2E08(bound);
             break;
         }
         case 2: {  // phBoundBox — ctor takes pointer to {1,1,1} default extents
-            bound = static_cast<phBound*>(xe_EC88(512));
+            bound = static_cast<phBound*>(rage_Alloc(512));
             if (bound != nullptr) {
                 const float kUnitExtents[3] = { 1.0f, 1.0f, 1.0f };
                 ph_7450(bound, kUnitExtents);
@@ -11207,32 +11207,32 @@ phBound* phBound::AllocateByType(uint8_t boundType) {
             break;
         }
         case 3: {  // phBoundGeometry
-            bound = static_cast<phBound*>(xe_EC88(176));
+            bound = static_cast<phBound*>(rage_Alloc(176));
             if (bound != nullptr) ph_0F78(bound);
             break;
         }
         case 4: {  // phBoundOctree
-            bound = static_cast<phBound*>(xe_EC88(192));
+            bound = static_cast<phBound*>(rage_Alloc(192));
             if (bound != nullptr) ph_71A8(bound);
             break;
         }
         case 5: {  // phBoundQuadtree
-            bound = static_cast<phBound*>(xe_EC88(192));
+            bound = static_cast<phBound*>(rage_Alloc(192));
             if (bound != nullptr) ph_D088(bound);
             break;
         }
         case 6: {  // phBoundOTGrid
-            bound = static_cast<phBound*>(xe_EC88(160));
+            bound = static_cast<phBound*>(rage_Alloc(160));
             if (bound != nullptr) ph_B4E0(bound);
             break;
         }
         case 7: {  // phBoundPolyhedron
-            bound = static_cast<phBound*>(xe_EC88(192));
+            bound = static_cast<phBound*>(rage_Alloc(192));
             if (bound != nullptr) ph_D8D0(bound);
             break;
         }
         case 9: {  // phBoundComposite
-            bound = static_cast<phBound*>(xe_EC88(144));
+            bound = static_cast<phBound*>(rage_Alloc(144));
             if (bound != nullptr) ph_DE80(bound);
             break;
         }

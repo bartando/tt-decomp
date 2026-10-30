@@ -9,7 +9,7 @@
 
 #include <cstdint>
 
-extern "C" void* xe_EC88(uint32_t size);                   // @ 0x820DEC88 — operator new
+extern "C" void* rage_Alloc(uint32_t size);                   // @ 0x820DEC88 — operator new
 extern "C" void* const datParserRecord_vtable[];           // @ 0x82037494
 
 namespace {
@@ -49,7 +49,7 @@ void* datParser_AddField(void* parserp, int32_t type, const char* name, void* fi
     if (parser->m_fieldPoolUsed < 64) {
         rec = &parser->m_fieldPool[parser->m_fieldPoolUsed++];
     } else {
-        rec = static_cast<datParserFieldRecord*>(xe_EC88(sizeof(datParserFieldRecord)));
+        rec = static_cast<datParserFieldRecord*>(rage_Alloc(sizeof(datParserFieldRecord)));
         if (rec != nullptr) {
             rec->m_type = 0;
             rec->m_name[0] = '\0';

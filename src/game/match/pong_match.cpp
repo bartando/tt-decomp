@@ -1391,16 +1391,16 @@ extern void* g_pongRenderable_vtable[];               // @ 0x82032404
 // The allocator sequence the 360 build inlines for `new`: 0x820C0038 makes sure
 // the thread's allocator table exists, then the current allocator's slot 1
 // (Allocate(size, align)) is called.
-extern "C" void sysMemAllocator_InitMainThread();     // @ 0x820C0038
+extern "C" void sysMemAllocator_InitThreadHeap();     // @ 0x820C0038
 namespace rage { void* rage_alloc_aligned(unsigned long size, unsigned long alignment); }
 // The matching inlined `delete`: pointers inside a resource are left alone,
 // anything else goes back through the current allocator's slot 2.
 namespace rage { uint8_t FindSingleton(void* ptr); }  // @ 0x820F90D0
 extern "C" void sysMemAllocator_Free(void* ptr);
-extern "C" void* xe_EC88(uint32_t size);              // @ 0x820DEC88, operator new
+extern "C" void* rage_Alloc(uint32_t size);              // @ 0x820DEC88, operator new
 
 static void* AllocateAligned(uint32_t size, uint32_t alignment) {
-    sysMemAllocator_InitMainThread();
+    sysMemAllocator_InitThreadHeap();
     return rage::rage_alloc_aligned(size, alignment);
 }
 
@@ -1644,7 +1644,7 @@ void gmPracticeTarget::LoadData() {
             if (count <= (0xFFFFFFFFu - header) / sizeof(gmPracticeTargetSet)) {
                 bytes = header + count * static_cast<uint32_t>(sizeof(gmPracticeTargetSet));
             }
-            gmPracticeTargetSetBlock* block = static_cast<gmPracticeTargetSetBlock*>(xe_EC88(bytes));
+            gmPracticeTargetSetBlock* block = static_cast<gmPracticeTargetSetBlock*>(rage_Alloc(bytes));
             gmPracticeTargetSet* sets;
             if (block != nullptr) {
                 block->m_count = numSets;

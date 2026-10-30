@@ -57,8 +57,8 @@ unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, a
 - The `pg_6F48`/`6C40`/`6F10`/`B850`/`C3B8` group are Xbox thread/event wrappers (ResumeThread,
   SetEvent, CloseHandle, SuspendThread, WaitForSingleObject); they need a per-thread
   last-error and a kernel layer the port doesn't have.
-- Bridges that forward to ported bodies, not lifts: `rage_free` → `free()`, `xe_EC88` → host
-  malloc, `util_PackColorRGBA`, `fiAsciiTokenizer_Destroy` → host `free()` (0x82433310 is the
+- Bridges that forward to ported bodies, not lifts: `rage_free` → `free()`,
+  `util_PackColorRGBA`, `fiAsciiTokenizer_Destroy` → host `free()` (0x82433310 is the
   CRT's free; unverifiable). Verified forwards: `hsmEvent_Init` → `snEvent_Construct`,
   `netStream_ReadS16` → `datBitBuffer` `ReadSigned<s16>`.
 
@@ -177,7 +177,6 @@ unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, a
 - `pong_creature.cpp:242` dereferences the raw address `(float*)0x82606750`.
 - `g_phRandomSeedPtr`/`ActiveCameraPtr`/`GlobalStatePtr` are dereferenced once too often;
   `ph_0CC0`'s state stride is 5, not 3.
-- `sysMemAllocator_InitThreadHeap` is 0x820C0038, and its heap is 0x02C00000.
 - `gmLogicSpectator_vfn_18` (`pong_match.cpp`) drops a `lis 1` (offset 0x18DA0).
 - `char_view.cpp` `PurgeFilteredNodes` is 0x82163D88, not 0x8216DB88.
 - The audVoiceStream vtable names are swapped.

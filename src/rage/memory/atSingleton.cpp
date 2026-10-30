@@ -919,7 +919,7 @@ uint32_t atSingleton_vfn_9_8C18_1(atSingleton* self)
 // ═══════════════════════════════════════════════════════════════════════════════
 //  atSingleton_12D0_g  @ 0x821E12D0 | size: 0x174 (372 bytes)
 //  Cold-path initialiser for an atSingleton instance stored at lbl_826064A0.
-//    1. Calls xe_main_thread_init_0038() for one-time TLS setup.
+//    1. Calls sysMemAllocator_InitThreadHeap() for one-time TLS setup.
 //    2. allocator->allocate(188) via vtable slot 1 — 188-byte atSingleton.
 //    3. If allocation succeeded, calls atSingleton_CAD0_g(newInstance) to
 //       run the 188-byte object's constructor.
@@ -1034,9 +1034,6 @@ extern "C" void SinglesNetworkClient_A508_h(void* self, void* ctx);
 //                                      byte +576 is a "shutdown" sentinel)
 extern uint8_t* g_loop_obj_ptr;
 extern uint8_t* g_input_obj_ptr;
-
-// datArray_Grow-style allocator (xe_EC88 @ 0x820DEC88 — TLS stack allocator).
-extern "C" void* xe_Alloc_EC88(uint32_t size);
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Helpers: free-if-untracked, walk-to-rightmost
@@ -1177,9 +1174,9 @@ extern "C" int32_t atSingleton_LookupByName_5000(void* /*unused*/, void* key)
 extern "C" void atSingleton_RehashRegistry_5138(void* /*context*/,
                                                 uint32_t newBucketCountArg)
 {
-    // xe_main_thread_init_0038 — startup barrier (scaffold `bl 0x820c0038`).
-    extern "C" void xe_main_thread_init_0038(void);
-    xe_main_thread_init_0038();
+    // sysMemAllocator_InitThreadHeap — startup barrier (scaffold `bl 0x820c0038`).
+    extern "C" void sysMemAllocator_InitThreadHeap(void);
+    sysMemAllocator_InitThreadHeap();
 
     const uint32_t newBucketCount = newBucketCountArg & 0xFFFF;
 

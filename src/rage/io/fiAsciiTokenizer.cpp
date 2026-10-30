@@ -559,7 +559,7 @@ extern "C" {
 // Forward declarations for shared helpers
 void fiAsciiTokenizer_1F08_g(const char* errorMsg);     // @ 0x82431F08 — CRT puts-style message writer
 [[noreturn]] void fiAsciiTokenizer_FB40_g(int exitCode); // @ 0x8242FB40 — CRT exit()
-void* xe_EC88(uint32_t size);                            // @ 0x820DEC88 — operator new
+void* rage_Alloc(uint32_t size);                            // @ 0x820DEC88 — operator new
 
 // .rdata string at 0x8202E2B8 — "out of memory"
 static const char* const g_pOutOfMemoryStr = "out of memory";
@@ -572,7 +572,7 @@ static const char* const g_pOutOfMemoryStr = "out of memory";
 // ─────────────────────────────────────────────────────────────────────────────
 // fiAsciiTokenizer_D588_g @ 0x8222D588 | size: 0x60
 //
-// Byte allocator — allocates the requested number of raw bytes via xe_EC88.
+// Byte allocator — allocates the requested number of raw bytes via rage_Alloc.
 // Returns nullptr if size is zero. The overflow check against 0xFFFFFFFF
 // is dead code in 32-bit context (always passes).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -580,7 +580,7 @@ void* fiAsciiTokenizer_D588_g(void* /*allocator*/, uint32_t size, const void* /*
     if (size == 0) {
         return nullptr;
     }
-    return xe_EC88(size);
+    return rage_Alloc(size);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -598,7 +598,7 @@ void* fiAsciiTokenizer_76D8_g(void* /*allocator*/, uint32_t count, const void* /
     if (count == 0) {
         return nullptr;
     }
-    return xe_EC88(count * 4);
+    return rage_Alloc(count * 4);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -616,7 +616,7 @@ void* fiAsciiTokenizer_8598_g(void* /*allocator*/, uint32_t count, const void* /
     if (count == 0) {
         return nullptr;
     }
-    return xe_EC88(count * 16);
+    return rage_Alloc(count * 16);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -662,7 +662,7 @@ void fiAsciiTokenizer_CC50_g(DynArrayU32* arr, uint32_t capacity,
 
     uint32_t* data = nullptr;
     if (capacity != 0) {
-        data = static_cast<uint32_t*>(xe_EC88(capacity * 4));
+        data = static_cast<uint32_t*>(rage_Alloc(capacity * 4));
     }
 
     arr->m_pBegin = data;
@@ -1003,7 +1003,7 @@ void DynArrayU32::InsertOverflow(uint32_t* pos, const uint32_t& value,
     }
     uint32_t* newBegin = nullptr;
     if (newCapacity != 0) {
-        newBegin = static_cast<uint32_t*>(xe_EC88(newCapacity * 4));
+        newBegin = static_cast<uint32_t*>(rage_Alloc(newCapacity * 4));
     }
 
     uint32_t* newEnd = newBegin;
@@ -1096,7 +1096,7 @@ void DynArrayMatrix34::InsertOverflow(Matrix34* pos, const Matrix34& value,
     }
     Matrix34* newBegin = nullptr;
     if (newCapacity != 0) {
-        newBegin = static_cast<Matrix34*>(xe_EC88(newCapacity * sizeof(Matrix34)));
+        newBegin = static_cast<Matrix34*>(rage_Alloc(newCapacity * sizeof(Matrix34)));
     }
 
     Matrix34* newEnd = fiAsciiTokenizer_DDD0_w(m_pBegin, pos, newBegin);

@@ -85,7 +85,7 @@ extern "C" void* sysMemAllocator_Alloc(size_t size) {
  *
  * On Xbox 360, this checked if the current thread owned the allocator
  * (vtable slot 17), then either called the allocator's Allocate (slot 1)
- * or fell back to a manual alignment wrapper around xe_EC88 (malloc).
+ * or fell back to a manual alignment wrapper around rage_Alloc.
  * See sysMemAllocator_Allocate_61A0 @ 0x821861A0.
  */
 extern "C" void* sysMemAllocator_Allocate(void* a, size_t b) {
@@ -146,23 +146,28 @@ extern "C" void sysMemAllocator_Free(void* ptr) {
     rage_free(ptr);
 }
 
-/**
- * rage_Alloc — Allocate memory (int size overload)
- *
- * General-purpose allocation wrapper used by various RAGE subsystems.
- * Routes through rage_malloc for host platform.
- */
-void* rage_Alloc(int a) {
-    if (a <= 0) return nullptr;
-    return rage_malloc((size_t)a);
-}
+// The guest r13 register points at this TLS root on the host port.
+extern "C" uint32_t* g_sda_base;
+extern "C" void sysMemAllocator_InitThreadHeap(void);  // @ 0x820C0038
 
 /**
- * rage_Alloc — Allocate memory (unsigned int size overload)
+ * rage_Alloc @ 0x820DEC88 | size: 0x50
+ *
+ * Operator-new-style entry: initialize the current thread allocator and
+ * dispatch Allocate(size, 16). Zero sizes and allocation failures pass through.
  */
-void* rage_Alloc(unsigned int a) {
-    if (a == 0) return nullptr;
-    return rage_malloc((size_t)a);
+void* rage_Alloc(unsigned int size) {
+    sysMemAllocator_InitThreadHeap();
+    void** tls = *reinterpret_cast<void***>(g_sda_base);
+    void* allocator = tls[1];
+    void** vtable = *reinterpret_cast<void***>(allocator);
+    using Allocate = void* (*)(void*, uint32_t, uint32_t);
+    return reinterpret_cast<Allocate>(vtable[1])(allocator, size, 16);
+}
+
+// Same entry, declared with a signed size by a few host-port callers.
+void* rage_Alloc(int size) {
+    return rage_Alloc(static_cast<unsigned int>(size));
 }
 
 /**
@@ -943,31 +948,6 @@ void grmShaderPreset_AllocArray(uint32_t count) { (void)count; }
 /** Network system shutdown — no-op until networking is active */
 void netSystem_Shutdown(void) {}
 
-}
-
-
-// ============================================================================
-// sysMemAllocator_InitThreadHeap — thread heap initialization
-// ============================================================================
-
-extern "C" void sysMemAllocator_InitThreadHeap(void) {
-    extern void* g_pAllocatorBase;
-    extern char g_mainThreadXtfStorage[256];  // @ 0x8271B114
-    extern uint32_t g_allocInitFlag;  // @ 0x8271B1D8
-    extern void xe_alloc_thread_ctx_6CA8(void* ctx, uint32_t heapSize, uint32_t flags);
-    extern void xe_get_thread_ctx_36E8(void);
-
-    void** base = (void**)g_pAllocatorBase;
-    if (!base) return;
-    if (base[1] != nullptr) return;
-    void* xtfBlock = (void*)g_mainThreadXtfStorage;
-    if (!(g_allocInitFlag & 1)) {
-        g_allocInitFlag |= 1;
-        xe_alloc_thread_ctx_6CA8(xtfBlock, 0x002C0000u, 0);
-        std::atexit(xe_get_thread_ctx_36E8);
-    }
-    base[1] = xtfBlock;
-    base[2] = xtfBlock;
 }
 
 
