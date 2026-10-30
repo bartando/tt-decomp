@@ -16,9 +16,11 @@
  *   - grcDevice_setSamplerTrilinearThreshold @ 0x82355C48 — Xenos texture fetch state
  *   - grcDevice_setSamplerLodBias       @ 0x82355948 — Xenos texture fetch state
  *   - grcDevice_SetViewport         @ 0x82355ED0 — clip and load the viewport transform
+ *   - grcDevice_SetIndices          @ 0x82356210 — bind the index buffer
  *   - grcDevice_SetStreamSource     @ 0x82356118 — bind a vertex buffer to a stream
  *   - grcDevice_SetPixelShaderConstantF @ 0x82356A70 — upload pixel shader constants 0..19
  *   - grcDevice_BeginDrawPrimitiveUP @ 0x82357630 — queue a draw and allocate its vertices
+ *   - grcGpuBuffer_Release          @ 0x82356CF0 — drop a reference, free on the last
  *   - grcGpuResource_Release        @ 0x82356DA8 — drop a reference, free on the last
  *   - grcDevice_SetTexture          @ 0x82359940 — bind a texture to a fetch slot
  *   - grcDevice_ReserveCommandSpace @ 0x82359E80 — carve space out of the command ring
@@ -503,14 +505,16 @@ extern const uint32_t __imp_VdGlobalXamDevice;   // @ 0x82000734
 // back to the kernel video device (the title's or, in a system process, XAM's)
 // and free its data block and itself if it owns them. Returns the references
 // left.
-// @ 0x82356DA8
-extern "C" uint32_t grcGpuResource_Release(void* resource) {
+// Both resource kinds keep a reference count at +4, a GPU handle at +8, their
+// data pointer and a flags word saying which allocations to free.
+static uint32_t releaseGpuResource(void* resource, uint32_t dataWord, uint32_t flagsWord,
+                                   uint32_t dataFlag, uint32_t dataTag) {
     uint32_t* words = static_cast<uint32_t*>(resource);
     const uint32_t references = --words[1];
     if (references != 0) {
         return references;
     }
-    if (words[10] != 0) {
+    if (words[dataWord] != 0) {
         const uint32_t slot = KeGetCurrentProcessType() == 2 ? __imp_VdGlobalXamDevice : __imp_VdGlobalDevice;
         void* gpuDevice = reinterpret_cast<void*>(static_cast<uintptr_t>(
             *reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(slot))));
@@ -521,14 +525,26 @@ extern "C" uint32_t grcGpuResource_Release(void* resource) {
                 rage_AA78(gpuDevice, &handle);
             }
         }
-        if (words[0x24C / 4] & 0x20000000u) {
-            _locale_register(reinterpret_cast<void*>(static_cast<uintptr_t>(words[10])), 0xA1800000);
+        if (words[flagsWord] & dataFlag) {
+            _locale_register(reinterpret_cast<void*>(static_cast<uintptr_t>(words[dataWord])), dataTag);
         }
     }
-    if (words[0x24C / 4] & 0x40000000u) {
+    if (words[flagsWord] & 0x40000000u) {
         _locale_register(resource, 0x24800000);
     }
     return 0;
+}
+
+// Name inferred: the smaller sibling of grcGpuResource_Release, with data at
+// +0xC and flags at +0x1C. Callers release one of each back to back.
+// @ 0x82356CF0
+extern "C" uint32_t grcGpuBuffer_Release(void* buffer) {
+    return releaseGpuResource(buffer, 0xC / 4, 0x1C / 4, 0x80000000u, 0xB1800000);
+}
+
+// @ 0x82356DA8
+extern "C" uint32_t grcGpuResource_Release(void* resource) {
+    return releaseGpuResource(resource, 0x28 / 4, 0x24C / 4, 0x20000000u, 0xA1800000);
 }
 
 extern "C" void grc_5E08(void* device, const void* rect);  // @ 0x82355E08
@@ -651,6 +667,34 @@ extern "C" void grcDevice_SetPixelShaderConstantF(void* device, uint32_t /*first
     *reinterpret_cast<uint64_t*>(state + 0x18) |= UINT64_C(0xF800000000000000);
 }
 
+// Device bindings count as 0x80000 in a resource's first word. Dropping one
+// stamps the current fence; the resource goes once no references remain.
+constexpr uint32_t kDeviceReference = 0x80000;
+
+static void dropDeviceReference(uint8_t* state, uint32_t* resource) {
+    if (resource == nullptr) {
+        return;
+    }
+    const uint32_t references = resource[0] - kDeviceReference;
+    resource[1] = *reinterpret_cast<uint32_t*>(state + 10396);
+    resource[0] = references;
+    if ((references & 0x00F800FFu) == 0) {
+        grcTexture_ReleaseResource(resource);
+    }
+}
+
+// Name inferred: device+0x30F4 sits just before the render targets.
+// @ 0x82356210
+extern "C" void grcDevice_SetIndices(void* device, void* indices) {
+    uint8_t* state = static_cast<uint8_t*>(device);
+    if (indices != nullptr) {
+        static_cast<uint32_t*>(indices)[0] += kDeviceReference;
+    }
+    dropDeviceReference(state, reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(
+        *reinterpret_cast<uint32_t*>(state + 0x30F4))));
+    *reinterpret_cast<uint32_t*>(state + 0x30F4) = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(indices));
+}
+
 // Bind `buffer` to vertex stream `stream` at `offset` with `stride` bytes per
 // vertex. Same reference swap as grcDevice_SetTexture; a non-null bind also
 // marks the vertex fetch constants dirty.
@@ -658,22 +702,13 @@ extern "C" void grcDevice_SetPixelShaderConstantF(void* device, uint32_t /*first
 extern "C" void grcDevice_SetStreamSource(void* device, uint32_t stream, void* buffer,
                                           uint32_t offset, uint32_t stride) {
     uint8_t* state = static_cast<uint8_t*>(device);
-    constexpr uint32_t kReference = 0x80000;
     if (buffer != nullptr) {
-        static_cast<uint32_t*>(buffer)[0] += kReference;
+        static_cast<uint32_t*>(buffer)[0] += kDeviceReference;
         *reinterpret_cast<uint64_t*>(state + 0x30) |= 0x400;
     }
 
     uint32_t* binding = reinterpret_cast<uint32_t*>(state + 0x310C + stream * 8u);
-    auto* previous = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(binding[1]));
-    if (previous != nullptr) {
-        const uint32_t references = previous[0] - kReference;
-        previous[1] = *reinterpret_cast<uint32_t*>(state + 10396);
-        previous[0] = references;
-        if ((references & 0x00F800FFu) == 0) {
-            grcTexture_ReleaseResource(previous);
-        }
-    }
+    dropDeviceReference(state, reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(binding[1])));
     binding[1] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(buffer));
     binding[0] = offset;
     state[0x3190 + stream] = static_cast<uint8_t>(stride >> 2);
@@ -689,14 +724,13 @@ extern "C" void grcDevice_SetTexture(void* device, uint32_t slot, void* texture)
     uint8_t* state = static_cast<uint8_t*>(device);
     auto** bound = reinterpret_cast<uint32_t**>(state + (slot + 3176u) * 4u);
     auto* previous = reinterpret_cast<uint32_t*>(static_cast<uintptr_t>(*reinterpret_cast<uint32_t*>(bound)));
-    constexpr uint32_t kReference = 0x80000;
     // Physical addresses at or above 0x1E00000 sit in the 4KB-offset aperture.
     const auto physical = [](uint32_t address) { return address + (((address >> 20) + 0x200) & 0x1000); };
 
     if (texture != nullptr) {
         auto* header = static_cast<uint32_t*>(texture);
         uint32_t* fetch = reinterpret_cast<uint32_t*>(state + (slot + 48u) * 24u);
-        header[0] += kReference;
+        header[0] += kDeviceReference;
         const uint32_t old1 = fetch[1], old3 = fetch[3], old4 = fetch[4], old5 = fetch[5];
         fetch[0] = (header[4] & ~0x003FFC00u) | (fetch[0] & 0x003FFC00u);
         fetch[1] = (physical(header[5]) & ~0xE0000800u) | (old1 & 0xE0000800u);
@@ -722,14 +756,7 @@ extern "C" void grcDevice_SetTexture(void* device, uint32_t slot, void* texture)
     }
     *reinterpret_cast<uint32_t*>(bound) = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(texture));
 
-    if (previous != nullptr) {
-        const uint32_t references = previous[0] - kReference;
-        previous[1] = *reinterpret_cast<uint32_t*>(state + 10396);
-        previous[0] = references;
-        if ((references & 0x00F800FFu) == 0) {
-            grcTexture_ReleaseResource(previous);
-        }
-    }
+    dropDeviceReference(state, previous);
 }
 
 extern "C" void grcDevice_CommitCommandSpace(void* device, uint32_t end, uint32_t sequence); // @ 0x82359DC0
