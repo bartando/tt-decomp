@@ -27,7 +27,7 @@ extern void rage_free(void* ptr);
 // (pcrCreature forward-declared in pong_player.hpp)
 
 // NOTE: pongPlayer_UpdateLocomotionState is the semantic alias for
-// pongPlayer_C678_g @ 0x820CC678 (see SECTION 59 forward + stub at end of file).
+// pongPlayer_C678_g @ 0x820CC678 (player_animation_state.cpp).
 // It is called from D228 to sync locomotion anim list + body-data state each frame.
 extern void pongPlayer_UpdateLocomotionState(pongPlayer* state);  // @ 0x820CC678
 
@@ -85,7 +85,8 @@ struct pongSwingData {
 extern void game_CD20(void* recoveryState);          // flush recovery @ 0x820DCD20
 extern void crAnimBlenderState_Init(void* animSubState);  // reset phase-blocked @ 0x8224C810
 extern void pcrAnimState_ComputePosition(vec3* out, pongAnimState* animState);  // compute anim pos
-extern void pongPlayer_GetAnimNormalizedTime(pongPlayer* state);    // @ 0x820CD238 (or similar)
+float pongPlayer_D238_g(void* recovery);  // @ 0x820DD238
+extern const float g_kFrameScale;        // @ 0x82079BB8 — 1/30
 // NOTE: the recovery "is anim time in range" predicate is pongPlayer_D298_2hr
 // @ 0x820DD298 (NOT 0x820CD298 — transcription off-by-one-nibble). Already lifted
 // in this file as pongPlayer_IsWithinTimingWindow() at SECTION 5 helper group.
@@ -502,146 +503,6 @@ bool pongPlayer::CanAcceptSwingInput() const
 
 
 // ===========================================================================
-// SECTION 6 — DA58: IsSwingApexReached  @ 0x820CDA58 | size: 0x27C
-// ===========================================================================
-/**
- * pongPlayer::IsSwingApexReached(float threshold)  @ 0x820CDA58
- *
- * Complex multi-path gate that determines whether the active swing has
- * progressed past a caller-supplied strength threshold. Returns true when
- * the swing should be registered as having "connected".
- *
- * The function encapsulates four priority-ordered evaluation paths:
- *
- *  PATH 0 — Active flag + creature state (prerequisite):
- *    If m_bActive is set, verifies that the creature state (m_pCreatureState2,
- *    slot 7 = IsReady) confirms the player is active. If either check fails
- *    the result is false and the remaining paths are skipped.
- *
- *    If the prerequisite passes → continue to PATH 1.
- *    If the prerequisite fails  → evaluate PATHS 2/3 without PATH 1's result.
- *
- *  PATH 1 — Creature state 2 blocking:
- *    If IsCreatureState2Active, return false immediately.
- *
- *  PATH 2 — Swing timer path:
- *    If IsSwingTimerActive: read m_pSwingSubState->m_swingProgress (+160).
- *    If progress > 0 ("swing has launched"), compute a normalised fraction:
- *       fraction = float(frameId at +340) * g_kSwingScaleFactor / swingProgress
- *    Compare m_pTimingState->m_peakX (+28 = recorded target position component)
- *    against this fraction. Return result of comparison.
- *
- *  PATH 3 — Swing phase path (IsSwingPhaseBlocked):
- *    Read anim state m_swingPhase (+412) against g_kZero.
- *    If phase > 0, look up the current frame from the anim array
- *    (m_pAnimState->m_pFrameArray[m_animProgress * 4 → slot][+16 → velocity record][+12 → float]).
- *    Compute normalised fraction same as PATH 2.
- *    Return comparison of m_swingPhase vs fraction.
- *
- *  PATH 4 — Recovery path:
- *    If IsRecovering: check recovery state byte at +44 (m_bForceBlock).
- *    If force-blocked → false. Otherwise:
- *      Call pongPlayer_GetAnimNormalizedTime to get the recovery progress float.
- *      Compare recovery float at +172 against caller's threshold (f1 arg).
- *      Return true if recovery is complete past threshold.
- *
- * @param threshold  Caller-supplied strength threshold (passed in f1).
- *                   Used in PATH 4 only.
- */
-bool pongPlayer::IsSwingApexReached(float threshold) const
-{
-    // ── PATH 0: active + creature state prerequisite ────────────────────
-    bool activeAndReady = false;
-    if (m_bActive) {
-        if (m_pCreatureState2) {
-            activeAndReady = m_pCreatureState2->IsReady();  // vtable slot 7
-        }
-    }
-
-    if (!activeAndReady) {
-        // ── PATH 1: creature state 2 block ──────────────────────────────
-        if (IsCreatureState2Active())
-            return false;
-
-        // ── PATH 2: swing timer ──────────────────────────────────────────
-        if (IsSwingTimerActive()) {
-            if (!m_pSwingSubState)
-                goto path3;
-
-            float swingProgress = m_pSwingSubState->m_swingProgress;  // +160
-            if (swingProgress <= g_kZero)
-                goto path3;
-
-            // Normalise frame count to [0, 1] range relative to total swing duration.
-            float fraction;
-            if (swingProgress > g_kZero) {
-                int16_t frameId = (int16_t)m_pSwingSubState->m_frameId;  // +340
-                fraction = (float)frameId * g_kSwingScaleFactor / swingProgress;
-            } else {
-                fraction = g_kZero;
-            }
-
-            float currentPos = m_pTimingState->m_peakTime;  // +0x24
-            return currentPos > fraction;
-        }
-
-    path3:
-        // ── PATH 3: swing phase blocked ──────────────────────────────────
-        if (IsSwingPhaseBlocked()) {
-            float swingPhase = m_pAnimState->m_swingPhase;  // +412
-            if (swingPhase <= g_kZero)
-                goto path4;
-
-            // Look up the current anim frame's velocity record.
-            // frameEntry layout: +16 = velocityRecord (ptr), +56 = frameId (int32)
-            // velocityRecord: +12 = velFloat (float)
-            uint32_t frameIdx   = (uint32_t)m_pAnimState->m_animProgress;  // +96 (index into array)
-            void**   frameArray = (void**)m_pAnimState->m_pFrameArray;      // +4
-            void*    frame      = frameArray[frameIdx];                     // array[idx]
-            uint32_t* frameWords = static_cast<uint32_t*>(frame);
-            void*    velocRec   = reinterpret_cast<void*>(frameWords[4]);   // +16 / 4
-
-            float velFloat = static_cast<float*>(velocRec)[3];             // +12 / 4
-
-            float fraction;
-            if (velFloat > g_kZero) {
-                int32_t frameId = static_cast<int32_t>(frameWords[14]);    // +56 / 4
-                fraction = (float)frameId * g_kSwingScaleFactor / velFloat;
-            } else {
-                fraction = g_kZero;
-            }
-
-            // Return true if current phase >= fraction (past the apex).
-            // NaN-safe: `!(phase < fraction)` matches bns idiom.
-            return !(swingPhase < fraction);
-        }
-
-    path4:
-        // ── PATH 4: recovery ──────────────────────────────────────────────
-        if (!IsRecovering())
-            return false;
-
-        // Force-block flag prevents any connection during mandatory recovery.
-        if (m_pRecoveryState->m_bForceBlock)
-            return false;
-
-        // Recovery state also needs a valid follow-up action to compare against.
-        if (!m_pRecoveryState->m_pFollowAction)
-            return false;
-
-        // Evaluate recovery progress via helper.
-        pongPlayer_GetAnimNormalizedTime((pongPlayer*)this);
-        float recoveryVal = m_pRecoveryState->m_recoveryTimer;
-
-        // NaN-safe comparison — matches bns idiom.
-        return !(recoveryVal < threshold);  // true if recovery ≥ threshold
-    }
-
-    return false;
-}
-
-
-// ===========================================================================
 // SECTION 10 — pongPlayer::~pongPlayer  (vfn_0) @ 0x8218B3C0 | size: 0x50
 // vtable slot 0 [destructor]
 //
@@ -991,7 +852,7 @@ bool pongPlayer::CheckOpponentSwingApex() const
         return false;
 
     // Has the opponent's swing reached its apex?
-    if (!opp->m_pPlayerState->IsSwingApexReached(0.0f))
+    if (!opp->m_pPlayerState->IsSwingApexReached())
         return false;
 
     // Commit flags: must not be committed yet, but secondary flag must be set.
@@ -1149,130 +1010,44 @@ void pongPlayer::OnButtonReleased()
 
 
 
-// ===========================================================================
-// SECTION 6 — DA58: IsSwingApexReached  @ 0x820CDA58 | size: 0x27C
-// Called from: pongPlayer_5890_g (CheckOpponentSwingApex)
-//
-// Returns true when the player's swing has reached a critical apex threshold
-// that the opponent can react to. This is a layered multi-system check:
-//
-//  GATE 0 (fast path): if m_bActive AND m_pCreatureState2->vtable[7]() is true
-//    → skip all inner checks, always return false.  When the creature state is
-//    "ready" the swing hasn't committed yet; no apex possible.
-//
-//  GATE 1: if IsCreatureState2Active → return false immediately.
-//
-//  PATH A — Swing timer running (IsSwingTimerActive):
-//    Reads m_pSwingSubState[+160] (cumulative swing progress float).
-//    If it is > g_kZero: compute a normalised apex fraction from the timing
-//    state's frame count (int16 at +340) divided by the speed float (+48
-//    of the velocity record at +48→+12).  Returns true if m_pTimingState's
-//    currentTime (+28) exceeds that fraction.
-//
-//  PATH B — Swing phase blocked (IsSwingPhaseBlocked):
-//    Reads m_pAnimState[+412] (m_swingPhase float) and the anim frame array.
-//    Computes the same normalised fraction using the frame-count int at
-//    m_pAnimState[+404], then compares m_pAnimState[+96] (current anim
-//    position) against it.  Returns true if that position > fraction.
-//
-//  PATH C — Recovering (IsRecovering):
-//    Reads m_pRecoveryState[+44] (force-block byte).
-//    If NOT force-blocked: checks m_pRecoveryState[+36]→[+172] (progress
-//    float) against a second normalised fraction from m_pRecoveryState[+36].
-//    Returns true if progress > fraction.
-//
-//  Fallback: returns false.
-//
-// Python-verified: cntlzw(1)+rlwinm(27,31,31)=0, cntlzw(0)+rlwinm(27,31,31)=1
-// i.e. the idiom is bool NOT — timer_running = (currentTime < targetTime).
-// ===========================================================================
-bool pongPlayerState::IsSwingApexReached(float threshold) const
-{
-    // GATE 0: if active AND creature state ready → apex impossible.
-    if (m_bActive && m_pCreatureState2 && m_pCreatureState2->IsReady())
+// Swing-apex gate on the inner state reached through pongCreature+0xBC.
+// No f1 argument: recovery obtains its threshold from the clip-time helper.
+// No active timing path means the gate has already been reached.
+// @ 0x820CDA58 | size: 0x27C
+bool pongPlayerState::IsSwingApexReached() const {
+    if (m_bActive && m_pCreatureState->IsReady())
         return false;
-
-    // GATE 1: creature state 2 still mid-action → apex not yet.
     if (IsCreatureState2Active())
         return false;
 
-    // ── PATH A: swing timer running ─────────────────────────────────────
-    if (IsSwingTimerActive()) {
-        if (!m_pSwingSubState)
-            goto path_b;
-
-        {
-            float swingProgress = m_pSwingSubState->m_swingProgress;  // +0xA0
-            if (swingProgress <= g_kZero)
-                goto path_b;
-
-            // Retrieve the velocity record and timing state.
-            void*  velRecord = m_pSwingSubState->m_pVelRecord;  // +0x30
-            float  speedFloat = static_cast<float*>(velRecord)[3];  // velRecord+12 / 4 = speed
-            int16_t frameCount = m_pSwingSubState->m_swingSubFrame;  // +0x154
-
-            float apexFraction = g_kZero;
-            if (speedFloat > g_kZero) {
-                apexFraction = (float)(int32_t)frameCount * g_kFrameToSecScale / speedFloat;
-            }
-
-            float currentTime = m_pTimingState->m_currentTime;
-            return currentTime > apexFraction;
-        }
+    if (IsSwingTimerActive() && m_pSwingSubState) {
+        if (!(m_pSwingSubState->m_swingProgress > g_kZero))
+            return true;
+        const float speed = static_cast<const float*>(m_pSwingSubState->m_pVelRecord)[3];
+        const float fraction = speed > g_kZero
+            ? float(m_pSwingSubState->m_swingSubFrame) * g_kFrameScale / speed : g_kZero;
+        return m_pTimingState->m_currentTime > fraction;
     }
 
-path_b:
-    // ── PATH B: swing phase blocked ──────────────────────────────────────
     if (IsSwingPhaseBlocked()) {
-        if (!m_pAnimState)
+        if (!(m_pAnimState->m_swingPhase <= g_kZero))
             return false;
-
-        float swingPhase = m_pAnimState->m_swingPhase;  // +0x19C
-        if (swingPhase <= g_kZero)
-            return false;
-
-        // Compute normalised fraction from anim frame array entry.
-        // frameEntry layout: +16 = velRecord (ptr), +56 = frameDuration (int32)
-        // velRecord layout: +12 = speedFloat (float)
-        int32_t  frameIdx    = m_pAnimState->m_frameIndex;       // +0x194
-        void**   frameArray  = static_cast<void**>(m_pAnimState->m_pFrameArray);  // +0x04
-        void*    frameEntry  = frameArray[frameIdx];
-        uint32_t* frameWords = static_cast<uint32_t*>(frameEntry);
-        void*    velRecord   = reinterpret_cast<void*>(frameWords[4]);   // +16 / 4
-        float    speedFloat  = static_cast<float*>(velRecord)[3];        // +12 / 4
-        int32_t  frameDuration = static_cast<int32_t>(frameWords[14]);   // +56 / 4
-
-        float apexFraction = g_kZero;
-        if (speedFloat > g_kZero) {
-            apexFraction = (float)frameDuration * g_kFrameToSecScale / speedFloat;
-        }
-
-        float animPos = m_pAnimState->m_animProgress;  // +0x60
-        return animPos < apexFraction;
+        void* const* frames = static_cast<void* const*>(m_pAnimState->m_pFrameArray);
+        const uint32_t* frame = static_cast<const uint32_t*>(frames[m_pAnimState->m_frameIndex]);
+        const float speed = reinterpret_cast<const float*>(frame[4])[3];
+        const float fraction = speed > g_kZero
+            ? float(static_cast<int32_t>(frame[14])) * g_kFrameScale / speed : g_kZero;
+        return m_pAnimState->m_animProgress >= fraction;
     }
 
-    // ── PATH C: in recovery ───────────────────────────────────────────────
     if (IsRecovering()) {
-        if (!m_pRecoveryState)
+        if (m_pRecoveryState->m_bForceBlock || !m_pRecoveryState->m_pFollowAction)
             return false;
-
-        // If force-blocked, the recovery apex is trivially reachable.
-        // NOTE: m_bForceBlock=true indicates mandatory recovery is still in
-        //       progress; no apex can be claimed while force-blocked.
-        //       Matches the behavior of IsRecovering() (D598) at the method level.
-        if (m_pRecoveryState->m_bForceBlock)
-            return false;
-
-        if (!m_pRecoveryState->m_pFollowAction)
-            return false;
-
-        float progress = m_pRecoveryState->m_recoveryTimer;  // +0xAC
-        return progress > threshold;
+        const float fraction = pongPlayer_D238_g(m_pRecoveryState);
+        return m_pRecoveryState->m_recoveryTimer >= fraction;
     }
-
-    return false;
+    return true;
 }
-
 
 // ===========================================================================
 // SECTION 7 — pongPlayerState swing-blender queries and CancelSwing
@@ -3479,8 +3254,6 @@ void pongPlayer::ResetSwingDisplayValues() {  // pongPlayer_7038 @ 0x821A7038
  *   - Otherwise returns: (float)(frameCount @ sub+32) * g_kFrameScale
  *                         / (totalDuration @ sub->inner+12)
  */
-extern const float g_kFrameScale;    // @ 0x82079BB8 [.rdata]  1/30
-
 float pongPlayer_D238_g(void* self) {  // @ 0x820DD238
     uint8_t* base = reinterpret_cast<uint8_t*>(self);
     void* subObj = *reinterpret_cast<void**>(base + 36);
@@ -4521,7 +4294,27 @@ void pongPlayer_06A0_g(float* outVec,
 // ---------------------------------------------------------------------------
 // External forward declarations for batch 10
 // ---------------------------------------------------------------------------
-extern void* pg_9C00_g(void* inputObj, void* creature);
+extern uint32_t pongMatch_GetCharacterIndex(uint32_t playerSlot); // @ 0x821C9B70
+extern uint32_t g_plrPlayerMgr_state;  // @ 0x82606430 — manager pointer
+extern void* g_gameDataMgr;           // @ 0x8271A2E4
+extern "C" void pongMatch_LogMissingPlayerMgr(const char* message); // @ 0x8240E6D0
+
+// @ 0x821C9C00 | size: 0x5C
+// Read the selected character for a match slot. With no player manager, log
+// and use character zero; the game-data manager and its array are still used.
+void* pongMatch_GetCharacterForSlot(void* /*match*/, uint32_t playerSlot) {
+    uint32_t characterIndex = 0;
+    if (g_plrPlayerMgr_state == 0) {
+        pongMatch_LogMissingPlayerMgr(
+            reinterpret_cast<const char*>(uintptr_t{0x8203CD80u}));
+    } else {
+        characterIndex = pongMatch_GetCharacterIndex(playerSlot);
+    }
+    auto* manager = static_cast<uint8_t*>(g_gameDataMgr);
+    void** characters = *reinterpret_cast<void***>(manager + 0x18);
+    return characters[characterIndex];
+}
+
 extern void phBoundCapsule_0880_g(void* capsule, void* outMatrix, uint32_t param);
 extern float pongPlayer_C7A8_g(pongPlayer* player);
 extern void pongPlayer_B088_2hr(void* timingData, float dir, float power);
@@ -4560,10 +4353,10 @@ void pongPlayer::UpdateOpponentBoundTransform() {  // pongPlayer_4C08_g @ 0x8219
     uint8_t* opponentBytes = reinterpret_cast<uint8_t*>(m_pOpponent);
     uint8_t* characterSub = *reinterpret_cast<uint8_t**>(opponentBytes + 188);
 
-    // Look up creature in the physics system
-    void* creature = *reinterpret_cast<void**>(characterSub + 8);
-    void* lookupResult = pg_9C00_g(
-        reinterpret_cast<void*>(g_pInputArrayTable), creature);
+    // +8 is the match player slot, used to resolve its character data.
+    uint32_t playerSlot = *reinterpret_cast<uint32_t*>(characterSub + 8);
+    void* lookupResult = pongMatch_GetCharacterForSlot(
+        reinterpret_cast<void*>(g_pInputArrayTable), playerSlot);
 
     // Navigate chain: result->+44->+324 to get bound capsule
     uint8_t* chainEntry = *reinterpret_cast<uint8_t**>(
@@ -5258,16 +5051,6 @@ extern "C" void pongPlayer_AB48_g(void* outVec, void* playerLike);
  */
 extern "C" float pongPlayer_94F8_wrh();
 
-/**
- * pongPlayer_DA58_g @ 0x820CDA58 | size: 0x27C (636 bytes) —
- *    IsSwingApexReached (declared in hpp:295).
- *
- * Large time/threshold compare over m_pAnimState + m_pTimingState. Already
- * ported at method level (SECTION 6 above and pongPlayerState::IsSwingApexReached
- * at the SECTION 6 duplicate @ line 1504+). Forward declaration retained for
- * binary-name parity.
- */
-
 ////////////////////////////////////////////////////////////////////////////////
 // Stubs lifted from src/stubs.cpp — pongPlayer free functions
 //
@@ -5330,10 +5113,8 @@ extern "C" int pongPlayer_BF18_g(void* /*self*/, int /*a*/, vec3* /*b*/,
                                    vec3* /*c*/, int /*d*/) { return 0; }
 
 // pongPlayer_C678_g @ 0x820CC678 | size: 0xBB0 (2992 bytes)
-// UpdateLocomotionState — 3KB monster; stub pending a dedicated subdivision pass.
-// C678_g is the binary-address symbol; UpdateLocomotionState is the semantic
-// alias used by pongPlayer::Process at line 307.
-extern "C" void pongPlayer_C678_g(pongPlayer* /*state*/) {}
+// Pose assembly and locomotion crossfade live in player_animation_state.cpp.
+extern "C" void pongPlayer_C678_g(pongPlayer* state);
 void pongPlayer_UpdateLocomotionState(pongPlayer* state) {
     pongPlayer_C678_g(state);
 }
@@ -5410,7 +5191,7 @@ extern const vec3 g_kCourtBoxInnerMax;  // @ 0x82607230
 extern const vec3 g_kCourtBoxInnerMin;  // @ 0x82607240
 
 // Sign-mask / compare helpers (8740_wrh).
-extern const uint32_t g_kFloatSignMask[4];  // @ 0x82619BE0 — 0x7FFFFFFF × 4
+extern const uint32_t g_kFloatSignMask[4];  // @ 0x82619BE0 — (0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0)
 extern const vec3     g_kVecConst_619BF0;   // @ 0x82619BF0 — 16-byte .data const
 
 // Constants used by the normalise-idiom in C070_wrh.
@@ -5860,57 +5641,24 @@ extern "C" void pongPlayer_C070_wrh(vec3* dst, const void* srcMatrix) {
 }
 
 
-// ---------------------------------------------------------------------------
-// pongPlayer_8740_wrh  @ 0x820E8740 | size: 0xEC (236 bytes)
-//
-// Per-axis "distance to bound" helper.  Computes:
-//
-//   for axis ∈ {x, y, z}:
-//     if  P[axis] < min[axis]: out[axis] = min[axis] - P[axis]   (negative-side violation)
-//     elif P[axis] > max[axis]: out[axis] = max[axis] - P[axis]  (positive-side violation)
-//     else:                   out[axis] = g_kFloatConst_D110 (0.0f signed-zero marker)
-//
-// Returns true iff ANY axis is inside the [min, max] box — i.e. at least one
-// axis returned the "inside" marker.  This is the sign test used by the
-// court-bounds / court-volume queries below.
-//
-// The final check is implemented with an AltiVec sign-mask AND followed by a
-// per-lane `vcmpeqfp.` against the zero vector; we express it as a direct
-// float equality check on g_kFloatConst_D110.
-// ---------------------------------------------------------------------------
-extern "C" bool pongPlayer_8740_wrh(const vec3* pos, const vec3* boundMin,
-                                     const vec3* boundMax, vec3* outDelta) {
-    const float zero = g_kFloatConst_D110;  // expected 0.0f
-
-    // X axis.
-    if (pos->x < boundMin->x) {
-        outDelta->x = boundMin->x - pos->x;
-    } else if (pos->x > boundMax->x) {
-        outDelta->x = boundMax->x - pos->x;
-    } else {
-        outDelta->x = zero;
-    }
-    // Y axis.
-    if (pos->y < boundMin->y) {
-        outDelta->y = boundMin->y - pos->y;
-    } else if (pos->y > boundMax->y) {
-        outDelta->y = boundMax->y - pos->y;
-    } else {
-        outDelta->y = zero;
-    }
-    // Z axis.
-    if (pos->z < boundMin->z) {
-        outDelta->z = boundMin->z - pos->z;
-    } else if (pos->z > boundMax->z) {
-        outDelta->z = boundMax->z - pos->z;
-    } else {
-        outDelta->z = zero;
-    }
-
-    // "Inside" test: true iff at least one axis landed in the zero slot.
-    // Equivalent to the PPC `vand`/`vcmpeqfp.` mask test: if none of the
-    // three deltas were zero, every lane was a violation → fully outside.
-    return (outDelta->x == zero) || (outDelta->y == zero) || (outDelta->z == zero);
+// Nearest AABB correction: move each xyz coordinate into the supplied bounds.
+// Bounds are used as supplied, including inverted ones. w is left untouched;
+// the final VMX reduction masks it out and requires ALL xyz deltas to be zero.
+// pongPlayer_ComputeBoxCorrection (was pongPlayer_8740_wrh) @ 0x820E8740 | size: 0xEC
+extern "C" bool pongPlayer_ComputeBoxCorrection(const vec3* pos, const vec3* boundMin,
+                                             const vec3* boundMax, vec3* outDelta) {
+    const float zero = g_kFloatConst_D110;
+    // Keep the per-axis stores: outDelta may alias any of the three inputs.
+    outDelta->x = pos->x < boundMin->x ? boundMin->x - pos->x
+        : pos->x > boundMax->x ? boundMax->x - pos->x : zero;
+    outDelta->y = pos->y < boundMin->y ? boundMin->y - pos->y
+        : pos->y > boundMax->y ? boundMax->y - pos->y : zero;
+    outDelta->z = pos->z < boundMin->z ? boundMin->z - pos->z
+        : pos->z > boundMax->z ? boundMax->z - pos->z : zero;
+    // VMX compares subnormal inputs as signed zero (non-Java mode).
+    return __builtin_fabsf(outDelta->x) < 0x1p-126f &&
+           __builtin_fabsf(outDelta->y) < 0x1p-126f &&
+           __builtin_fabsf(outDelta->z) < 0x1p-126f;
 }
 
 

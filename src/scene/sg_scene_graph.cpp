@@ -170,22 +170,20 @@ void sgTraverseDrawDebug::Apply(sgNode* pNode) {
 }
 
 // ---------------------------------------------------------------------------
-// sgTypedIterator — stateful pre-order walker with a cmSimple type filter
+// sgTypedIterator — stateful pre-order walker with an sgNode type filter
 //
 // Prime and Advance are mutually recursive through the iterator state:
 //   Advance() moves m_pCurrent to the next pre-order node, then calls Prime()
 //   Prime()   checks the type filter; on miss it logs and calls Advance()
 //
-// Together they land m_pCurrent on the next cmSimple-compatible node or
+// Together they land m_pCurrent on the next sgNode-compatible node or
 // leave it nullptr when the walk is exhausted.
 // ---------------------------------------------------------------------------
 
-namespace {
+// Loaded type ID shared with sgNode::IsType; this is a word, not its address.
+extern uint32_t g_sgNode_typeId;  // @ 0x825C93D0
 
-// sgNode's type ID: the word at 0x825C93D0 (.data), which holds its own
-// address (`lis -32163; lwz -27696`). sgNode::IsType compares against the same
-// value through g_sgNode_typeId (globals.c), so it is kept, not nulled.
-void* const kCmSimpleFilterVtable = reinterpret_cast<void*>(uintptr_t{0x825C93D0u});
+namespace {
 
 // Assertion / trace format stub (4-byte `blr`-only stripped helper).
 // Declared here rather than pulled in from pong_player.cpp to keep the
@@ -193,96 +191,65 @@ void* const kCmSimpleFilterVtable = reinterpret_cast<void*>(uintptr_t{0x825C93D0
 extern "C" void nop_8240E6D0(const char* fmt, const char* arg);   // @ 0x8240E6D0
 
 // @ 0x82071DC8 (.rdata) — fmt passed to nop_8240E6D0
-const char kTypeMismatchFmt[] = "sgIter - Skipping non-sgNode '%s'";
+const char* const kTypeMismatchFmt = reinterpret_cast<const char*>(uintptr_t{0x82071DC8u});
 
 }  // namespace
 
-/**
- * sgTypedIterator::Prime
- * @ 0x823DA070 | size: 0x88
- *
- * If m_pCurrent is non-null, asks it IsType(cmSimple_vtable) (slot 20).
- *   - returns true → iterator sits on a matching node, nothing to do.
- *   - returns false → log the mismatch via the node's slot-19 getter +
- *                     the shared nop/log stub, then Advance() past it.
- *
- * No-op when m_pCurrent is already nullptr (walk already finished).
- */
+// @ 0x823DA0F8 | size: 0x40
+// Search above node for the first sibling, without crossing the walk root.
+sgNode* sgTypedIterator::FindAncestorSibling(sgNode* node) {
+    for (sgNode* parent = node->m_pParent;
+         parent != nullptr && parent != m_pRoot;
+         parent = parent->m_pParent) {
+        if (parent->m_pNextSibling != nullptr) {
+            return parent->m_pNextSibling;
+        }
+    }
+    return nullptr;
+}
+
+// @ 0x823DA070 | size: 0x88
+// Leave the cursor on an sgNode; log and advance past other XML node types.
 void sgTypedIterator::Prime() {
-    sgNode* pCurrent = m_pCurrent;
-    if (pCurrent == nullptr) {
+    sgNode* current = m_pCurrent;
+    if (current == nullptr) {
         return;
     }
-
-    // Slot 20 — sgNode::IsType(typeId). typeId is the cmSimple vtable
-    // address; the base sgNode implementation simply compares it against
-    // a static per-derived-class pointer (see sgNode_vfn_20).
-    typedef int (*IsTypeFn)(sgNode*, void*);
-    IsTypeFn isType = reinterpret_cast<IsTypeFn>(pCurrent->vtable[20]);
-    if (isType(pCurrent, kCmSimpleFilterVtable)) {
-        return;  // match: leave m_pCurrent where it is
+    using IsTypeFn = uint32_t (*)(sgNode*, uint32_t);
+    IsTypeFn isType = reinterpret_cast<IsTypeFn>(current->vtable[20]);
+    if ((isType(current, g_sgNode_typeId) & 0xFFu) != 0) {
+        return;
     }
-
-    // Mismatch path: fetch the node's slot-19 accessor (likely
-    // GetDebugName / GetTypeName) and hand its result, plus a fixed
-    // rodata fmt string, to the stripped logger stub.
-    typedef const char* (*SlotFn)(sgNode*);
-    SlotFn slot19 = reinterpret_cast<SlotFn>(m_pCurrent->vtable[19]);
-    const char* pInfo = slot19(m_pCurrent);
-    nop_8240E6D0(kTypeMismatchFmt, pInfo);
-
-    // Advance() will re-Prime(), so the loop continues until we land on
-    // a match or exhaust the walk.
+    // IsType is virtual and may change the cursor. Reload it before slot 19.
+    using NameFn = const char* (*)(sgNode*);
+    const char* name = reinterpret_cast<NameFn>(m_pCurrent->vtable[19])(m_pCurrent);
+    nop_8240E6D0(kTypeMismatchFmt, name);
     Advance();
 }
 
-/**
- * sgTypedIterator::Advance
- * @ 0x823D9FD0 | size: 0x9C
- *
- * Pre-order successor walk over the scene-graph tree rooted at m_pRoot.
- * Successor search order for the current node C:
- *   1. C->m_pFirstChild   (descend)
- *   2. if C is the root, terminate (m_pCurrent := nullptr)
- *   3. C->m_pNextSibling  (step right)
- *   4. C->m_pParent->m_pNextSibling  (one climb; further climbs would
- *      be done by the recursive Prime()/Advance() pair but the lifted
- *      scaffold only models the single-level uncle step)
- *
- * After updating m_pCurrent, re-Prime() so the filter is re-checked.
- */
+// @ 0x823D9FD0 | size: 0x9C
+// Pre-order successor followed by the type filter; root bounds ancestor climbs.
 void sgTypedIterator::Advance() {
-    sgNode* pCurrent = m_pCurrent;
-    sgNode* pNext    = nullptr;
-
-    if (pCurrent != nullptr) {
-        // Step 1: descend to first child if any.
-        sgNode* pChild = pCurrent->m_pFirstChild;
-        if (pChild != nullptr) {
-            pNext = pChild;
-        } else if (pCurrent == m_pRoot) {
-            // Step 2: root with no children — walk over.
-            pNext = nullptr;
-        } else {
-            // Step 3: try next sibling.
-            sgNode* pSibling = pCurrent->m_pNextSibling;
-            if (pSibling != nullptr) {
-                pNext = pSibling;
-            } else {
-                // Step 4: climb once, then try parent's sibling.
-                sgNode* pParent = pCurrent->m_pParent;
-                if (pParent != nullptr && pParent != m_pRoot &&
-                    pParent->m_pNextSibling == nullptr) {
-                    Prime();  // tail-recursive call into Prime (matches asm)
-                    return;
+    sgNode* current = m_pCurrent;
+    sgNode* next = nullptr;
+    if (current != nullptr) {
+        if (current->m_pFirstChild != nullptr) {
+            next = current->m_pFirstChild;
+        } else if (current != m_pRoot) {
+            next = current->m_pNextSibling;
+            if (next == nullptr) {
+                sgNode* parent = current->m_pParent;
+                if (parent != nullptr && parent != m_pRoot) {
+                    next = parent->m_pNextSibling;
+                    if (next == nullptr) {
+                        next = FindAncestorSibling(parent);
+                    }
                 }
-                pNext = (pParent != nullptr) ? pParent->m_pNextSibling : nullptr;
             }
         }
     }
-
-    m_pCurrent = pNext;
-    Prime();  // re-filter the new position
+    m_pCurrent = next;
+    Prime();
 }
 
 /**

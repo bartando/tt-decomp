@@ -1256,7 +1256,7 @@ extern "C" void util_24C8(void* pThis);       // 0x821624C8 — audControl teard
 
 // audControl destructor body lives under the symbol `util_1568` in the symbol
 // table (the static-recomp miscategorised it as a utility because it is
-// shared between audControl::~audControl and audControl::ScalarDtor).
+// used by audControl::~audControl).
 // It stores the base audControl vtable into +0x00, calls audControl::Stop,
 // decrements refcounts on the wrapped voice and owning group, and (when the
 // "stop-notify" flag at +0x18 is set) also fires util_24C8.
@@ -1535,7 +1535,7 @@ void audControl3d::SetMaxDistance(float /*unused*/) {
 // the list-surgery helpers at 0x8257_0D08 and 0x8257_13C8 which still need
 // to be lifted before the update path can be reconstructed cleanly.
 // Slot 0 (dtor) is now lifted below.  Slot 1 (ScalarDtor) for audControl3d
-// mirrors the base audControl::ScalarDtor state machine and is still TODO.
+// mirrors the base audControl::Service state machine and is still TODO.
 
 // ═════════════════════════════════════════════════════════════════════════════
 // audControlMgr — Lifecycle and Mass-Control Helpers
@@ -1641,33 +1641,13 @@ float audControlGroup::GetEffectiveVolume() {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// audControl — Scalar-Destructor State Machine (vfn_1)
+// audControl — Playback service (vfn_1)
 // ═════════════════════════════════════════════════════════════════════════════
 
-// @ 0x82161700 | size: 0x1C0
-// audControl::ScalarDtor (vfn_1) — NOT a classical scalar-deletion destructor
-// despite the vtable slot name.  It is the pre-teardown state machine that
-// brings the wrapped voice down cleanly before the main dtor runs:
-//
-//   • m_voice  (+0x04)   : pointer to an audVoice-ish wrapper
-//   • m_state  (+0x10)   : playback state (1 = playing, 2 = stopping,
-//                          3 = releasing, others ignored)
-//   • m_pGroup (+0x0C)   : owning audControlGroup (flags are read from +0x28)
-//   • m_flags  (+0x14)   : output mask assembled from the group's flag word
-//
-// Flow:
-//   state == 1 → switch to "stopping" (2) and fall through.
-//   state == 2 → IsPlaying(); if still active, bail early (next tick retries).
-//                otherwise clear state and invoke voice vfn_4 (Stop).
-//   state == 3 → IsPlaying(); if still active, bail.  otherwise clear state,
-//                invoke voice vfn_8 (StopAndRelease), and null m_voice.
-//
-// Post-state dispatch the method also rebuilds m_flags from the group's
-// enable word at m_pGroup+0x28:
-//     bit 2 → bit 0, bit 0 (masked by master-mute byte) → bit 0, bit 1 → bit 2,
-//     bit 3 → bit 3, bit 4 → bit 4, bit 5 → bit 5.
-// If the result is non-zero, vfn_7 (Update) is fired and m_flags cleared.
-void audControl::ScalarDtor(int /*flags*/) {
+// @ 0x82161700 | size: 0x1B4
+// Service one tick: state 1 becomes 2; states 2/3 poll completion and stop or
+// release. Merge group changes into pending flags, dispatch slot 7, then clear.
+void audControl::Service() {
     uint8_t* self = reinterpret_cast<uint8_t*>(this);
 
     void*  voice = *reinterpret_cast<void**>(self + 0x04);
@@ -1676,13 +1656,12 @@ void audControl::ScalarDtor(int /*flags*/) {
     if (voice != nullptr) {
         if (state == 1) {
             *reinterpret_cast<int32_t*>(self + 0x10) = 2;
-            state = 2;
         }
 
         if (state == 2) {
             void** voiceVtbl = *reinterpret_cast<void***>(voice);
-            using IsPlayingFn = uint8_t (*)(void*);
-            uint8_t playing = reinterpret_cast<IsPlayingFn>(voiceVtbl[18])(voice) & 0x1;
+            using IsPlayingFn = uint32_t (*)(void*);
+            uint32_t playing = reinterpret_cast<IsPlayingFn>(voiceVtbl[18])(voice) & 0xFFu;
             if (playing == 0) {
                 void** myVtbl = *reinterpret_cast<void***>(self);
                 using StopFn = void (*)(void*);
@@ -1690,8 +1669,8 @@ void audControl::ScalarDtor(int /*flags*/) {
             }
         } else if (state == 3) {
             void** voiceVtbl = *reinterpret_cast<void***>(voice);
-            using IsPlayingFn = uint8_t (*)(void*);
-            uint8_t playing = reinterpret_cast<IsPlayingFn>(voiceVtbl[18])(voice) & 0x1;
+            using IsPlayingFn = uint32_t (*)(void*);
+            uint32_t playing = reinterpret_cast<IsPlayingFn>(voiceVtbl[18])(voice) & 0xFFu;
             if (playing == 0) {
                 *reinterpret_cast<int32_t*>(self + 0x10) = 0;
 
@@ -1712,10 +1691,6 @@ void audControl::ScalarDtor(int /*flags*/) {
 
     uint8_t* group = *reinterpret_cast<uint8_t**>(self + 0x0C);
     uint32_t groupFlags = *reinterpret_cast<uint32_t*>(group + 0x28);
-    if (groupFlags == 0) {
-        return;
-    }
-
     uint32_t mFlags = *reinterpret_cast<uint32_t*>(self + 0x14);
     if (groupFlags & 0x4) {
         mFlags |= 0x1;
@@ -1742,8 +1717,8 @@ void audControl::ScalarDtor(int /*flags*/) {
     }
 
     void** myVtbl = *reinterpret_cast<void***>(self);
-    using UpdateFn = void (*)(void*);
-    reinterpret_cast<UpdateFn>(myVtbl[7])(this);
+    using UpdateFn = void (*)(void*, uint32_t);
+    reinterpret_cast<UpdateFn>(myVtbl[7])(this, mFlags);
     *reinterpret_cast<uint32_t*>(self + 0x14) = 0;
 }
 
@@ -1753,19 +1728,11 @@ void audControl::ScalarDtor(int /*flags*/) {
 // ═════════════════════════════════════════════════════════════════════════════
 
 // @ 0x82161518 | size: 0x50
-// audControl::~audControl (vfn_0) — dispatches the shared destructor body,
-// then — when the scalar-delete flag (bit 0 of the deletion param) is set —
-// frees the object through the RAGE allocator.  The body lives under the
-// util_1568 symbol because ScalarDtor (vfn_1) reuses it as the teardown
-// epilogue when the state-machine finishes its stop/release sequence.
+// audControl::~audControl (vfn_0) — dispatches the shared destructor body.
+// The scalar-deleting entry at the same address frees when its flag is set.
 audControl::~audControl() {
     audControl_DestructorBody(this);
 }
-
-// Note: scalar-deleting variant (`operator delete`-style) is dispatched via
-// vtable slot 1 (ScalarDtor) which is already lifted further up in this
-// file — it runs the state machine, then when called from delete-expression
-// context rage_free'd the object through the same `util_1568` epilogue.
 
 // ═════════════════════════════════════════════════════════════════════════════
 // audControlGroup — Update + Parameter-Loading

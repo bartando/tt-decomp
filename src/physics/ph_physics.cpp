@@ -8,6 +8,7 @@
  */
 
 #include "ph_physics.hpp"
+#include "rage/math.hpp"
 
 extern "C" void* rage_alloc(uint32_t size);  // RAGE heap alloc (defined in heap.c)
 
@@ -859,13 +860,6 @@ float ph_GetCapsuleRadius(void* capsule) {
 extern double crt_cos(double angle); // @ 0x824302B0
 extern double crt_sin(double angle); // @ 0x824301D8
 
-// One double angle; the outputs are rounded to float independently.
-// ph_SinCos @ 0x820D04F0 | size: 0x60
-void ph_SinCos(float* outCosine, float* outSine, double angle) {
-    *outCosine = static_cast<float>(crt_cos(angle));
-    *outSine = static_cast<float>(crt_sin(angle));
-}
-
 // Build a padded 3x3 X rotation from one double-precision angle.
 // ph_BuildRotationMatrixX (was phBoundCapsule_3F10_g) @ 0x820C3F10 | size: 0x84
 // The three padding words and any translation row remain untouched.
@@ -1126,27 +1120,6 @@ void rage::phBoundCapsule::ScaleRadius(float scale) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// rage::phBoundCapsule::ComputeBounds @ 0x820D04F0 | size: 0x60
-//
-// Computes the bounding box extents for the capsule by calling two helper
-// functions and storing their results.
-//
-// Parameters:
-//   scale - Scale factor for bound computation
-//   outMin - Pointer to store minimum bound
-//   outMax - Pointer to store maximum bound
-// ─────────────────────────────────────────────────────────────────────────────
-void rage::phBoundCapsule::ComputeBounds(float scale, float* outMin, float* outMax) {
-    // Compute minimum bound
-    float minBound = ph_Cosf(scale);
-    *outMin = minBound;
-    
-    // Compute maximum bound using the scale
-    float maxBound = ph_Sinf(scale);
-    *outMax = maxBound;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // rage::phBoundCapsule::ComputeExtent @ 0x820D0550 | size: 0x50
 //
 // Computes a single extent value based on two input parameters.
@@ -1210,59 +1183,6 @@ void rage::phBoundCapsule::InitializeAxisAlignedZ(float halfLength, float* outMa
     outMatrix[8] = zero;
     outMatrix[9] = zero;
     outMatrix[10] = one;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// rage::phBoundCapsule::TransformByDirection @ 0x820C40A8 | size: 0x13C
-//
-// Transforms the capsule's orientation matrix based on a direction vector.
-// Performs a complex 3x3 matrix transformation using the input direction.
-//
-// Parameters:
-//   halfLength - Half the length of the capsule
-//   direction - Pointer to 3-component direction vector
-//   outMatrix - Pointer to 44-byte output structure (3x3 matrix + padding)
-// ─────────────────────────────────────────────────────────────────────────────
-void rage::phBoundCapsule::TransformByDirection(float halfLength, const float* direction, float* outMatrix) {
-    // Compute capsule parameters
-    float minBound = ph_Cosf(halfLength);
-    float maxBound = ph_Sinf(halfLength);
-    
-    // Load direction components
-    float dirX = direction[0];
-    float dirY = direction[1];
-    float dirZ = direction[2];
-    
-    const float one = g_floatOne;
-    float scale = one - minBound;
-    
-    // Compute diagonal elements (scaled by direction squared)
-    float diagX = dirX * dirX * scale + minBound;
-    float diagY = dirY * dirY * scale + minBound;
-    float diagZ = dirZ * dirZ * scale + minBound;
-    
-    outMatrix[0] = diagX;   // +0
-    outMatrix[5] = diagY;   // +20
-    outMatrix[10] = diagZ;  // +40
-    
-    // Compute off-diagonal elements (cross products with maxBound)
-    float xyTerm = dirX * scale * dirY;
-    float xzScaled = maxBound * dirZ;
-    
-    outMatrix[1] = xyTerm + xzScaled;   // +4
-    outMatrix[4] = xyTerm - xzScaled;   // +16
-    
-    float xzTerm = dirX * scale * dirZ;
-    float xyScaled = maxBound * dirY;
-    
-    outMatrix[2] = xzTerm - xyScaled;   // +8
-    outMatrix[8] = xzTerm + xyScaled;   // +32
-    
-    float yzTerm = scale * dirZ * dirY;
-    float yxScaled = maxBound * dirX;
-    
-    outMatrix[6] = yzTerm + yxScaled;   // +24
-    outMatrix[9] = yzTerm - yxScaled;   // +36
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -6284,44 +6204,6 @@ float rage::phBoundCapsule::SumFloatArray(int count) const {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 5. rage::phBoundCapsule::RotateVectors @ 0x820D05A0 | size: 0xB4 (180B)
-//
-// Applies a 2D rotation to the two 4-component vectors stored at offsets
-// +16 and +32 in the object. Uses ComputeBounds to get sin/cos values,
-// then performs:
-//   vec_at_32 = vec_at_32 * cos - vec_at_16 * sin  (new vec_at_32)
-//   vec_at_16 = vec_at_16 * cos + vec_at_32_orig * sin  (new vec_at_16)
-//
-// This is a standard 2D rotation matrix applied componentwise to two
-// 4-element vectors representing the capsule's local axes.
-// ─────────────────────────────────────────────────────────────────────────────
-void rage::phBoundCapsule::RotateVectors() {
-    float sinVal, cosVal;
-    this->ComputeBounds(0.0f, &sinVal, &cosVal);
-
-    // Load vectors
-    float* vec16 = (float*)((char*)this + 16);   // +0x10
-    float* vec32 = (float*)((char*)this + 32);   // +0x20
-
-    // Splat sin and cos across all 4 components
-    // new_vec32 = vec32 * cos - vec16 * sin  (vnmsubfp: -(a*b - c) = c - a*b)
-    // new_vec16 = vec16 * cos + vec32_orig * sin  (vmaddfp: a*b + c)
-
-    float orig_vec32[4], orig_vec16[4];
-    for (int i = 0; i < 4; i++) {
-        orig_vec32[i] = vec32[i];
-        orig_vec16[i] = vec16[i];
-    }
-
-    for (int i = 0; i < 4; i++) {
-        vec32[i] = orig_vec32[i] * sinVal - orig_vec16[i] * cosVal;
-    }
-    for (int i = 0; i < 4; i++) {
-        vec16[i] = orig_vec16[i] * sinVal + orig_vec32[i] * cosVal;
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // 7. rage::phBoundCapsule::NormalizeVector2D @ 0x82199048 | size: 0xB8 (184B)
 //
 // Normalizes a 2D vector (x, y stored at +0 and +4 of this object).
@@ -8522,7 +8404,6 @@ void rage::phArticulatedCollider::AccumulateTorqueAtRootJoint(const float* force
 extern void ph_1B78_3(void* outVec, float halfLength, float radius);
 extern void util_DA50(void* dst, const void* src);  // phBound::CopyFrom base
 extern void* g_display_obj_ptr;
-extern void phBoundCapsule_SetCapsuleExtents(void* thisPtr, const float* midpoint, const float* axisA, const float* axisB);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // phBoundCapsule::GetPolygonCount (vfn_12) @ 0x8256FBD0 | size: 0x08
@@ -8638,37 +8519,6 @@ float rage::phBoundCapsule::GetBoundingDistance(const float* direction, uint8_t 
               + centroid[2] * direction[2];
 
     return dot + distance;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// phBoundCapsule::ValidateAndSetExtents @ 0x82143F08 | size: 0x84
-//
-// Validates that a rotation vector is non-zero before applying capsule
-// extents. If the rotation column (row 1) is all-zero, returns immediately.
-// Otherwise computes the midpoint (row0 + row2) and dispatches to
-// phBoundCapsule_SetCapsuleExtents for full capsule setup.
-// ─────────────────────────────────────────────────────────────────────────────
-void rage::phBoundCapsule::ValidateAndSetExtents(const float* matrix) {
-    const float* rotation = matrix + 4;
-
-    uint32_t absX = *(uint32_t*)(rotation + 0) & 0x7FFFFFFF;
-    uint32_t absY = *(uint32_t*)(rotation + 1) & 0x7FFFFFFF;
-    uint32_t absZ = *(uint32_t*)(rotation + 2) & 0x7FFFFFFF;
-    uint32_t absW = *(uint32_t*)(rotation + 3) & 0x7FFFFFFF;
-
-    bool allZero = (absX == 0 && absY == 0 && absZ == 0 && absW == 0);
-    if (allZero)
-        return;
-
-    const float* row0 = matrix;
-    const float* row2 = matrix + 8;
-    float midpoint[4];
-    midpoint[0] = row0[0] + row2[0];
-    midpoint[1] = row0[1] + row2[1];
-    midpoint[2] = row0[2] + row2[2];
-    midpoint[3] = row0[3] + row2[3];
-
-    phBoundCapsule_SetCapsuleExtents(this, midpoint, rotation, row2);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -9090,7 +8940,7 @@ static float phDotVmx(const float* a, const float* b, unsigned count) {
 // phMatrix_RotateZ (was phBoundCapsule_5D88_g) @ 0x82175D88 | size: 0xB0
 void phMatrix_RotateZ(float* matrix, double angle) {
     float cosine, sine;
-    ph_SinCos(&cosine, &sine, angle);
+    rage::cosSin(&cosine, &sine, angle);
     float x[4], y[4];
     memcpy(x, matrix, sizeof(x));
     memcpy(y, matrix + 4, sizeof(y));
@@ -9313,7 +9163,7 @@ float phBoundCapsule_26B8(float height, float radius) {
     return result;
 }
 
-// (3F08 already lifted above as ValidateAndSetExtents)
+// (3F08 lifted as rage::expandAabbByOffsetBox in rage/math/polygon_clip.cpp)
 
 // (8608 is rage::clipAabbToActiveCamera; CF48/DB10 are LookupTableValues/SetupCapsuleFromState above)
 

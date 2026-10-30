@@ -58,7 +58,7 @@ struct audControl {
 
     // ── virtual methods ──
     virtual ~audControl();                  // [0] @ 0x82161518
-    virtual void ScalarDtor(int flags); // [1] @ 0x82161700
+    virtual void Service();     // [1] @ 0x82161700 — playback transitions and dirty updates
     virtual void Stop();       // [4] @ 0x82161ca8 — clears wrapped voice and resets state
     virtual void Update(uint32_t flags);  // [7] @ 0x82161e28 — processes volume/position/pan updates
     virtual float GetVolume();  // [11] @ 0x82160768 — returns volume at +32

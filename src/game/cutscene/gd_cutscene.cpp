@@ -447,7 +447,8 @@ void gdCSCharAnimNames::FindRandAnimData(uint32_t randomSeed, uint32_t selection
     //           (multiply by 0x5DEECE66D-style constants at loc_82349BA8
     //           in sibling code) that needs its own math-helper lift;
     //         * the final selection loop (>0x8240D6E8) calls back through
-    //           pg_9C00_g + snprintf format "%s_%d" and dispatches slot 4
+    //           pongMatch_GetCharacterForSlot + snprintf format "%s_%d"
+    //           and dispatches slot 4
     //           of an unnamed roster class we haven't mapped yet.
     //       The three high-level steps documented above remain the current
     //       best-effort summary. Full lift deferred until the random-table

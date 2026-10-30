@@ -28,6 +28,8 @@ namespace rage {
 
 // These names describe the actual helpers, rather than their capsule/animation auto-names.
 extern bool mat44InverseAffineInPlace(float* matrix); // @ 0x820D7B30
+extern void mergeAabbCenterSize(float (*destination)[4], const float* center,
+                               const float* fullSize); // @ 0x82143F90
 // LTCG leaves the output in r8, with unused integer slots r4..r7.
 extern void buildClipFrustumPlanes(void* context, uint32_t, uint32_t, uint32_t, uint32_t,
                                    float (*planes)[4], float nearClip, float farClip,
@@ -69,6 +71,28 @@ void transformClipPoint(float* point, const float (*matrix)[4]) {
 }
 
 } // namespace
+
+// Formerly phBoundCapsule_3F08_g / phBoundCapsule::ValidateAndSetExtents.
+// Inferred identity: callers accumulate three projected scene boxes (0x821490A0)
+// or six 48-byte boxes (0x821459C4). The callee unions center/full-size AABBs.
+// @ 0x82143F08 | size: 0x84
+void expandAabbByOffsetBox(float (*destination)[4], const float (*box)[4]) {
+    bool empty = true;
+    for (unsigned lane = 0; lane < 4; ++lane) {
+        uint32_t bits;
+        __builtin_memcpy(&bits, &box[1][lane], sizeof(bits));
+        bits &= lbl_82619BE0[lane];
+        float size;
+        __builtin_memcpy(&size, &bits, sizeof(size));
+        empty &= flushClipVmx(size) == 0.0f;
+    }
+    if (empty) return;
+
+    alignas(16) float center[4];
+    for (unsigned lane = 0; lane < 4; ++lane)
+        center[lane] = flushClipVmx(flushClipVmx(box[0][lane]) + flushClipVmx(box[2][lane]));
+    mergeAabbCenterSize(destination, center, box[1]);
+}
 
 // Eight corners of an AABB, in the order consumed by g_boxFaceIndices.
 // Formerly phBoundCapsule_7EF8_g; r3=out, r4=center, r5=full size.

@@ -53,6 +53,11 @@ def _defines(text, marker):
             return code_before.endswith(("{", "}"))
         if line[:len(line) - len(line.lstrip())]:
             return False  # an indented comment sits inside a body
+        prev_start = text.rfind("\n", 0, max(line_start - 1, 0)) + 1
+        next_end = text.find("\n", text.find("\n", marker.end()) + 1)
+        neighbours = (text[prev_start:line_start], text[text.find("\n", marker.end()) + 1:next_end])
+        if any(n.lstrip().startswith("//") and MARKER.search(n) for n in neighbours):
+            return False  # one line of a commented address list
         rest = text[text.find("\n", marker.end()) + 1:]
     rest = re.sub(r"/\*.*?\*/|//[^\n]*", "", rest[:1500], flags=re.S)
     code = rest.lstrip("\n")
