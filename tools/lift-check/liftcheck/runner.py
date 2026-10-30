@@ -339,6 +339,11 @@ class Checker:
                 regs["gpr64"][n_] = int(v) & ((1 << 64) - 1)
             elif reg.startswith("f"):
                 regs["fpr"][int(reg[1:])] = float(v)
+            elif reg.startswith("v"):
+                n_ = int(reg[1:])
+                if not 0 <= n_ < 128 or len(v) != 4:
+                    raise SystemExit(f"spec: {reg} needs four float lanes and a register number from 0 to 127")
+                vregs[n_] = [struct.unpack(">I", struct.pack(">f", lane))[0] for lane in v]
             else:
                 raise SystemExit(f"spec: unknown register {reg}")
         t.stack_fill = rng.randbytes(0x9000)
