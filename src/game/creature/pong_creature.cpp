@@ -2910,16 +2910,16 @@ void LocomotionStateAnim_6380_g(void* self, void* animList) {
 }
 
 /**
- * BinarySearchAnimKey @ 0x8224A390 | size: 0xA8
+ * LocomotionStateAnim_FindChannelByKey @ 0x8224A390 | size: 0xA8
  *
- * Binary search through a sorted animation key array to find an
+ * Binary search through a sorted channel key array to find an
  * entry matching a 24-bit key. The key is constructed from
  * (animID_high << 16) | animID_low. On match, writes the found
  * index to *outIndex and returns the entry pointer. On miss,
  * writes the insertion point to *outIndex and returns nullptr.
  */
-// LocomotionStateAnim_A390_v12 @ 0x8224A390
-void* LocomotionStateAnim_A390_v12(void* self, uint8_t animID_high, uint16_t animID_low, int32_t* outIndex) {
+// LocomotionStateAnim_FindChannelByKey @ 0x8224A390
+void* LocomotionStateAnim_FindChannelByKey(void* self, uint8_t animID_high, uint16_t animID_low, int32_t* outIndex) {
     LocomotionStateAnim* lsa = (LocomotionStateAnim*)self;
     uint16_t count = *(uint16_t*)&lsa->field_0x0028;
 
@@ -3137,44 +3137,34 @@ bool LocomotionStateAnim_8250_fw(void* self, uint8_t mode, uint16_t animID, void
 }
 
 /**
- * LookupAndPlayAnim @ 0x82248828 | size: 0xB4
+ * LocomotionStateAnim_EvaluateChannel @ 0x82248828 | size: 0xB4
  *
- * Looks up an animation by computing a fractional index from the
- * animation count and a time parameter, runs a binary search to
- * find the matching key, and either starts the animation via
- * vtable slot 4 (on hit) or calls vtable slot 13 (on miss).
+ * Look up the destination DOF's type/id in the animation's channel table.
+ * On a hit, evaluate it at time * (sampleCount - 1) / duration; otherwise reset
+ * the destination. Keep the unused r4 slot so the destination stays in r5.
  */
-// LocomotionStateAnim_8828_g @ 0x82248828
-bool LocomotionStateAnim_8828_g(void* self, float time) {
-    LocomotionStateAnim* lsa = (LocomotionStateAnim*)self;
-    uint16_t rawCount = lsa->field_0x000a;
-    float duration = *(float*)&lsa->field_0x000c;
+bool LocomotionStateAnim_EvaluateChannel(void* self, void* /*unusedR4*/, void* destination, float time) {
+    LocomotionStateAnim* lsa = static_cast<LocomotionStateAnim*>(self);
+    const uint8_t* channel = static_cast<const uint8_t*>(destination);
+    const uint8_t type = channel[5];
+    const uint16_t id = *reinterpret_cast<const uint16_t*>(channel + 6);
+    const float duration = *reinterpret_cast<const float*>(&lsa->field_0x000c);
+    const float sampleRate = static_cast<float>(static_cast<int>(lsa->field_0x000a) - 1) / duration;
+    const float sampleTime = sampleRate * time;
 
-    // Compute scaled time: ((count-1) / duration) * time
-    float countMinusOne = (float)((int)rawCount - 1);
-    float scaledTime = (countMinusOne / duration) * time;
-
-    // Read the key bytes from self for the search
-    uint8_t animID_high = lsa->field_0x0005;
-    uint16_t animID_low = lsa->field_0x0006;
-
-    // Binary search for the key
-    int32_t foundIndex;
-    void* result = LocomotionStateAnim_A390_v12(self, animID_high, animID_low, &foundIndex);
-
-    if (result != nullptr) {
-        // Found: call vtable slot 4 on result
-        void** keyArray = (void**)lsa->field_0x0024;
-        void* animEntry = keyArray[foundIndex];
-        VCALL(result, 4, void(*)(void*, void*, void*))(result, animEntry, self);
-
+    int32_t index;
+    void* found = LocomotionStateAnim_FindChannelByKey(self, type, id, &index);
+    if (found) {
+        void** channels = reinterpret_cast<void**>(lsa->field_0x0024);
+        // The source is in r5 and time in f1; r4 is an unused FP argument slot.
+        using Evaluate = void (*)(void*, void*, void*, float);
+        VCALL(destination, 4, Evaluate)(destination, nullptr, channels[index], sampleTime);
         return true;
-    } else {
-        // Not found: call vtable slot 13
-        VCALL(result, 13, void(*)(void*))(result);
-
-        return false;
     }
+
+    using Reset = void (*)(void*);
+    VCALL(destination, 13, Reset)(destination);
+    return false;
 }
 
 
