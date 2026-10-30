@@ -14,8 +14,11 @@
 #include <cstdlib>  // For strtol
 #include <cmath>    // For fused multiply-add
 
+void swfSetClipEvents(void* instance, uint32_t events, uint32_t records, int32_t count);  // @ 0x823FD320
+
 // External functions
 extern "C" {
+    extern const char lbl_82074EE4[];  // @ 0x82074EE4
     extern const char lbl_82074EF0[];  // @ 0x82074EF0
     void swfCMD_PlaceObject2ClipEvent_D3E8(void* instance, int event, const char* name);  // @ 0x823FD3E8
     void rage_free(void* ptr);                  // @ 0x820C00C0 — canonical heap free (see src/crt/heap.c)
@@ -895,6 +898,34 @@ void swfCMD_PlaceObject2::Execute(swfINSTANCE* parent) {
         std::memcpy(&value, color, sizeof(value));
         std::memcpy(child + 0x38, &value, sizeof(value));
     }
+}
+
+// @ 0x824083D8
+void swfCMD_PlaceObject2ClipEvent::Execute(swfINSTANCE* parent) {
+    auto* command = reinterpret_cast<uint8_t*>(this);
+    reinterpret_cast<swfCMD_PlaceObject2*>(this)->Execute(parent);
+
+    const uint16_t depth = *reinterpret_cast<uint16_t*>(command + 0x10);
+    auto* child = *reinterpret_cast<uint8_t**>(reinterpret_cast<uint8_t*>(parent) + 0xB4);
+    while (child && *reinterpret_cast<uint16_t*>(child + 0xA6) < depth) {
+        child = *reinterpret_cast<uint8_t**>(child + 0xB8);
+    }
+    if (!child || *reinterpret_cast<uint16_t*>(child + 0xA6) != depth) return;
+
+    if (*reinterpret_cast<uint16_t*>(command + 0x14) != 0xFFFF &&
+        *reinterpret_cast<void**>(command + 0x2C)) {
+        struct Value { void* data; uint32_t type; };
+        Value name = {*reinterpret_cast<void**>(command + 0x2C), 1};
+        Value value = {child, 5};
+        auto** vtable = *reinterpret_cast<void***>(parent);
+        using SetMember = void (*)(swfINSTANCE*, const Value*, const Value*);
+        reinterpret_cast<SetMember>(vtable[11])(parent, &name, &value);
+        *reinterpret_cast<void**>(child + 0xBC) = *reinterpret_cast<void**>(command + 0x2C);
+    }
+    swfSetClipEvents(child, *reinterpret_cast<uint32_t*>(command + 0x20),
+                     *reinterpret_cast<uint32_t*>(command + 0x28),
+                     *reinterpret_cast<int32_t*>(command + 0x24));
+    swfCMD_PlaceObject2ClipEvent_D3E8(child, 1, lbl_82074EE4);
 }
 
 /**
