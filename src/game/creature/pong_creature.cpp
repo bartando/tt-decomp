@@ -2824,8 +2824,8 @@ bool LocomotionStateAnim_81A8(void* self, uint8_t type, uint16_t animID, void** 
         return false;
     }
 
-    // Read weight from weight array: animPair[1] + 16 is the array base
-    float* weightArrayBase = (float*)((char*)animPair[1] + 16);
+    // The weight object holds an array pointer at +0x10, not inline floats.
+    float* weightArrayBase = *(float**)((char*)animPair[1] + 16);
     uint32_t arrayOffset = (uint32_t)index << 2;  // rotlwi r8,r9,2
     float weight = *(float*)((char*)weightArrayBase + arrayOffset);
 
