@@ -3,8 +3,18 @@
 Compare xyz writes, untouched memory, calls, and preserved registers against the
 original instructions. No callees are stubbed. Mask ONLY referenced particles' w
 words: the original initializes xyz at entry SP-0x160 but reads the uninitialized
-fourth scratch word at SP-0x154 into its w arithmetic. This unused padding lane
-has no portable value; the lift keeps the input w without changing its ABI.
+fourth scratch word at SP-0x154 into its w arithmetic. That lane has no defined
+value from the entry arguments; the lift keeps input w without changing its ABI.
+
+Downstream trace: the two callers (0x82341600/0x82341A50) use lane-wise Verlet
+updates; repeated constraint passes (0x82340DB8) and the collision paths use dot3.
+The mode-1 transform at 0x82337008 masks position.w and supplies homogeneous 1
+before dot4. Bounds at 0x823405A8 use dot3 for radius; their center.w can retain
+padding. No CPU xyz dependence on particle.w was found in these paths.
+This is NOT proof that all later consumers discard w: upload at 0x823D8910
+passes a full particle to 0x821569C0, which memcpy's the runtime positionSize
+(vertexBuffer+0x5C). Cloth asset formats and shader treatment of a copied fourth
+lane remain unverified. The mask establishes solver xyz equivalence only.
 
 Cover signed empty counts, padding to eight, multiple batches, batch snapshots,
 duplicate/self endpoints and last-store order, full uint16 indices, position-base
