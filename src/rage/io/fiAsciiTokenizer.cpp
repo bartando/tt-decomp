@@ -9,14 +9,6 @@
  * 126 fiAsciiTokenizer_* symbols exist in the binary. Individual decomps
  * will replace the weak bodies below as each one is lifted.
  *
- * Already address-backed in the project:
- *   fiAsciiTokenizer_2628_g @ 0x82432628 — floating-point token emitter
- *     (Printf-style "%g"-equivalent that classifies the value: NaN, inf,
- *     whole-number, small, or general, dispatching to one of several
- *     formatters). The 0x24C-byte body lives in stubs.cpp; the thin
- *     passthrough is kept here until the full FP-classification state
- *     machine is lifted.
- *
  * This file intentionally keeps the surface minimal and self-contained.
  */
 
@@ -64,16 +56,6 @@ uint8_t fiAsciiTokenizer_ReadBool(void* tokenizer, void* dst, void* key) {
 // 0x82430460 frees its buffer through it. Bridged to the host heap.
 void fiAsciiTokenizer_Destroy(void* tokenizer) {
     free(tokenizer);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// fiAsciiTokenizer_2628_g @ 0x82432628 — float formatter entry.
-// Left as a weak body matching the prior stubs.cpp definition until the
-// 0x24C-byte body is decompiled.
-// ─────────────────────────────────────────────────────────────────────────────
-float fiAsciiTokenizer_2628_g(float a) {
-    (void)a;
-    return 0.0f;
 }
 
 } // extern "C"
@@ -498,12 +480,6 @@ bool fiAsciiTokenizer::CloseAndFlush(const char* closingStr) {
 } // namespace rage
 
 // Note: slot 36 is WriteStringWithPadding @ 0x822E6998 (see CloseAndFlush).
-// Note: fiAsciiTokenizer_2628_g @ 0x82432628 (0x24C bytes) is the FP
-//   formatter state machine — classifies NaN/inf/whole/small/general and
-//   dispatches to the matching %g-variant. Migration from stubs.cpp is
-//   deferred until a dedicated session.
-
-
 // ═════════════════════════════════════════════════════════════════════════════
 // Batch lift: 10 functions from rage::fiAsciiTokenizer
 // vtable slots 14–17, 26, 30 + allocator helpers D588, 76D8, 8598, CC50

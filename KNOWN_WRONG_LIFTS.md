@@ -221,8 +221,7 @@ unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, a
 - Symbol-map misnames around the ball: `phBoundCapsule_32D0_g`/`30E0_w` are the ball's flight
   acceleration and bounce (`ball_flight.cpp`); `phBoundCapsule_8368_g` (0x82288368) is the
   predictor's step; `pongBallInstance_1FA0`/`2B08`/`2E18` are phSimulator collision broadphase;
-  `pongBallInstance_4E10`/`51B8`/`5400` sit inside RAGE's contact solver;
-  `fiAsciiTokenizer_2628_g` (0x82432628) is CRT math, probably `tan`.
+  `pongBallInstance_4E10`/`51B8`/`5400` sit inside RAGE's contact solver.
 - `pong_ball.cpp` `ProcessCollisionAndActivate` (0x8227FA48) is fabricated: the real function
   classifies the impact (0x82280070), posts messages and plays audio, and never touches
   velocity. The `pongBallInstance` fields at +0x42A0 and up are reads of the impact object.
