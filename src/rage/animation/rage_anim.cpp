@@ -12,6 +12,7 @@
 #include <cmath>
 #include <cmath>
 
+extern void crAnimDof_BlendQuaternion(void* outQuat, void* context, float* value); // @ 0x820C44A0
 extern double crt_sqrt(double value); // @ 0x824301D0
 extern "C" void sysMemAllocator_InitMainThread(); // @ 0x820C0038
 extern "C" void* xe_Alloc_EC88(uint32_t size); // @ 0x820DEC88
@@ -957,11 +958,11 @@ void* crAnimDofQuaternion::GetValue() {
 // ─────────────────────────────────────────────────────────────────────────────
 // crAnimDofQuaternion::Evaluate()  [vtable slot 4 @ 0x820C4BF0]
 //
-// Evaluates animation channels and stores the result quaternion.
-// Delegates to EvaluateChannels helper.
+// Forwards output, context and the quaternion at +16 to the blend helper.
 // ─────────────────────────────────────────────────────────────────────────────
-void crAnimDofQuaternion::Evaluate(void* animContext, float time, float* outQuat) {
-    EvaluateChannels(animContext, time, outQuat);
+void crAnimDofQuaternion::Evaluate(void* animContext, float /*time*/, float* outQuat) {
+    crAnimDof_BlendQuaternion(outQuat, animContext,
+        reinterpret_cast<float*>(reinterpret_cast<char*>(this) + 16));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1084,11 +1085,13 @@ void crAnimDofQuaternion::Normalize() {
 // Copies a quaternion from an external source into this DOF's storage.
 // ─────────────────────────────────────────────────────────────────────────────
 void crAnimDofQuaternion::SetValue(const float* sourceQuat) {
-    float* quat = reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(this) + 16);
-    quat[0] = sourceQuat[0];
-    quat[1] = sourceQuat[1];
-    quat[2] = sourceQuat[2];
-    quat[3] = sourceQuat[3];
+    char* quat = reinterpret_cast<char*>(this) + 16;
+    const char* source = reinterpret_cast<const char*>(sourceQuat);
+    uint64_t pair;
+    __builtin_memcpy(&pair, source, 8);
+    __builtin_memcpy(quat, &pair, 8);
+    __builtin_memcpy(&pair, source + 8, 8);
+    __builtin_memcpy(quat + 8, &pair, 8);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

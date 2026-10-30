@@ -32,36 +32,7 @@ extern void* rage_alloc(uint32_t size);                /* @ 0x820DEC88 */
 
 /* Global allocator context — the value at SDA[r13+0].
  * Dereferencing offset +4 from this yields the active sysMemAllocator*. */
-extern rageAllocator* g_pAllocator;                 /* @ SDA:0x82600000 + 4 */
-
-
-/* ============================================================================
- * rage_free @ 0x820C00C0 | size: 0x60
- *
- * The canonical RAGE heap free function.
- *
- * Guards:
- *  1. NULL check — silently ignores NULL pointers.
- *  2. atSingleton ownership check — if the pointer belongs to a registered
- *     singleton, the free is silently skipped (prevents cross-heap corruption).
- *  3. Dispatches to the global allocator's virtual Free method (vtable slot 2).
- *
- * C++ code should use rage::Free(ptr) from rage/memory.h.
- * ============================================================================
- */
-void rage_free(void* ptr)
-{
-    if (!ptr)
-        return;
-
-    /* If the singleton registry claims this pointer, don't free it */
-    uint8_t singletonStatus = rage_FindSingleton(ptr);
-    if (singletonStatus != 0)
-        return;
-
-    /* Dispatch to the global allocator's Free method (vtable slot 2) */
-    g_pAllocator->vtable->Free(g_pAllocator, ptr);
-}
+extern rageAllocator* g_pAllocator;
 
 
 /* ============================================================================
@@ -132,7 +103,7 @@ void sysMemAllocator_Free(void* ptr)
 
     if (!isOwned) {
         /* Not owned by allocator — check singleton registry */
-        uint8_t singletonStatus = rage_FindSingleton(ptr);
+        uint8_t singletonStatus = (uint8_t)rage_FindSingleton(ptr);
         if (singletonStatus != 0)
             return;
 

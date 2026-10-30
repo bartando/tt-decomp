@@ -11,7 +11,6 @@
  *   __cinit_impl        @ 0x82433D00 | size: 0x84
  *   _crt_spinlock_acquire @ 0x82433F58 | size: 0x60
  *   _crt_spinlock_release (paired with acquire)
- *   _crt_tls_fiber_setup @ 0x82566B78 | size: 0x0C
  *   _crt_tls_callback
  *   _crt_fiber_destroy
  *   _tls_dtor_cleanup
@@ -100,18 +99,6 @@ void _crt_spinlock_release(int id) {
 
 static pthread_key_t g_crt_fiber_key;
 static int g_crt_fiber_key_created = 0;
-
-/**
- * _crt_tls_fiber_setup @ 0x82566B78 | size: 0x0C
- *
- * On Xbox 360, reads the TLS fiber value from the thread's XeTlsBlock.
- * On the host, returns the current thread's CRT fiber context pointer.
- * Returns NULL if no fiber context has been set up for this thread.
- */
-void _crt_tls_fiber_setup(void) {
-    /* On the host, this is a no-op. The fiber context is managed
-     * through _cinit_setup's TLS slot allocation. */
-}
 
 /**
  * _crt_tls_callback

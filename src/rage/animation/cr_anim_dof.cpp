@@ -11,7 +11,6 @@
  *     - GetDefaultVector3 (lazy-init default vec3)
  *     - GetIdentityVector (lazy-init identity vec3)
  *   crAnimDofQuaternion:
- *     - Evaluate (quaternion blend entry point)
  *     - SetDofFlags, SetBlendWeight (simple accessors)
  *     - GetChannelFlags, GetConstraintIndexA/B (null-checked getters)
  *     - SetChannelType, SetCallback (null-checked setters)
@@ -162,22 +161,6 @@ float* crAnimDof_GetIdentityVector()
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ─── Evaluation ──────────────────────────────────────────────────────────────
-
-/**
- * crAnimDofQuaternion::Evaluate  [vtable slot 4]
- * @ 0x820C4BF0 | size: 0x10
- *
- * Evaluates the quaternion DOF by tail-calling the quaternion blend helper.
- * Rearranges arguments: output buffer first, then animation context, then
- * the internal quaternion data at object offset +16.
- */
-void crAnimDofQuaternion_Evaluate(crAnimDofQuaternion* self,
-                                   void* animContext, float* outQuat)
-{
-    crAnimDof_BlendQuaternion(outQuat, animContext,
-                              reinterpret_cast<float*>(
-                                  reinterpret_cast<char*>(self) + 16));
-}
 
 /**
  * crAnimDofQuaternion::EvaluateWrapper
