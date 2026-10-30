@@ -48,7 +48,16 @@ struct grcViewport {
     CamMatrix44 m_cameraMtx44;      // +0x180 - camera matrix with w forced to (0, 0, 0, 1)
     CamMatrix44 m_viewMtx;          // +0x1C0 - inverse of the camera matrix, w forced to (0, 0, 0, 1)
     CamMatrix44 m_viewMtxFlipZ;     // +0x200 - m_viewMtx with its z column negated
-    uint8_t     _pad_0x240[0xF8];   // +0x240..+0x337
+    uint8_t     _pad_0x240[0x80];   // +0x240..+0x2BF
+    CamMatrix44 m_screenMtx;       // +0x2C0 - pixel scale/translation (third row untouched)
+    float       m_normalizedRect[4]; // +0x300 - x, y, width, height
+    float       m_screenDepth;     // +0x310
+    uint8_t     _pad_0x314[0x0C];
+    float       m_viewportScaleX;  // +0x320 - aspect calculation scale
+    float       m_viewportScaleY;  // +0x324 - zero selects default aspect
+    uint8_t     _pad_0x328[8];
+    int32_t     m_windowWidth;     // +0x330 - cached window dimensions
+    int32_t     m_windowHeight;    // +0x334
     // Perspective inputs. Writers set all four and m_isPerspective, then call
     // 0x82153598, which builds the projection from them; 0x82153318 calls
     // 0x82153598 again while m_isPerspective is set.
@@ -60,6 +69,8 @@ struct grcViewport {
     uint8_t     m_isPerspective;    // +0x360
     uint8_t     _pad_0x361[0x2F];   // +0x361..+0x38F
 
+    float GetAspectRatio() const;                 // @ 0x82143E98
+    void UpdateScreenMatrix();                    // @ 0x82152EE0
     void SetTransformMatrices(const CamMatrix44& first, const CamMatrix44& second); // @ 0x821538C0
     void SetCameraMtx(const CamMatrix44& cameraMtx);  // @ 0x821539F0
 };
@@ -329,7 +340,6 @@ struct pongCameraMgr {
     bool TryTransition(void* gameState);   // @ 0x821F7338
     bool TryTransitionMode20(void* gameState);  // @ 0x821F6B78
     bool IsStateNine() const;              // @ 0x821F7F40
-    float GetAspectRatio() const;          // @ 0x82143E98
     bool IsCameraStateZero() const;        // @ 0x821F7E28
     bool IsCameraStateOne() const;         // @ 0x821F7E40
     bool IsCameraStateTwo() const;         // @ 0x821F7E60

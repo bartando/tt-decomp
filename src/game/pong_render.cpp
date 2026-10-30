@@ -16,6 +16,7 @@
  */
 
 #include "pong_render.hpp"
+#include "camera/pong_camera.hpp"
 #include <string.h>
 
 // pongLightState_CopyLights @ 0x8213E110 | size: 0x30C (was game_E110)
@@ -1060,9 +1061,9 @@ void pongScrnTransSwipe::Reset() {
 // that allows taking screenshots or rendering UI elements to textures.
 //
 // The function performs a render state sandwich pattern:
-//   1. Save current render state (game_2EE0 + game_2E80 + grc_EB10)
+//   1. Save current render state (grcViewport::UpdateScreenMatrix + game_2E80 + grc_EB10)
 //   2. Render Flash HUD element with specific parameters
-//   3. Restore previous render state (game_2EE0 + game_2E80 + grc_EB10)
+//   3. Restore previous render state (grcViewport::UpdateScreenMatrix + game_2E80 + grc_EB10)
 //
 // Globals accessed:
 //   0x821EBA9C (pongPlayer_BA20_g + 0x7C) - previous render state pointer
@@ -1072,7 +1073,7 @@ void pongScrnTransSwipe::Reset() {
 //   0x821FE3D4 (pongCameraMgr_D648_g + 0xD8C) - HUD Flash base object pointer
 //
 // External function references:
-//   game_2EE0 @ 0x82152EE0 - Save/restore render context (part 1)
+//   grcViewport::UpdateScreenMatrix @ 0x82152EE0 - Rebuild the pixel-space viewport matrix
 //   game_2E80 @ 0x82152E80 - Save/restore render context (part 2)
 //   grc_EB10 @ 0x8214EB10 - Graphics device state save/restore
 //   hudFlashBase_0F08_g @ 0x82140F08 - Render Flash HUD element
@@ -1092,7 +1093,6 @@ extern float g_hudRenderParam;          // @ 0x82140110 (parameter for HUD rende
 extern struct hudFlashBase* g_hudFlashBase;  // @ 0x821FE3D4 (HUD Flash system object)
 
 // External function declarations
-extern void game_2EE0(void* renderState);
 extern void game_2E80(void* renderState);
 extern void grc_EB10(void* deviceState);
 extern void hudFlashBase_0F08_g(void* hudObj, int modeIndex, float param1, float param2,
@@ -1108,7 +1108,7 @@ void pongScreenCapture_rtti_B0EC_0(pongScreenCapture* this_ptr) {
     
     // If there is a current render state, save it
     if (currentState != nullptr) {
-        game_2EE0(currentState);
+        static_cast<grcViewport*>(currentState)->UpdateScreenMatrix();
         game_2E80(currentState);
         
         // Save graphics device state at offset +768 (0x300)
@@ -1131,7 +1131,7 @@ void pongScreenCapture_rtti_B0EC_0(pongScreenCapture* this_ptr) {
     
     // If there was a previous state, restore it
     if (previousState != nullptr) {
-        game_2EE0(previousState);
+        static_cast<grcViewport*>(previousState)->UpdateScreenMatrix();
         game_2E80(previousState);
         
         // Restore graphics device state
@@ -1317,20 +1317,6 @@ void game_2E80(void* renderState) {
     // No-op on host: OpenGL manages render state internally.
     // The save/restore pattern is only needed for Xbox 360's explicit
     // GPU state management.
-}
-
-/**
- * game_2EE0 @ 0x82152EE0 | size: 0x190
- *
- * Restores render state from a previously saved buffer. Counterpart
- * to game_2E80. Applies viewport, scissor rect, and render target
- * configuration back to the GPU device.
- *
- * TODO: Full SIMD lift — writes GPU registers via D3D device.
- */
-void game_2EE0(void* renderState) {
-    (void)renderState;
-    // No-op on host: OpenGL manages render state internally.
 }
 
 /**
