@@ -1195,10 +1195,9 @@ pcrAnimObserver* PlaceAnimObserver(pcrAnimObserver* observer, datResource& rsc) 
 
 } // namespace rage
 
-namespace rage {
+double crt_floor(double value); // @ 0x82431910
 
-// The original calls this helper; its implementation lives at the game address.
-double AnimFloor(double value); // @ 0x82431910
+namespace rage {
 
 // Sample `index` (clamped to the channel) as scale * sample * ~1/65535 + bias.
 // Layout: +0x08 uint16 sample table (32-bit address), +0x0C sample count,
@@ -1224,7 +1223,7 @@ float DecodeQuantizedFloat(crAnimChannelQuantizeFloat* channel, int index) {
 // @ 0x822478E0
 void crAnimChannelQuantizeFloat::vfn_5(void* context, float time, float* outValue) {
     (void)context;
-    int frame = static_cast<int>(static_cast<float>(AnimFloor(time)));
+    int frame = static_cast<int>(static_cast<float>(crt_floor(time)));
     float fraction = time - static_cast<float>(frame);
     if (fraction > 0.999f) {
         *outValue = DecodeQuantizedFloat(this, frame + 1);

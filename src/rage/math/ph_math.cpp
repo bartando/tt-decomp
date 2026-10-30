@@ -363,3 +363,12 @@ float ph_Sinf(float x) { return static_cast<float>(crt_sin(x)); }
 float ph_Cosf(float x) { return static_cast<float>(crt_cos(x)); }
 float ph_Atan2f(float y, float x) { return static_cast<float>(crt_atan2(y, x)); }
 float ph_Sqrtf(float x) { return static_cast<float>(crt_sqrt(x)); }
+
+// @ 0x82431910
+double crt_floor(double x) {
+    const double truncated = static_cast<double>(ConvertTruncate(x));
+    const double magnitude = __builtin_fabs(x);
+    const double rounded = x - truncated >= 0.0 ? truncated : truncated - 1.0;
+    const double result = 1.0e18 - magnitude >= 0.0 ? rounded : x;
+    return -magnitude >= 0.0 ? x : result;
+}

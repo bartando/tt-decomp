@@ -15,6 +15,8 @@ extern "C" void* rage_alloc(uint32_t size);  // RAGE heap alloc (defined in heap
 #include <math.h>
 #include <string.h>
 
+double crt_floor(double value); // @ 0x82431910
+
 double crt_sqrt(double value);  // @ 0x824301D0 — fsqrt, rounded by its callers
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -721,39 +723,6 @@ bool phBoundOTGrid::IsCellValid(int cellIndex) {
 }  // namespace rage
 
 // ─────────────────────────────────────────────────────────────────────────────
-// rage::phBoundOTGrid::RoundToNearestInt @ 0x82431910 | size: 0x3C
-//
-// Rounds a double-precision floating point value to the nearest integer,
-// handling edge cases and clamping. Uses PowerPC fsel-based rounding logic.
-//
-// This is a helper function used by grid coordinate conversion routines to
-// convert world-space positions to discrete grid cell indices.
-//
-// Returns: Rounded value as a double
-// ─────────────────────────────────────────────────────────────────────────────
-double rage::phBoundOTGrid::RoundToNearestInt(double value) {
-    // Convert to int64 and back to get truncated value
-    int64_t truncated = static_cast<int64_t>(value);
-    double truncatedFloat = static_cast<double>(truncated);
-    
-    // Calculate the fractional part
-    double fraction = value - truncatedFloat;
-    
-    // Adjust for rounding: if fraction >= 0.5, round up; otherwise round down
-    double rounded = (fraction >= 0.0) ? truncatedFloat : (truncatedFloat - 1.0);
-    
-    // Handle edge cases using fsel-style logic
-    double absValue = (value >= 0.0) ? value : -value;
-    double result = (fraction >= 0.0) ? rounded : truncatedFloat;
-    
-    // Clamp to valid range
-    const double MAX_SAFE_INT = 9007199254740992.0;  // 2^53
-    result = (absValue <= MAX_SAFE_INT) ? result : value;
-    
-    return result;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // rage::phBoundOTGrid::WorldPositionToGridIndex @ 0x8229B418 | size: 0xC8
 //
 // Converts a 3D world-space position to a linear grid cell index within the
@@ -781,12 +750,12 @@ int rage::phBoundOTGrid::WorldPositionToGridIndex(const float* position) {
     
     // Scale and round Z coordinate
     float scaledZ = position[2] * scaleFactor;
-    double roundedZ = RoundToNearestInt(static_cast<double>(scaledZ));
+    double roundedZ = crt_floor(static_cast<double>(scaledZ));
     int32_t cellZ = static_cast<int32_t>(roundedZ) - offsetX;
     
     // Scale and round X coordinate
     float scaledX = position[0] * scaleFactor;
-    double roundedX = RoundToNearestInt(static_cast<double>(scaledX));
+    double roundedX = crt_floor(static_cast<double>(scaledX));
     int32_t cellX = static_cast<int32_t>(roundedX) - offsetY;
     
     // Validate bounds

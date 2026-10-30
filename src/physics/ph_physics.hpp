@@ -1117,7 +1117,6 @@ struct phBoundOTGrid {
                           float maxX, float maxY, float maxZ);  // @ 0x82508098
 
     // Grid coordinate conversion
-    double RoundToNearestInt(double value);                     // @ 0x82431910
     int WorldPositionToGridIndex(const float* position);        // @ 0x8229B418
 
     // Collision detection helpers (called by SetupCollisionGrid)
