@@ -63,8 +63,7 @@ def subresource(ctx):
 
 
 def depth(ctx):
-    stencil = ctx.r(6) if ctx.side == "orig" else ctx.r(5)
-    logical(ctx, ("depth", ctx.r(3), ctx.r(4), ctx.f(1), stencil))
+    logical(ctx, ("depth", ctx.r(3), ctx.r(4), ctx.f(1), ctx.r(6)))
 
 
 def color(ctx):
@@ -115,7 +114,7 @@ def deferred(ctx):
 CALLS = {
     "rage_A980": model(rollover, args=("r3",)),
     "grc_89D0": model(subresource, args=("r3", "r4", "r5")),
-    "CCalMoviePlayer_D700_p39": model(depth, args=("r3", "r4", "f1")),
+    "grcDevice_SetDepthStencilClear": model(depth, args=("r3", "r4", "f1", "r6")),
     "fiAsciiTokenizer_D808_fw": model(color, args=("r3", "r4")),
     "game_37B0": stub(ret="void", args=("r3", "r4", "r5", "r6", "r7")),
     "grc_3E20": model(flush, args=("r3",)),

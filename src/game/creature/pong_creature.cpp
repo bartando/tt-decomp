@@ -2837,44 +2837,6 @@ bool LocomotionStateAnim_C4A8_g(void* self, uint16_t animID1, uint16_t animID2, 
 }
 
 /**
- * ApplyAnimCallbacks @ 0x82386380 | size: 0xA8
- *
- * Iterates over an animation list and calls a callback function for
- * each entry. The callback is either LocomotionStateAnim_C128_g or
- * LocomotionStateAnim_C288_g, depending on whether the animation
- * data has the "mirrored" flag set (bit 0 of field +20 at sub-data +4).
- * After processing, calls LocomotionStateAnim_FinalizeProcessing on self+36.
- */
-// LocomotionStateAnim_6380_g @ 0x82386380
-void LocomotionStateAnim_6380_g(void* self, void* animList) {
-    LocomotionStateAnim* lsa = (LocomotionStateAnim*)self;
-    typedef void (*AnimCallback)(void* entry, void* unusedR4, void* skeleton, float weight);
-
-    void* animData = (void*)lsa->field_0x0024;
-
-    // Select callback based on mirrored flag
-    AnimCallback callback = LocomotionStateAnim_C128_g;
-
-    void* subData = *(void**)((char*)animData + 4);
-    uint32_t flags = *(uint32_t*)((char*)subData + 20);
-    if (flags & 0x1) {
-        callback = LocomotionStateAnim_C288_g;
-    }
-
-    // Iterate over animation entries
-    int16_t count = *(int16_t*)((char*)animList + 12);
-    if (count > 0) {
-        void** animArray = (void**)*(void**)((char*)animList + 8);
-        for (int i = 0; i < count; i++) {
-            callback(animArray[i], nullptr, animData, 0.0f);
-        }
-    }
-
-    // Finalize
-    LocomotionStateAnim_FinalizeProcessing((void*)lsa->field_0x0024);
-}
-
-/**
  * LocomotionStateAnim_FindChannelByKey @ 0x8224A390 | size: 0xA8
  *
  * Binary search through a sorted channel key array to find an

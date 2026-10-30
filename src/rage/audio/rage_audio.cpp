@@ -40,8 +40,8 @@ extern const float g_audVolumeScaleFactor;      // volume scale factor
 extern const float g_audVolumeOffset;      // volume offset (subtracted before scaling)
 
 // Audio command ring buffer globals.
-extern uint32_t g_audCommandWriteIndex;         // audio command write index
-extern uint32_t* g_pAudCommandRingBuffer;        // audio command ring buffer
+extern uint32_t g_audCommandWriteIndex; // @ 0x825EE220
+extern uint32_t* g_pAudCommandRingBuffer; // @ 0x825EBD2C
 
 // Voice free list sentinels.
 extern uint8_t g_audSfxVoiceFreeList[];        // @ 0x825CA91C; +4 is the active-voice list @ 0x825CA920
@@ -289,17 +289,15 @@ bool audVoice::IsPlaying() {
 
 namespace {
 
-uint32_t& g_cmdWriteIndex = g_audCommandWriteIndex;  // reuses file-scope extern
-uint32_t*& g_pCmdRing     = g_pAudCommandRingBuffer;  // reuses file-scope extern
-
 // Packed command header written into the ring buffer as a single uint32_t:
 //   byte 0: command class (voice type)
 //   byte 1: parameter count + 1
 //   bytes 2-3: command ID
 void PushAudioCommand(uint8_t cmdClass, uint16_t cmdId, uint8_t paramCount,
                       const uint32_t* params) {
-    uint32_t idx = g_cmdWriteIndex;
-    uint32_t* slot = &g_pCmdRing[idx];
+    uint32_t idx = g_audCommandWriteIndex;
+    uint32_t* slot = &g_pAudCommandRingBuffer[idx];
+    g_audCommandWriteIndex = idx + 1;
 
     // Write header: class | (paramCount+1) | cmdId
     uint8_t* hdr = reinterpret_cast<uint8_t*>(slot);
@@ -311,14 +309,13 @@ void PushAudioCommand(uint8_t cmdClass, uint16_t cmdId, uint8_t paramCount,
 
     // Copy parameter words
     if (paramCount > 0) {
-        uint32_t* dst = &g_pCmdRing[idx];
+        uint32_t* dst = &g_pAudCommandRingBuffer[idx];
+        // Publish before reading params: they can reference the write index.
+        g_audCommandWriteIndex = idx + paramCount;
         for (uint8_t i = 0; i < paramCount; i++) {
             dst[i] = params[i];
         }
-        idx += paramCount;
     }
-
-    g_cmdWriteIndex = idx;
 }
 
 } // namespace
@@ -399,9 +396,9 @@ void* audVoiceStream_GetStreamRef() // @ 0x82163D28
 // param count) and copies parameter words into the ring buffer.
 // ─────────────────────────────────────────────────────────────────────────────
 void audCommand_Enqueue(uint8_t cmdClass, uint16_t cmdId,  // @ 0x821AAEE8
-                           const uint32_t* params, uint8_t paramCount)
+                           const uint32_t* params, uint32_t paramCount)
 {
-    PushAudioCommand(cmdClass, cmdId, paramCount, params);
+    PushAudioCommand(cmdClass, cmdId, static_cast<uint8_t>(paramCount), params);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

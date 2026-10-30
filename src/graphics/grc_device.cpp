@@ -1196,8 +1196,8 @@ extern "C" {
 extern void grc_89D0(void* texture, uint32_t slice, uint32_t level, uint32_t* pitch,
                      uint32_t* size, uint32_t* offset, uint32_t* packedSize, uint32_t* width,
                      uint32_t* height, uint32_t* depth, uint32_t* address);  // @ 0x823589D0
-extern void CCalMoviePlayer_D700_p39(void* device, uint32_t index, float depth,
-                                    uint32_t stencil);  // @ 0x8235D700
+extern void grcDevice_SetDepthStencilClear(void* device, uint32_t unusedR4,
+    uint32_t unusedR5, uint32_t stencil, float depth); // @ 0x8235D700
 // The color arrives in v1 on Xenon, independently of r3..r6.
 extern void fiAsciiTokenizer_D808_fw(uint32_t format, uint32_t numberFormat,
                                     uint32_t* low, uint32_t* high);  // @ 0x8235D808
@@ -1434,7 +1434,7 @@ extern "C" void grcDevice_Resolve(void* device, uint32_t flags, const int32_t* s
     dirty(48) |= UINT64_C(0xF000000000);
     const bool clearDepthEnabled = (flags & 0x200u) != 0;
     if (clearDepthEnabled) {
-        CCalMoviePlayer_D700_p39(device, 0, clearDepth, clearStencil);
+        grcDevice_SetDepthStencilClear(device, 0, 0, clearStencil, clearDepth);
     }
     if ((flags & 0x100u) != 0) {
         const uint32_t colorTarget = copyControl & 7u;
@@ -1589,4 +1589,52 @@ extern "C" void grcDevice_Resolve(void* device, uint32_t flags, const int32_t* s
     if (g_grcResolveSubmit != 0) {
         rage_AD98(device);
     }
+}
+
+// Former auto-name CCalMoviePlayer_D700_p39. Pack D24S8 or float24 depth and
+// update clear registers, preserving every unrelated dirty-state bit.
+// Explicit unused GPRs keep stencil in Xenon's r6 as well as ppc32's r6.
+// @ 0x8235D700 | size: 0x104 (includes four padding bytes)
+extern "C" void grcDevice_SetDepthStencilClear(void* device, uint32_t unusedR4,
+    uint32_t unusedR5, uint32_t stencil, float depth) {
+    (void)unusedR4; (void)unusedR5;
+    auto* dev = static_cast<uint8_t*>(device);
+    uint32_t packed, mode;
+    if ((*reinterpret_cast<uint16_t*>(dev + 11464) & 1) == 0) {
+        // fctidz saturates to signed 64 bits; stfiwx keeps the low word.
+        auto convert = [](float value) -> uint32_t {
+            if (!(value >= -0x1p63f)) return 0;
+            if (value >= 0x1p63f) return 0xFFFFFFFFu;
+            return static_cast<uint32_t>(static_cast<int64_t>(value));
+        };
+        packed = (convert(depth * 16777215.0f) << 8) | stencil;
+        mode = convert(depth * 2047.0f);
+    } else {
+        uint32_t bits;
+        __builtin_memcpy(&bits, &depth, 4);
+        uint32_t value;
+        if (bits & 0x80000000u) {
+            value = 0;
+        } else {
+            const unsigned exponent = bits >> 23;
+            if (exponent >= 113) {
+                value = ((bits & 0x07800000u) | (bits + 4)) >> 3;
+            } else {
+                const unsigned shift = 113 - exponent;
+                // Xenon's slw/srw use six shift bits; bit 5 zeroes the result.
+                const unsigned roundShift = (shift - 1) & 63;
+                const uint32_t round = roundShift < 32 ? 1u << roundShift : 0;
+                const uint32_t mantissa = ((bits & 0x7FFFFFu) + round) | 0x800000u;
+                const unsigned resultShift = shift & 63;
+                value = resultShift < 32 ? mantissa >> resultShift : 0;
+            }
+        }
+        packed = (value << 8) | (stencil & 0xFF);
+        mode = packed >> 21;
+    }
+    const uint32_t state = *reinterpret_cast<uint32_t*>(dev + 11648);
+    const uint32_t sameStencil = stencil == dev[11650] ? 0x800 : 0;
+    *reinterpret_cast<uint32_t*>(dev + 11884) = packed;
+    *reinterpret_cast<uint32_t*>(dev + 11880) = mode | ((sameStencil ^ 0x800) ^ ((~state << 6) & 0x800));
+    *reinterpret_cast<uint64_t*>(dev + 48) |= 3ULL << 34;
 }

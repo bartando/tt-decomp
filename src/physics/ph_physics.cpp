@@ -861,8 +861,6 @@ float ph_GetCapsuleRadius(void* capsule) {
 // Build a padded 3x3 X rotation from one double-precision angle.
 // ph_BuildRotationMatrixX (was phBoundCapsule_3F10_g) @ 0x820C3F10 | size: 0x84
 // The three padding words and any translation row remain untouched.
-extern double crt_cos(double angle); // @ 0x824302B0
-extern double crt_sin(double angle); // @ 0x824301D8
 void ph_BuildRotationMatrixX(float* matrix, double angle) {
     const float cosine = static_cast<float>(crt_cos(angle));
     const float sine = static_cast<float>(crt_sin(angle));

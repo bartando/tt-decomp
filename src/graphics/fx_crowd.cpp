@@ -138,3 +138,28 @@ void fxCrowdAnimPlayback_Update(fxCrowdAnimPlayback* self) {
         }
     }
 }
+
+// The crowd-manager tick (0x8238B094) applies the playback's current frame to
+// the creature at +0x1C. Former auto-name: LocomotionStateAnim_6380_g.
+extern void LocomotionStateAnim_C128_g(void*, void*, void*, float); // @ 0x8224C128
+extern void LocomotionStateAnim_C288_g(void*, void*, void*, float); // @ 0x8224C288
+extern void LocomotionStateAnim_C8F8_g(void* skeleton); // @ 0x8214C8F8
+
+// @ 0x82386380 | size: 0xA8
+void fxCrowd_ApplyAnimationFrame(void* creature, const void* frame) {
+    auto* self = static_cast<uint8_t*>(creature);
+    const auto* list = static_cast<const uint8_t*>(frame);
+    void* skeleton = *reinterpret_cast<void**>(self + 0x24);
+    const auto* data = *reinterpret_cast<const uint8_t**>(static_cast<uint8_t*>(skeleton) + 4);
+    using Apply = void (*)(void*, void*, void*, float);
+    const Apply apply = (*reinterpret_cast<const uint32_t*>(data + 20) & 1)
+        ? LocomotionStateAnim_C288_g : LocomotionStateAnim_C128_g;
+    const unsigned count = *reinterpret_cast<const uint16_t*>(list + 12);
+    for (unsigned i = 0; i < count; ++i) {
+        // Callbacks may replace the frame's entries. The skeleton for this
+        // loop stays fixed, but finalization uses the creature's current one.
+        auto* entries = *reinterpret_cast<void* const* const*>(list + 8);
+        apply(entries[i], nullptr, skeleton, 0.0f);
+    }
+    LocomotionStateAnim_C8F8_g(*reinterpret_cast<void**>(self + 0x24));
+}
