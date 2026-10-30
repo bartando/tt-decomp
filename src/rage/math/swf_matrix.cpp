@@ -16,3 +16,25 @@ void swfConcatMatrix(float* out, const float* child, const float* parent) {
 }
 
 } // namespace rage
+
+// @ 0x824301D8
+extern double crt_sin(double x);
+// @ 0x824302B0
+extern double crt_cos(double x);
+
+namespace rage {
+
+// @ 0x823FA2A0
+void swfMakeRotationMatrix(float* out, float degrees) {
+    const float radians = degrees * 0x1.1df46ap-6f;
+    const float cosine = static_cast<float>(crt_cos(radians));
+    const float sine = static_cast<float>(crt_sin(radians));
+    out[0] = cosine;
+    out[3] = cosine;
+    out[5] = 0.0f;
+    out[4] = 0.0f;
+    out[1] = sine;
+    out[2] = -sine;
+}
+
+} // namespace rage
