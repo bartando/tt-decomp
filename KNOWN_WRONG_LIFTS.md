@@ -121,8 +121,6 @@ unchecked slot numbers: `CCalMoviePlayer`, `pongSaveFile`, `pongAudioManager`, a
 - `gd_data.cpp` passes XML field types by value (asm: by address); 0x825CAF90 is the Int
   handler, not an enum one.
 - 0x825EBC54 (`boundContext` in `rage_grm.cpp`) behaves like a write counter.
-- `fx_effects.cpp` and `ProcessAnimationList` pass the skeleton to 0x8224C128/0x8224C288
-  (LocomotionStateAnim C128/C288) in r4; the asm reads it from r5.
 - `pongPlayer_B208_g` and `pongPlayer_D7B0_g` are `pongPlayerState` functions.
 - `pongMover::Reset` is still broadly wrong (only its teleport call was fixed).
 - `ph_physics.cpp` has two conflicting names for 0x820C3F98 (builds a rotation about y).

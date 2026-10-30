@@ -34,7 +34,8 @@ extern void pongPlayer_UpdateLocomotionState(pongPlayer* state);  // @ 0x820CC67
 // C128 = standard transition, C288 = alternate (flag-gated) transition.
 extern void LocomotionStateAnim_BlendLocomotionAnims(uint32_t entry, void* unusedR4,
                                                    void* skeleton, float weight);
-extern void LocomotionStateAnim_TransitionLocomotionState(uint32_t entry, void* parent, float dt);
+extern void LocomotionStateAnim_TransitionLocomotionState(uint32_t entry, void* unusedR4,
+                                                        void* skeleton, float weight);
 
 
 // ── External game helpers referenced by pong_player.cpp ───────────────────
@@ -355,7 +356,7 @@ void pongPlayer::UpdateAnimationState() {
             LocomotionStateAnim_BlendLocomotionAnims(entries[i], nullptr, m_pParent,
                                                    g_recoveryTimerThreshold);
         } else {
-            LocomotionStateAnim_TransitionLocomotionState(entries[i], m_pParent,
+            LocomotionStateAnim_TransitionLocomotionState(entries[i], nullptr, m_pParent,
                                                         g_recoveryTimerThreshold);
         }
     }
