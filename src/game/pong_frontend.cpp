@@ -1107,8 +1107,8 @@ extern "C" {
     // Debug output
     void DbgPrint(const char* format, ...);
 
-    // TLS fiber setup — returns current fiber/thread context
-    void* _crt_tls_fiber_setup();
+    // Current Xbox thread ID
+    uint32_t xe_GetCurrentThreadId();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1444,24 +1444,25 @@ void* CCalMoviePlayer::GetFrameBuffer() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Group 11: Fiber Context Management (64B + 16B)
-// Manage the fiber/thread context pointer at offset +10376 (0x2888)
+// Group 11: Thread ID Management (64B + 16B)
+// Manage the thread ID at offset +10376 (0x2888)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Replaces the fiber context. Releases old context if present, acquires new one.
+/// Stores the current thread ID.
 /// CCalMoviePlayer::ReplaceFiberContext @ 0x8235EB30 | size: 0x40
 void CCalMoviePlayer::ReplaceFiberContext() {
-    if (m_pFiberContext) {
-        _crt_tls_fiber_setup();  // Release/cleanup existing context
+    uint32_t* threadId = (uint32_t*)((uint8_t*)this + 10376);
+    if (*threadId) {
+        xe_GetCurrentThreadId();
     }
-    m_pFiberContext = _crt_tls_fiber_setup();
+    *threadId = xe_GetCurrentThreadId();
 }
 
-/// Clears the fiber context pointer (with memory barrier).
+/// Clears the thread ID (with memory barrier).
 /// CCalMoviePlayer::ClearFiberContext @ 0x8235EB70 | size: 0x10
 void CCalMoviePlayer::ClearFiberContext() {
     // eieio -- enforce in-order execution of I/O (memory barrier)
-    m_pFiberContext = nullptr;
+    *(uint32_t*)((uint8_t*)this + 10376) = 0;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -93,7 +93,7 @@ extern uint32_t  g_pPlayerDataTable_slot;        // active slot index mirror
 extern float     g_kPowerBlend;                  // power blend constant @ 0x825C2EA0
 extern float     g_kFrameToSecScale;             // frames-to-seconds   @ 0x8202D100
 
-extern bool CheckButtonPressed(void* record);                              // pg_FFF8_g @ 0x8225FFF8
+extern bool CheckButtonPressed(void* record);                              // pg_FFF8_g @ 0x821DFFF8
 extern void PostPageGroupMessage(void* rec, int code, int mask, int a3, int opActive); // pg_E6E0
 extern void pongPlayer_ComputeStepDelta(void* obj, int maxSteps, float* outDelta);   // @ 0x821E0508
 extern bool pongPlayer_CheckServeInput(pongPlayer* p);                            // @ 0x82195B60

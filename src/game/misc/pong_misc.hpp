@@ -1096,7 +1096,7 @@ public:
     void*    m_hThreadWriteA;           // +0x10C (+268) thread handle: WriteThreadProcA
     void*    m_hThreadWriteB;           // +0x110 (+272) thread handle: WriteThreadProcB
     uint8_t  _pad114[10100];            // +0x114 (+276) gap to fiber context
-    uint32_t m_fiberContext;            // +0x2888 (+10376) fiber/TLS context state
+    uint32_t m_threadId;            // +0x2888 (+10376) current thread ID
 
     // ── non-virtual methods ──
 

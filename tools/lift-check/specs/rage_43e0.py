@@ -18,7 +18,7 @@ ADDRESS = 0x823643E0
 SOURCE = "src/graphics/grc_gpu_hang.cpp"
 
 EXTERNS = {
-    "sys_GetGpuWatchdogTick": 0x82566B78,
+    "xe_GetCurrentThreadId": 0x82566B78,
     "rage_DebugPrintf": 0x82363FE0,
     "g_gpuHangSentinel": 0x82606654,
     "g_sda_base": 0x82600000,

@@ -33,7 +33,7 @@ extern const float k_aspectRatioScale;   /* lbl_8202D108 @ 0x8202D108 */
 
 /* Helper functions */
 extern void rage_GetExecutableName(const char* pKey, uint32_t* pOut);
-extern void _crt_tls_fiber_setup(void);
+extern uint32_t xe_GetCurrentThreadId(void);
 extern void VdQueryVideoMode(void* pMode);
 extern void memcpy(void* dst, const void* src, uint32_t size);
 
@@ -165,8 +165,8 @@ void SetupRenderFiber(void* pRootGameObj) {
     /* Read fiber handle from offset +10396 */
     uint32_t fiberHandle = *(uint32_t*)(pRoot + 10396);
     
-    /* Initialize TLS fiber */
-    _crt_tls_fiber_setup();
+    /* Read the current thread ID. */
+    xe_GetCurrentThreadId();
     
     /* If fiber handle exists, configure it */
     if (fiberHandle != 0) {

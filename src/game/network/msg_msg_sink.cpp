@@ -2130,7 +2130,6 @@ uint32_t msgMsgSink::SetMessageBuffer(void* param) {
 extern void msgMsgSink_EC28_g(void* sink, uint32_t key, void* outSlot, uint32_t flags);
 extern void msgSlot_SetFloat(void* slot, float value, uint32_t flags);
 extern void game_3F28_h(void* session, void* priorityData);
-extern int32_t _crt_tls_fiber_setup();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // msgMsgSink_D168_sp @ 0x8244D168 | 108 bytes

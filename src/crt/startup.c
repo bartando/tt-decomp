@@ -55,7 +55,7 @@ void HalReturnToFirmware(uint32_t routine);                /* @ 0x82585E4C */
 void RtlEnterCriticalSection(void* criticalSection);       /* @ 0x82585E0C */
 void RtlLeaveCriticalSection(void* criticalSection);       /* @ 0x82585DFC */
 int __cinit_impl(void);                                    /* @ 0x82433D00 */
-void* _crt_tls_fiber_setup(void);                          /* @ 0x82566B78 */
+uint32_t xe_GetCurrentThreadId(void);                          /* @ 0x82566B78 */
 void* _calloc_crt(int count, int size);                    /* @ 0x82433FB8 */
 void _tls_dtor_cleanup(void);                              /* @ 0x82433D88 */
 void _crt_tls_callback(int initFlag);                      /* @ 0x82434090 */
@@ -246,7 +246,7 @@ int _cinit_setup(void)
 
     fiberContext->m_isFiberReady = 1;
     fiberContext->m_tlsBackingStore = (void*)kCrtFiberTemplate;
-    fiberContext->m_tlsFiberValue = (uint32_t)(uintptr_t)_crt_tls_fiber_setup();
+    fiberContext->m_tlsFiberValue = xe_GetCurrentThreadId();
     fiberContext->m_tlsFiberIndex = -1;
 
     g_cinit_list_node.m_callback = _crt_tls_callback;

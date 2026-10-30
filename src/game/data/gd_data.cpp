@@ -15,7 +15,7 @@
 extern void rage_free(void* ptr);
 extern void datResourceMgr_RemoveEntry(void* obj);                    // @ 0x820F8EE8 - Object cleanup
 extern void sysMemAllocator_PlatformFree(void* obj, uint32_t flags);    // @ 0x82566C20 - Free/release with flags
-extern void sysMemAllocator_Free(void* ptr);                            // @ 0x82186228 - TLS allocator free
+extern void sysMemAllocator_Free(void* ptr);                            // @ 0x820C00C0 - ordinary allocator free
 extern void sysMemAllocator_InitThreadHeap(void);          // @ 0x820C0038 - Main thread init
 
 namespace rage {

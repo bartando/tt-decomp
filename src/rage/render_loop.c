@@ -29,7 +29,7 @@
  *   +0x1EF  uint8  m_bSkipRender       (bool)
  *   +0x1F0  int32  m_nPendingUpdates
  *   +0x1F4  float  m_fTargetFPS
- *   +0x1FC  uint32 m_fiberHandle
+ *   +0x1FC  uint32 m_threadId
  *   +0x208  float  m_fRefreshRate
  *   +0x20C  float  m_fLastSceneTime
  *   +0x210  uint8  m_bFramePresented   (bool)
@@ -594,7 +594,7 @@ void gameLoop_init_C2D0(gameLoop* pLoop)
     /* Integer fields. */
     pLoop->m_nPendingUpdates = 0;
     pLoop->m_nUnknown504     = -1;
-    pLoop->m_fiberHandle     = 0;
+    pLoop->m_threadId     = 0;
     pLoop->m_nDisplayModeIdx = -1;
 
     /* Set m_bFullscreenMode and m_bFramePresented to 1. */
@@ -794,8 +794,8 @@ void gameLoop_Shutdown_94B8(gameLoop* pLoop)
  *   +0x20  uint32_t  nUnknown32     — passed to grmShaderPreset_AllocArray
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-/* TLS fiber setup (CRT) @ 0x82566B78 */
-extern uint32_t _crt_tls_fiber_setup(void);
+/* Current thread ID @ 0x82566B78 */
+extern uint32_t xe_GetCurrentThreadId(void);
 
 /* hsmContext display-mode init @ 0x8215CE30 */
 extern void fiAsciiTokenizer_InitializeTokenizer(hsmContext* pHsm, uint32_t stateA, uint32_t stateB);
@@ -912,8 +912,8 @@ void gameLoop_Init_8F30(gameLoop* pLoop, void* pConfig)
     uint8_t* pCfg = (uint8_t*)pConfig;
     hsmContext* pSm = &pLoop->m_stateMachine;
 
-    /* 1. Set up TLS fiber, store handle. */
-    pLoop->m_fiberHandle = _crt_tls_fiber_setup();
+    /* 1. Store the current thread ID. */
+    pLoop->m_threadId = xe_GetCurrentThreadId();
 
     /* 2. Copy display states from config. */
     pLoop->m_nDisplayStateB = *(uint32_t*)(pCfg + 12);
