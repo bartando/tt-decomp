@@ -247,16 +247,7 @@ struct cmCapture {
     void vfn_17();  // [17] @ 0x822787f8
 };
 
-// ── rage::cmChanged  [vtable @ 0x820567F4] ──────────────────────────
-struct cmChanged {
-    void**      vtable;           // +0x00
-
-    // ── virtual methods ──
-    void vfn_6();  // [6] @ 0x82278018
-    void vfn_10();  // [10] @ 0x82277ef0
-    void vfn_16();  // [16] @ 0x822778b8
-    void vfn_17();  // [17] @ 0x82278168
-};
+// ── rage::cmChanged — defined in rage_cm_types.hpp
 
 // ── rage::cmClamp — defined in rage_cm_types.hpp
 
@@ -674,15 +665,7 @@ struct cmMotorPlant {
     void vfn_3();  // [3] @ 0x82279d98
 };
 
-// ── rage::cmMultiply  [vtable @ 0x82053B1C] ──────────────────────────
-struct cmMultiply {
-    void**      vtable;           // +0x00
-
-    // ── virtual methods ──
-    void vfn_4();  // [4] @ 0x8227b2f0
-    void vfn_5();  // [5] @ 0x8227b2b8
-    void vfn_16();  // [16] @ 0x822624f8
-};
+// ── rage::cmMultiply — defined in rage_cm_types.hpp
 
 // ── rage::cmNamedValueSet  [vtable @ 0x820373AC] ──────────────────────────
 struct cmNamedValueSet {

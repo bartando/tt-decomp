@@ -34,7 +34,7 @@ extern "C" {
     void* swfInstanceConstruct(void* storage);  // @ 0x823FB570
     void rage_DebugLog(const char* msg, ...);    // debug log stub (no-op)
     void swfSymtab_Delete(void* symtab, const char* key);   // symtab key delete
-    void swfPopResult(void* dst);               // pop result from call stack
+    void* swfPopResult(void* dst);              // @ 0x82403270 — pop and return dst
     int _stricmp(const char*, const char*);     // case-insensitive string compare
     float swfComputeFramePosition(void* ctx, void* entry, float* outMin, float* outMax);
     const char* util_A768_1(const void* value, void* buffer, int maxLen);  // @ 0x823FA768 — SWF value to string
@@ -134,9 +134,11 @@ extern "C" const char* util_A768_1(const void* value, void* buffer, int maxLen) 
 extern void* g_swfScriptObjectPool;  // @ SDA offset 19540
 extern void* g_swfInstancePool;      // @ SDA offset 19536
 extern void* g_swfScriptArrayPool;   // @ SDA offset 19552
-extern const char* g_str_swf_unsupportedMethod;  // @ 0x82075054, defined in pong_strings.cpp
 
 namespace rage {
+
+extern uint32_t g_swfCallDepth;       // @ 0x82604D1C
+extern uint32_t g_swfValueStack[192]; // @ 0x82715C98 — 96 {payload, tag} pairs
 
 struct swfAtlasGlyph {
     float u, v, width, height;  // Atlas texels.
@@ -701,7 +703,7 @@ int swfSCRIPTOBJECT::VisitMembers() {
  * @param result Output: {value, type} pair written on success
  * @return       true if found, false otherwise
  */
-bool swfSCRIPTOBJECT::GetMember(const char* name, void* result) {
+uint32_t swfSCRIPTOBJECT::GetMember(const char* name, void* result) {
     extern void* g_swfStringBuffer;       // @ 0x82604850
     extern void* g_swfGlobalObject;       // @ 0x82602818
     extern void* g_swfGlobalScope;        // @ 0x8260282C
@@ -821,49 +823,33 @@ void swfSCRIPTOBJECT::DeleteMember(const char* name) {
  */
 void swfSCRIPTOBJECT::Invoke(const char* methodName, void* args, int argCount, void* outResult) {
 
-    // Set up GetMember call: lookupKey = {methodName, type=7 (string)}
-    // lookupResult = {0, 0} (will be filled in)
-    swfValuePair lookupKey = { (uint32_t)(uintptr_t)methodName, SWF_VALUE_STRING };
-    swfValuePair lookupResult = { 0, 0 };
-    swfValuePair* resultValue = (swfValuePair*)outResult;
+    // This ABI uses a type-1 direct string and a type-7 empty lookup value;
+    // swfValueType's historical enum does not describe these two tags.
+    swfValuePair lookupKey = { (uint32_t)(uintptr_t)methodName, 1 };
+    swfValuePair lookupResult = { 0, 7 };
+    auto* resultValue = static_cast<swfValuePair*>(outResult);
 
-    // Call GetMember (virtual slot 10) — virtual dispatch on this
-    bool found = this->GetMember((const char*)&lookupKey, &lookupResult);
-
-    if (!found) {
-        // Method not found
-        rage_DebugLog(g_str_swf_unsupportedMethod, methodName);
-        resultValue->data = 0;
-        resultValue->type = SWF_VALUE_DELETED;  // undefined
+    uint32_t found = this->GetMember(reinterpret_cast<const char*>(&lookupKey), &lookupResult);
+    if (uint8_t(found) == 0) {
+        rage_DebugLog("Unsupported script method: %s", methodName);
+        *resultValue = {0, 3};
         return;
     }
 
-    // Initialize result to {0, type=object}
-    resultValue->data = 0;
-    resultValue->type = SWF_VALUE_OBJECT;
-
-    if (lookupResult.type == SWF_VALUE_NATIVE_FUNC) {
-        // Type 6: native function pointer — call directly
-        typedef void (*NativeFunc)(void*, void*, int, void*);
-        NativeFunc fn = (NativeFunc)(uintptr_t)lookupResult.data;
+    *resultValue = {0, 5};
+    if (lookupResult.type == 6) {
+        using NativeFunc = void (*)(void*, void*, int, void*);
+        auto fn = reinterpret_cast<NativeFunc>(static_cast<uintptr_t>(lookupResult.data));
         fn(this, args, argCount, outResult);
-    } else if (lookupResult.type == SWF_VALUE_OBJECT) {
-        // Type 5: script object — call its Execute method (vtable slot 14).
-        // Callable script objects are always swfACTIONFUNC (slot 14 is only
-        // defined there); virtual dispatch picks the right derived override.
-        swfACTIONFUNC* callableObj = (swfACTIONFUNC*)(uintptr_t)lookupResult.data;
-
-        extern uint32_t g_swfCallDepth;  // @ 0x82604D1C
+    } else if (lookupResult.type == 5) {
+        auto* callableObj = reinterpret_cast<swfACTIONFUNC*>(static_cast<uintptr_t>(lookupResult.data));
         uint32_t prevDepth = g_swfCallDepth;
-
         callableObj->Execute(args, argCount, this, 0);
-
-        // If call stack depth increased, a return value was pushed
-        if ((int32_t)g_swfCallDepth > (int32_t)prevDepth) {
-            swfPopResult(outResult);
+        if (static_cast<int32_t>(g_swfCallDepth) > static_cast<int32_t>(prevDepth)) {
+            swfValuePair popped;
+            *resultValue = *static_cast<swfValuePair*>(swfPopResult(&popped));
         }
     }
-    // Other types: return the default {0, 5}
 }
 
 void swfSCRIPTOBJECT_ScalarDestructor(swfSCRIPTOBJECT* obj, int flags) {
@@ -1571,7 +1557,7 @@ void swfACTIONFUNC::DeleteMember(const char* name) {
 // swfINSTANCE slot 10 @ 0x823FB970: display properties and script fallback.
 // The shared declaration calls r4 a const char*, but the game passes an SWF
 // {value, type} key. Convert it before comparing or forwarding the property name.
-bool swfINSTANCE::GetMember(const char* name, void* result) {
+uint32_t swfINSTANCE::GetMember(const char* name, void* result) {
     extern void* g_swfStringBuffer;        // @ 0x82604850
     extern void* g_swfRootObject;          // @ 0x82602828
     extern void* g_swfGlobalScope;         // @ 0x8260282C
@@ -1944,7 +1930,7 @@ void swfACTIONFUNC::Invoke(const char* methodName, void* args, int argCount, voi
 // then delegates to inner object's GetMember (vtable slot 10).
 // Local entries store 8-byte {value, type} pairs in m_pLocalValues (+7328).
 // ─────────────────────────────────────────────────────────────────────────────
-bool swfACTIONFUNC::GetMember(const char* name, void* result) {
+uint32_t swfACTIONFUNC::GetMember(const char* name, void* result) {
     // Intern the name string
     char internBuffer[SWF_INTERN_BUFFER_SIZE];
     extern const char* swfInternString(const char* name, void* buffer, int maxLen);
@@ -2015,7 +2001,7 @@ swfSCRIPTARRAY::~swfSCRIPTARRAY() {
 
 
 // @ 0x823FEB48
-bool swfSCRIPTARRAY::GetMember(const char* name, void* result) {
+uint32_t swfSCRIPTARRAY::GetMember(const char* name, void* result) {
     // Like the other GetMember overrides, name points at an 8-byte VM value,
     // despite the historical const char* declaration. String keys are never
     // parsed as array indices; only "length" is handled here.
@@ -2554,7 +2540,24 @@ float swfComputeFramePosition(void* a, void* b, float* c, float* d) {
 const char* swfInternString(const char* a, void* b, int c) {
     (void)b; (void)c; return a;
 }
-void swfPopResult(void* a) { (void)a; }
+// @ 0x82403270
+void* swfPopResult(void* dst) {
+    // Native storage is mapped to the retail addresses only by lift-check.
+    // Empty pops produce integer zero.
+    auto& depth = rage::g_swfCallDepth;
+    auto* stack = rage::g_swfValueStack;
+    if (depth == 0) {
+        rage_DebugLog("Warning: Attempting to pop object from the stack but nothing is on the stack");
+        stack[0] = 0;
+        stack[1] = 3;
+        depth = 1;
+    }
+    --depth;
+    auto* out = static_cast<uint32_t*>(dst);
+    out[0] = stack[depth * 2];
+    out[1] = stack[depth * 2 + 1];
+    return dst;
+}
 void swfSymtab_Delete(void* a, const char* b) { (void)a; (void)b; }
 void swfSymtab_Enumerate(void* a) { (void)a; }
 void* swfSymtab_Lookup(void* a, const char* b) { (void)a; (void)b; return nullptr; }
