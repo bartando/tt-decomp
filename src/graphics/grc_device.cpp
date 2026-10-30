@@ -1,10 +1,11 @@
 /**
- * graphics/grc_device.cpp — Graphics Device Lifecycle Management
+ * graphics/grc_device.cpp — Graphics Device Lifecycle and Sampler State
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
  *
  * Core graphics device functions:
  *   - grcDevice_shutdown    @ 0x8214FA58 — Primary shutdown sequence
  *   - grcDevice_shutdownAlt @ 0x821540D0 — Alternate shutdown path
+ *   - grcDevice_setSamplerMinFilter @ 0x82355418 — Xenos texture fetch state
  *
  * Note: grcDevice_beginScene lives in grc_render.cpp alongside grcDevice_clear.
  */
@@ -179,4 +180,45 @@ void grcDevice_shutdownAlt(void)
 
     /* Clear device pointer. */
     g_pGrcDeviceAlt = NULL;
+}
+
+extern const uint32_t g_grcAnisoFilterTable[17];  // @ 0x82065D10
+
+// @ 0x82355418
+void grcDevice_setSamplerMinFilter(void* device, uint32_t sampler, uint32_t filter) {
+    // Xenon ABI: r3 = device, r4 = sampler, r5 = D3D filter value; no return value.
+    // Previously mislabeled phArticulatedCollider_5418_p42. These are Xenos fetch
+    // constants: word 3 has min_filter[22:21] and aniso_filter[27:25], while
+    // word 4 has min_aniso_walk[11] and the volume filter bits [1:0].
+    uint8_t* state = static_cast<uint8_t*>(device);
+    uint32_t* fetch = reinterpret_cast<uint32_t*>(state + (sampler + 48u) * 24u);
+    uint32_t word3 = fetch[3];
+    uint32_t word4 = fetch[4];
+    uint32_t anisotropic = filter >> 2;
+
+    // The shared anisotropy field also depends on the previous mag_aniso_walk.
+    // Preserve the PPC's subtract/andc mask, including for raw filter values.
+    uint32_t anisoMask = (((word4 >> 10) & 1u) | anisotropic) - 1u;
+    uint32_t anisoFilter = g_grcAnisoFilterTable[state[12020u + sampler]] & ~anisoMask;
+    word4 = (word4 & ~0x800u) | ((anisotropic << 11) & 0x800u);
+    fetch[4] = word4;
+
+    uint32_t packedFilter = (anisoFilter << 4) | anisotropic | filter;
+    word3 = (word3 & ~0x0E600000u) | ((packedFilter << 21) & 0x0E600000u);
+    fetch[3] = word3;
+
+    // Compress the low bits of mag/min into vol_mag/vol_min. The cached byte
+    // selects automatic derivation (bits >= 2 clear) or an explicit override.
+    uint32_t volumeFilters = ((word3 >> 19) & 1u) | ((word3 >> 20) & 2u);
+    uint32_t volumeOverride = state[12098u + sampler];
+    uint32_t volumeMask = (volumeOverride >> 2) - 1u;
+    uint32_t volume = (volumeFilters & volumeMask) + (volumeOverride & ~volumeMask);
+    fetch[4] = (word4 & ~3u) | (volume & 3u);
+
+    // srd uses the low seven shift bits and yields zero for shifts 64..127.
+    // Guard the C++ shift so that those inputs never invoke undefined behavior.
+    uint32_t shift = sampler & 127u;
+    uint64_t dirtyBit = shift < 64u ? (UINT64_C(0x8000000000000000) >> shift) : 0;
+    uint64_t* dirtySamplers = reinterpret_cast<uint64_t*>(state + 32);
+    *dirtySamplers |= dirtyBit;
 }
