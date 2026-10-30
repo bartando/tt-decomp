@@ -12,6 +12,7 @@
 #include <new>      // For placement new
 #include <cstring>  // For strcmp
 #include <cstdlib>  // For strtol
+#include <cmath>    // For fused multiply-add
 
 // External functions
 extern "C" {
@@ -31,10 +32,15 @@ extern "C" {
     int _stricmp(const char*, const char*);     // case-insensitive string compare
     float swfComputeFramePosition(void* ctx, void* entry, float* outMin, float* outMax);
     const char* util_A768_1(const void* value, void* buffer, int maxLen);  // @ 0x823FA768 — SWF value to string
-    float util_EF98(void* instance, int includeChildren);  // @ 0x823FEF98 — display width
-    float swfINSTANCE_F0D8_w(void* instance, int includeChildren);  // @ 0x823FF0D8 — display height
+    float util_EF98(void* instance, float* outMin);  // @ 0x823FEF98 — display width, optional minimum
+    float swfINSTANCE_F0D8_w(void* instance, float* outMin);  // @ 0x823FF0D8 — display height, optional minimum
+    void* util_B188(void* slots, int index);  // @ 0x823FB188
+    uint8_t util_0068(void* record);  // @ 0x821E0068 — button released this frame
+    void phBoundCapsule_B018_g(void* transform);  // @ 0x823FB018 — rebuild SWF affine transform
     int _snprintf(char* buffer, size_t count, const char* format, ...);  // @ 0x820C0B40
 }
+
+extern bool CheckButtonPressed(void* record);  // @ 0x821DFFF8
 
 // @ 0x823FA768
 extern "C" const char* util_A768_1(const void* value, void* buffer, int maxLen) {
@@ -1497,6 +1503,9 @@ void swfCONTEXT_ProcessContextTree(swfCONTEXT* ctx) {
 // SWF image globals. Native storage lives in rage_data.cpp.
 // ============================================================================
 extern void* g_currentSwfContext;  // @ 0x8260281C
+extern void* g_swfSlotObject;      // @ 0x82604848
+extern int32_t g_swfPointerX;      // @ 0x825F312C
+extern int32_t g_swfPointerY;      // @ 0x825F3138
 extern uint32_t g_swfCallDepth;    // @ 0x82604D1C
 extern float g_swfFrameScale;      // @ 0x82079B90
 extern void* g_swfGlobalObject;    // @ 0x82602818
@@ -1510,6 +1519,92 @@ extern void* g_vtable_swfSCRIPTOBJECT; // @ 0x82074D14 — address of the table
 void swfINSTANCE::FindOrCreateChildByDepth() {}
 
 } // namespace rage
+
+// @ 0x823FD078
+extern "C" void pg_D078_g(void* instance) {
+    // Guest swfINSTANCE layout: definition +4, affine matrix +8, children
+    // +0xB4/+0xB8, frame callback +0xCC, pointer callback +0xD0.
+    char* object = static_cast<char*>(instance);
+    using CallbackFn = void (*)(void*, int, int, void*, int);
+    void* callback = *reinterpret_cast<void**>(object + 0xCC);
+    if (callback) {
+        void** vtable = *static_cast<void***>(callback);
+        reinterpret_cast<CallbackFn>(vtable[14])(callback, 0, 0, instance, 0);
+    }
+
+    void* definition = *reinterpret_cast<void**>(object + 4);
+    void** vtable = *static_cast<void***>(definition);
+    using UpdateFn = void (*)(void*, void*);
+    reinterpret_cast<UpdateFn>(vtable[2])(definition, instance);
+
+    if (rage::g_currentSwfContext == instance) {
+        int fromState = 0;
+        int toState = 0;
+        if (CheckButtonPressed(util_B188(rage::g_swfSlotObject, 13))) {
+            fromState = 2;
+            toState = 3;
+        } else if (util_0068(util_B188(rage::g_swfSlotObject, 13)) != 0) {
+            fromState = 3;
+            toState = 2;
+        }
+        if (fromState != 0) {
+            definition = *reinterpret_cast<void**>(object + 4);
+            vtable = *static_cast<void***>(definition);
+            using TransitionFn = void (*)(void*, void*, int, int);
+            reinterpret_cast<TransitionFn>(vtable[3])(definition, instance, fromState, toState);
+        }
+    }
+
+    if (*reinterpret_cast<void**>(object + 0xD0) &&
+        util_0068(util_B188(rage::g_swfSlotObject, 32)) != 0) {
+        const int32_t pointerX = rage::g_swfPointerX;
+        const int32_t pointerY = rage::g_swfPointerY;
+        const float hitX = static_cast<float>(pointerX);
+        const float hitY = static_cast<float>(pointerY);
+
+        // The original reuses the high words of its signed int64 conversion
+        // scratch as outMin. Preserve them when a bounds helper writes nothing:
+        // positive coordinates leave +0, negative coordinates leave a NaN.
+        const uint32_t minXBits = pointerY < 0 ? 0xFFFFFFFFu : 0;
+        const uint32_t minYBits = pointerX < 0 ? 0xFFFFFFFFu : 0;
+        float minX;
+        float minY;
+        std::memcpy(&minX, &minXBits, sizeof(minX));
+        std::memcpy(&minY, &minYBits, sizeof(minY));
+        const float width = util_EF98(instance, &minX);
+        const float height = swfINSTANCE_F0D8_w(instance, &minY);
+        const float maxX = minX + width;
+        const float maxY = minY + height;
+
+        float* matrix = reinterpret_cast<float*>(object + 8);
+        phBoundCapsule_B018_g(matrix);
+        // Keep fmuls rounding before each fmadds, and the final translation
+        // addition separate. Ordered comparisons also reject all NaN bounds.
+        const float leftProduct = matrix[0] * minX;
+        const float topProduct = matrix[3] * minY;
+        const float left = std::fma(matrix[2], minY, leftProduct) + matrix[4];
+        const float top = std::fma(matrix[1], minX, topProduct) + matrix[5];
+        if (hitX >= left) {
+            const float rightProduct = matrix[0] * maxX;
+            const float right = std::fma(matrix[2], maxY, rightProduct) + matrix[4];
+            if (hitX <= right && hitY >= top) {
+                const float bottomProduct = matrix[1] * maxX;
+                const float bottom = std::fma(matrix[3], maxY, bottomProduct) + matrix[5];
+                if (hitY <= bottom) {
+                    callback = *reinterpret_cast<void**>(object + 0xD0);
+                    vtable = *static_cast<void***>(callback);
+                    reinterpret_cast<CallbackFn>(vtable[14])(callback, 0, 0, instance, 0);
+                }
+            }
+        }
+    }
+
+    void* child = *reinterpret_cast<void**>(object + 0xB4);
+    while (child) {
+        pg_D078_g(child);
+        child = *reinterpret_cast<void**>(static_cast<char*>(child) + 0xB8);
+    }
+}
 
 // ============================================================================
 // Stubs pending full implementation — pg_/PageGroup/swf*/hudFlashBase/Dialog
