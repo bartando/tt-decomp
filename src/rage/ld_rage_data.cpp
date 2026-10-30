@@ -32,6 +32,9 @@ extern "C" const float kDebugShadowOffsetY = 2.0f;
 
 namespace rage {
 
+struct XAudioBufferPool;
+XAudioBufferPool* g_xaudioBufferPool = nullptr; // @ 0x825E788C
+
 extern const float g_xactFadeZero = 0.0f; // @ 0x82003DA8
 extern const float g_xactFadeOne = 1.0f; // @ 0x82003DAC
 extern const float g_xactFadeStep = 5.0f; // @ 0x82004AA8
