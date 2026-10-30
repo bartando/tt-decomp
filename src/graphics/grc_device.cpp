@@ -10,6 +10,7 @@
  *   - grcDevice_setSamplerMagFilter @ 0x823555A8 — Xenos texture fetch state
  *   - grcDevice_setSamplerMaxAnisotropy @ 0x82355828 — Xenos texture fetch state
  *   - grcDevice_setSamplerMipFilter     @ 0x82355738 — Xenos texture fetch state
+ *   - grcDevice_setSamplerAddressU/V/W  @ 0x82355B58/BA8/BF8 — Xenos texture fetch state
  *   - grcDevice_setSamplerLodBias       @ 0x82355948 — Xenos texture fetch state
  *   - grcDevice_SetViewport         @ 0x82355ED0 — clip and load the viewport transform
  *   - grcDevice_SetStreamSource     @ 0x82356118 — bind a vertex buffer to a stream
@@ -371,6 +372,33 @@ void grcDevice_setSamplerMipFilter(void* device, uint32_t sampler, uint32_t filt
     uint32_t shift = sampler & 127u;
     uint64_t dirtyBit = shift < 64u ? (UINT64_C(0x8000000000000000) >> shift) : 0;
     *reinterpret_cast<uint64_t*>(state + 32) |= dirtyBit;
+}
+
+// Fetch dword 0's clamp_x/y/z fields, three bits each.
+static void setSamplerAddressMode(void* device, uint32_t sampler, uint32_t mode, uint32_t shift) {
+    uint8_t* state = static_cast<uint8_t*>(device);
+    uint32_t* fetch = reinterpret_cast<uint32_t*>(state + (sampler + 48u) * 24u);
+    uint32_t mask = 7u << shift;
+    fetch[0] = (fetch[0] & ~mask) | ((mode << shift) & mask);
+
+    uint32_t bit = sampler & 127u;
+    uint64_t dirtyBit = bit < 64u ? (UINT64_C(0x8000000000000000) >> bit) : 0;
+    *reinterpret_cast<uint64_t*>(state + 32) |= dirtyBit;
+}
+
+// @ 0x82355B58
+void grcDevice_setSamplerAddressU(void* device, uint32_t sampler, uint32_t mode) {
+    setSamplerAddressMode(device, sampler, mode, 10);
+}
+
+// @ 0x82355BA8
+void grcDevice_setSamplerAddressV(void* device, uint32_t sampler, uint32_t mode) {
+    setSamplerAddressMode(device, sampler, mode, 13);
+}
+
+// @ 0x82355BF8
+void grcDevice_setSamplerAddressW(void* device, uint32_t sampler, uint32_t mode) {
+    setSamplerAddressMode(device, sampler, mode, 16);
 }
 
 // The bias arrives as raw float bits (a D3D-style sampler state DWORD) and is
