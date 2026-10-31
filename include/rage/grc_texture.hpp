@@ -20,7 +20,7 @@ struct grcTexture {
     virtual void vfn_13(void*, void*);              // slot 13
     virtual void vfn_14(void*, void*);              // slot 14
     virtual void vfn_15();                          // slot 15
-    virtual void vfn_16(void*);                     // slot 16
+    virtual void SetLodLevel(uint32_t level);       // slot 16; setter stores low byte
     virtual void vfn_17(float, void*);              // slot 17
     virtual void vfn_18(void*, void*);              // slot 18
     virtual void vfn_19();                          // slot 19
@@ -31,4 +31,5 @@ struct grcTexture {
     virtual void vfn_24();                          // slot 24
     virtual void Flush();                           // slot 25  (byte offset +100)
 };
+uint32_t Release(grcTexture* texture); // @ 0x820C2E18
 } // namespace rage

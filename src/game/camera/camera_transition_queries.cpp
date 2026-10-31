@@ -6,6 +6,7 @@ uint8_t pongCameraMgr_6E08(void* evaluator, TransitionParams* key,
                           int mode, void* flags, int enable); // @ 0x82216E08
 extern "C" const float g_cameraConstPool[32]; // @ 0x8202D108
 extern "C" float g_cameraThreshold; // @ 0x825C5EC0
+extern "C" uint32_t g_nScreenWidth; // @ 0x825C9014
 
 // Query mode 20 first. Its edits to the local key's second word survive into
 // the mode-3 query, whose first word comes from the live source plus one.
@@ -35,4 +36,27 @@ bool pongCameraMgr_5308_fw(void* source, void* evaluator) {
         return false;
     *static_cast<float*>(source) = copy.value;
     return true;
+}
+
+// The four fixed display-mode records at 0x825CB75C supply these factors;
+// both code references to that table only read it. Preserve the original
+// fallback division, which produces NaN when the screen-size word is zero.
+// @ 0x82228EA0 | size: 0x90
+float gameLoop_GetDisplayAspect(void* gameLoop) {
+    struct AspectView {
+        uint8_t unused[0x200];
+        int32_t mode;
+        float stretch;
+    };
+    const auto* state = static_cast<const AspectView*>(gameLoop);
+    constexpr float factors[] = {1.0f, 4.0f / 3.0f, 8.0f / 7.0f, 16.0f / 9.0f};
+    const uint32_t mode = static_cast<uint32_t>(state->mode);
+    float factor;
+    if (mode < 4) {
+        factor = factors[mode];
+    } else {
+        const float dimension = static_cast<float>(static_cast<int32_t>(g_nScreenWidth));
+        factor = dimension / dimension;
+    }
+    return state->stretch * factor;
 }

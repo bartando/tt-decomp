@@ -284,7 +284,6 @@ struct pongCameraMgr {
     // ── non-virtual methods ──
     void ChangeCamera();
     void AdjustTimingForIndex(int index);  // @ 0x82173430
-    bool TryTransition(void* gameState);   // @ 0x821F7338
     bool TryTransitionMode20(void* gameState);  // @ 0x821F6B78
     bool IsStateNine() const;              // @ 0x821F7F40
     bool IsCameraStateZero() const;        // @ 0x821F7E28

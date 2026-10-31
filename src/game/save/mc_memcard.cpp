@@ -1,3 +1,4 @@
+#include "rage/fi_stream.hpp"
 /**
  * mc_memcard.cpp — Xbox 360 memory card/save-data state machine
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -13,13 +14,6 @@
 
 extern "C" {
 void atFactory_GetFactory(void* singleton);  // @ 0x822E2E60
-void* rage_datTypeFactory_Create_stub(void* singleton,
-                                   const void* typeInfo,
-                                   const void* typeOps,
-                                   std::int32_t flags,
-                                   std::int32_t isRootType);  // @ 0x822E3040
-void fiStreamBuf_Read_stub(void* factoryContext, void* storage, std::uint32_t size);  // @ 0x822E3828
-void fiStreamBuf_Close_stub(void* factoryContext);  // @ 0x822E3B38
 void rage_DebugLog(const void* messageTag,
                   const void* typeInfo,
                   const void* typeOps,
@@ -214,9 +208,9 @@ void mcMemcardControl::Init()
     void* typeFactorySingleton = reinterpret_cast<void*>(kTypeFactorySingletonAddress);
     atFactory_GetFactory(typeFactorySingleton);
 
-    void* factoryContext = rage_datTypeFactory_Create_stub(typeFactorySingleton,
-                                                        m_typeRegistration.m_pTypeInfo,
-                                                        m_typeRegistration.m_pTypeOps,
+    void* factoryContext = fiStreamBuf_OpenAll(typeFactorySingleton,
+                                                        static_cast<const char*>(m_typeRegistration.m_pTypeInfo),
+                                                        static_cast<const char*>(m_typeRegistration.m_pTypeOps),
                                                         0,
                                                         1);
 
@@ -226,10 +220,10 @@ void mcMemcardControl::Init()
         sysMemAllocator_InitThreadHeap();
         m_typeRegistration.m_pTypeStorage = rage_malloc(m_typeRegistration.m_typeStorageSize);
 
-        fiStreamBuf_Read_stub(factoryContext,
+        fiStreamBuf_Read(factoryContext,
                            m_typeRegistration.m_pTypeStorage,
                            m_typeRegistration.m_typeStorageSize);
-        fiStreamBuf_Close_stub(factoryContext);
+        fiStreamBuf_Close(factoryContext);
     }
 
     rage_DebugLog(reinterpret_cast<const void*>(kMemcardTypeDebugLabel),

@@ -1,3 +1,4 @@
+#include "rage/fi_stream.hpp"
 #include "rage/time_state.hpp"
 #include "grc/image_state.hpp"
 /**
@@ -1325,10 +1326,6 @@ void fxAmbient::ApplyBoneOverrides() {
 // External RAGE runtime helpers referenced by these four methods.
 // (atFactory_GetFactory is already declared near fxSpecialFx above; rage_free_00C0
 //  is declared in the fxAmbient block.)
-extern void* rage_datTypeFactory_Create(void* holder, const char* typeName,
-                                        const char* modName, int flag1,
-                                        int zero);                // @ 0x822E3040
-extern void  fiStreamBuf_Close(void* stream);                     // @ 0x822E3B38
 extern void  atSingleton_5218(void* dst, void* desc);             // @ 0x82385218
 extern void  atSingleton_53E0_w(void* dst, const char* name,
                                 void* desc);                      // @ 0x823853E0
@@ -1435,7 +1432,7 @@ void fxBallSpinWispData::ScalarDtor(int flags) {
  *
  * Each factory is fetched via:
  *   atFactory_GetFactory(&g_fxReticleSingleton);      // initialize holder
- *   desc = rage_datTypeFactory_Create(holder, typeName, "fx", 1, 0);
+ *   desc = fiStreamBuf_OpenAll(holder, typeName, "fx", 1, 0);
  *
  * The 32-byte local descriptor laid out on the stack for each bind is:
  *   +0   fiTokenizer_vtable
@@ -1459,7 +1456,7 @@ void fxReticle::RegisterReticleTypes() {
     atFactory_GetFactory(holder);
 
     // ── Slot A: "ideal_reticle" → this+48 ────────────────────────────
-    void* descA = rage_datTypeFactory_Create(holder,
+    void* descA = fiStreamBuf_OpenAll(holder,
                                              fxReticle_s_idealName,
                                              fxReticle_s_modId, 1, 0);
     if (descA != nullptr) {
@@ -1481,7 +1478,7 @@ void fxReticle::RegisterReticleTypes() {
     }
 
     // ── Slot B: "actual_reticle" → this+64 ───────────────────────────
-    void* descB = rage_datTypeFactory_Create(holder,
+    void* descB = fiStreamBuf_OpenAll(holder,
                                              fxReticle_s_actualName,
                                              fxReticle_s_modId, 1, 0);
     if (descB != nullptr) {
@@ -1500,7 +1497,7 @@ void fxReticle::RegisterReticleTypes() {
     }
 
     // ── Slot C: "reticle" → this+80 (and +96 for "Target" subkey) ───
-    void* descC = rage_datTypeFactory_Create(holder,
+    void* descC = fiStreamBuf_OpenAll(holder,
                                              fxReticle_s_reticleName,
                                              fxReticle_s_modId, 1, 0);
     if (descC != nullptr) {
