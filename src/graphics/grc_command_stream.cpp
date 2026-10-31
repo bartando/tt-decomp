@@ -5,7 +5,6 @@ extern "C" void* grcDevice_AllocateCommandData(void* device, uint32_t words,
 extern "C" uint32_t KeGetCurrentProcessType(); // @ 0x82585E9C
 extern const uint32_t __imp_VdGlobalDevice;    // @ 0x82000730
 extern const uint32_t __imp_VdGlobalXamDevice; // @ 0x82000734
-extern "C" void rage_EEC0(void* start, void* end); // @ 0x8235EEC0
 extern "C" void rage_A4E0(void* device, uint32_t* count, uint32_t* source); // @ 0x8235A4E0
 extern "C" void rage_A8C0(void* device, void* commands, uint32_t count,
                           uint32_t source, uint32_t flags, void* fixups); // @ 0x8235A8C0

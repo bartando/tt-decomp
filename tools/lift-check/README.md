@@ -75,6 +75,9 @@ on a made-up TU, the example specs, and mutated lifts that must all fail.
 
 ### Spec reference
 
+- `CACHE_EFFECTS = True` compares executed `dcbf` cache-line addresses (128-byte
+  Xenon lines) and `sync` barriers in order. Use it for cache-maintenance helpers
+  whose effects would otherwise be invisible to byte-level memory comparison.
 - `inputs(t)`: `t.index` is the zero-based trial number (stable with `--only`);
   `t.alloc(size, name, fill="random"|"zero"|bytes, ctype="Struct")` reserves
   input memory and returns its address (`ctype` makes that struct's float members compare

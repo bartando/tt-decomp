@@ -91,6 +91,7 @@ class SideResult:
     fpr: list
     instructions: int = 0
     fpscr: int = 0
+    cache_events: list = field(default_factory=list)
 
 
 @dataclass
@@ -103,7 +104,7 @@ class RunFrame:
 
 
 class Machine:
-    def __init__(self, image: bytes, lift, symbols, helper_ranges):
+    def __init__(self, image: bytes, lift, symbols, helper_ranges, *, cache_effects=False):
         self.image = image
         self.lift = lift
         self.syms = symbols
@@ -135,6 +136,9 @@ class Machine:
         self.assist = Assist(self)
         self.hi_shadow: list = [None] * 32      # per GPR: {low word: upper word} or None
         self._hooked: set[int] = set()
+        self.cache_effects = cache_effects
+        self._cache_hooked: set[int] = set()
+        self.cache_events: list = []
 
         uc.hook_add(UC_HOOK_BLOCK, self._on_block)
         uc.hook_add(UC_HOOK_MEM_WRITE, self._on_write)
@@ -163,6 +167,11 @@ class Machine:
         added = False
         for k, w in enumerate(words):
             a = lo + 4 * k
+            if self.cache_effects and a not in self._cache_hooked and w >> 26 == 31:
+                if (w >> 1) & 1023 in (86, 598):  # dcbf / sync
+                    self._cache_hooked.add(a)
+                    self.uc.hook_add(UC_HOOK_CODE, self._on_cache, begin=a, end=a)
+                    added = True
             if a in self._hooked:
                 continue
             if needs_assist(w) or wide and needs_predict(w):
@@ -171,6 +180,15 @@ class Machine:
                 added = True
         if added:
             self.uc.ctl_flush_tb()       # blocks translated before the hook existed
+
+    def _on_cache(self, uc, addr, size, _):
+        word = self.u32(addr)
+        if (word >> 1) & 1023 == 86:
+            ra, rb = (word >> 16) & 31, (word >> 11) & 31
+            address = ((self.gpr(ra) if ra else 0) + self.gpr(rb)) & M32
+            self.cache_events.append(('dcbf', address & ~127))
+        else:
+            self.cache_events.append(('sync', (word >> 21) & 3))
 
     # ── register/memory interface used by assist, vmx and policies ────────
     def gpr(self, n):
@@ -404,6 +422,7 @@ class Machine:
         self.dispatch = dispatch
         self.writes = {}
         self.calls = []
+        self.cache_events = []
         self.fault = None
         self.hi_shadow = [None] * 32
         self.assist.vmx.v = [list(v) for v in vregs]
@@ -431,7 +450,8 @@ class Machine:
         return SideResult(side, self.fault, self.writes, self.calls,
                           [self.gpr(n) for n in range(32)],
                           [self.gpr64(n) for n in range(32)],
-                          [self.fpr(n) for n in range(32)], fpscr=self.fpscr())
+                          [self.fpr(n) for n in range(32)], fpscr=self.fpscr(),
+                          cache_events=self.cache_events)
 
     def restore(self, addrs, initial):
         """Puts back the initial bytes at every address a side wrote."""

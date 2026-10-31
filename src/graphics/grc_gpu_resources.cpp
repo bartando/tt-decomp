@@ -21,7 +21,6 @@ extern "C" {
 
 // rage_EEC0 — GPU memory resolve/invalidate helper
 // @ 0x8235EEC0 — takes two addresses (start, end) for a GPU memory region
-extern void rage_EEC0(void* start, void* end);
 
 extern void grcPatchVertexFetchInstructions(void* device, void* shader, uint32_t codeAddress, void* declaration);  // @ 0x82362A68
 extern void rage_32F0(void* device, uint32_t repatch, void* shader, uint32_t* programControl,
