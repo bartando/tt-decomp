@@ -1,8 +1,8 @@
 // Serve-start query and the pending input-event reset that follows a serve.
 #include <cstdint>
+#include "rage/sys_callback.hpp"
 
 struct pongSwingAnimView;
-extern "C" void sysCallback_Invoke(void*, void*); // @ 0x8225FFF8
 
 namespace {
 template<class T> T& at(void* object, unsigned offset) {

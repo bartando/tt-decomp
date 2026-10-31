@@ -12,11 +12,11 @@
 
 #include <stdint.h>
 #include <cstring>
+#include "rage/sys_callback.hpp"
 
 // Forward declarations
 extern "C" void rage_free(void* ptr);
 extern "C" void rage_ReleaseSingleton(void* obj);
-extern void sysCallback_Invoke(void* obj, int flags);
 extern "C" void rage_AssertMainThread(void);
 
 // ── Common vtable slot signatures ───────────────────────────────────────────
