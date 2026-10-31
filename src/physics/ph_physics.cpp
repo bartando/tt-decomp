@@ -17,6 +17,7 @@
 #include "joint_initialization.hpp"
 #include "rage/math.hpp"
 #include "rage/mat33.hpp"
+#include "rage/ptr32.hpp"
 
 extern "C" void* rage_alloc(uint32_t size);  // RAGE heap alloc (defined in heap.c)
 
@@ -9112,8 +9113,8 @@ static inline __attribute__((always_inline)) void phPropagateSelectedResponse(
     int child = bodyIndex;
     while (child > 0) {
         const int parentIndex = static_cast<int32_t>(data[72 + child]);
-        auto* joint = reinterpret_cast<rage::phArticulatedJointOps*>(uintptr_t(data[41 + child]));
-        void* parent = reinterpret_cast<void*>(uintptr_t(data[10 + parentIndex]));
+        auto* joint = rage::load_ptr32<rage::phArticulatedJointOps>(data, (41 + child) * 4);
+        void* parent = rage::load_ptr32<void>(data, (10 + parentIndex) * 4);
         joint->ResolveParentResponse(phSelectedResponse(body), phSelectedResponse(parent));
         data[105 + child] = 1;
         child = parentIndex;
@@ -9122,9 +9123,9 @@ static inline __attribute__((always_inline)) void phPropagateSelectedResponse(
     for (int edge = 1; edge < static_cast<int32_t>(data[1]); ++edge) {
         if (data[105 + edge] != 0)
             continue;
-        auto* joint = reinterpret_cast<rage::phArticulatedJointOps*>(uintptr_t(data[41 + edge]));
-        void* parent = reinterpret_cast<void*>(uintptr_t(data[10 + data[72 + edge]]));
-        void* destination = reinterpret_cast<void*>(uintptr_t(data[10 + edge]));
+        auto* joint = rage::load_ptr32<rage::phArticulatedJointOps>(data, (41 + edge) * 4);
+        void* parent = rage::load_ptr32<void>(data, (10 + data[72 + edge]) * 4);
+        void* destination = rage::load_ptr32<void>(data, (10 + edge) * 4);
         joint->ResolveChildResponse(phSelectedResponse(parent), phSelectedResponse(destination));
     }
 }
@@ -9145,7 +9146,7 @@ void phArticulatedCollider_ApplyPointImpulseResponse(void* jointData, int bodyIn
         impulse[4 + lane] = phFlushVmx(-(second - first));
     }
     uint32_t* data = static_cast<uint32_t*>(jointData);
-    float* body = reinterpret_cast<float*>(uintptr_t(data[10 + bodyIndex]));
+    float* body = rage::load_ptr32<float>(data, (10 + bodyIndex) * 4);
     phSpatialTensor_Multiply(body + 0x310 / 4, impulse, phSelectedResponse(body));
     phPropagateSelectedResponse(data, bodyIndex, body);
 }
@@ -9157,7 +9158,7 @@ void phArticulatedCollider_ApplyAngularImpulseResponse(void* jointData, int body
     memset(impulse, 0, 16);
     memcpy(impulse + 4, torque, 16);
     uint32_t* data = static_cast<uint32_t*>(jointData);
-    float* body = reinterpret_cast<float*>(uintptr_t(data[10 + bodyIndex]));
+    float* body = rage::load_ptr32<float>(data, (10 + bodyIndex) * 4);
     phSpatialTensor_Multiply(body + 0x310 / 4, impulse, phSelectedResponse(body));
     phPropagateSelectedResponse(data, bodyIndex, body);
 }
@@ -9169,11 +9170,11 @@ void phArticulatedCollider_BuildPointResponse(void* jointData, int bodyIndex, co
     uint32_t* data = static_cast<uint32_t*>(jointData);
     for (unsigned axis = 0; axis < 3; ++axis) {
         for (int i = 0; i < static_cast<int32_t>(data[1]); ++i)
-            *reinterpret_cast<uint32_t*>(uintptr_t(data[10 + i])) = axis;
+            *rage::load_ptr32<uint32_t>(data, (10 + i) * 4) = axis;
         phArticulatedCollider_ApplyPointImpulseResponse(data, bodyIndex, g_phResponseBasis[axis], point);
     }
     for (int i = 0; i < static_cast<int32_t>(data[1]); ++i)
-        *reinterpret_cast<uint32_t*>(uintptr_t(data[10 + i])) = 0;
+        *rage::load_ptr32<uint32_t>(data, (10 + i) * 4) = 0;
 }
 
 // phArticulatedCollider_BuildAngularResponse @ 0x82257918 | size: 0x118
@@ -9181,11 +9182,11 @@ void phArticulatedCollider_BuildAngularResponse(void* jointData, int bodyIndex) 
     uint32_t* data = static_cast<uint32_t*>(jointData);
     for (unsigned axis = 0; axis < 3; ++axis) {
         for (int i = 0; i < static_cast<int32_t>(data[1]); ++i)
-            *reinterpret_cast<uint32_t*>(uintptr_t(data[10 + i])) = axis;
+            *rage::load_ptr32<uint32_t>(data, (10 + i) * 4) = axis;
         phArticulatedCollider_ApplyAngularImpulseResponse(data, bodyIndex, g_phResponseBasis[axis]);
     }
     for (int i = 0; i < static_cast<int32_t>(data[1]); ++i)
-        *reinterpret_cast<uint32_t*>(uintptr_t(data[10 + i])) = 0;
+        *rage::load_ptr32<uint32_t>(data, (10 + i) * 4) = 0;
 }
 
 // Build the selected body's point-response matrix, with output in r6. Three
@@ -9212,7 +9213,7 @@ void phArticulatedCollider_GetPointResponseMatrix(void* jointData, int bodyIndex
         for (unsigned lane = 0; lane < 4; ++lane)
             output[row * 4 + lane] = phFlushVmx(phFlushVmx(lbl_82606750[lane]) - phFlushVmx(output[row * 4 + lane]));
     const uint32_t* data = static_cast<const uint32_t*>(jointData);
-    const float* body = reinterpret_cast<const float*>(uintptr_t(data[10 + bodyIndex]));
+    const float* body = rage::load_ptr32<const float>(data, (10 + bodyIndex) * 4);
     alignas(16) float angular[16] = {};
     for (unsigned row = 0; row < 3; ++row)
         for (unsigned column = 0; column < 3; ++column)
