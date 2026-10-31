@@ -193,23 +193,8 @@ float pongMover_GetBlendWeight(pongMover* mover) {
 }
 
 // pongMover_GetInputSpeed (was pg_B4D0_g) @ 0x820CB4D0 | size: 0xC8
-float pongMover_GetInputSpeed(pongMover* mover) {
-    const auto movementData = []() {
-        return *reinterpret_cast<const uint8_t* const*>(
-            static_cast<const uint8_t*>(g_gameDataMgr) + 0x14);
-    };
-    if (mover->m_flags & 4)
-        return *reinterpret_cast<const float*>(movementData() + 0x64);
-    auto* match = reinterpret_cast<const uint8_t*>(g_pInputArrayTable);
-    const uint32_t index = mover->m_creatureIndex;
-    if (match[uint32_t(index * 36 + 0xC4)] != 0)
-        return *reinterpret_cast<const float*>(movementData() + 0x58);
-    const auto* character = static_cast<const uint8_t*>(pongMatch_GetCharacterForSlot(
-        const_cast<uint8_t*>(match), index));
-    const auto* movement = *reinterpret_cast<const uint8_t* const*>(character + 0x28);
-    const float scale = *reinterpret_cast<const float*>(movement + 0x64);
-    return scale * *reinterpret_cast<const float*>(movementData() + 0x58);
-}
+// Defined in its owning module; do not duplicate the export here.
+
 
 // pongMover_UpdateMovementState (was game_A390) @ 0x820CA390 | size: 0xF4
 void pongMover_UpdateMovementState(pongMover* mover) {

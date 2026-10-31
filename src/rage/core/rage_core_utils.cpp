@@ -23,6 +23,7 @@
 #include <cmath>
 #include "game/template_registry.hpp"
 #include "rage/singleton.h"
+#include "rage/rage.h"
 #include "rage/sys_callback.hpp"
 #include "rage/ref_counted_header.hpp"
 
@@ -249,14 +250,8 @@ extern "C" void rage_debugLog_c(const char* fmt, ...) {
  * On Xbox 360, this wrote to the kernel debug output channel.
  * On the host, we route to printf.
  */
-extern "C" void DbgPrint(const char* fmt, ...) {
-    if (!fmt) return;
-    va_list args;
-    va_start(args, fmt);
-    std::vprintf(fmt, args);
-    va_end(args);
-    std::printf("\n");
-}
+// Defined in its owning module; do not duplicate the export here.
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SECTION 3: String Utilities
@@ -581,7 +576,7 @@ namespace rage {
  * Primary allocation function in the rage namespace. Routes through
  * the global sysMemAllocator with the specified alignment.
  */
-void* Allocate(unsigned long size, unsigned long alignment) {
+void* Allocate(size_t size, size_t alignment) {
     if (size == 0) return nullptr;
     if (alignment < 16) alignment = 16;
 
@@ -1008,7 +1003,8 @@ extern "C" void* RtlEnterCriticalSection_D6F0_fw(void* critSection) {
 // xe_GetLoadContext — C++ overload (C version in xe_tls.c)
 // ============================================================================
 
-extern "C" void xe_GetLoadContext(void* context) { (void)context; }
+// Defined in its owning module; do not duplicate the export here.
+
 
 
 // ============================================================================
@@ -1068,8 +1064,6 @@ void _c_atArray_Clear(void* a) { atArray_Clear(a); }
 void _c_audControl_Destructor(void* o) __asm__("_audControl_Destructor");
 void _c_audControl_Destructor(void* o) { audControl_Destructor(o); }
 
-void _c_hsmContext_SetNextState(void* c, int s) __asm__("_hsmContext_SetNextState_2800");
-void _c_hsmContext_SetNextState(void* c, int s) { hsmContext_SetNextState(c, s); }
 
 
 // _c_sysCallback_Invoke not needed — sysCallback_Invoke already has extern "C" linkage

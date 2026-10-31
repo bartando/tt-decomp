@@ -206,31 +206,16 @@ uint32_t VdPersistDisplay(void) {
  * 
  * Captures the current thread context.
  */
-void RtlCaptureContext(void* pContext) {
-    if (!pContext) {
-        return;
-    }
-    
-    // Zero out context structure
-    // Real implementation would capture registers, stack pointer, etc.
-    memset(pContext, 0, 1024);  // Assume context is ~1KB
-    
-    printf("Video: Capture thread context (stubbed)\n");
-}
+// Defined in its owning module; do not duplicate the export here.
+
 
 /**
  * RtlUnwind @ 0x8258629C
  * 
  * Unwinds the stack during exception handling.
  */
-void RtlUnwind(void* TargetFrame, void* TargetIp, void* ExceptionRecord, void* ReturnValue) {
-    (void)TargetFrame;
-    (void)TargetIp;
-    (void)ExceptionRecord;
-    (void)ReturnValue;
-    
-    printf("Video: Unwind stack (stubbed)\n");
-}
+// Defined in its owning module; do not duplicate the export here.
+
 
 //=============================================================================
 // Thread Creation (Audio Processing Threads)
@@ -241,33 +226,4 @@ void RtlUnwind(void* TargetFrame, void* TargetIp, void* ExceptionRecord, void* R
  * 
  * Creates a new thread for audio processing.
  */
-uint32_t ExCreateThread(void** pHandle, uint32_t dwStackSize, uint32_t* pThreadId,
-                        void* pStartAddress, void* pParameter, uint32_t dwCreationFlags) {
-    (void)dwStackSize;
-    (void)dwCreationFlags;
-    
-    if (!pHandle || !pStartAddress) {
-        return 0xC000000D;  // STATUS_INVALID_PARAMETER
-    }
-    
-    // Create thread using SDL2
-    SDL_Thread* thread = SDL_CreateThread(
-        (SDL_ThreadFunction)pStartAddress,
-        "AudioThread",
-        pParameter
-    );
-    
-    if (!thread) {
-        fprintf(stderr, "Video: Failed to create thread: %s\n", SDL_GetError());
-        return 0xC0000017;  // STATUS_NO_MEMORY
-    }
-    
-    *pHandle = (void*)thread;
-    
-    if (pThreadId) {
-        *pThreadId = SDL_GetThreadID(thread);
-    }
-    
-    printf("Video: Created thread (ID: %u)\n", pThreadId ? *pThreadId : 0);
-    return 0;  // STATUS_SUCCESS
-}
+// Defined in its owning module; do not duplicate the export here.
