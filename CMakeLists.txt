@@ -145,6 +145,10 @@ set(SOURCES
     src/rage/swf_text.cpp
     src/rage/swf_bounds.cpp
     src/rage/swf_action_copy.cpp
+    src/rage/swf_paint.cpp
+    src/rage/localized_font.cpp
+    src/rage/localized_font_lifecycle.cpp
+    src/rage/localized_font_effect.cpp
     src/rage/swf_clip_events.cpp
     src/rage/core/timer.cpp
     src/rage/core/rage_core_utils.cpp
@@ -254,6 +258,7 @@ set(SOURCES
     src/game/match/hsm_log_strings.cpp
     src/game/match/pong_match.cpp
     src/game/match/match_ai_array.cpp
+    src/game/match/practice_target_words.cpp
     src/game/match/replay_state_publish.cpp
     src/game/match/lvl_table.cpp
     src/game/match/pong_states.cpp
@@ -341,6 +346,7 @@ set(SOURCES
     src/rage/network/sn_event.cpp
     src/xam/kernel_import_thunks.c
     src/rage/math/float_approach.cpp
+    src/rage/math/index_wrap.cpp
     src/rage/math/ph_math.cpp
     src/rage/math/polygon_clip.cpp
     src/rage/math/swf_matrix.cpp

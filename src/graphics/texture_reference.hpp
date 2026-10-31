@@ -54,7 +54,7 @@ struct grcTextureReferenceBase : datBase {
     virtual void  ForwardSlot13(void* a, void* b);          // slot 13
     virtual void  ForwardSlot14(void* a, void* b);          // slot 14
     virtual void  ForwardSlot15();                          // slot 15
-    virtual void  ForwardSlot16(void* a);                   // slot 16
+    virtual void  ForwardSlot16(uint32_t level);            // slot 16
     virtual void  ForwardSlot17(float f, void* a);          // slot 17  – takes float arg
     virtual void  ForwardSlot18(void* a, void* b);          // slot 18
     virtual void  vfn_19();                                 // slot 19  (abstract/subclass)

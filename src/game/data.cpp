@@ -14,6 +14,7 @@
  */
 
 #include "data/gd_data.hpp"
+#include "rage/index_wrap.hpp"
 #include <cstdint>
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -67,11 +68,6 @@ extern void xe_AllocateBuffer(void* outPtr, uint32_t count);
 //
 // @ 0x821DDAF0 | size: 0x80
 extern int32_t crSkeletonData_FindBoneByName(void* skeletonData, const char* boneName);
-
-// Integer wrap — wraps `value` into the range [min, max] using modular arithmetic.
-// Equivalent to: min + ((value - min) % (max - min + 1))
-// @ 0x820DC4E8 | size: 0x58
-extern int32_t math_WrapIndex(int32_t value, int32_t min, int32_t max);
 
 // Debug logger — no-op in release builds (single `blr` instruction).
 // @ 0x8240E6D0
