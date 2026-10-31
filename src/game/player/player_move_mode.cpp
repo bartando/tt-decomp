@@ -7,7 +7,7 @@ extern "C" void* g_rendererState; // @ 0x8260641C
 extern "C" void pongPlayer_7C78_g(pongPlayer*, uint8_t); // @ 0x820C7C78
 extern bool pongPlayer_CheckServeInput(pongPlayer*); // @ 0x82195B60
 extern void pg_6CF8(void*, int32_t); // @ 0x820C6CF8
-extern void pongPlayer_BBE0_g(void*, uint8_t); // @ 0x8218BBE0
+extern void pongPlayer_BBE0_g(void*, uint32_t); // @ 0x8218BBE0
 
 namespace {
 template<class T> T& at(void* object, unsigned offset) {
