@@ -1,8 +1,8 @@
 # Physics link wave G — completed and remaining
 
-This pass addresses 23 of the 85 ABI entries supplied in `/tmp/tt-wave-G/physics.txt`.
-It adds 37 original PPC routines (18 are dependencies absent from that list).
-The 62 entries below were not addressed by this pass.
+This pass addresses 24 of the 85 ABI entries supplied in `/tmp/tt-wave-G/physics.txt`.
+It adds 38 original PPC routines (18 are dependencies absent from that list).
+The 61 entries below were not addressed by this pass.
 
 ## Completed
 
@@ -267,12 +267,33 @@ Verification and limits:
 - Native compilation succeeds; completed missing spellings no longer occur in
   linker errors. Remaining unrelated symbols still prevent linking.
 
-## Remaining input entries (62)
+## Continuation — flattened joint limit/error arrays
 
-Next audited target: `phArticulatedCollider_CreateJointConstraints` is
-`0x82258C98`, a joint constraint/error-array gather returning a count, with five
-output array pointers. The current declaration treats them as integers and
-mislabels the return as a handle. Its caller is `0x82250528`.
+- `phArticulatedCollider_CreateJointConstraints` was a misleading declared-only
+  spelling of `0x82258C98`, now `phArticulatedCollider_GatherJointLimits`.
+  Its five arguments are typed output arrays, and its return is a row count.
+  Real joint virtuals at +0C/+10 provide each constraint count and state.
+- The lift preserves the cached outer bound, joint-pointer reloads, owner index
+  store before state query, sequential aliased stores, sign-bit error clamp,
+  and reference-error calculation. It lives in
+  `src/physics/articulated_constraints.cpp`, included by CMake.
+- Corrected `0x82250528` to `UpdateJointConstraintErrors`: five confirmed pointer
+  slots, dirty flag at +1D4, and returned count at +1D8. No handle allocation or
+  pointer-valued return is involved.
+- Specs `ph_articulated_gather_joint_limits` and
+  `ph_articulated_update_joint_limits` pass seeds 1 and 2 (600 / 300 trials).
+  Cases include signed/zero counts, nonfinite/sign-bit behavior, aliased output
+  arrays, count mutation, replaced joint pointers and observable store ordering.
+  No ignored bytes; finite float32 results are exact.
+- `_articulated_limit_mutations.py` checks signs, derived values, store order,
+  pointer/bound caching, indices, returned count, flag and caller output slots;
+  all 12 mutations are caught as behavioral failures.
+- Native compilation succeeds; the old missing spelling is absent from the
+  remaining linker errors. The complete existing articulated timestep pipeline
+  also passes 96 trials on each of seeds 1 and 2 after the interface changes.
+
+## Remaining input entries (61)
+
 
 - `_phDemoWorld_67D0_g`
 - `_ph_2E08`
@@ -288,7 +309,6 @@ mislabels the return as a handle. Its caller is `0x82250528`.
 - `_sub_823517F8`
 - `aud_2478(double)`
 - `game_CE58(void*)`
-- `phArticulatedCollider_CreateJointConstraints(void*, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int)`
 - `phBoundCapsule_ACB0_p45(void*)`
 - `phBoundCapsule_ComputeAngleXZ(void*, float, float)`
 - `phBoundCapsule_DecomposeRotation(float*, float*, float*, float*, float*)`

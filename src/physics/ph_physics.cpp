@@ -12,6 +12,7 @@
 #include "articulated_joint.hpp"
 #include "articulated_motion.hpp"
 #include "articulated_response.hpp"
+#include "articulated_constraints.hpp"
 #include "joint_initialization.hpp"
 #include "rage/math.hpp"
 #include "rage/mat33.hpp"
@@ -7496,8 +7497,6 @@ void phBoundCapsule_DecomposeMatrixToEuler(const float* matrix, float* outEuler)
 
 // External functions used by phArticulatedCollider methods
 extern void phCollider_vfn_1(void* collider);
-extern void* phArticulatedCollider_CreateJointConstraints(void* jointData, uint32_t boneMap,
-    uint32_t constraintMap, uint32_t jointParamA, uint32_t jointParamB, uint32_t jointParamC);
 
 // ---------------------------------------------------------------------------
 // phArticulatedCollider::Shutdown (vfn_1) @ 0x8224E6D8 | size: 0x48
@@ -7630,29 +7629,19 @@ void rage::phArticulatedCollider::ApplyScaledMatrixRowZ(float scale) {
     fn(this, axisVec);
 }
 
-// ---------------------------------------------------------------------------
-// phArticulatedCollider::SetupJointConstraints (vfn_47) @ 0x82250528 | size: 0x50
-//
-// Initializes the joint constraint system. Sets m_bJointsDirty
-// to 1, loads five parameter pointers (m_pJointTypeArray, m_pJointConfigArray,
-// m_pJointInertiaArray, m_pJointDampingArray, m_pJointMassArray), and
-// dispatches to phArticulatedCollider_CreateJointConstraints for constraint setup.
-// Stores the returned constraint handle in m_pPhysicsData.
-// ---------------------------------------------------------------------------
-void rage::phArticulatedCollider::SetupJointConstraints() {
-    m_bJointsDirty = 1;  // +468 (byte flag)
-
-    void* jointData = (void*)(uintptr_t)m_pJointArray;    // +464
-    uint32_t boneMap = m_pJointTypeArray;          // +0x1DC
-    uint32_t constraintMap = m_pJointConfigArray;  // +0x1E4
-    uint32_t jointParamA = m_pJointInertiaArray;   // +0x1EC
-    uint32_t jointParamB = m_pJointDampingArray;   // +0x1F4
-    uint32_t jointParamC = m_pJointMassArray;      // +0x1FC
-
-    uint32_t result = (uint32_t)(uintptr_t)phArticulatedCollider_CreateJointConstraints(
-        jointData, boneMap, constraintMap, jointParamA, jointParamB, jointParamC);
-
-    m_pPhysicsData = result;  // +472
+// phArticulatedCollider::UpdateJointConstraintErrors @ 0x82250528 | size: 0x50
+void rage::phArticulatedCollider::UpdateJointConstraintErrors() {
+    uint8_t* collider = reinterpret_cast<uint8_t*>(this);
+    void* data = reinterpret_cast<void*>(uintptr_t(*reinterpret_cast<const uint32_t*>(collider + 0x1D0)));
+    auto* jointIndices = reinterpret_cast<uint32_t*>(uintptr_t(*reinterpret_cast<const uint32_t*>(collider + 0x1DC)));
+    auto* states = reinterpret_cast<uint32_t*>(uintptr_t(*reinterpret_cast<const uint32_t*>(collider + 0x1E4)));
+    auto* errors = reinterpret_cast<float*>(uintptr_t(*reinterpret_cast<const uint32_t*>(collider + 0x1EC)));
+    auto* referenceErrors = reinterpret_cast<float*>(uintptr_t(*reinterpret_cast<const uint32_t*>(collider + 0x1F4)));
+    auto* weights = reinterpret_cast<float*>(uintptr_t(*reinterpret_cast<const uint32_t*>(collider + 0x1FC)));
+    collider[0x1D4] = 1;
+    const int32_t count = phArticulatedCollider_GatherJointLimits(data, jointIndices, states,
+                                                               errors, referenceErrors, weights);
+    *reinterpret_cast<int32_t*>(collider + 0x1D8) = count;
 }
 
 // ---------------------------------------------------------------------------

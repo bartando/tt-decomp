@@ -166,6 +166,7 @@ set(SOURCES
     # Physics
     src/physics/ph_physics.cpp
     src/physics/bound_lookup.cpp
+    src/physics/articulated_constraints.cpp
     src/physics/ph_update_object.cpp
     
     # Graphics

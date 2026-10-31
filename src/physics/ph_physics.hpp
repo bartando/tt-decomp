@@ -520,7 +520,7 @@ struct phArticulatedCollider {
     void ApplyScaledMatrixRowX(float scale);
     void ApplyScaledMatrixRowY(float scale);
     void ApplyScaledMatrixRowZ(float scale);
-    void SetupJointConstraints();
+    void UpdateJointConstraintErrors(); // @ 0x82250528
     void DispatchJointUpdate(int index);
     void DispatchJointSolve(int index);
 };
