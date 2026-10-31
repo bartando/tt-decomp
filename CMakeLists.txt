@@ -335,6 +335,7 @@ set(SOURCES
     src/rage/network/sn_event.cpp
     src/xam/kernel_import_thunks.c
     src/rage/math/float_approach.cpp
+    src/rage/math/index_wrap.cpp
     src/rage/math/ph_math.cpp
     src/rage/math/polygon_clip.cpp
     src/rage/math/swf_matrix.cpp

@@ -1,4 +1,5 @@
 #include "rage/ptr32.hpp"
+#include "rage/index_wrap.hpp"
 #include "game/camera_queries.hpp"
 /**
  * pong_camera_helpers.cpp
@@ -44,12 +45,15 @@ struct CameraConditionRing {
     int32_t capacity;                    // +0x10
 };
 struct CameraTransitionRing {
-    uint8_t unused00[0x0C];
+    uint8_t unused00[8];
+    int32_t count;                      // +0x08
     rage::ptr32<CameraTransitionEntry> entries;
     int32_t end;                        // +0x10
     uint32_t unused14;
     int32_t head;                       // +0x18
     int32_t capacity;                   // +0x1C
+    int32_t cursor;                     // +0x20
+    int32_t cursorCapacity;             // +0x24
 };
 static_assert(offsetof(CameraConditionRing, capacity) == 0x10, "condition ring layout");
 static_assert(offsetof(CameraTransitionRing, capacity) == 0x1C, "transition ring layout");
@@ -70,6 +74,40 @@ bool conditionEqual(const TransitionFlags& event, const TransitionFlags& require
     __builtin_memcpy(&b, &required.flag2, sizeof b);
     return a == b;
 }
+}
+
+// Advance within an inclusive [head,end] range, which can straddle zero.
+// The cursor's following word stores the physical capacity.
+// @ 0x82215B10 | size: 0xB8
+void pg_5B10_fw(int32_t* cursor, const int32_t* head, const int32_t* end) {
+    const int32_t low = *head, high = *end;
+    if (static_cast<uint32_t>(high) > static_cast<uint32_t>(low)) {
+        *cursor = math_WrapIndex(static_cast<int32_t>(static_cast<uint32_t>(*cursor) + 1u), low, high);
+    } else if (static_cast<uint32_t>(high) < static_cast<uint32_t>(low)) {
+        if (*cursor >= low) {
+            *cursor = static_cast<int32_t>(static_cast<uint32_t>(*cursor) + 1u);
+            if (*cursor >= cursor[1]) *cursor = 0;
+        } else if (*cursor <= high) {
+            *cursor = static_cast<int32_t>(static_cast<uint32_t>(*cursor) + 1u);
+            if (*cursor > high) *cursor = low;
+        }
+    }
+}
+
+// @ 0x82215BC8 | size: 0xB8
+void pg_5BC8_fw(int32_t* cursor, const int32_t* head, const int32_t* end) {
+    const int32_t low = *head, high = *end;
+    if (static_cast<uint32_t>(high) > static_cast<uint32_t>(low)) {
+        *cursor = math_WrapIndex(static_cast<int32_t>(static_cast<uint32_t>(*cursor) - 1u), low, high);
+    } else if (high < low) {
+        if (*cursor >= low) {
+            *cursor = static_cast<int32_t>(static_cast<uint32_t>(*cursor) - 1u);
+            if (*cursor < low) *cursor = high;
+        } else if (*cursor <= high) {
+            *cursor = static_cast<int32_t>(static_cast<uint32_t>(*cursor) - 1u);
+            if (*cursor < 0) *cursor = static_cast<int32_t>(static_cast<uint32_t>(cursor[1]) - 1u);
+        }
+    }
 }
 
 // Every required condition must occur in the entry's event slice. Conditions
@@ -126,6 +164,95 @@ uint8_t pongCameraMgr_6E08(void* object, TransitionParams* key,
         cursor = nextRingIndex(cursor, capacity);
     }
     return 0;
+}
+
+// Search the half-open time interval, rewind to its first entry, then filter
+// by mode and conditions. The cursor belongs to the evaluator and stays at
+// the last visited entry on both success and failure.
+// @ 0x82216F68 | size: 0x310
+extern "C" bool pg_6F68(void* object, void* params, int mode,
+                         unsigned int* flags, int requiredCount) {
+    auto* ring = static_cast<CameraTransitionRing*>(object);
+    auto* key = static_cast<TransitionParams*>(params);
+    const auto inInterval = [key](const CameraTransitionEntry& entry) {
+        float duration;
+        __builtin_memcpy(&duration, &key->vtableOrState, sizeof duration);
+        const float upper = key->value + duration;
+        return entry.mode != 0 && entry.key.value >= key->value && entry.key.value < upper;
+    };
+    const auto advance = [ring]() { pg_5B10_fw(&ring->cursor, &ring->head, &ring->end); };
+    const auto retreat = [ring]() { pg_5BC8_fw(&ring->cursor, &ring->head, &ring->end); };
+    int32_t visited = 0;
+    for (;;) {
+        if (visited >= ring->count) return false;
+        if (inInterval(ring->entries.get()[ring->cursor])) break;
+        advance();
+        visited = static_cast<int32_t>(static_cast<uint32_t>(visited) + 1u);
+    }
+    const int32_t firstFound = ring->cursor;
+    do {
+        retreat();
+    } while (inInterval(ring->entries.get()[ring->cursor]) && ring->cursor != firstFound);
+    advance();
+    auto* entry = ring->entries.get() + ring->cursor;
+    const auto matches = [mode, flags, requiredCount](const CameraTransitionEntry* candidate) {
+        return candidate->mode == mode && pongCameraMgr_5CE8(candidate,
+            reinterpret_cast<const TransitionFlags*>(flags), requiredCount) != 0;
+    };
+    if (matches(entry)) {
+        key->value = entry->key.value;
+        return true;
+    }
+    advance();
+    const int32_t scanStart = ring->cursor;
+    for (;;) {
+        entry = ring->entries.get() + ring->cursor;
+        if (!inInterval(*entry)) return false;
+        if (matches(entry)) {
+            key->value = entry->key.value;
+            return true;
+        }
+        advance();
+        if (ring->cursor == scanStart) return false;
+    }
+}
+
+// @ 0x821F3B28 | size: 0x5C
+bool pg_3B28_fw(TransitionParams* key, void* evaluator) {
+    TransitionFlags flags = {3, 1};
+    return pg_6F68(evaluator, key, 5, &flags.flag1, 1);
+}
+
+extern "C" uint32_t g_cameraLerpState; // @ 0x826064C4
+
+// Both the forward event and interval query must stay within the original
+// clamp bound. Commit the local result only after both calls succeed.
+// @ 0x821F7338 | size: 0xE4
+extern "C" bool pongCameraMgr_7338_helper(void* source, void* evaluator) {
+    const float current = *static_cast<const float*>(source);
+    const float threshold = g_cameraThreshold;
+    const float lower = threshold - current >= 0.0f ? current : threshold;
+    const float upper = current - threshold >= 0.0f ? current : threshold;
+    TransitionParams key;
+    __builtin_memcpy(&key, source, sizeof key);
+    key.value = lower;
+    TransitionFlags flags = {3, 1};
+    if (pongCameraMgr_6E08(evaluator, &key, 7, &flags, 1) == 0 || key.value > upper)
+        return false;
+    if (!pg_6F68(evaluator, &key, 16, &flags.flag1, 1) || key.value > upper)
+        return false;
+    *static_cast<float*>(source) = key.value;
+    return true;
+}
+
+// @ 0x821F7818 | size: 0xBC
+void pg_7818(CamShotKey* source) {
+    TransitionParams key;
+    __builtin_memcpy(&key, source, sizeof key);
+    void* evaluator = rage::load_ptr32<void>(g_pReplayStateData, 0x68D18);
+    TransitionFlags flags = {3, 0};
+    if (pg_6F68(evaluator, &key, 5, &flags.flag1, 1) || pg_3B28_fw(&key, evaluator))
+        ++g_cameraLerpState;
 }
 
 // @ 0x821F3500 | size: 0x9C
