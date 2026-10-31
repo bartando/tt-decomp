@@ -106,8 +106,8 @@ pongMover::pongMover(void* creaturePool) {
     m_flags = 1;
 
     // Zero tail fields
-    m_unkE0 = 0;
-    m_unkE4 = 0;
+    m_velocityContext = nullptr;
+    m_velocityOverride = nullptr;
 
     // If creature pointer is already set (placement-new on pre-allocated memory),
     // adjust it relative to the pool base: m_pCreature += pool[idx+2]
@@ -304,6 +304,147 @@ void pongMover_AdjustVelocity(pongMover* mover, float* x, float* z) {
     };
     adjust(x, position[0], lower[0], upper[0]);
     adjust(z, position[2], lower[2], upper[2]);
+}
+
+namespace {
+float moverFlushVmx(float value) {
+    uint32_t bits;
+    memcpy(&bits, &value, sizeof(bits));
+    if ((bits & 0x7F800000u) == 0) {
+        bits &= 0x80000000u;
+        memcpy(&value, &bits, sizeof(value));
+    }
+    return value;
+}
+
+// The VMX normalization used by both target-velocity paths. Dot xyz, refine
+// the reciprocal square root once, and scale all four lanes (including w).
+void moverNormalize(float* vector) {
+    double dot = 0.0;
+    for (unsigned lane = 0; lane < 3; ++lane) {
+        const float value = moverFlushVmx(vector[lane]);
+        dot += static_cast<double>(value) * value;
+    }
+    const float length2 = moverFlushVmx(static_cast<float>(dot));
+    float reciprocal = moverFlushVmx(static_cast<float>(
+        1.0 / __builtin_sqrt(static_cast<double>(length2))));
+    if (reciprocal == __builtin_inff()) reciprocal = 0.0f;
+    const float squared = moverFlushVmx(reciprocal * reciprocal);
+    const float product = moverFlushVmx(length2 * squared);
+    for (unsigned lane = 0; lane < 4; ++lane) {
+        const float half = lane < 3 ? 0.5f : 0.0f;
+        const float one = lane < 3 ? 1.0f : 0.0f;
+        const float halfReciprocal = moverFlushVmx(half * reciprocal);
+        const float error = -moverFlushVmx(product - one);
+        const float correction = moverFlushVmx(error * halfReciprocal);
+        const float scale = moverFlushVmx(correction + reciprocal);
+        vector[lane] = moverFlushVmx(moverFlushVmx(vector[lane]) * scale);
+    }
+}
+}
+
+// Select a target speed from travel time and separation, then apply the
+// normalized direction. This helper was labelled as a capsule operation.
+// pongMover_ComputeTargetVelocity (was phBoundCapsule_A9A0_g) @ 0x820CA9A0 | size: 0x1A4
+float* pongMover_ComputeTargetVelocity(float* out, pongMover* mover,
+                                     const float* origin, const float* target) {
+    alignas(16) float direction[4];
+    for (unsigned lane = 0; lane < 4; ++lane)
+        direction[lane] = moverFlushVmx(moverFlushVmx(target[lane]) - moverFlushVmx(origin[lane]));
+    const float separationX = __builtin_fabsf(target[0] - origin[0]);
+    out[0] = out[1] = out[2] = 0.0f;
+    const float x2 = direction[0] * direction[0];
+    const float distance = static_cast<float>(crt_sqrt(__builtin_fmaf(direction[2], direction[2], x2)));
+    const float requiredSpeed = distance / mover->m_posZ;
+    moverNormalize(direction);
+    float weight = 0.0f;
+    if (requiredSpeed > pongMover_GetInputSpeed(mover)) {
+        weight = 1.0f;
+    } else {
+        const float amount = separationX > 0.0f ? separationX * 1.4492753744125366f
+                                                : distance * 0.7246376872062683f;
+        const double raised = amount >= 0.0f ? amount : 0.0;
+        const float clamped = static_cast<float>(raised - 1.0 >= 0.0 ? 1.0 : raised);
+        weight = clamped * clamped;
+    }
+    const float speed = __builtin_fabsf(pongMover_GetInputSpeed(mover)) * weight;
+    for (unsigned lane = 0; lane < 4; ++lane)
+        out[lane] = moverFlushVmx(moverFlushVmx(direction[lane]) * moverFlushVmx(speed));
+    return out;
+}
+
+// pongMover_ComputeLocalVelocity (was phBoundCapsule_A640_g) @ 0x820CA640 | size: 0x14C
+float* pongMover_ComputeLocalVelocity(float* out, pongMover* mover) {
+    const auto* creature = static_cast<const uint8_t*>(mover->m_pCreature);
+    out[0] = mover->m_unk30;
+    out[1] = 0.0f;
+    out[2] = mover->m_unk34;
+    const auto* instance = *reinterpret_cast<const uint8_t* const*>(creature + 0xA4);
+    alignas(16) float position[4];
+    memcpy(position, instance + 0x40, sizeof(position));
+    if (!(pongMover_GetBlendWeight(mover) <= 0.0f)) {
+        const float x = mover->m_posX - position[0];
+        const float z = mover->m_posY - position[2];
+        const float x2 = x * x;
+        const float distance = static_cast<float>(crt_sqrt(__builtin_fmaf(z, z, x2)));
+        if (distance <= mover->m_unk50) {
+            memset(out, 0, 16);
+            mover->m_flags |= 8;
+            return out;
+        }
+        alignas(16) float target[4] = {mover->m_posX, position[1], mover->m_posY, 0.0f};
+        alignas(16) float velocity[4];
+        pongMover_ComputeTargetVelocity(velocity, mover, position, target);
+        const float limit = mover->m_unk48;
+        const auto clamp = [limit](float value) {
+            const float delta = value - -limit;
+            const float raised = delta >= 0.0f ? value : -limit;
+            return double(raised) - limit >= 0.0 ? limit : raised;
+        };
+        out[0] = clamp(velocity[0]);
+        out[2] = clamp(velocity[2]);
+    }
+    return out;
+}
+
+extern const uint8_t g_hudShell_UpdateBlock[0x60]; // @ 0x825CAEB8
+
+// pongMover_ComputeRemoteVelocity (was phBoundCapsule_A790_g) @ 0x820CA790 | size: 0x20C
+float* pongMover_ComputeRemoteVelocity(float* out, pongMover* mover) {
+    out[0] = out[1] = out[2] = 0.0f;
+    if (!(pongMover_GetBlendWeight(mover) > 0.0f)) return out;
+    const auto* creature = static_cast<const uint8_t*>(mover->m_pCreature);
+    const auto* instance = *reinterpret_cast<const uint8_t* const*>(creature + 0xA4);
+    const int32_t type = *reinterpret_cast<const int32_t*>(creature + 0xC8);
+    alignas(16) float position[4];
+    memcpy(position, instance + 0x40, sizeof(position));
+    // The original never initializes scratch w. Give that padding lane a
+    // defined value; only xyz participates in distance/arrival decisions.
+    alignas(16) float direction[4] = {mover->m_posX, position[1], mover->m_posY, 0.0f};
+    for (unsigned lane = 0; lane < 4; ++lane)
+        direction[lane] = moverFlushVmx(moverFlushVmx(direction[lane]) - moverFlushVmx(position[lane]));
+    const float x2 = direction[0] * direction[0];
+    const float distance2 = __builtin_fmaf(direction[2], direction[2], x2);
+    const float threshold = type == 2 && !(mover->m_flags & 0x20) ? mover->m_unk54 : 1e-6f;
+    if (!(distance2 > threshold)) {
+        mover->m_flags |= 8;
+        return out;
+    }
+    if (mover->m_velocityOverride) {
+        alignas(16) float scratch[4];
+        const float* result = mover->m_velocityOverride(scratch, mover->m_velocityContext, mover->m_unk48);
+        memcpy(out, result, 16);
+        return out;
+    }
+    const float distance = static_cast<float>(crt_sqrt(distance2));
+    float frameRate;
+    memcpy(&frameRate, g_hudShell_UpdateBlock + 0x0C, sizeof(frameRate));
+    float speed = distance * frameRate;
+    if (speed > mover->m_unk48) speed = mover->m_unk48;
+    moverNormalize(direction);
+    for (unsigned lane = 0; lane < 4; ++lane)
+        out[lane] = moverFlushVmx(moverFlushVmx(direction[lane]) * moverFlushVmx(speed));
+    return out;
 }
 
 // Blend input and local/remote movement, mirror it for the court side, and
@@ -561,41 +702,44 @@ void* LocomotionStateAnim::FindAnimationByID(uint32_t type, uint32_t id) {
     return nullptr;
 }
 
-/**
- * LocomotionStateAnim::SetupAnimationPair @ 0x8224C418 | size: 0x90
- * 
- * Finds two animations by their IDs and calls virtual methods on them
- * to set up animation blending or transition. This is commonly used for
- * locomotion state transitions where two animations need to be blended.
- * 
- * The function searches for both animations, and if both are found,
- * calls their respective virtual methods with the provided parameter.
- * 
- * @param animID1 First animation ID (upper 16 bits)
- * @param animID2 Second animation ID (upper 16 bits)
- * @param param Parameter to pass to animation virtual methods
- * @return true if both animations found and configured, false otherwise
- */
-bool LocomotionStateAnim::SetupAnimationPair(uint16_t animID1, uint16_t animID2, void* param) {
-    // Find first animation (ID1, 0)
-    void* anim1 = FindAnimationByID(animID1, 0);
-    
-    // Find second animation (ID2, 0)
-    void* anim2 = FindAnimationByID(animID2, 0);
-    
-    // Both animations must exist
-    if (!anim1 || !anim2) {
-        return false;
-    }
-    
-    // Call virtual method on first animation with offset parameter
-    // vtable[17] - likely SetupBlendSource or similar
-    VCALL(anim1, 17, void(*)(void*, void*))(anim1, (char*)param + 16);
+namespace {
+// The shared channel vtable has vector/quaternion setters at slots 17/18.
+// Its deleting entry occupies one slot; a C++ destructor would add an ABI pair.
+struct AnimationPairChannel {
+    virtual void slot0() = 0;
+    virtual void slot1() = 0;
+    virtual void slot2() = 0;
+    virtual void slot3() = 0;
+    virtual void slot4() = 0;
+    virtual void slot5() = 0;
+    virtual void slot6() = 0;
+    virtual void slot7() = 0;
+    virtual void slot8() = 0;
+    virtual void slot9() = 0;
+    virtual void slot10() = 0;
+    virtual void slot11() = 0;
+    virtual void slot12() = 0;
+    virtual void slot13() = 0;
+    virtual void slot14() = 0;
+    virtual void slot15() = 0;
+    virtual void slot16() = 0;
+    virtual void SetVector(const float* value) = 0;     // slot 17
+    virtual void SetQuaternion(const float* value) = 0; // slot 18
+};
+}
 
-    // Call virtual method on second animation with base parameter
-    // vtable[18] - likely SetupBlendTarget or similar
-    VCALL(anim2, 18, void(*)(void*, void*))(anim2, param);
-    
+// Find both type channels with ID zero, then write translation and rotation.
+// Keep the unused integer slot so param remains in r7; IDs arrive as full words.
+// LocomotionStateAnim::SetupAnimationPair @ 0x8224C418 | size: 0x90
+bool LocomotionStateAnim::SetupAnimationPair(uint32_t animID1, uint32_t animID2,
+                                            void* unusedR6, const void* param) {
+    (void)unusedR6;
+    auto* first = static_cast<AnimationPairChannel*>(FindAnimationByID(animID1, 0));
+    auto* second = static_cast<AnimationPairChannel*>(FindAnimationByID(animID2, 0));
+    if (!first || !second)
+        return false;
+    first->SetVector(reinterpret_cast<const float*>(static_cast<const uint8_t*>(param) + 16));
+    second->SetQuaternion(static_cast<const float*>(param));
     return true;
 }
 
@@ -3914,21 +4058,22 @@ struct pongBallInstSlot {
 // rage::phLevel and rage::phSimulator, reduced to the calls made here (the
 // same reading as pong_player.cpp's phLevelView).
 struct phLevelCreatureView {
-    void**   vtable;        // +0x00
+    virtual void slot0();
+    virtual void slot1();
+    virtual void slot2();
+    virtual void slot3();
+    virtual void* GetActiveBody(uint16_t index); // slot 4
+    virtual void slot5();
+    virtual void slot6();
+    virtual void slot7();
+    virtual void slot8();
+    virtual void slot9();
+    virtual void slot10();
+    virtual void UpdateObjectLocation(uint16_t index); // slot 11
+
     uint8_t  _pad04[0x18];
-    uint8_t* objectStates;  // +0x1C  one byte per level index; low 3 bits 0 = active
-
+    uint8_t* objectStates; // +0x1C
     bool IsActive(uint16_t index) const { return (objectStates[index] & 7) == 0; }
-
-    // Slot 4: the body of an active object, or null.
-    void* GetActiveBody(uint16_t index) {
-        return reinterpret_cast<void* (*)(phLevelCreatureView*, uint16_t)>(vtable[4])(this, index);
-    }
-
-    // Slot 11: called after an instance's matrix was changed by hand.
-    void UpdateObjectLocation(uint16_t index) {
-        reinterpret_cast<void (*)(phLevelCreatureView*, uint16_t)>(vtable[11])(this, index);
-    }
 };
 
 struct phSimulatorCreatureView {
@@ -4350,6 +4495,126 @@ void pongCreature::SyncFragmentPose() {
     phBoundView* bound = Layout(self->inst)->archetype->bound;
     if (bound->vfn_2())
         bound->vfn_3(Layout(self->inst)->matrix);
+}
+
+// Only virtual dispatch lives in this view; fields use the existing instance
+// layout. No destructor: the original has one deleting slot, not an ABI pair.
+struct pongCreatureTeleportInstance {
+    virtual void slot0();
+    virtual void slot1();
+    virtual void slot2();
+    virtual void SetLastMatrix(const pongCreatureMatrix* matrix); // slot 3
+    virtual void slot4();
+    virtual void slot5();
+    virtual void slot6();
+    virtual void slot7();
+    virtual void slot8();
+    virtual void slot9();
+    virtual void slot10();
+    virtual void slot11();
+    virtual void slot12();
+    virtual void slot13();
+    virtual void slot14();
+    virtual void slot15();
+    virtual void slot16();
+    virtual void slot17();
+    virtual void slot18();
+    virtual void slot19();
+    virtual void slot20();
+    virtual void slot21();
+    virtual void slot22();
+    virtual void slot23();
+    virtual void slot24();
+    virtual void slot25();
+    virtual void slot26();
+    virtual void slot27();
+    virtual void slot28();
+    virtual void slot29();
+    virtual void slot30();
+    virtual void slot31();
+    virtual void slot32();
+    virtual void slot33();
+    virtual void slot34();
+    virtual void slot35();
+    virtual void slot36();
+    virtual void slot37();
+    virtual void slot38();
+    virtual void slot39();
+    virtual void slot40();
+    virtual void slot41();
+    virtual void slot42();
+    virtual void slot43();
+    virtual void slot44();
+    virtual void slot45();
+    virtual void slot46();
+    virtual void SyncBoneMatrices(); // slot 47
+};
+
+// Copy the world matrix, update the owning creature's pose, and notify physics.
+// pongCreatureInst_ApplyTeleportMatrix (was pongCreature_8FA8_g) @ 0x820C8FA8 | size: 0xE8
+void pongCreatureInst_ApplyTeleportMatrix(pongCreatureInst* inst, const pongCreatureMatrix* matrix) {
+    auto* bytes = reinterpret_cast<uint8_t*>(inst);
+    const auto* source = reinterpret_cast<const uint8_t*>(matrix);
+    for (unsigned row = 0; row < 4; ++row)
+        memcpy(bytes + 0x10 + row * 16, source + row * 16, 16);
+    auto* owner = *reinterpret_cast<pongCreature**>(bytes + 0xD0);
+    LocomotionStateAnim_C8F8_g(CreatureLayout(owner)->skeleton);
+    auto* dispatch = reinterpret_cast<pongCreatureTeleportInstance*>(inst);
+    dispatch->SetLastMatrix(matrix);
+    owner = *reinterpret_cast<pongCreature**>(bytes + 0xD0);
+    owner->SyncFragmentPose();
+    dispatch->SyncBoneMatrices();
+    const uint16_t index = *reinterpret_cast<const uint16_t*>(bytes + 8);
+    if (index != 0xFFFF)
+        g_pPhysicsLevel->UpdateObjectLocation(index);
+}
+
+extern void pongCreatureWorker_Reset(pongCreatureWorker* worker, pongCreatureSkeleton* skeleton); // @ 0x820FAB78
+extern "C" void* g_plrPlayerMgr_state; // @ 0x82606430
+extern "C" uint8_t* g_large_buffer_ptr; // @ 0x8260637C
+
+struct pongCreatureTeleportSignals {
+    uint8_t _pad0000[0x1814];
+    uint8_t** entries; // +0x1814
+    uint16_t count; // +0x1818
+    uint8_t _pad181A[2];
+    uint8_t* secondary; // +0x181C
+};
+
+// Apply a requested teleport and invalidate animation/physics caches.
+// pongCreature_Teleport @ 0x820C7A28 | size: 0x24C
+void pongCreature_Teleport(pongCreature* creature, const pongCreatureMatrix* matrix,
+                           bool resetWorkers, bool updatePoseFirst, bool keepInstanceMatrix) {
+    auto* self = CreatureLayout(creature);
+    rage_DebugLogNop("pongCreature::Teleport() - teleporting player[%d] to [%f,%f,%f]",
+                     self->playerIndex, double(matrix->d[0]), double(matrix->d[1]), double(matrix->d[2]));
+    pongCreatureWorker* workers[2] = {self->character->data->workers[0], self->character->data->workers[1]};
+    const bool haveWorkers = workers[0] || workers[1];
+    if (resetWorkers && haveWorkers && updatePoseFirst)
+        creature->UpdateAnimation();
+    if (!keepInstanceMatrix)
+        pongCreatureInst_ApplyTeleportMatrix(self->inst, matrix);
+    if (resetWorkers && haveWorkers) {
+        // Copy both poses before either worker reset can change them.
+        for (auto* worker : workers) {
+            if (!worker) continue;
+            auto* pose = static_cast<uint8_t*>(worker->field24);
+            const auto* root = *reinterpret_cast<const uint8_t* const*>(pose);
+            for (unsigned row = 0; row < 4; ++row)
+                memcpy(pose + 0xB0 + row * 16, root + 0x10 + row * 16, 16);
+            memcpy(pose + 0xF0, pose + 0xE0, 16);
+        }
+        for (auto* worker : workers)
+            if (worker) pongCreatureWorker_Reset(worker, self->skeleton);
+    }
+    const auto* table = static_cast<const uintptr_t*>(g_plrPlayerMgr_state);
+    const uint32_t entry = static_cast<uint32_t>(table[uint32_t(self->playerIndex) + 33]);
+    auto* signals = reinterpret_cast<pongCreatureTeleportSignals*>(table[uint32_t(entry + 29)]);
+    for (unsigned i = 0; i < signals->count; ++i)
+        signals->entries[i][0x3E] = 1;
+    if (signals->secondary)
+        signals->secondary[0xA4] = 1;
+    g_large_buffer_ptr[g_phFrameIndex + 0x91] = 1;
 }
 
 /**

@@ -223,7 +223,7 @@ struct LocomotionStateAnim {
 
     // ── implemented methods ──
     void* FindAnimationByID(uint32_t type, uint32_t id);  // @ 0x8224BEF8
-    bool SetupAnimationPair(uint16_t animID1, uint16_t animID2, void* param);  // @ 0x8224C418
+    bool SetupAnimationPair(uint32_t animID1, uint32_t animID2, void* unusedR6, const void* param);  // @ 0x8224C418
     void CopyAnimationData();       // @ 0x8214C8F8
     void ProcessAnimationList(void* animationList);  // @ 0x82380540
     float CalculateBlendFactor(void* timingData);  // @ 0x820C1910
@@ -1285,8 +1285,8 @@ struct pongMover {
      *  +0x87..+0x8F  pad
      *  +0x90..+0xCF  m_remoteRestMatrix[16]  (64-byte 4x4 float matrix)
      *  +0xD0..+0xDF  m_pathData[4]  (16 bytes, zeroed by Reset)
-     *  +0xE0  m_unkE0  (zeroed by ctor)
-     *  +0xE4  m_unkE4  (zeroed by ctor)
+     *  +0xE0  m_velocityContext  (zeroed by ctor)
+     *  +0xE4  m_velocityOverride  (zeroed by ctor)
      */
     void**      vtable;                    /* +0x00 */
     uint8_t     _pad04[12];               /* +0x04..+0x0F */
@@ -1323,8 +1323,8 @@ struct pongMover {
     uint8_t     _pad87[9];               /* +0x87..+0x8F */
     float       m_remoteRestMatrix[16];  /* +0x90  64-byte 4x4 matrix (remote-source rest pose) */
     float       m_pathData[4];           /* +0xD0  16-byte path state, zeroed by Reset */
-    uint32_t    m_unkE0;                 /* +0xE0 */
-    uint32_t    m_unkE4;                 /* +0xE4 */
+    void*       m_velocityContext;       /* +0xE0 */
+    float* (*m_velocityOverride)(float* out, void* context, float speed); /* +0xE4 */
 
     /* non-virtual methods */
     pongMover(void* creaturePool);              /* @ 0x820CB5F0 */
@@ -1364,6 +1364,8 @@ struct pongSkelLookAtDriver {
 
 // Offsets checked against the asm; only meaningful on the game's 32-bit layout.
 #if __SIZEOF_POINTER__ == 4
+static_assert(offsetof(pongMover, m_velocityContext) == 0xE0, "");
+static_assert(offsetof(pongMover, m_velocityOverride) == 0xE4, "");
 static_assert(offsetof(LocomotionStateMf, field_0x0028) == 0x28, "");
 static_assert(offsetof(pcrAnimEventMsg, m_message) == 0x28, "");
 static_assert(offsetof(pcrAnimEventMsg_s, m_stringParam) == 0x30, "");
