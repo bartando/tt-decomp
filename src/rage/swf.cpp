@@ -1,3 +1,5 @@
+#include "grc/device_state.h"
+#include "rage/math.hpp"
 /**
  * rage::swf* — Scaleform Flash UI System Implementation
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -52,7 +54,6 @@ extern "C" {
     int _snprintf(char* buffer, size_t count, const char* format, ...);  // @ 0x820C0B40
     extern void* g_sda_6404;  // @ 0x82606404 — shared texture lookup owner
     void hudFlashBase_76F8_g(int stage, int slot, void* texture);  // @ 0x820F76F8
-    void hudFlashBase_B138_g();  // @ 0x8215B138
     void sysCallback_Invoke(void* callback, void* argument);  // @ 0x8225FFF8
     void grcDevice_Present(uint32_t flags, int color, int clearDepth, float depth,
                            bool clearStencil, int stencil);  // @ 0x8214F088
@@ -706,7 +707,6 @@ void swfSetTransformMatrix(void* transform, const float* matrix) {
 #if defined(__clang__)
 #pragma clang fp contract(off)
 #endif
-    extern double swfAsin(double value);  // @ 0x82430E88
     extern void swfMakeRotationMatrix(float* out, float degrees);  // @ 0x823FA2A0
     extern void swfConcatMatrix(float* out, const float* child, const float* parent);  // @ 0x823FA1E0
     extern float g_swfMinShear;  // @ 0x825C90C8 — shared -0.01 tolerance
@@ -741,7 +741,7 @@ void swfSetTransformMatrix(void* transform, const float* matrix) {
         normalizedD = inverseLength * normalizedD;
         const float normalizedC = inverseLength * negativeC;
         const float sine = -std::fma(normalizedD, 0.0f, -normalizedC);
-        const float radians = static_cast<float>(swfAsin(sine));
+        const float radians = static_cast<float>(::crt_asin(sine));
         const float degrees = radians * 57.2957763671875f;  // 0x82079B44
         rotation = rotation + degrees;
         // PPC bge tests !LT, so an unordered (NaN) angle also exits the loop.
@@ -2291,11 +2291,10 @@ swfSPRITE::~swfSPRITE() {}
  */
 bool swfContext_IsGlobalSlot13AltMode() {
     // External declarations
-    extern void* swfGlobalObject_GetSlotValuePtr(void* obj, int slotIndex);  // @ 0x823FB188
     extern void* g_swfSlotObject;  // @ 0x82604848 (SDA offset 18504)
     
     // Get slot 13 value from the global SWF object
-    uint8_t* result = (uint8_t*)swfGlobalObject_GetSlotValuePtr(g_swfSlotObject, 13);
+    uint8_t* result = (uint8_t*)::util_B188(g_swfSlotObject, 13);
     
     // Load bytes at offsets +0 and +3
     uint8_t byte0 = result[0];
@@ -2354,7 +2353,7 @@ void swfRenderInstanceTree(void* instance, const void* parentTransform) {
     if (texture) {
         hudFlashBase_76F8_g(0, 0, texture);
         if (g_grmShaderFx_flushRequired != 0 || g_grmShaderFx_forceResetFlag != 0) {
-            hudFlashBase_B138_g();
+            grcDevice_FlushRenderState();
         }
         node[0x94] = 1;
     }

@@ -8,7 +8,7 @@ from liftcheck.runner import Checker, Options
 MUTATIONS = [
     ("grow by one", "array->capacity + static_cast<uint16_t>(growth)", "array->capacity + 1"),
     ("wrong allocation size", "uint32_t(array->capacity) * 4", "uint32_t(array->capacity) * 8"),
-    ("skip construction", "crAnimPointer_Construct(data + i);", ";"),
+    ("skip construction", "datResource_PlacePointer(reinterpret_cast<uint32_t*>(data + i));", ";"),
     ("skip copy", "data[i] = array->data[i];", ";"),
     ("free tracked storage", "& 0xFF) == 0", "& 0xFF) != 0"),
     ("test whole tracking result", "(rage_FindSingleton(old) & 0xFF)",

@@ -1,3 +1,4 @@
+#include "rage/operator_new.hpp"
 /**
  * rage_core_utils.cpp — RAGE engine core utility function implementations
  * Rockstar Presents Table Tennis (Xbox 360, 2006)

@@ -1,5 +1,7 @@
 #pragma once
 
+double crt_asin(double value); // @ 0x82430E88
+
 namespace rage {
 
 // Original double angle in f1; round cos/sin to float and store in that order.

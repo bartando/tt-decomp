@@ -116,7 +116,7 @@ CALLS = {
     "grc_89D0": model(subresource, args=("r3", "r4", "r5")),
     "grcDevice_SetDepthStencilClear": model(depth, args=("r3", "r4", "f1", "r6")),
     "fiAsciiTokenizer_D808_fw": model(color, args=("r3", "r4")),
-    "game_37B0": stub(ret="void", args=("r3", "r4", "r5", "r6", "r7")),
+    "grcDevice_SetScissorRect": stub(ret="void", args=("r3", "r4", "r5", "r6", "r7")),
     "grc_3E20": model(flush, args=("r3",)),
     "grc_DBF8": model(setup, args=("r3", "r4")),
     "grcDevice_AllocateCommandData": model(vertices, args=("r3", "r4", "r5")),

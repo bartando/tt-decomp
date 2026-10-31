@@ -19,6 +19,9 @@
 
 namespace rage {
 
+// Channel-data header in r3, unused context in r4, time in f1, output in r5.
+void crAnimEvaluateQuaternionChannels(void* channels, void* context, float time, float* outQuat); // @ 0x820C44A0
+
 // ── rage::crAnimChannel  [vtable @ 0x8204F724] ──────────────────────────
 struct crAnimChannel {
     void**      vtable;           // +0x00
@@ -403,9 +406,6 @@ struct crAnimDofQuaternion {
     void Normalize();          // [13] @ 0x820c52b0
     void SetValue(const float* sourceQuat);    // [18] @ 0x820c52d8
     int  IsQuaternion();       // [20] @ 0x8210cbd0
-
-    // ── non-virtual helper methods ──
-    void EvaluateChannels(void* animContext, float time, float* outQuat);
 };
 
 // ── rage::crAnimDofVector3  [vtable @ 0x82027B9C] ──────────────────────────

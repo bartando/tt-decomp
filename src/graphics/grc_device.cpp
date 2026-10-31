@@ -1,3 +1,5 @@
+#include "grc/device_state.h"
+#include "xam/kernel.h"
 /**
  * graphics/grc_device.cpp — Graphics Device Lifecycle and Sampler State
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -55,7 +57,6 @@ extern void grcDevice_cleanupInternal(void* pDevice);   /* @ 0x82151068 — Clea
 extern void grcDevice_releaseSharedResources(void);      /* @ 0x8214F338 — Release shared grc resources */
 extern void grcDeviceXenon_teardown(void* pTarget);      /* @ 0x82366CA0 — Full GPU teardown (VdShutdownEngines) */
 extern void _locale_register(void* pLocale, uint32_t flags);  /* @ 0x820C02D0 */
-extern void thunk_DbgBreakPoint(void);             /* @ 0x82566B70 */
 extern void grcDevice_setRenderTarget(void* pDevice, int32_t arg); /* @ 0x82357400 — Set active render target */
 
 /* Forward declaration — defined below */
@@ -144,7 +145,7 @@ void grcDevice_shutdown(void)
                 typedef void (*DtorFn)(void*, int);
                 ((DtorFn)pObj->vtable[0])(pObj, 1);
             } else {
-                thunk_DbgBreakPoint();  /* Unexpected refcount */
+                DbgBreakPoint();  /* Unexpected refcount */
             }
 
             g_grcRefCountedObjs[i] = NULL;
@@ -168,7 +169,7 @@ void grcDevice_shutdown(void)
             pTargetData[3] = refCount - 1;
 
             if (refCount - 1 == 0) {
-                thunk_DbgBreakPoint();
+                DbgBreakPoint();
             }
 
             g_pGrcDeviceObj = NULL;
@@ -1271,8 +1272,6 @@ extern void grcDevice_SetDepthStencilClear(void* device, uint32_t unusedR4,
 // The color arrives in v1 on Xenon, independently of r3..r6.
 extern void fiAsciiTokenizer_D808_fw(uint32_t format, uint32_t numberFormat,
                                     uint32_t* low, uint32_t* high);  // @ 0x8235D808
-extern void game_37B0(void* device, int32_t left, int32_t top,
-                      int32_t right, int32_t bottom);  // @ 0x823537B0
 extern void grc_3E20(void* device);  // @ 0x82363E20
 extern uint32_t* grc_DBF8(void* device, uint32_t* cursor);  // @ 0x8235DBF8
 extern void grc_CFD8(void* device, uint32_t flags, const int32_t* rect, const float* color,
@@ -1525,7 +1524,7 @@ extern "C" void grcDevice_Resolve(void* device, uint32_t flags, const int32_t* s
     const bool expandScissor = left < signed15(word(11524)) || top < signed15(word(11524) >> 16)
         || right > signed15(word(11528)) || bottom > signed15(word(11528) >> 16);
     if (expandScissor) {
-        game_37B0(device, left, top, right, bottom);
+        grcDevice_SetScissorRect(device, left, top, right, bottom);
     }
     grc_3E20(device);
     bool tiledTargets = (state[10432] & 16u) != 0;
@@ -1619,7 +1618,7 @@ extern "C" void grcDevice_Resolve(void* device, uint32_t flags, const int32_t* s
     *++cursor = 8199; *++cursor = word(11484);
     saveCursor(cursor);
     if (expandScissor) {
-        game_37B0(device, signed15(word(11524)), signed15(word(11524) >> 16),
+        grcDevice_SetScissorRect(device, signed15(word(11524)), signed15(word(11524) >> 16),
                    signed15(word(11528)), signed15(word(11528) >> 16));
     }
     const uint32_t resolveBytes = destinationHeight * pitch * bytesPerBlock;
