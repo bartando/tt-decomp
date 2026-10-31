@@ -1,3 +1,4 @@
+#include "game/game_message.hpp"
 // Rebuild the prediction after a hit. The authoritative implementation is
 // disasm/sections/.text.s, 0x82287B50..0x82288364.
 #include "ball_predict.hpp"
@@ -117,7 +118,6 @@ extern int BallPredict_GetInitialVelocities(gdBallPredictData* data, bpVec4* vel
                                             bpVec4* spin);  // @ 0x821D8C70
 extern void pongPlayer_5010_g(void* sub, void* output, void* parent, int flag); // @ 0x821D5010
 extern void pg_70C8_g();                                    // @ 0x822870C8
-extern void PostPageGroupMessageFmt(uint32_t id, uint32_t mask, const char* format, ...); // @ 0x8225E480
 
 namespace {
 GameStateView* GameState() { return static_cast<GameStateView*>(g_game_state_ptr); }
@@ -314,5 +314,5 @@ void ballPredict_ProcessHit(void* hitPtr, const BallFlightVec4* velocity,
     }
     data->m_hitVel = outSpin;
     state->predict->m_hitPos = outVelocity;
-    PostPageGroupMessageFmt(0x22, 0x40, "i", 1);
+    PostGameMessageFmt(0x22, 0x40, "i", 1);
 }

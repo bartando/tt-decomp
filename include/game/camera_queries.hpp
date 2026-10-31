@@ -18,3 +18,6 @@ bool pongCameraMgr_5308_fw(void* key, void* evaluator); // @ 0x821F5308
 }
 
 float gameLoop_GetDisplayAspect(void* gameLoop); // @ 0x82228EA0
+
+struct pongCameraMgr;
+bool pg_7CD8_2h(pongCameraMgr* key, void* evaluator, int, int, int count); // @ 0x821F7CD8

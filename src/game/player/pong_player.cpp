@@ -2,6 +2,7 @@
 #include "game/network_timestamp.hpp"
 #include "rage/ptr32.hpp"
 #include "rage/float_approach.hpp"
+#include "game/ai_swing_direction.hpp"
 /**
  * pongPlayer — Player state query functions
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -96,7 +97,6 @@ extern float     g_kPowerBlend;                  // power blend constant @ 0x825
 extern float     g_kFrameToSecScale;             // frames-to-seconds   @ 0x8202D100
 
 extern bool CheckButtonPressed(void* record);                              // pg_FFF8_g @ 0x821DFFF8
-extern void PostPageGroupMessage(void* rec, int code, int mask, int a3, int opActive); // pg_E6E0
 extern bool pongPlayer_CheckServeInput(pongPlayer* p);                            // @ 0x82195B60
 extern void pongPlayer_InitActionState(void* actionState, int released);            // @ 0x821A1460
 
@@ -841,107 +841,46 @@ bool pongPlayer::CheckOpponentSwingApex() const
 }
 
 
-// ===========================================================================
-// SECTION 17 — CheckButtonInput  (vfn_7) @ 0x8218EE10 | size: 0x1BC
-// vtable slot 7
-//
-// Per-frame button-state handler.  Called every frame when the player is
-// active. Skipped when the game clock is at frame 10 (pause/replay guard).
-//
-// Logic:
-//  1. Read global clock (lis(-32161) + -21712 → +12). If it equals 10
-//     (a special frame count used during replay scrubbing), skip entirely.
-//
-//  2. Check whether m_inputSlotIdx (+14 in g_pButtonStateTable) is in
-//     "button pressed" state (value == 1).  If not pressed, bail.
-//
-//  3. If pressed, look up this player's 808-byte data record via the
-//     global player data table (g_pPlayerDataTable), using the vtable
-//     entry from slot 1 of our own vtable as the lookup key.
-//
-//  4. Call CheckButtonPressed on (record + 796) — checks whether this button press
-//     is "new" (first frame down) vs already-held.
-//       - If newly pressed: compute a bit mask `1 << m_inputSlotIdx` and
-//         check whether the opponent's input slot (15 - m_inputSlotIdx)
-//         is also active. Call PostPageGroupMessage to fire the "button down" event
-//         with code 2125.
-//       - If held (not new): accumulate a float into the record via
-//         pongPlayer_0508_g (reads analog input) and fmadds/fadds into the
-//         record's score field. This implements "power charging" while
-//         the button is held.
-//
-// New confirmed fields:
-//   +0x1D0 (464) = m_inputSlotIdx   — confirmed used as direct integer index
-//   +0x1F0 (496) = m_pActionState   — confirmed from vfn_9
-// ===========================================================================
+// The retail player exposes its input query at virtual slot 1. The older
+// pongPlayer declaration still conflates this slot with a scalar destructor.
+namespace {
+class PlayerInputQuery {
+public:
+    virtual void Destroy() = 0;
+    virtual uint32_t IsInputEnabled() = 0;
+};
+}
+extern "C" void* g_loop_obj_ptr; // @ 0x825EAB30
+extern "C" void* g_pReplayStateData; // @ 0x8271A2EC
+
+// pongPlayer::CheckButtonInput @ 0x8218EE10
 void pongPlayer::CheckButtonInput()
 {
-    // Guard: skip during replay/pause frame.
-    // g_pClockObj → ptr → +12 = frame state int
-    uint32_t* clockPtr = reinterpret_cast<uint32_t*>(g_pClockObj);
-    int32_t clockState = reinterpret_cast<int32_t*>(clockPtr[0])[3];  // deref + offset 12/4
-    if (clockState == 10)
+    if (*reinterpret_cast<const int32_t*>(static_cast<const uint8_t*>(g_loop_obj_ptr) + 12) == 10)
+        return;
+    const auto slot = [this]() { return *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(this) + 0x1D0); };
+    if (static_cast<const int32_t*>(g_input_obj_ptr)[slot() + 14] != 1)
         return;
 
-    // Check if this player's button is currently pressed (state == 1 = "down").
-    int32_t buttonState = ((int32_t*)g_pButtonStateTable)[m_inputSlotIdx + 14];
-    if (buttonState != 1)
-        return;
-
-    // Look up per-player 808-byte data record.
-    // Key = vtable[1] of this object (the scalar dtor pointer, used as player ID).
-    void*    vtableKey  = ((void**)*(void**)this)[1];
-    uint32_t slotIdx    = g_pPlayerSlotTable[m_inputSlotIdx + 1];   // (+14 alternate index)
-    // Each row in g_pPlayerDataTable is 808 bytes; the per-player record begins at +12 within the row.
-    // TODO(researched): the 808-byte record spans input, button history, charge
-    //       accumulators, and slot-mirror state; there is no RTTI-visible type
-    //       for it (it's a flat .data array, verified via data_section_structs.txt).
-    //       Leaving the byte-offset arithmetic until a dedicated pass models the
-    //       record from the ~15 functions that touch it.
-    uint8_t* record     = reinterpret_cast<uint8_t*>(g_pPlayerDataTable) + (slotIdx * 808) + 12;
-
-    // Is this the first frame the button is down?
-    bool isNewPress = CheckButtonPressed((void*)(record + 796));
-
-    if (isNewPress) {
-        // Check if opponent's slot is also active (mirrored slot = 15 - mySlot).
-        int32_t mirrorSlot = 15 - m_inputSlotIdx;
-        bool    opponentActive;
-        if (((int32_t*)g_pButtonStateTable)[mirrorSlot] == 0) {
-            // Verify against the saved slot in the player data table.
-            opponentActive = (g_pPlayerDataTable_slot == m_inputSlotIdx);
-        } else {
-            opponentActive = true;
-        }
-
-        // Fire the "button down" event: mask = 1 << m_inputSlotIdx, code 2125.
-        uint8_t buttonMask = (uint8_t)(1u << (m_inputSlotIdx & 31));
-        PostPageGroupMessage(record, /*code*/ 2125, /*mask*/ buttonMask,
-                /*unused*/ 0, /*opponentActive*/ (int)opponentActive);
-    } else {
-        // Button held: accumulate power into the record's score float.
-        // Read the analog-axis float return, then blend via fmadds or fadds.
-        const float delta = pongPlayer_0508_g(record, 30);
-
-        // Blend constant from global table: g_kPowerBlend @ 0x825C2EA0
-        float blend = g_kPowerBlend;
-        float threshold = g_kZero;
-
-        // Score accumulator @ g_pButtonStateTable + 0x8CEC (36076).
-        // TODO(researched): g_pButtonStateTable is another flat .data array
-        //       (no RTTI type); offset +0x8CEC falls inside the final quarter
-        //       of the table, consistent with a per-player charge accumulator.
-        //       Pending a dedicated modelling pass.
-        float& scoref = *reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(g_pButtonStateTable) + 0x8CEC);
-
-        if (delta < threshold) {
-            // Linear blend: scoref = delta * blend + threshold
-            scoref = delta * blend + threshold;
-        } else {
-            // Additive: scoref = delta + threshold
-            scoref = delta + threshold;
+    auto* table = g_pPlayerDataTable; // @ 0x8271A31C
+    const uint32_t index = reinterpret_cast<const uint32_t*>(table)[slot() + 1];
+    auto* record = table + index * 0x328u + 12;
+    const uint8_t enabled = static_cast<uint8_t>(reinterpret_cast<PlayerInputQuery*>(this)->IsInputEnabled());
+    const auto* input = static_cast<const int32_t*>(g_input_obj_ptr);
+    auto* replay = static_cast<uint8_t*>(g_pReplayStateData);
+    if (enabled != 0 && CheckButtonPressed(rage::load_ptr32<uint8_t>(record, 0x31C) + 8)) {
+        const uint32_t playerSlot = slot();
+        if (input[15 - playerSlot] == 0 ||
+            *reinterpret_cast<const uint32_t*>(replay + 0x68D00) == playerSlot) {
+            PostGameMessage(2125, static_cast<uint8_t>(1u << (playerSlot & 31)), 0, nullptr);
+            return;
         }
     }
+    if (replay[0x68CFA] == 0 || slot() != 0 || input[14] != 1)
+        return;
+    const float delta = pongPlayer_0508_g(record, 30);
+    *reinterpret_cast<float*>(replay + 0x68CEC) =
+        delta < 0.0f ? std::fma(delta, g_kPowerBlend, 1.0f) : delta + 1.0f;
 }
 
 
@@ -2718,7 +2657,6 @@ void pongPlayer::ResetSwingTrackingState() {  // pongPlayer_FA40_g @ 0x8219FA40
  *   5. Clears byte at +5512 and sets +5504 to 1 (default shot type).
  *   6. Calls ref_fi_FCD8 to finalise the serve FSM transition.
  */
-extern void pongPlayer_5F70_g(void* charSlotEntry);  // copy shot data to char table
 extern void ref_fi_FCD8(void* self);                  // finalise serve FSM
 
 void pongPlayer::FinalizeServeSetup() {  // pongPlayer_F9C0_g @ 0x8219F9C0
@@ -3045,7 +2983,6 @@ void pongPlayer::Update() {  // pongPlayer_Update @ 0x8218CF08
  * pongPlayer_4C08_g on self to synchronise replay state.
  */
 extern void pongCreature_59C0_g(void* creature);    // @ 0x820C59C0
-extern void pongPlayer_4C08_g(pongPlayer* player);  // @ 0x82194C08
 
 void pongPlayer::UpdateReplay() {  // pongPlayer_UpdateReplay @ 0x8218E178
     if (!m_pLocomotionState) {
@@ -4155,6 +4092,7 @@ void pongPlayer_06A0_g(float* outVec,
 // ---------------------------------------------------------------------------
 extern uint32_t pongMatch_GetCharacterIndex(uint32_t playerSlot); // @ 0x821C9B70
 extern void* g_gameDataMgr;           // @ 0x8271A2E4
+extern "C" const char g_pongMatchMissingPlayerMgr[]; // @ 0x8203CD80
 
 // @ 0x821C9C00 | size: 0x5C
 // Read the selected character for a match slot. With no player manager, log
@@ -4162,13 +4100,14 @@ extern void* g_gameDataMgr;           // @ 0x8271A2E4
 void* pongMatch_GetCharacterForSlot(void* /*match*/, uint32_t playerSlot) {
     uint32_t characterIndex = 0;
     if (!g_plrPlayerMgr_state) {
-        nop_8240E6D0("PLAYERMANAGER does not exist yet, there is no loaded character!");
+        nop_8240E6D0(g_pongMatchMissingPlayerMgr);
     } else {
         characterIndex = pongMatch_GetCharacterIndex(playerSlot);
     }
     auto* manager = static_cast<uint8_t*>(g_gameDataMgr);
     auto* characters = rage::load_ptr32<rage::ptr32<void>>(manager, 0x18);
-    return rage::load_ptr32<void>(characters, characterIndex * 4u);
+    const uint32_t byteOffset = characterIndex * 4u;
+    return rage::load_ptr32<void>(characters, byteOffset);
 }
 
 extern void phBoundCapsule_0880_g(void* capsule, void* outMatrix, void* samplingState);
@@ -4187,45 +4126,6 @@ extern const float g_kFloatConst_5C5938;    // height ratio threshold @ 0x825C59
 extern const float g_kFloatConst_79BB8;     // frame-to-duration scale @ 0x82079BB8
 extern const double g_kDoubleConst_79D10;   // floor constant @ 0x82079D10
 extern const double g_kDoubleConst_79B08;   // ceiling constant @ 0x82079B08
-
-
-// ===========================================================================
-// 1. UpdateOpponentBoundTransform
-// ===========================================================================
-/**
- * pongPlayer::UpdateOpponentBoundTransform()
- * @ 0x82194C08 | size: 0xA8
- *
- * Gets the opponent's physics bound capsule via the creature lookup chain,
- * computes a transform matrix, and copies the 4x16-byte result into
- * m_pLocoState2 at offset +32.
- */
-void pongPlayer::UpdateOpponentBoundTransform() {  // pongPlayer_4C08_g @ 0x82194C08
-    if (!m_pOpponent) return;
-
-    // Get opponent's character sub-object at +188
-    uint8_t* opponentBytes = reinterpret_cast<uint8_t*>(m_pOpponent);
-    uint8_t* characterSub = *reinterpret_cast<uint8_t**>(opponentBytes + 188);
-
-    // +8 is the match player slot, used to resolve its character data.
-    uint32_t playerSlot = *reinterpret_cast<uint32_t*>(characterSub + 8);
-    void* lookupResult = pongMatch_GetCharacterForSlot(
-        reinterpret_cast<void*>(g_pInputArrayTable), playerSlot);
-
-    // Navigate chain: result->+44->+324 to get bound capsule
-    uint8_t* chainEntry = *reinterpret_cast<uint8_t**>(
-        static_cast<uint8_t*>(lookupResult) + 44);
-    void* boundCapsule = *reinterpret_cast<void**>(chainEntry + 324);
-
-    // Compute transform matrix from bound capsule
-    alignas(16) vec3 transformMatrix[4];  // 4x16 = 64 bytes
-    void* meshParam = *reinterpret_cast<void**>(characterSub + 28);
-    phBoundCapsule_0880_g(boundCapsule, transformMatrix, meshParam);
-
-    // Copy matrix to locomotion state data at +32
-    uint8_t* dest = reinterpret_cast<uint8_t*>(m_pLocoState2) + 32;
-    memcpy(dest, transformMatrix, sizeof(vec3) * 4);
-}
 
 
 // ===========================================================================
@@ -6010,15 +5910,6 @@ struct shotTargetLayout {
 // rtti aiPlayer (vtable 0x8203A83C, stored by 0x821A5FC8); pongPlayer+0x1F0.
 // What 0x821A66A8 fills in: four direction weights the AI wants for its swing.
 // The names follow the pad's order (see pongPlayer_ReadSwingDirectionInput).
-struct aiSwingDirectionView {
-    uint8_t _pad00[0x04];
-    float   up;        // +0x04
-    float   down;      // +0x08
-    float   right;     // +0x0C
-    float   left;      // +0x10
-    uint8_t _pad14[0x44];
-    uint8_t resolved;  // +0x58  set by 0x821A66A8, which returns at once while it is set
-};
 
 struct aiPlayerServeView {
     struct Sub34 {
@@ -6221,8 +6112,6 @@ extern void* g_networkTimingObject;  // @ 0x8271A328
 // @ 0x82391480 — cached timestamp text for log lines.
 // @ 0x821D3860 — records a named transition on the game state object.
 extern void game_3860(void* gameState, int kind, const char* name);
-// @ 0x82198A48 — StartServe's query callback: *answer = io_Input_poll_9D68 && +0x17EC != 0.
-extern void io_8A48(pongPlayer* player, int32_t* answer);
 // Flags argument of PostGameMessage: one bit per player.
 static uint32_t PlayerMessageBit(int32_t playerIndex) {
     return playerIndex != 0 ? 2u : 1u;
@@ -6259,8 +6148,6 @@ extern bool pongPlayer_04B0_g(void* pad, int32_t button);
 // @ 0x821921D0 — 0, or the stick's direction as 1..8; going by how
 // ReadSwingDirectionInput maps it, 1 is up and they run clockwise.
 extern int32_t phBoundCapsule_21D0_g(pongPlayer* player);
-// @ 0x821A66A8 — works out the AI's direction weights once (sets `resolved`).
-extern void pongPlayer_66A8_g(aiSwingDirectionView* dir);
 // @ 0x82193A68 — applies the four weights (left, right, up, down) to the swing.
 extern void pongPlayer_3A68_g(pongPlayer* player, float left, float right, float up, float down);
 // @ 0x8219EE88 — the shotTarget's side: hands the weights to its +0xAF0 object.

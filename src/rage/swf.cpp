@@ -1,3 +1,4 @@
+#include "rage/swf_value.hpp"
 #include "rage/swf_state.hpp"
 #include "rage/swf_text.hpp"
 #include "rage/ptr32.hpp"
@@ -46,7 +47,6 @@ extern "C" {
     int _stricmp(const char*, const char*);     // case-insensitive string compare
     float swfComputeFramePosition(void* ctx, void* entry, float* outMin, float* outMax);
     const char* util_A768_1(const void* value, void* buffer, int maxLen);  // @ 0x823FA768 — SWF value to string
-    int32_t swfValueToInteger(const void* value);  // @ 0x823FA5C8
     float swfValueToFloat(const void* value);  // @ 0x823FA688
     double atof(const char* text); // @ 0x82432B80
     int atoi(const char* text); // @ 0x82432120
@@ -80,7 +80,7 @@ extern "C" int32_t swfValueToInteger(const void* value) {
     switch (words[1]) {
     case 0: case 1:
         // Even the chunk-string tag is parsed directly, without flattening it.
-        return std::atoi(reinterpret_cast<const char*>(static_cast<uintptr_t>(words[0])));
+        return std::atoi(rage::load_ptr32<const char>(value, 0));
     case 2:
         return *static_cast<const uint8_t*>(value);
     case 3:

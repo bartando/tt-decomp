@@ -307,7 +307,7 @@ struct pongCameraMgr {
                                 uint32_t param3, uint32_t param4,
                                 uint32_t param5, uint32_t param6);  // @ 0x821F99D0
 
-    // Camera change wrappers (tail-call to pg_7CD8_2h with mode N)
+    // Camera change wrappers (require shot-condition count N)
     bool TryCameraChange_Mode1(void* gameState);  // @ 0x821F7DF8
     bool TryCameraChange_Mode2(void* gameState);  // @ 0x821F7E00
     bool TryCameraChange_Mode3(void* gameState);  // @ 0x821F7E08
@@ -358,14 +358,6 @@ struct pongCameraMgr {
     bool ThresholdQuery_Mode17_Reverse(void* gameState, float delta);   // @ 0x821F96E0 (96E0_fw)
     bool ThresholdQuery_Mode18(void* gameState, float delta);           // @ 0x821F9778 (9778_fw)
     bool ThresholdQuery_Mode18_Reverse(void* gameState, float delta);   // @ 0x821F9810 (9810_fw)
-
-    // Camera selection by index (tail-call to pongCameraMgr_SetCameraByIndex)
-    void SelectCamera1();  // @ 0x821F7DF8
-    void SelectCamera2();  // @ 0x821F7E00
-    void SelectCamera3();  // @ 0x821F7E08
-    void SelectCamera4();  // @ 0x821F7E10
-    void SelectCamera5();  // @ 0x821F7E18
-    void SelectCamera6();  // @ 0x821F7E20
 
     // MI destructor adjustor thunk
     void DtorAdjustor();  // @ 0x82166DB8

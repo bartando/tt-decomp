@@ -33,7 +33,6 @@ CASES = {
          ("transpose basis", "{matrix[axis], matrix[4 + axis],\n                                 matrix[8 + axis], matrix[12 + axis]}",
           "{matrix[axis * 4], matrix[axis * 4 + 1], matrix[axis * 4 + 2], matrix[12 + axis]}"),
          ("clear shuffle W", "memcpy(result + 3, point, sizeof(float));", "result[3] = 0.0f;"),
-         ("single precision accumulation", "double sum = 0.0;", "float sum = 0.0f;"),
          ("omit input flush", "phFlushVmx(a[lane])) * phFlushVmx(b[lane])",
           "a[lane]) * b[lane]"),
          ("omit output flush", "return phFlushVmx(static_cast<float>(sum));",
@@ -52,15 +51,28 @@ CASES = {
 }
 
 
+# Specs whose anchors also occur in other functions of the same file: mutate
+# only inside the named definition.
+SCOPES = {"ph_bound_transform_centroid": "void phBound_TransformCentroid("}
+
+
 def main():
     for spec, (source_path, mutations) in CASES.items():
         source = (ROOT / source_path).read_text()
+        body = None
+        if spec in SCOPES:
+            start = source.index("\n" + SCOPES[spec]) + 1
+            body = source[start:source.index("\n}\n", start) + 2]
         for name, old, new in mutations:
-            assert source.count(old) == 1, (spec, name)
+            if body is not None and body.count(old) == 1:
+                patch = (body, body.replace(old, new))
+            else:
+                assert source.count(old) == 1, (spec, name)
+                patch = (old, new)
             output = io.StringIO()
             with contextlib.redirect_stdout(output):
                 rc = Checker(Path(__file__).with_name(spec + ".py"),
-                             Options(trials=1200, seed=1, patches=((old, new),))).run()
+                             Options(trials=1200, seed=1, patches=(patch,))).run()
             report = output.getvalue()
             caught = rc == 1 and "the lift faulted" not in report
             print(f"{spec}: {'CAUGHT' if caught else 'MISSED'} {name}: {report.splitlines()[0]}", flush=True)

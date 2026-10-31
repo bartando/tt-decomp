@@ -22,12 +22,20 @@ CASES = [
 
 def main():
     source = (Path(__file__).resolve().parents[3] / "src/game/game_message.cpp").read_text()
+    signatures = {
+        "game_message_guard_enter": "void GameMessageGuard_Enter(",
+        "game_message_guard_leave": "void GameMessageGuard_Leave(",
+        "game_message_dispatch": "void DispatchGameMessage(",
+        "game_message_post": "void PostGameMessage(",
+    }
     for spec, label, old, new in CASES:
-        assert old in source, label
+        start = source.index(signatures[spec])
+        body = source[start:source.index("\n}", start) + 2]
+        assert old in body, label
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             rc = Checker(Path(__file__).with_name(spec + ".py"),
-                         Options(seed=1, patches=((old, new),))).run()
+                         Options(seed=1, patches=((body, body.replace(old, new)),))).run()
         print(f"{'CAUGHT' if rc == 1 else 'MISSED'} {label}: {output.getvalue().splitlines()[0]}", flush=True)
         if rc != 1:
             print(output.getvalue())

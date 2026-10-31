@@ -114,31 +114,6 @@ int GetPageGroupState(PageGroup* pageGroup, int stateId);
 void SetPageGroupVisible(PageGroup* pageGroup);
 
 /**
- * ProcessPageGroupInput @ 0x8225E480 | size: 0x25C
- * 
- * Processes input events for a page group, handling button presses
- * and navigation.
- * 
- * @param pageGroup  Pointer to page group
- * @param inputData  Input data structure
- */
-void ProcessPageGroupInput(PageGroup* pageGroup, void* inputData);
-
-/**
- * PostPageGroupMessage @ 0x8225E6E0 | size: 0x118
- * 
- * Posts a message/event to a page group for processing.
- * 
- * @param target     Target object (page group or context)
- * @param messageId  Message ID code
- * @param param1     First message parameter
- * @param param2     Second message parameter
- * @param param3     Third message parameter
- */
-void PostPageGroupMessage(void* target, int messageId, int param1, 
-                          int param2, int param3);
-
-/**
  * CheckButtonPressed @ 0x821DFFF8 | size: 0x6C
  * 
  * Checks if a button is currently pressed in the input state.

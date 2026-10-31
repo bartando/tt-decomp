@@ -1,3 +1,4 @@
+#include "rage/swf_value.hpp"
 #include "rage/hud_page_group.hpp"
 /**
  * hud.cpp — HUD and Flash-based UI implementations
@@ -307,9 +308,6 @@ extern "C" void hudShell_vfn_0(void* pThis, uint32_t deleteFlag)
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Opaque SinglesNetworkClient helpers exposed from the network layer
-extern "C" void*  SinglesNetworkClient_FindParam(void* pageGroup,
-                                                 const void* key); // @ 0x823F9280
-extern "C" int    SinglesNetworkClient_ReadInt(void* pParam);      // @ 0x823FA5C8
 
 // Shell per-frame update constants block @ 0x825CAEB8
 extern const uint8_t g_hudShell_UpdateBlock[0x60];
@@ -331,11 +329,10 @@ void hudShell::vfn_2()
     bool  netDirty  = hudFlashBase_IsNetworkDirty(this);
     void* pageGroup = hudFlashBase_GetPageGroup(this);
 
-    void* pParam = SinglesNetworkClient_FindParam(pageGroup,
-                                                  g_hudShell_LookupKey);
+    void* pParam = swfFindPageGroupValue(pageGroup, static_cast<const char*>(g_hudShell_LookupKey));
     int value;
     if (pParam != nullptr) {
-        value = SinglesNetworkClient_ReadInt(pParam);
+        value = swfValueToInteger(pParam);
     } else {
         // On the "missing" path pass5 reloads the caller-owned scratch slot;
         // treat that as the sentinel -1 (matches the "value != -1" test).
@@ -435,7 +432,7 @@ void hudLoadingScreen::vfn_11()
     void* pageGroup = hudFlashBase_GetPageGroup(this);
 
     // Bind "status" entry — value 1, kind 3.
-    void* pStatus = SinglesNetworkClient_BindEntry(pageGroup,
+    void* pStatus = swfGetOrCreatePageGroupValue(pageGroup,
                                                    static_cast<const char*>(g_hudLoading_KeyStatus));
     if (pStatus != nullptr) {
         *(uint32_t*)((uint8_t*)pStatus + 0) = 1;
@@ -448,7 +445,7 @@ void hudLoadingScreen::vfn_11()
         void* tipDst = (void*)(self + 1469);
         rage_atStringCopy(static_cast<const char*>(g_hudLoading_TipTemplate), static_cast<char*>(tipDst), 64);
 
-        void* pTip = SinglesNetworkClient_BindEntry(pageGroup,
+        void* pTip = swfGetOrCreatePageGroupValue(pageGroup,
                                                     static_cast<const char*>(g_hudLoading_KeyTipText));
         if (pTip != nullptr) {
             *(void**  )((uint8_t*)pTip + 0) = tipDst;

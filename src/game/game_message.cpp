@@ -2,6 +2,10 @@
 #include "game/game_message.hpp"
 #include "xam/kernel.h"
 #include <cstring>
+#include <cstdarg>
+#if defined(_MSC_VER)
+#include <malloc.h>
+#endif
 
 extern "C" uint8_t g_gameMessageQueueLock[32]; // @ 0x82619DA0
 extern "C" uint32_t g_gameMessageQueueWords; // @ 0x825F3860
@@ -78,6 +82,63 @@ void PostGameMessage(uint32_t id, uint32_t flags, uint32_t payloadWords, const v
         std::memcpy(reinterpret_cast<uint8_t*>(message) + 4, payload, words * 4);
     else if (immediate && words != 0)
         std::memset(reinterpret_cast<uint8_t*>(message) + 4, 0, words * 4);
+    if (immediate) DispatchGameMessage(message);
+    else g_gameMessageQueueWords = initialWords + words + 1;
+    if (guard.entered != 0) GameMessageGuard_Leave(&guard);
+}
+
+// 'f' carries IEEE float bits as an integer word. Strings include the bytes
+// through the next word boundary, including any bytes following their NUL.
+// @ 0x8225E480
+void PostGameMessageFmt(uint32_t id, uint32_t flags, const char* format, ...) {
+    GameMessageGuard guard;
+    guard.entered = 0;
+    guard.lock = reinterpret_cast<RTL_CRITICAL_SECTION*>(g_gameMessageQueueLock);
+    GameMessageGuard_Enter(&guard);
+    const bool immediate = (flags & 0x40) != 0;
+    va_list arguments;
+    va_start(arguments, format);
+    va_list countArguments;
+    va_copy(countArguments, arguments);
+    uint32_t words = 0;
+    for (const char* type = format; *type; ++type) {
+        if (*type == 'i' || *type == 'f') {
+            (void)va_arg(countArguments, uint32_t);
+            ++words;
+        } else if (*type == 's') {
+            const char* text = va_arg(countArguments, const char*);
+            words += (static_cast<uint32_t>(std::strlen(text)) + 4u) >> 2;
+        }
+    }
+    va_end(countArguments);
+    const uint32_t initialWords = g_gameMessageQueueWords;
+    GameEventHeader* message;
+    if (immediate) {
+#if defined(_MSC_VER)
+        message = static_cast<GameEventHeader*>(_alloca((words + 1u) * 4u));
+#else
+        message = static_cast<GameEventHeader*>(__builtin_alloca((words + 1u) * 4u));
+#endif
+    } else {
+        message = reinterpret_cast<GameEventHeader*>(g_gameMessageQueue +
+            (uint32_t(g_gameMessageQueueBank) * 1024 + initialWords) * 4);
+    }
+    message->id = static_cast<uint16_t>(id);
+    message->flags = static_cast<uint8_t>(flags);
+    message->payloadWords = static_cast<uint8_t>(words);
+    auto* payload = reinterpret_cast<uint32_t*>(message + 1);
+    uint32_t written = 0;
+    for (const char* type = format; *type; ++type) {
+        if (*type == 'i' || *type == 'f') {
+            payload[written++] = va_arg(arguments, uint32_t);
+        } else if (*type == 's') {
+            const char* text = va_arg(arguments, const char*);
+            const uint32_t length = (static_cast<uint32_t>(std::strlen(text)) + 4u) >> 2;
+            std::memcpy(payload + written, text, length * 4u);
+            written += length;
+        }
+    }
+    va_end(arguments);
     if (immediate) DispatchGameMessage(message);
     else g_gameMessageQueueWords = initialWords + words + 1;
     if (guard.entered != 0) GameMessageGuard_Leave(&guard);

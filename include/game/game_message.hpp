@@ -14,3 +14,7 @@ void PostGameMessage(uint32_t id, uint32_t flags, uint32_t payloadWords, const v
 
 // @ 0x8225E7F8
 void DispatchGameMessage(GameEventHeader* message);
+
+// @ 0x8225E480. 'i' and 'f' consume raw 32-bit words (floats are bit patterns,
+// not promoted doubles); 's' consumes a C string, copied including word padding.
+void PostGameMessageFmt(uint32_t id, uint32_t flags, const char* format, ...);

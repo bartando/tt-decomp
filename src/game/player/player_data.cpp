@@ -145,6 +145,10 @@ extern "C" alignas(16) uint8_t g_kCourtBoxInnerMin[32] = {};
 extern "C" alignas(16) uint8_t g_ballSplashArray[832] = {};
 TT_DATA_ALIAS("g_playerDataArray2", "g_ballSplashArray");
 
+// @ 0x8203CD80 (.rdata)
+extern "C" const char g_pongMatchMissingPlayerMgr[] =
+    "PLAYERMANAGER does not exist yet, there is no loaded character!";
+
 // @ 0x8271A304 (.data)
 extern "C" void* g_pTableDims = nullptr;
 TT_DATA_ALIAS("g_pCourtGeomSingleton", "g_pTableDims");

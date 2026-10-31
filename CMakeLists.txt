@@ -153,6 +153,7 @@ set(SOURCES
     src/rage/localized_font.cpp
     src/rage/localized_font_lifecycle.cpp
     src/rage/localized_font_effect.cpp
+    src/rage/localized_font_array.cpp
     src/rage/swf_clip_events.cpp
     src/rage/core/timer.cpp
     src/rage/core/rage_core_utils.cpp
@@ -258,6 +259,8 @@ set(SOURCES
     src/game/player/player_serve_hit_point_data.cpp
     src/game/player/player_shot_target_setup.cpp
     src/game/player/player_spin_helpers.cpp
+    src/game/player/ai_swing_direction.cpp
+    src/game/player/player_shot_reset.cpp
     src/game/player/camera_node_cast.cpp
     src/game/player/player_camera_side.cpp
     src/game/player/player_camera_side_data.cpp
