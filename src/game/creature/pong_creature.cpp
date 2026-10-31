@@ -12,6 +12,7 @@
 #include "globals.h"
 #include "game/pong_strings.hpp"
 #include "rage/mat33.hpp"
+#include "../player/pong_gameplay_queries.hpp"
 #include <cstring>
 
 // ── Vtable dispatch helpers ─────────────────────────────────────────────────
@@ -267,6 +268,69 @@ void pongMover_UpdateMovementState(pongMover* mover) {
         mover->m_bIsMoving = 0;
     }
     mover->m_targetTimer = 0.0f;
+}
+
+// The movement rate used by court-boundary braking. The interpolation's
+// identical endpoints are intentional: retain its rounding and NaN behavior.
+// pongMover_GetMovementRate (was game_B368) @ 0x820CB368 | size: 0x164
+float pongMover_GetMovementRate(pongMover* mover) {
+    const auto movementData = []() {
+        return *reinterpret_cast<const uint8_t* const*>(
+            static_cast<const uint8_t*>(g_gameDataMgr) + 0x14);
+    };
+    auto* match = reinterpret_cast<uint8_t*>(g_pInputArrayTable);
+    const uint32_t index = mover->m_creatureIndex;
+    const bool special = match[uint32_t(index * 36 + 0xC4)] != 0;
+    if (mover->m_bHasTarget) {
+        const float elapsed = mover->m_moveTimer * 0.5714285969734192f;
+        const double nonnegative = elapsed >= 0.0f ? elapsed : 0.0;
+        const float fraction = static_cast<float>(nonnegative - 1.0 >= 0.0 ? 1.0 : nonnegative);
+        const float rate = *reinterpret_cast<const float*>(movementData() + 0x5C);
+        const float delta = rate - rate;
+        if (special)
+            return __builtin_fmaf(delta, fraction, rate);
+        const auto* character = static_cast<const uint8_t*>(
+            pongMatch_GetCharacterForSlot(match, index));
+        const auto* movement = *reinterpret_cast<const uint8_t* const*>(character + 0x28);
+        return __builtin_fmaf(delta, fraction, rate) *
+               *reinterpret_cast<const float*>(movement + 0x6C);
+    }
+    if (special)
+        return *reinterpret_cast<const float*>(movementData() + 0x60);
+    const auto* character = static_cast<const uint8_t*>(
+        pongMatch_GetCharacterForSlot(match, index));
+    const auto* movement = *reinterpret_cast<const uint8_t* const*>(character + 0x28);
+    const float scale = *reinterpret_cast<const float*>(movement + 0x6C);
+    return scale * *reinterpret_cast<const float*>(movementData() + 0x60);
+}
+
+extern double crt_sqrt(double value); // @ 0x824301D0
+
+// Limit each velocity component to the stopping speed before its court edge.
+// pongMover_AdjustVelocity (was phBoundCapsule_A488_g) @ 0x820CA488 | size: 0x1B4
+void pongMover_AdjustVelocity(pongMover* mover, float* x, float* z) {
+    alignas(16) float lower[4], upper[4], position[4];
+    pongMatchSettings_GetCourtBounds(g_pInputArrayTable, mover->m_creatureIndex, lower, upper);
+    const auto* creature = static_cast<const uint8_t*>(mover->m_pCreature);
+    const auto* instance = *reinterpret_cast<const uint8_t* const*>(creature + 0xA4);
+    memcpy(position, instance + 0x40, sizeof(position));
+    const float rate = pongMover_GetMovementRate(mover);
+    const auto adjust = [rate](float* velocity, float coordinate, float low, float high) {
+        if (*velocity < 0.0f) {
+            const float distance = __builtin_fabsf(coordinate - low);
+            const float limit = -static_cast<float>(crt_sqrt((distance * rate) * 2.0f));
+            const float delta = *velocity - limit;
+            const float bounded = delta >= 0.0f ? *velocity : limit;
+            *velocity = bounded >= 0.0f ? 0.0f : bounded;
+        } else if (*velocity > 0.0f) {
+            const float distance = __builtin_fabsf(coordinate - high);
+            const float limit = static_cast<float>(crt_sqrt((distance * rate) * 2.0f));
+            const double nonnegative = *velocity >= 0.0f ? *velocity : 0.0;
+            *velocity = static_cast<float>(nonnegative - limit >= 0.0 ? limit : nonnegative);
+        }
+    };
+    adjust(x, position[0], lower[0], upper[0]);
+    adjust(z, position[2], lower[2], upper[2]);
 }
 
 // Blend input and local/remote movement, mirror it for the court side, and
