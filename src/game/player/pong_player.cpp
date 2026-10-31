@@ -1,3 +1,4 @@
+#include "game/player_court.hpp"
 #include "game/player_manager_state.hpp"
 #include "game/network_timestamp.hpp"
 #include "rage/ptr32.hpp"
@@ -169,8 +170,6 @@ void pongPlayer_06A0_g(float* outVec, pongPlayer* player);  // ComputeSwingTarge
 // Swing/target helpers
 extern void pongPlayer_ComputeTargetPosition(vec3* outVec, void* targetStruct);
 extern double crt_tan(double input); // @ 0x82432628
-extern void pongPlayer_ComputeCourtPosition(vec3* outVec, void* targetData);
-extern void pongPlayer_GetCourtBounds(void* self, int r4, void* p3, void* p4, int p5, void* p6, void* p7, uint8_t metadataByte);
 extern void pongPlayer_InterpolateCourtPoint(void* adjustedVec, void* gridBase, void* p3, void* p4, void* p5);
 
 
@@ -1268,154 +1267,31 @@ void pongPlayer::UpdateSwingTimingAdjustment() {
     *adjustmentPtr = value;
 }
 
-/**
- * pongPlayer::UpdatePositionFromSwingTarget()  @ 0x8219E6D8 | size: 0x70
- *
- * Computes a 3D position from the player's swing target indices and adds
- * it to the player's base position vector.
- *
- * The function:
- * 1. Reads two indices from offsets +948 and +952 (likely row/column indices)
- * 2. Computes array offset: ((index1 * 9 + index2 * 3) * 32) + 976
- * 3. Calls pongPlayer_ComputeCourtPosition to get a target vector
- * 4. Adds the target vector to the player's position at offset +880
- * 5. Stores the result at offset +832
- */
-void pongPlayer::UpdatePositionFromSwingTarget() {
-    // Load the two indices that determine which swing target to use.
-    // These are at high offsets (+948, +952) in the pongPlayer struct — past the
-    // confirmed layout. Access via byte pointer until struct is extended.
-    uint8_t* self = reinterpret_cast<uint8_t*>(this);
-    uint32_t index1 = *reinterpret_cast<uint32_t*>(self + 948);
-    uint32_t index2 = *reinterpret_cast<uint32_t*>(self + 952);
-
-    // Compute the array offset: ((index1 * 9 + index2 * 3) * 32) + 976
-    uint32_t arrayOffset = ((index1 * 9 + index2 * 3) * 32) + 976;
-
-    // Get pointer to the swing target data within this object.
-    vec3* swingTarget = reinterpret_cast<vec3*>(self + arrayOffset);
-
-    vec3 targetDelta;
-    pongPlayer_ComputeCourtPosition(&targetDelta, swingTarget);
-
-    // Load position offset vector at +880, store result at +832.
-    vec3* currentOffset  = reinterpret_cast<vec3*>(self + 880);
-    vec3* resultPosition = reinterpret_cast<vec3*>(self + 832);
-
-    resultPosition->x = targetDelta.x + currentOffset->x;
-    resultPosition->y = targetDelta.y + currentOffset->y;
-    resultPosition->z = targetDelta.z + currentOffset->z;
-}
-
-
-
-// ===========================================================================
-// SECTION 19 — InitializeCollisionGrid  @ 0x8219E008 | size: 0x2BC
-//
-// Initializes a 4x4 grid of collision/interaction points on the player.
-// Each grid cell stores normalized coordinates and associated metadata.
-//
-// The grid covers offsets +864 through +1248 (384 bytes total, 96 bytes per
-// row). Each cell contains:
-//   - 2D normalized position (x, y)
-//   - Mirrored copies at +860/+864 offsets
-//   - Metadata flags
-//
-// Grid coordinates are computed as:
-//   x = ((i + (i+1)) / 2) * 0.5 * scale
-//   y = ((j + (j+1)) / 2) * 0.5 * scale
-//
-// This creates a uniform grid from 0.25 to 1.75 in each dimension.
-//
-// @param r4  Pass-through parameter for pongPlayer_GetCourtBounds
-// @param r6  Metadata byte (stored at grid cell +856/857)
-// ===========================================================================
-void pongPlayer::InitializeCollisionGrid(int r4, uint8_t metadataByte)
-{
-    // Load constants from .rdata
-    const float* constants = &g_kFloatConst_D10C;  // was (const float*)0x8202D10C
-    const float scale = constants[0];      // Base scale factor
-    const float zero = constants[1];       // Zero constant
-    const float halfScale = 0.5f;          // Normalization factor
-    const float epsilon = 0.01f;           // Small offset for grid adjustments
-    
-    // Initialize base state via helper function
-    pongPlayer_GetCourtBounds(this, r4, nullptr, nullptr, 1, nullptr, nullptr, metadataByte);
-    
-    // Grid storage base pointers
-    uint8_t* gridBase = (uint8_t*)this + 864;      // +0x360
-    uint8_t* cellPtr = (uint8_t*)this + 984;       // +0x3D8 (first cell)
-    uint8_t* mirrorBase = g_mirrorBuffer;  // was (uint8_t*)0x82606720
-    
-    // Outer loop: 4 rows (i = 0 to 3)
-    for (int i = 0; i < 4; i++) {
-        // Compute normalized X coordinate for this row
-        // x = ((i + (i+1)) / 2) * 0.5 * scale
-        float xNorm = ((float)i + (float)(i + 1)) * halfScale * halfScale * scale;
-        
-        // Inner loop: 4 columns (j = 0 to 3)
-        for (int j = 0; j < 4; j++) {
-            // Compute normalized Y coordinate for this column
-            // y = ((j + (j+1)) / 2) * 0.5 * scale
-            float yNorm = ((float)j + (float)(j + 1)) * halfScale * halfScale * scale;
-            
-            // Store primary coordinates
-            *(float*)(cellPtr + 0) = yNorm;   // Y at current position
-            *(float*)(cellPtr - 4) = xNorm;   // X at previous position
-            
-            // Store mirrored copies
-            *(float*)(cellPtr + 864) = yNorm;
-            *(float*)(cellPtr + 860) = xNorm;
-            
-            // Initialize temporary vectors for collision detection
-            vec3 tempVec = { zero, zero, zero };
-            vec3 adjustedVec = {};
-            
-            // Compute adjusted coordinates based on quadrant
-            switch (j) {
-                case 0:  // Bottom-left quadrant
-                    adjustedVec.x = xNorm - epsilon;
-                    adjustedVec.y = yNorm - epsilon;
-                    break;
-                    
-                case 1:  // Bottom-right quadrant
-                    adjustedVec.x = xNorm + epsilon;
-                    adjustedVec.y = yNorm - epsilon;
-                    break;
-                    
-                case 2:  // Top-right quadrant
-                    adjustedVec.x = xNorm + epsilon;
-                    adjustedVec.y = yNorm + epsilon;
-                    break;
-                    
-                case 3:  // Top-left quadrant
-                    adjustedVec.x = xNorm - epsilon;
-                    adjustedVec.y = yNorm + epsilon;
-                    break;
-            }
-            
-            // Call collision detection helper with adjusted coordinates
-            pongPlayer_InterpolateCourtPoint(&adjustedVec, gridBase, nullptr, nullptr, nullptr);
-            
-            // Advance to next cell (96 bytes per cell)
-            cellPtr += 96;
+// Add the selected cell's embedded position to the live target offset, with
+// the VMX instruction's four-lane snapshots and subnormal flushing.
+// @ 0x8219E6D8 | size: 0x70
+vec3* pongPlayer::UpdatePositionFromSwingTarget() {
+    auto* self = reinterpret_cast<uint8_t*>(this);
+    const uint32_t row = *reinterpret_cast<const uint32_t*>(self + 0x3B4);
+    const uint32_t column = *reinterpret_cast<const uint32_t*>(self + 0x3B8);
+    const uint32_t byteOffset = ((row * 3u + column) * 3u) * 32u + 0x3D0u;
+    void* position = pongPlayer_E7B0_g(self + byteOffset);
+    alignas(16) float point[4], offset[4], result[4];
+    __builtin_memcpy(point, position, sizeof point);
+    __builtin_memcpy(offset, self + 0x370, sizeof offset);
+    auto flushVmx = [](float value) {
+        uint32_t bits;
+        __builtin_memcpy(&bits, &value, sizeof bits);
+        if ((bits & 0x7F800000u) == 0) {
+            bits &= 0x80000000u;
+            __builtin_memcpy(&value, &bits, sizeof value);
         }
-        
-        // Store metadata flags at end of row
-        *(cellPtr - 8) = metadataByte;
-        *(cellPtr - 7) = *(uint8_t*)((uint8_t*)this + 944);  // Copy player state flag
-        
-        // Copy row data to mirror buffer using AltiVec
-        // Load 16 bytes from gridBase, store to mirrorBase
-        memcpy(mirrorBase, gridBase, 16);
-        
-        // Store additional metadata
-        *(cellPtr + 856) = metadataByte;
-        *(cellPtr + 857) = *(uint8_t*)((uint8_t*)this + 944);
-        
-        // Copy to mirror buffer again
-        memcpy(mirrorBase, gridBase, 16);
-    }
+        return value;
+    };
+    for (int lane = 0; lane < 4; ++lane)
+        result[lane] = flushVmx(flushVmx(point[lane]) + flushVmx(offset[lane]));
+    __builtin_memcpy(self + 0x340, result, sizeof result);
+    return reinterpret_cast<vec3*>(self + 0x340);
 }
 
 
@@ -3269,9 +3145,6 @@ void pongPlayer::FindRegisteredListener(void* unused, void* target) {
 // ===========================================================================
 
 // ── New external function declarations for this batch ───────────────────
-// Court bounds + interpolation (called by pongPlayer_E7B0_g)
-extern void  pongPlayer_FD20_g(void* a, int b, void* c, void* d,
-                               int e, void* f, void* g, unsigned char h); // @ 0x821EFD20
 // pongPlayer_InterpolateCourtGridPosition — forward declared at top of file with correct 6-param signature
 // Camera-side predicate — returns a byte, not a pointer
 extern uint8_t pongPlayer_7CC0_g(void* matchConfig);                   // @ 0x821E7CC0
@@ -3326,49 +3199,6 @@ extern "C" void pongPlayer_9C60_g(void* base, int index, uint32_t value) {
 }
 
 
-// ===========================================================================
-// SEC 49 — pongPlayer_E7B0_g  @ 0x8219E7B0 | size: 0x7C (124 bytes)
-// ===========================================================================
-/**
- * Computes a swing target vector from court bounds.
- *
- * Input struct layout:
- *   +0:  uint8_t courtType     +1: uint8_t courtSubType
- *   +4:  float   posX          +8: float   posY
- *   +16: vec3    result (output — written by this function)
- *
- * Steps:
- *  1. Calls pongPlayer_FD20_g to resolve two court boundary vectors.
- *  2. Packs (posX, posY) into a temp and calls pongPlayer_InterpolateCourtGridPosition
- *     to interpolate a position within those bounds.
- *  3. Returns pointer to the result vec3 at input+16.
- */
-extern "C" void* pongPlayer_E7B0_g(void* inputStruct) {
-    uint8_t* input = reinterpret_cast<uint8_t*>(inputStruct);
-    uint8_t courtType    = input[0];
-    uint8_t courtSubType = input[1];
-    float posX = *reinterpret_cast<float*>(input + 4);
-    float posY = *reinterpret_cast<float*>(input + 8);
-
-    // Resolve court boundary vectors for the given types
-    vec3 boundsA{}, boundsB{};
-    pongPlayer_FD20_g(
-        g_pTableDims, courtType, &boundsA, &boundsB, courtSubType,
-        reinterpret_cast<void*>(static_cast<uintptr_t>(1)), nullptr, 0);
-
-    // Pack current position for interpolation
-    float tempPos[2] = { posX, posY };
-
-    // Interpolate within bounds → write result at input+16
-    void* result = input + 16;
-    pongPlayer_InterpolateCourtGridPosition(
-        tempPos,
-        courtType,
-        reinterpret_cast<float*>(result), &boundsA.x, &boundsB.x,
-        reinterpret_cast<float*>(g_mirrorBuffer));
-
-    return result;
-}
 
 
 // ===========================================================================
@@ -4176,7 +4006,6 @@ extern void phBoundCapsule_0880_g(void* capsule, void* outMatrix, void* sampling
 extern float pongPlayer_C7A8_g(pongPlayer* player);
 extern void pongPlayer_B088_2hr(void* timingData, float dir, float power);
 extern void pongPlayer_E2C8_g(void* obj, int a, int b, int c, int d);
-extern void pongPlayer_E008_g(void* obj, int a, int b, int c);
 extern bool pongPlayer_D6B8_IsCreatureReady(void* characterSub);
 extern void ServeStartedMessage_CFE8_2h(void* msgObj, void* targetData, int param);
 extern void PlayerMovementMessage_D258_2hr(void* msgObj, float posX, float posZ);
@@ -4925,12 +4754,6 @@ void pongPlayer_UpdateLocomotionState(pongPlayer* state) {
 extern "C" bool pongPlayer_DE98_g(void* state) {
     return static_cast<pongPlayerState*>(state)->IsInReturnPosition();
 }
-
-// pongPlayer_FD20_g @ 0x821EFD20 | size: 0x1A4
-// Court bounds + interpolation helper invoked by E7B0_g.
-void pongPlayer_FD20_g(void* /*a*/, int /*b*/, void* /*c*/,
-                         void* /*d*/, int /*e*/, void* /*f*/,
-                         void* /*g*/, unsigned char /*h*/) {}
 
 // Player-system entry points exposed as named symbols (from stubs.cpp).
 extern "C" void pongPlayer_ApplyNetStateImpl(void* /*self*/) {}

@@ -353,8 +353,7 @@ struct pongPlayer {
 
     // ── Additional methods (lifted batches) ──────────────────────────────
     void UpdateSwingTimingAdjustment();
-    void UpdatePositionFromSwingTarget();
-    void InitializeCollisionGrid(int r4, uint8_t metadataByte);
+    vec3* UpdatePositionFromSwingTarget();
     bool IsSwingTimerExpiredAndReady() const;
     void SetPlayerSide(uint8_t side);
     bool IsRecoveryTimerBelowThreshold() const;
