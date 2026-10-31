@@ -1,3 +1,4 @@
+#include "rage/ref_counted_header.hpp"
 /**
  * pong_frontend.cpp — Frontend Menu State Machine Implementation
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -1472,7 +1473,6 @@ void CCalMoviePlayer::ClearFiberContext() {
 // External helper functions used by constructors/destructors
 extern "C" {
     void CCalMoviePlayer_BaseCtorHelper(void* obj);  // @ 0x82488580 - base class constructor helper
-    void CCalMoviePlayer_BaseDtorHelper(void* obj);  // @ 0x824885C8 - base class destructor helper
     void CCalMoviePlayer_InitEvents(void* obj);      // @ 0x8248E0E8 - event initialization
     void CCalMoviePlayer_CleanupEvents(void* obj);   // @ 0x8248FA48 - event cleanup
 }
@@ -1501,7 +1501,7 @@ void CCalMoviePlayer::CtorDerived() {
 void CCalMoviePlayer::DtorDerived() {
     *(void**)this = VTABLE_CCalMoviePlayer_Base;  // revert to base vtable for CCalMoviePlayer
     CCalMoviePlayer_CleanupEvents(this);
-    CCalMoviePlayer_BaseDtorHelper(this);
+    datBase_ClearField12(this);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

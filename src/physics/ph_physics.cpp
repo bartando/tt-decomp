@@ -1,4 +1,5 @@
 #include "rage/mat33.hpp"
+#include "rage/ref_counted_header.hpp"
 /**
  * ph_physics.cpp — RAGE physics module utilities
  * Rockstar Presents Table Tennis (Xbox 360)
@@ -4950,7 +4951,6 @@ void rage::phArticulatedCollider::SetConstraint_12b(uint32_t value) {
 
 // Forward declarations for phObject helpers
 extern void phObject_4F28_p46(void* thisPtr);
-extern void thunk_fn_824885C8(void* thisPtr);  // -> util_85C8
 extern void set_3348(void* thisPtr, float value);
 extern void phObject_WriteValue(void* thisPtr, uint32_t param);
 extern "C" void _locale_register(void* ptr, uint32_t tag);
@@ -4992,11 +4992,11 @@ int32_t phObject_33(void* thisPtr, uint32_t valueA, uint32_t valueB) {
 // phObject_DestructorThunk @ 0x8248B878 | size: 0x10
 //
 // Destructor helper: sets the vtable pointer for a specific subclass,
-// then tail-calls util_85C8 (via thunk_fn_824885C8) for base cleanup.
+// then tail-calls util_85C8 (via datBase_ClearField12_Thunk) for base cleanup.
 // ─────────────────────────────────────────────────────────────────────────────
 void phObject_DestructorThunk(void* thisPtr) {
     *(void**)thisPtr = (void*)0x82019168;  // lis r11,-32255; addi r11,r11,-28312
-    thunk_fn_824885C8(thisPtr);
+    datBase_ClearField12_Thunk(thisPtr);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -26,7 +26,7 @@ def _caller(addr, targets, frame=0x80, setup=()):
     return words + [0x80010000 | (frame + 4), 0x38210000 | frame, 0x7C0803A6, 0x4E800020]
 
 
-def _fixture(orig_words, lift_words, callees, policies=None):
+def _fixture(orig_words, lift_words, callees, policies=None, *, cache_effects=False):
     image = bytearray(0x1000)
     ranges = {}
     for addr, words in {IMAGE_BASE: orig_words, **callees}.items():
@@ -44,7 +44,7 @@ def _fixture(orig_words, lift_words, callees, policies=None):
     c = Checker.__new__(Checker)
     c.repo = repo_root()
     c.lift, c.syms, c.image = lift, syms, bytes(image)
-    c.spec = SimpleNamespace(FUNCTION='caller')
+    c.spec = SimpleNamespace(FUNCTION='caller', CACHE_EFFECTS=cache_effects)
     c.opts, c.ftol, c.ignore = Options(), 0, []
     c.policies = policies or {addr: run() for addr in callees}
     c.fake_policies, c._canon, c._leaf, c.host = {}, {}, {}, {}
@@ -52,7 +52,7 @@ def _fixture(orig_words, lift_words, callees, policies=None):
     c.disasm_cache = {}
     c.orig_range = ranges[IMAGE_BASE]
     c.addr, c.lift_home = IMAGE_BASE, [(lift.lo, lift.hi)]
-    c.machine = Machine(c.image, lift, syms, [])
+    c.machine = Machine(c.image, lift, syms, [], cache_effects=cache_effects)
     c.machine.prescan(*c.orig_range)
     c.machine.prescan(lift.lo, lift.hi)
     return c
@@ -150,11 +150,30 @@ def msr_regressions():
 
 
 def regressions():
+    cache_errors = []
+    # dcbf 0,r3; sync; blr. Cache effects are invisible to ordinary memory diffs.
+    flush = [0x7C0018AC, 0x7C0004AC, 0x4E800020]
+    for enabled, body, broken in [(False, flush[1:], False), (True, flush, False),
+                                  (True, flush[1:], True), (True, [flush[0], flush[2]], True)]:
+        try:
+            c = _fixture(flush, body, {}, cache_effects=enabled)
+            c._dw = None
+            t, regs, results = _sides(c, {3: ARENA_BASE + 127})
+            if enabled:
+                assert results[0].cache_events == [('dcbf', ARENA_BASE), ('sync', 0)]
+            try:
+                c.compare(t, regs, *results)
+            except Divergence:
+                assert broken, 'equal cache operations failed'
+            else:
+                assert not broken, 'missing cache operation passed'
+        except Exception as e:
+            cache_errors.append(f'cache effects enabled={enabled}, broken={broken}: {e}')
     a, b = IMAGE_BASE + 0x100, IMAGE_BASE + 0x200
     # The stack store intentionally overlaps a SysV caller's saved LR unless
     # run() supplies the Xenon caller argument area.
     leaf = [0x38600007, 0x90610014, 0x4E800020]  # li r3,7; stw r3,20(r1); blr
-    errors = []
+    errors = cache_errors
     for count in (1, 2, 3):
         label = f'run() repeat calls: original 2, lift {count}'
         try:

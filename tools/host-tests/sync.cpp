@@ -1,4 +1,6 @@
 #include "xam/kernel.h"
+#include "xam/thread_sync.h"
+#include "platform/host_error.h"
 #include <atomic>
 #include <cassert>
 #include <chrono>
@@ -66,5 +68,15 @@ int main() {
     MmFreePhysicalMemory(0,memory); assert(!MmQueryAllocationSize(memory));
     assert(!MmAllocatePhysicalMemoryEx(0,5000,4,1,UINT32_MAX,0));
     assert(!MmAllocatePhysicalMemoryEx(0,5000,4,0,UINT32_MAX,3));
-    std::puts("PASS host synchronization, TLS, IRQL and allocation contracts");
+    assert(sysThread_WaitTimeout(nullptr,0)==UINT32_MAX && hostGetLastError()==6);
+    assert(NtCreateSemaphore(&sem,0,nullptr,0,1)==STATUS_SUCCESS);
+    assert(sysThread_WaitTimeout(sem,0)==STATUS_TIMEOUT);
+    assert(sysThread_WaitTimeoutEx(sem,0,1)==UINT32_MAX && hostGetLastError()==50);
+    assert(sysThread_ReleaseSemaphore(sem,2,nullptr)==0 && hostGetLastError()==298);
+    assert(sysThread_ReleaseSemaphore(sem,1,nullptr)==1);
+    assert(sysThread_WaitTimeout(sem,0)==STATUS_SUCCESS);
+    hostSetLastError(123);
+    std::thread errors([] { assert(hostGetLastError()==0); hostSetLastError(456); assert(hostGetLastError()==456); });
+    errors.join(); assert(hostGetLastError()==123); NtClose(sem);
+    std::puts("PASS host synchronization, TLS, IRQL, allocation and integrated SDK wait/error contracts");
 }

@@ -12,14 +12,12 @@
  *   XeTlsBlock_BindMainThread  — bind TLS block to main thread
  *   XePhysicalAlloc_stub       — physical memory allocation
  *   xe_GetLoadContext           — get load context (2 overloads)
- *   game_CrtFatalExit_thunk    — CRT fatal exit handler
  */
 
 #include <stdint.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 /*=========================================================================
  * XeTlsBlock Management
@@ -153,20 +151,4 @@ void* XePhysicalAlloc_stub(uint32_t sizeBytes, int32_t protectFlags,
  */
 void xe_GetLoadContext(void) {
     /* No-op on host */
-}
-
-/*=========================================================================
- * CRT Fatal Exit
- *=========================================================================*/
-
-/**
- * game_CrtFatalExit_thunk
- *
- * Called when the CRT encounters a fatal error that cannot be recovered.
- * On Xbox 360, this triggers a system-level crash handler.
- * On the host, we print an error and abort.
- */
-void game_CrtFatalExit_thunk(void) {
-    fprintf(stderr, "[CRT] Fatal exit — aborting\n");
-    abort();
 }

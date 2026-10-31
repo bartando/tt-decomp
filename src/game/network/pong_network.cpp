@@ -2,6 +2,7 @@
 #include "game/network_context.hpp"
 #include "rage/dat_bit_buffer.hpp"
 #include "rage/memory.h"
+#include "rage/hud_page_group.hpp"
 #include "crt/rtti.h"
 // pong_network.cpp — Network message implementations | Rockstar Presents Table Tennis (Xbox 360, 2006)
 
@@ -98,7 +99,6 @@ extern void pongNetMessageHolder_7668_2hr(void* stateArray);
 // Forward declarations for network functions
 extern void NetDataQuery_InitNested(void* a);
 extern bool CheckButtonPressed(void* record);
-extern void* snSession_FindProperty(void* context, const char* name);
 extern void WriteInt8Bits(void* client, int16_t value, int size);
 extern void NetworkClient_WriteSecondaryPlayerData(void* client, int16_t index, void* data);
 extern void NetworkClient_BeginJoinRequest(void* client);
@@ -919,7 +919,7 @@ setup_network:
     // Find available network message slot
     extern const char g_szMessageType[];  // @ 0x8205DFB0
     uint32_t clientState = *(uint32_t*)((uint8_t*)networkClient + 92);
-    void* messageSlot = snSession_FindProperty((void*)clientState, g_szMessageType);
+    void* messageSlot = SinglesNetworkClient_BindEntry((void*)clientState, g_szMessageType);
 
     // Initialize message slot if found
     if (messageSlot != nullptr) {

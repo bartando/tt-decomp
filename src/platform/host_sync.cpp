@@ -103,7 +103,7 @@ extern "C" NTSTATUS NtReleaseSemaphore(HANDLE handle, int32_t count, int32_t* pr
     object->changed.notify_all();
     return STATUS_SUCCESS;
 }
-extern "C" NTSTATUS NtWaitForSingleObjectEx(HANDLE handle, uint32_t mode, uint32_t alertable, LARGE_INTEGER* timeout) {
+extern "C" NTSTATUS NtWaitForSingleObjectEx(HANDLE handle, uint32_t mode, uint32_t alertable, const LARGE_INTEGER* timeout) {
     if (mode > 1) return STATUS_INVALID_PARAMETER;
     if (alertable) return STATUS_NOT_SUPPORTED; // No host APC delivery mechanism.
     auto object = lookup(handle);

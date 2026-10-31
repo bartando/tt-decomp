@@ -3,6 +3,7 @@
 #include "platform/video_imports.h"
 #include "grc/device_state.h"
 #include "xam/kernel.h"
+#include "rage/grc_command_stream.hpp"
 /**
  * graphics/grc_device.cpp — Graphics Device Lifecycle and Sampler State
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -210,7 +211,6 @@ void grcDevice_shutdownAlt(void)
     g_pGrcDeviceAlt = NULL;
 }
 
-extern "C" void* rage_A980(void* device); // @ 0x8235A980 — refill the command buffer, return its cursor
 
 // Xenon ABI: r3 = device, r4..r7 = signed left/top/right/bottom (exclusive bounds).
 // The cursor points at the last written word: every command store preincrements it.
@@ -506,6 +506,18 @@ extern "C" void grcTexture_ReleaseResource(void* texture); // @ 0x82352708
 
 extern "C" uint32_t xe_GetCurrentThreadId();     // @ 0x82566B78
 extern "C" void rage_AA78(void* gpuDevice, uint32_t* handle);  // @ 0x8235AA78
+
+// @ 0x8235EAD8 | size: 0x54 (was rage_EAD8 / rmcDrawable_Release)
+extern "C" uint32_t grcDevice_Release(void* device) {
+    auto* state = static_cast<uint8_t*>(device);
+    auto& references = *reinterpret_cast<uint32_t*>(state + 0x0C);
+    if (references != 1)
+        return --references;
+    grcDeviceXenon_teardown(device);
+    void* allocation = *reinterpret_cast<void**>(state - sizeof(void*));
+    _locale_register(allocation, 0x24800000u);
+    return 0;
+}
 
 // Drop a reference to a GPU resource. On the last one, hand its handle (+0x08)
 // back to the kernel video device (the title's or, in a system process, XAM's)
@@ -1263,7 +1275,6 @@ extern void grc_CFD8(void* device, uint32_t flags, const int32_t* rect, const fl
                      float depth, uint32_t stencil);  // @ 0x8235CFD8
 extern void rage_AD98(void* device);  // @ 0x8235AD98
 extern void grcDevice_FlushDirtyState(void* device);  // @ 0x82363C00
-extern uint32_t* grc_9B60(void* fixups);  // @ 0x82359B60 — grow the draw-fixup list
 }
 
 // Begin a draw from caller-filled vertex memory. Returns the 16-byte-aligned

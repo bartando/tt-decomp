@@ -350,14 +350,13 @@ struct pongShadowMap {
     uint8_t      _pad3b1[0x1f];        // padding to +0x3d0
 
     // ── draw submission block @ +0x3d0..+0x460 ──
-    uint32_t     m_draw_3d0;           // +0x3d0  R:4 W:1
+    void*        m_mapTexture;         // +0x3d0
     uint32_t     m_draw_3d4;           // +0x3d4  R:2 W:1
     uint32_t     m_draw_3d8;           // +0x3d8  R:0 W:1
-    uint8_t      _pad3dc[0x14];        // padding to +0x3f0
-    uint32_t     m_draw_3f0;           // +0x3f0  R:2 W:0
-    uint32_t     m_draw_3f4;           // +0x3f4  R:1 W:0
-    uint32_t     _pad3f8;              // padding
-    uint32_t     m_draw_3fc;           // +0x3fc  R:1 W:0
+    uint8_t      _pad3dc[4];
+    void*        m_playerTextures[2][2]; // +0x3e0
+    void*        m_activeTextures[2];   // +0x3f0
+    void*        m_singlePlayerTextures[2]; // +0x3f8
     uint32_t     _pad400;              // padding
     uint32_t     m_draw_404;           // +0x404  R:2 W:0
     uint32_t     m_draw_408;           // +0x408  R:1 W:0

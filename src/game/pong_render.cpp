@@ -1,5 +1,7 @@
 #include "grc/image_state.hpp"
 #include "grc/progress_state.h"
+#include "rage/grc_command_stream.hpp"
+#include "rage/sys_callback.hpp"
 /**
  * pong_render.cpp — Light state and render bucket implementation
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -22,7 +24,7 @@
 #include "camera/pong_camera.hpp"
 #include <cstring>
 #include "rage/shader_parameters.hpp"
-#include "rage/sys_callback.hpp"
+#include "rage/grc_texture.hpp"
 
 // pongLightState_CopyLights @ 0x8213E110 | size: 0x30C (was game_E110)
 // Copies all eight slots, regardless of count. game_E0A8 (0x8213E0A8)
@@ -55,6 +57,7 @@ float flushLightVmx(float value) {
 }  // namespace
 extern ShaderTable* lbl_825EBC40;          // @ 0x825EBC40
 extern "C" const uint8_t g_shaderParameterDirtyMasks[8];           // @ 0x825D4C80  MSB-first dirty-bit masks
+extern "C" const uint32_t g_shaderMatrixTransposeMasks[3][4]; // @ 0x8202F0A0
 extern const float lbl_825C5938;               // @ 0x825C5938  -1.0f
 extern const float lbl_8202D108;               // @ 0x8202D108  1.0f
 extern "C" uint32_t g_grmShaderFx_variantTable[23];  // @ 0x825EBBD8  pending render state
@@ -317,17 +320,68 @@ static_assert(__builtin_offsetof(pongShadowConfig, mapSampleScale) == 2032, "map
 static_assert(__builtin_offsetof(pongShadowMap, m_config) == 8, "shadow config pointer");
 static_assert(__builtin_offsetof(pongShadowMap, m_draw_430) == 1072, "last shader handle");
 #endif
-extern void* game_53C8(pongShadowMap* map, int32_t player, int32_t layer); // @ 0x821453C8
-extern void pongShadowMap_A5C8_g(uint32_t handle, void* texture);         // @ 0x8215A5C8
-extern void game_9AA0(ShaderTable* table, uint32_t handle, const ShaderVector* matrices,
-                      int32_t count);                                  // @ 0x82159AA0
 
-namespace {
-int32_t shadowTextureDimension(void* texture, int slot) {
-    using DimensionFn = int32_t (*)(void*);
-    return reinterpret_cast<DimensionFn>((*static_cast<void***>(texture))[slot])(texture);
+// @ 0x821453C8 | size: 0x90
+void* game_53C8(pongShadowMap* map, int32_t player, int32_t layer) {
+    if (map->m_config->slots[3 + layer * 2 + player].enabled == 0)
+        return g_grcDefaultTexture;
+    if (static_cast<int32_t>(map->m_draw_444) < 2) {
+        if (player != static_cast<int32_t>(map->m_draw_448))
+            return g_grcDefaultTexture;
+        return map->m_singlePlayerTextures[layer];
+    }
+    if (player == static_cast<int32_t>(map->m_draw_448))
+        return map->m_activeTextures[layer];
+    if (layer > 0)
+        return g_grcDefaultTexture;
+    return map->m_playerTextures[player][layer];
 }
-} // namespace
+// @ 0x8215A5C8 | size: 0xA4
+void pongShadowMap_A5C8_g(uint32_t handle, void* texture) {
+    ++g_grmShaderFx_boundContext;
+    if (texture == nullptr)
+        texture = g_grcDefaultTexture;
+    void* resource = static_cast<rage::grcTexture*>(texture)->GetShaderResource();
+    // The virtual can change the active table; capture it only after the call.
+    ShaderTable* table = lbl_825EBC40;
+    const uint32_t bit = (handle >> 1) & 0x1FFFFu;
+    const uint32_t slot = table->entries[(handle >> 18) * 2 + 1] & 0xFFFFu;
+    ShaderVector* bank = table->values;
+    table->dirtyBits[bit >> 3] |= g_shaderParameterDirtyMasks[bit & 7];
+    memcpy(bank + slot, &resource, sizeof(resource));
+}
+// @ 0x82159AA0 | size: 0x124
+void game_9AA0(ShaderTable* table, uint32_t handle, const ShaderVector* matrices,
+               int32_t count) {
+    uint32_t* descriptor = table->entries + (handle >> 18) * 2;
+    uint32_t bit = (handle >> 1) & 0x1FFFFu;
+    uint32_t length = count != 0 ? static_cast<uint32_t>(count)
+                                 : ((descriptor[0] >> 2) & 0x3FFFu);
+    const uint32_t end = bit + length;
+    while (bit < end) {
+        // lvx snapshots all four rows before any write; stvx rounds down too.
+        uint32_t matrix[4][4];
+        memcpy(matrix, reinterpret_cast<const void*>(
+            reinterpret_cast<uintptr_t>(matrices) & ~uintptr_t(15)), sizeof(matrix));
+        descriptor += 2;
+        const uint32_t format = (descriptor[0] >> 4) & 7;
+        const uint32_t slot = descriptor[1] & 0xFFFFu;
+        ShaderVector* bank = table->values;
+        const uint32_t* mask = g_shaderMatrixTransposeMasks[(format + 1) / 4];
+        uint32_t output[4][4];
+        for (uint32_t row = 0; row < 4; ++row) {
+            for (uint32_t lane = 0; lane < 4; ++lane) {
+                output[row][lane] = (matrix[row][lane] & ~mask[lane])
+                                  | (matrix[lane][row] & mask[lane]);
+            }
+        }
+        table->dirtyBits[bit >> 3] |= g_shaderParameterDirtyMasks[bit & 7];
+        memcpy(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(bank + slot)
+                                      & ~uintptr_t(15)), output, sizeof(output));
+        ++bit;
+        matrices += 4;
+    }
+}
 
 // @ 0x82147228 | size: 0x600 (was pongShadowMap_7228_g)
 void pongShadowMap::applyShaderParameters(int32_t pass) {
@@ -368,9 +422,9 @@ void pongShadowMap::applyShaderParameters(int32_t pass) {
 
     float scaleX, scaleY, offsetX, offsetY;
     if (pass == 0) {
-        void* texture = reinterpret_cast<void*>(static_cast<uintptr_t>(m_draw_3d0));
-        int32_t height = shadowTextureDimension(texture, 9);
-        int32_t width = shadowTextureDimension(texture, 8);
+        void* texture = m_mapTexture;
+        int32_t height = static_cast<rage::grcTexture*>(texture)->GetHeight();
+        int32_t width = static_cast<rage::grcTexture*>(texture)->GetWidth();
         float radius = m_config->mapSampleScale * 0.5f;
         scaleY = radius / static_cast<float>(height);
         scaleX = radius / static_cast<float>(width);
@@ -380,30 +434,30 @@ void pongShadowMap::applyShaderParameters(int32_t pass) {
         void* texture = game_53C8(this, player, 0);
         pongShadowMap_A5C8_g(m_draw_408, texture);
         pongShadowMap_A5C8_g(m_draw_410, texture);
-        void* second = lbl_825EBA20;
+        void* second = g_grcDefaultTexture;
         if (m_config->slots[player + 5].enabled != 0 && player == static_cast<int32_t>(m_draw_448))
-            second = reinterpret_cast<void*>(static_cast<uintptr_t>(
-                static_cast<int32_t>(m_draw_444) < 2 ? m_draw_3fc : m_draw_3f4));
+            second = static_cast<int32_t>(m_draw_444) < 2 ? m_singlePlayerTextures[1]
+                                                            : m_activeTextures[1];
         pongShadowMap_A5C8_g(m_draw_40c, second);
         pongShadowMap_A5C8_g(m_draw_414, second);
-        if (texture == lbl_825EBA20)
+        if (texture == g_grcDefaultTexture)
             texture = second;
 
-        int32_t width = shadowTextureDimension(texture, 8);
-        void* reference = reinterpret_cast<void*>(static_cast<uintptr_t>(m_draw_3f0));
-        int32_t referenceWidth = shadowTextureDimension(reference, 8);
+        int32_t width = static_cast<rage::grcTexture*>(texture)->GetWidth();
+        void* reference = m_activeTextures[0];
+        int32_t referenceWidth = static_cast<rage::grcTexture*>(reference)->GetWidth();
         float scaledWidth = m_config->playerSampleScale * static_cast<float>(width);
         scaleX = scaledWidth / static_cast<float>(referenceWidth);
-        int32_t height = shadowTextureDimension(texture, 9);
-        int32_t referenceHeight = shadowTextureDimension(reference, 9);
+        int32_t height = static_cast<rage::grcTexture*>(texture)->GetHeight();
+        int32_t referenceHeight = static_cast<rage::grcTexture*>(reference)->GetHeight();
         float scaledHeight = m_config->playerSampleScale * static_cast<float>(height);
         scaleY = scaledHeight / static_cast<float>(referenceHeight);
-        height = shadowTextureDimension(texture, 9);
-        width = shadowTextureDimension(texture, 8);
+        height = static_cast<rage::grcTexture*>(texture)->GetHeight();
+        width = static_cast<rage::grcTexture*>(texture)->GetWidth();
         scaleY /= static_cast<float>(height);
         scaleX /= static_cast<float>(width);
-        height = shadowTextureDimension(texture, 9);
-        width = shadowTextureDimension(texture, 8);
+        height = static_cast<rage::grcTexture*>(texture)->GetHeight();
+        width = static_cast<rage::grcTexture*>(texture)->GetWidth();
         offsetY = lbl_825CA430[1] / static_cast<float>(height);
         offsetX = lbl_825CA430[0] / static_cast<float>(width);
     }
@@ -434,9 +488,6 @@ void pongShadowMap::applyShaderParameters(int32_t pass) {
 // ─────────────────────────────────────────────────────────────────────────────
 extern void pongLightState_Reset(pongLightState* state, int32_t mask);  // @ 0x82154628
 extern void cmOperatorCtor_0B50_w(void* overrideState);  // @ 0x820F0B50
-extern "C" void* rage_A980(void* device);  // @ 0x8235A980
-extern uint32_t* grc_9B60(void* commands);  // @ 0x82359B60
-extern void rage_C660(void* device);  // @ 0x8235C660
 
 // @ 0x82225D90 | size: 0x328 (was rage_5D90)
 // Inferred name from the layer descriptors consumed by pongDrawBucket_AddEntry.
@@ -862,7 +913,21 @@ extern SwipePattern g_swipePatterns[17];  // @ 0x825D09A0
 extern void util_PackColorRGBA(uint32_t* outColor, const float* inVector);  // @ 0x8223F840
 extern void hudFlashBase_DrawFlashOverlay(void* hudObj, void* corner1, void* corner2, 
                                  float alpha, int reverseFlag);  // @ 0x82140420
-extern void pongScrnTransFadeIn_EndTransition(void* obj);  // @ 0x82378460
+extern "C" uint32_t g_sceneResetMatrix[4]; // @ 0x8261A0C0
+
+// @ 0x82378460 | size: 0x90
+void pongScrnTransFadeIn_EndTransition(void* obj) {
+    auto* callbacks = reinterpret_cast<SystemCallback*>(static_cast<uint8_t*>(obj) + 0x10);
+    SystemCallback& completion = callbacks[1];
+    if (completion.kind != 0)
+        sysCallback_Invoke(&completion, 0);
+    // Reload the template after the callback, which can update either callback.
+    completion.target = reinterpret_cast<void*>(static_cast<uintptr_t>(g_sceneResetMatrix[0]));
+    completion.function = reinterpret_cast<void (*)()>(static_cast<uintptr_t>(g_sceneResetMatrix[1]));
+    completion.storedArgument = reinterpret_cast<void*>(static_cast<uintptr_t>(g_sceneResetMatrix[2]));
+    completion.kind = g_sceneResetMatrix[3];
+    callbacks[0] = completion;
+}
 
 // Global pointers (accessed via SDA and absolute addresses)
 extern struct hudFlashBase* g_hudFlashBase;  // @ 0x82606454 (SDA, r2+25556)
@@ -1239,7 +1304,6 @@ void pongScrnTransFreezeAndCrossFade::Render() {
 // ─────────────────────────────────────────────────────────────────────────────
 void pongScrnTransFreezeAndCrossFade::End() {
     // Forward to pongScrnTransFadeIn implementation
-    extern void pongScrnTransFadeIn_EndTransition(void* thisPtr);
     pongScrnTransFadeIn_EndTransition(this);
 }
 

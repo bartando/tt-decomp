@@ -45,7 +45,7 @@ void rage_debugLog(const char*, ...) {}
 // @ 0x8240E6D0 — blr. rage_audio.cpp (audVoiceSfx's invalid-entry messages).
 void audDebugLog(const char*, ...) {}
 
-// @ 0x8240E6D0 — blr, per dialog_validation.cpp's own note on it.
+// @ 0x8240E6D0 — blr in the original .text disassembly.
 void rage_PrintDebugLine(const char*, ...) {}
 
 }  // extern "C"

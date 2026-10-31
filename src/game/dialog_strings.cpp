@@ -56,7 +56,7 @@ const char* g_str_dialog_invalidDialogID     = "Invalid dialog ID[%d]";         
 const char* g_str_dialog_invalidLines        = "Invalid Lines[%d] for dialog[%d]";            // @ 0x82075E90
 
 // ────────────────────────────────────────────────────────────────────────────
-// Unlock / match-result diagnostic strings (referenced by dialog_validation.cpp)
+// Unlock / match-result diagnostic strings
 // ────────────────────────────────────────────────────────────────────────────
 const char* g_str_dialog_unlockItemNoName       = "no item name specified";
 const char* g_str_dialog_unlockItemNameTooLong  = "unlock item name [%s] is too long by %d characters!";

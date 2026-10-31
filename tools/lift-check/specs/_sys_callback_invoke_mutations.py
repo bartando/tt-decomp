@@ -6,9 +6,11 @@ from liftcheck.runner import Checker, Options
 
 MUTATIONS = [
     ("skip bound callbacks", "if (callback->target)", "if (false)"),
+    ("skip free callbacks", "if (callback->target)", "if (true)"),
     ("bound no-argument target lost", "(callback->function)(callback->target);", "(callback->function)(callback->storedArgument);"),
     ("bound stored argument lost", "callback->target, callback->storedArgument);", "callback->target, argument);"),
     ("bound runtime argument lost", "callback->target, callback->storedArgument, argument);", "callback->target, callback->storedArgument, nullptr);"),
+    ("bound two arguments swapped", "callback->target, callback->storedArgument, argument);", "callback->target, argument, callback->storedArgument);"),
     ("bound runtime uses stored", "callback->target, argument);", "callback->target, callback->storedArgument);"),
     ("skip free no-argument callback", "callback->function();", "(void)callback;"),
     ("free stored uses runtime", "(callback->function)(callback->storedArgument);", "(callback->function)(argument);"),
@@ -27,9 +29,10 @@ def main():
         with contextlib.redirect_stdout(output):
             rc = Checker(Path(__file__).with_name("sys_callback_invoke.py"),
                          Options(seed=1, patches=((old, new),))).run()
-        print(f"{'CAUGHT' if rc == 1 else 'MISSED'} {label}: "
-              f"{output.getvalue().splitlines()[0]}", flush=True)
-        if rc != 1:
+        first = output.getvalue().splitlines()[0]
+        caught = rc == 1 and first.startswith('FAIL ')
+        print(f"{'CAUGHT' if caught else 'MISSED'} {label}: {first}", flush=True)
+        if not caught:
             print(output.getvalue())
             return 1
     print(f"Caught {len(MUTATIONS)}/{len(MUTATIONS)} mutations", flush=True)

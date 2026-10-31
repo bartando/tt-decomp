@@ -64,6 +64,7 @@ set(SOURCES
     src/platform/host_sync.cpp
     src/platform/host_memory.cpp
     src/xam/kernel.c
+    src/xam/thread_sync.cpp
     src/xam/kernel_shims.c
     src/xam/network.c
     src/xam/static_init.c
@@ -141,7 +142,6 @@ set(SOURCES
     src/game/data/gd_vib_event.cpp
     src/game/debug_strings.cpp
     src/game/dialog_strings.cpp
-    src/game/dialog/dialog_validation.cpp
     src/game/pong_logos_strings.cpp
     src/game/pong_strings.cpp
     src/game/save/mc_memcard.cpp
@@ -248,9 +248,11 @@ set(SOURCES
     src/graphics/tri_strip_list.cpp
     src/graphics/grc_debug_strings.cpp
     src/graphics/grc_gpu_hang.cpp
+    src/graphics/grc_cache.cpp
+    src/graphics/grc_command_stream.cpp
+    src/graphics/grc_device.cpp
     src/graphics/grc_gpu_resources.cpp
     src/graphics/fx_billboard.cpp
-    src/graphics/grc_device.cpp
     src/graphics/grc_vertex_buffer.cpp
     src/graphics/grc_render.cpp
     src/graphics/texture_reference.cpp

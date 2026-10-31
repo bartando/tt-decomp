@@ -1,3 +1,4 @@
+#include "rage/ref_counted_header.hpp"
 /**
  * cr_anim_dof.cpp — crAnimDof / crAnimDofQuaternion Implementation
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -42,14 +43,6 @@ extern void crAnimDof_BlendQuaternion(void* outQuat, void* animContext,
 // Sets the phInst vtable at +0, then clears field +12.
 // @ 0x824887F8 | size: 0x10
 extern void phInst_DestroySubObject(void* subObj);
-
-// Clears the base-class datBase field at offset +12.
-// @ 0x824885C8 | size: 0x0C
-extern void datBase_ClearField12(void* obj);
-
-// Thunk that tail-calls datBase_ClearField12.
-// @ 0x82494128
-extern void datBase_ClearField12_Thunk(void* obj);
 
 // Parent-class initializer for crAnimDofQuaternion sub-objects.
 // @ 0x8248BA30

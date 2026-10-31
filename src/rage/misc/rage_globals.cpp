@@ -50,21 +50,4 @@ float g_cm_negateVec[4] = {-1.0f, -1.0f, -1.0f, -1.0f};
 // Graphics/Texture System Globals
 // ============================================================================
 
-/**
- * g_pTextureFactory
- * 
- * Pointer to the global texture factory instance.
- * Used by grcTextureReferenceBase for texture management.
- */
-void* g_pTextureFactory = nullptr;
-
-/**
- * g_bTextureEndianDirty
- * 
- * Flag indicating whether texture endianness needs to be corrected.
- * Xbox 360 is big-endian, modern platforms are little-endian.
- * Used by grcTextureReferenceBase::Serialize.
- */
-bool g_bTextureEndianDirty = true;  // Always true on little-endian platforms
-
 } // namespace rage

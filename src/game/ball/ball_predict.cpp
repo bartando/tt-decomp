@@ -1,8 +1,8 @@
+#include "rage/sys_callback.hpp"
 // ball_predict.cpp — gdBallPredictData, the ball trajectory predictor
 // Rockstar Presents Table Tennis (Xbox 360, 2006)
 
 #include "ball_predict.hpp"
-#include "rage/sys_callback.hpp"
 
 #include <cmath>
 

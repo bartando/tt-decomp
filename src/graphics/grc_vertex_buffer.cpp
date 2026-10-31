@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include "rage/grc_resource_state.hpp"
 
 namespace {
 
@@ -122,7 +123,6 @@ extern "C" uint8_t pg_7578_g(void* buffer); // @ 0x82157578
 extern "C" float* util_5B08(float* result, void* buffer, uint32_t index); // @ 0x82155B08
 
 extern "C" uint8_t g_grcUseResourceLocks; // @ 0x8260640C
-namespace rage { extern uint8_t g_bTextureEndianDirty; } // @ 0x82606562
 extern "C" uint32_t xe_GetCurrentThreadId(); // @ 0x82566B78
 extern "C" uint32_t grcResource_Lock(void* resource, uint32_t fence, uint32_t unusedR5,
                                     uint32_t auxiliary, uint32_t base, uint32_t auxiliaryBase,

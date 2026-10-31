@@ -62,7 +62,7 @@ def grow(ctx):
 
 
 CALLS = {
-    "util_FFF8": boundary("callback", args=("r3", "r4")),
+    "sysCallback_Invoke": boundary("callback", args=("r3", "r4")),
     "pongRender_ResetState": boundary("reset render state"),
     "pongLightState_Reset": boundary("reset lights", reset, args=("r3", "r4")),
     "pg_C2A0_g": boundary("lookup", lookup, args=("r3", "r4")),

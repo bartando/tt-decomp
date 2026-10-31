@@ -3,6 +3,7 @@
 #include "crt/host_format.h"
 #include "grc/device_state.h"
 #include "rage/math.hpp"
+#include "rage/sys_callback.hpp"
 /**
  * rage::swf* — Scaleform Flash UI System Implementation
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -18,7 +19,6 @@
 #include <cstring>  // For strcmp
 #include <cstdlib>  // For strtol
 #include <cmath>    // For fused multiply-add
-#include "rage/sys_callback.hpp"
 
 void swfSetMember(void* list, const char* name, const uint32_t* value); // @ 0x823FB258
 uint32_t swfHashMemberName(const char* name); // @ 0x8223A868

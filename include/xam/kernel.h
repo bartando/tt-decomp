@@ -135,7 +135,7 @@ NTSTATUS KeWaitForSingleObject(void* Object, uint32_t WaitReason, uint32_t WaitM
                                 uint32_t Alertable, LARGE_INTEGER* Timeout);
 
 // Xbox extended wait adds WaitMode to the NT handle wait contract.
-NTSTATUS NtWaitForSingleObjectEx(HANDLE handle, uint32_t waitMode, uint32_t alertable, LARGE_INTEGER* timeout);
+NTSTATUS NtWaitForSingleObjectEx(HANDLE handle, uint32_t waitMode, uint32_t alertable, const LARGE_INTEGER* timeout); // @ 0x82585EFC
 NTSTATUS NtClose(HANDLE handle);
 void KeInitializeEvent(void* event, EVENT_TYPE type, int32_t initialState);
 NTSTATUS RtlInitializeCriticalSection(struct _RTL_CRITICAL_SECTION* section);
@@ -171,7 +171,7 @@ NTSTATUS NtCreateSemaphore(HANDLE* SemaphoreHandle, uint32_t DesiredAccess,
  * @param PreviousCount   Pointer to receive previous count (can be NULL)
  * @return STATUS_SUCCESS or error code
  */
-NTSTATUS NtReleaseSemaphore(HANDLE SemaphoreHandle, int32_t ReleaseCount, int32_t* PreviousCount);
+NTSTATUS NtReleaseSemaphore(HANDLE SemaphoreHandle, int32_t ReleaseCount, int32_t* PreviousCount); // @ 0x8258666C
 
 //=============================================================================
 // Critical Region Functions
@@ -373,7 +373,7 @@ void RtlInitAnsiString(ANSI_STRING* DestinationString, const char* SourceString)
  * @param Status NTSTATUS code to convert
  * @return Corresponding Win32 error code
  */
-uint32_t RtlNtStatusToDosError(NTSTATUS Status);
+uint32_t RtlNtStatusToDosError(NTSTATUS Status); // @ 0x82585E5C
 
 //=============================================================================
 // XEX Header Functions

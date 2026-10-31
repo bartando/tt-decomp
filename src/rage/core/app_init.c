@@ -1,3 +1,4 @@
+#include "xam/thread_sync.h"
 /**
  * rage/app_init.c — RAGE engine game-object and application initialisation
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -405,7 +406,6 @@ void grcSetup_PresentFrame(struct grcSetup* self, bool doFlip)
 // ===========================================================================
 
 extern void**    __imp_ExThreadObjectType;           /* @ 0x82000900 */
-extern void      game_CrtFatalExit_thunk(int32_t errorCode); /* @ 0x8242BF10 */
 
 /* Xbox 360 kernel thread management */
 typedef int32_t NTSTATUS;
@@ -421,7 +421,7 @@ int xe_SetThreadProcessor(uint32_t threadHandle, uint32_t processorNum)
 {
     if (processorNum >= 6u) {
         /* STATUS_INVALID_PARAMETER = 0xC000000D */
-        game_CrtFatalExit_thunk((int32_t)0xC000000D);
+        sysThread_SetErrorFromStatusThunk((int32_t)0xC000000D);
         return -1;
     }
 
@@ -430,7 +430,7 @@ int xe_SetThreadProcessor(uint32_t threadHandle, uint32_t processorNum)
                                                 (void**)__imp_ExThreadObjectType,
                                                 &kthread);
     if (status < 0) {
-        game_CrtFatalExit_thunk(status);
+        sysThread_SetErrorFromStatusThunk(status);
         return -1;
     }
 

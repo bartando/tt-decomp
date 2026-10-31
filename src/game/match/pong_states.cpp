@@ -1,4 +1,5 @@
 #include "game/network_context.hpp"
+#include "rage/hud_page_group.hpp"
 /**
  * pong_states.cpp — HSM state/context classes for UI screens
  * Rockstar Presents Table Tennis (Xbox 360, 2006)

@@ -105,7 +105,8 @@ class Checker:
         if rng is None:
             raise SystemExit(f"lift-check: 0x{self.addr:08X} isn't a function in the symbol map")
         self.orig_range = rng
-        self.machine = Machine(self.image, self.lift, self.syms, self.syms.helper_ranges())
+        self.machine = Machine(self.image, self.lift, self.syms, self.syms.helper_ranges(),
+                               cache_effects=getattr(self.spec, 'CACHE_EFFECTS', False))
         m = self.machine
         if getattr(self.spec, "STATIC_INIT", True):
             from .staticinit import patch
@@ -571,6 +572,14 @@ class Checker:
             raise Divergence(f"the lift faulted: {l.fault.kind}: {l.fault.detail}",
                              [f"at {self.where('lift', l.fault.pc)}",
                               "the original returned normally"])
+        if getattr(self.spec, 'CACHE_EFFECTS', False) and o.cache_events != l.cache_events:
+            for k in range(max(len(o.cache_events), len(l.cache_events))):
+                a = o.cache_events[k] if k < len(o.cache_events) else None
+                b = l.cache_events[k] if k < len(l.cache_events) else None
+                if a != b:
+                    raise Divergence(f'cache operation #{k + 1} differs',
+                                     [f'original: {a}', f'lift: {b}',
+                                      f'event counts: {len(o.cache_events)} vs {len(l.cache_events)}'])
         # calls
         oc = [c for c in o.calls if not c.transparent]
         lc = [c for c in l.calls if not c.transparent]

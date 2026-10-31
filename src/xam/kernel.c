@@ -298,6 +298,9 @@ uint32_t RtlNtStatusToDosError(NTSTATUS Status) {
         case STATUS_TIMEOUT:
             return 0x000005B4;  // ERROR_TIMEOUT
         
+        case STATUS_SEMAPHORE_LIMIT_EXCEEDED:
+            return 298; // ERROR_TOO_MANY_POSTS
+
         case STATUS_PENDING:
             return 0x000003E5;  // ERROR_IO_PENDING
         

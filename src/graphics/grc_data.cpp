@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include "link/tt_alias.h"
+#include "rage/grc_resource_state.hpp"
 
 
 // @ 0x8202D110 (.rdata)
@@ -65,10 +66,24 @@ extern "C" const uint8_t g_grcFetchFormatSizes[64] = {
     0x2, 0x1, 0x2, 0x4, 0x1, 0x2, 0x4, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
     0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x3, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0
 };
+// @ 0x8202F0A0 (.rdata) — lvx selects one aligned mask per matrix format.
+extern "C" alignas(16) const uint32_t g_shaderMatrixTransposeMasks[3][4] = {
+    {0, 0, 0, 0},
+    {0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu},
+    {1, 2, 1, 2},
+};
+
+// @ 0x825EBA20 (.data) — fallback texture used by render and texture references.
+// g_grcDefaultTexture is the canonical slot in graphics/image_data.cpp.
+
+// @ 0x8260663C (.data) — enable per-thread command handle tracking.
+uint32_t g_grcThreadCommandTracking = 0;
 // @ 0x8260640C (.data) — use the resource locking path for CPU mappings
 extern "C" uint8_t g_grcUseResourceLocks = 0;
 
 namespace rage {
 // @ 0x82606562 (.data) — suppress resource unlock while endian data is dirty
+// Image value is 0. The native loader may need to set this when byte-swapping
+// big-endian resource data on little-endian hosts.
 uint8_t g_bTextureEndianDirty = 0;
 }

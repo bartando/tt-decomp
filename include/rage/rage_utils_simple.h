@@ -25,6 +25,9 @@ extern "C" {
  */
 uint32_t rage_IncrementRefCount(void* obj);
 
+// Last device reference tears down the GPU and frees the allocation header.
+uint32_t grcDevice_Release(void* device); // @ 0x8235EAD8
+
 /**
  * rage_AlignAndDelegate @ 0x82353130 | size: 0x10
  * 

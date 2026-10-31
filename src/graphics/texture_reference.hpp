@@ -10,11 +10,11 @@
 #include <stdint.h>
 #endif
 #include "../rage/data/rage_dat.hpp"
+#include "rage/grc_texture.hpp"
 
 namespace rage {
 
 struct grcTexture;
-struct grcTextureFactory;
 struct grcSerializerCtx;
 
 // ---------------------------------------------------------------------------
@@ -46,8 +46,8 @@ struct grcTextureReferenceBase : datBase {
     virtual void  ForwardSlot5();                           // slot  5
     virtual void  ForwardSlot6();                           // slot  6
     virtual void  ForwardSlot7(void* param);                // slot  7
-    virtual void  ForwardSlot8();                           // slot  8
-    virtual void  ForwardSlot9();                           // slot  9
+    virtual int32_t ForwardSlot8();                           // slot  8
+    virtual int32_t ForwardSlot9();                           // slot  9
     virtual void  vfn_10();                                 // slot 10  (abstract/subclass)
     virtual grcTexture* GetTexture() = 0;                   // slot 11  – abstract: returns bound texture
     virtual grcTexture* GetTexture2() = 0;                  // slot 12  – abstract variant (used by LOD path)
@@ -58,7 +58,7 @@ struct grcTextureReferenceBase : datBase {
     virtual void  ForwardSlot17(float f, void* a);          // slot 17  – takes float arg
     virtual void  ForwardSlot18(void* a, void* b);          // slot 18
     virtual void  vfn_19();                                 // slot 19  (abstract/subclass)
-    virtual void  ForwardSlot20();                          // slot 20
+    virtual void* ForwardSlot20();                          // slot 20
     virtual grcTexture* vfn_21(void* a, void* b, void* c); // slot 21
     virtual void  vfn_22(void* a);                          // slot 22
     virtual void  vfn_23();                                 // slot 23  (abstract/subclass)

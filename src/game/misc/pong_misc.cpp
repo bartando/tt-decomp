@@ -1,3 +1,6 @@
+#include "rage/rage_utils_simple.h"
+#include "rage/ref_counted_header.hpp"
+#include "xam/thread_sync.h"
 /**
  * pong_misc.cpp — Miscellaneous game classes (fsmMachine, misc helpers)
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -1043,18 +1046,15 @@ int CCalMoviePlayer::ComputeFrameSize() {  // 3F00_h
 // ─────────────────────────────────────────────────────────────────────────────
 
 // External helpers used by batch 2+ functions
-extern "C" void pong_EmptyVirtualDestructor(void* obj) __asm__("_util_85C8");            // @ 0x824885C8 - base destructor
 extern "C" void phInst_Release(void* obj);            // @ 0x82460850 - physics instance release
 extern "C" uint32_t xe_GetCurrentThreadId();      // @ 0x82566B78
 extern "C" void _locale_register(void* ptr);     // @ 0x820C02D0 - memory dealloc
 extern "C" void pg_SleepYield(int frames);           // @ 0x82566C80 - wait N frames
 extern "C" void sysIpcHandle_Release(void* ptr) __asm__("_pg_6F48");              // @ 0x82566F48 - release page ref
-extern "C" uint32_t sysThread_WaitTimeout(void* handle, int timeout) __asm__("_pg_C3B8_g"); // @ 0x8242C3B8 - wait with timeout
 extern "C" void sysIpcHandle_Close(void* handle) __asm__("_pg_6F10_g");                     // @ 0x82566F10 - close handle
 extern "C" void* sysThread_Create(void* r3, uint32_t stackSize, void* entryPoint,
                             void* context, uint32_t priority, void* r8) __asm__("_pg_6F88_w"); // @ 0x82566F88 - create thread
 extern "C" int xe_SetThreadProcessor(void* threadHandle, uint32_t proc); // @ 0x8242B8A8 - defined in src/rage/core/app_init.c (accepts thread handle pointer)
-extern "C" void rmcDrawable_Release(void* ptr) __asm__("_rage_EAD8");            // @ 0x8235EAD8 - release callback object
 
 // Thread entry points for CCalMoviePlayer worker threads
 extern "C" void CCalMoviePlayer_EC88_p33(void* ctx); // @ 0x8248EC88 - FillReadBufferA entry
@@ -1080,7 +1080,7 @@ extern "C" void grcBuffer_Release(void* obj) __asm__("_grc_BDC0");  // @ 0x8235B
 void CCalMoviePlayer::DtorIntermediate() {
     *(void**)this = (void*)0x820092C0;  // Restore CCalMoviePlayer vtable
     CleanupResources();                  // Clean up threads and resources
-    pong_EmptyVirtualDestructor(this);                     // Destroy base class
+    datBase_ClearField12(this);                     // Destroy base class
 }
 
 /**
@@ -1457,7 +1457,6 @@ void CCalMoviePlayer::StopPlaybackFull(uint32_t mode) {
 
 // External helpers
 extern void rmcDrawable_AddRef(void* ptr) __asm__("_rage_EAC0");   // @ 0x8235EAC0 - AddRef on video callback
-extern void rmcDrawable_Release(void* ptr) __asm__("_rage_EAD8");   // @ 0x8235EAD8 - Release video callback
 
 /**
  * CCalMoviePlayer::SetStatusFlagsA @ 0x8248EF70 | size: 0x64
@@ -1586,7 +1585,7 @@ void CCalMoviePlayer::FlushAndNotify() {
  *
  * Replaces the video callback object at offset +48. If a new callback is
  * provided, calls rmcDrawable_AddRef (AddRef) on it. If an existing callback is
- * stored, calls rmcDrawable_Release (Release) before replacing. Returns 0.
+ * stored, calls grcDevice_Release (Release) before replacing. Returns 0.
  *
  * This mirrors SetAudioInterface but for the video path, using direct
  * helper calls rather than vtable dispatch for ref-counting.
@@ -1600,7 +1599,7 @@ int CCalMoviePlayer::SetVideoCallback(void* pCallback) {
     // Release the old callback if present
     void* pOldCallback = m_pBufferObject;
     if (pOldCallback != nullptr) {
-        rmcDrawable_Release(pOldCallback);
+        grcDevice_Release(pOldCallback);
         m_pBufferObject = nullptr;
     }
 
@@ -1654,7 +1653,7 @@ int CCalMoviePlayer::ValidateOutputFormat() {
  *
  * Scalar deleting destructor for the base CCalMoviePlayer class.
  * Stamps the base vtable (0x820092C0), runs the event cleanup helper
- * (CCalMoviePlayer_13), destroys the base object (pong_EmptyVirtualDestructor), and
+ * (CCalMoviePlayer_13), destroys the base object (datBase_ClearField12), and
  * optionally frees memory if bit 0 of flags is set.
  */
 void CCalMoviePlayer::ScalarDeletingDtorBase(int flags) {
@@ -1665,7 +1664,7 @@ void CCalMoviePlayer::ScalarDeletingDtorBase(int flags) {
     CleanupResources();
 
     // Destroy base object
-    pong_EmptyVirtualDestructor(this);
+    datBase_ClearField12(this);
 
     // Free if ownership flag set
     if (flags & 1) {
@@ -2355,7 +2354,7 @@ int32_t CCalMoviePlayer::DrainPlaybackBuffer(uint32_t statusC) {
  *    - signaling its event (vslots 48-51)
  *    - waiting with timeout (pg_C3B8_g, retrying on WAIT_TIMEOUT=258)
  *    - closing the handle (pg_6F10_g)
- * 4. Releases the callback object at +48 (rmcDrawable_Release)
+ * 4. Releases the callback object at +48 (grcDevice_Release)
  * 5. Releases the media source at +44 (vslot 2)
  * 6. Reinitializes defaults via vslot 38
  *
@@ -2442,7 +2441,7 @@ thread_cleanup:
 
     // Release callback object at +48
     if (m_pBufferObject != nullptr) {
-        rmcDrawable_Release(m_pBufferObject);
+        grcDevice_Release(m_pBufferObject);
         m_pBufferObject = nullptr;
     }
 
@@ -3419,7 +3418,6 @@ extern "C" void CCalMoviePlayer_CF28_wrh(void* pDevice, float f1,
 extern "C" void util_E8E8(void* context, const char* sourceLabel, const char* valueLabel, int32_t mode) __asm__("_util_E8E8");
 extern "C" void pg_1448_g(void* self) __asm__("_pg_1448_g");
 extern "C" void pg_6EB0_g(int32_t mode) __asm__("_pg_6EB0_g");
-extern "C" void pg_6DC0_g(void* handle, int32_t signalState, int32_t pulseMode) __asm__("_pg_6DC0_g");
 extern "C" void* pg_B760(uint32_t accessMask, int32_t inheritHandle, int32_t handleValue) __asm__("_pg_B760");
 extern "C" void pg_6C40_g(void* handle) __asm__("_pg_6C40_g");
 extern "C" void pg_6ED8_g(void* handle) __asm__("_pg_6ED8_g");
@@ -3555,12 +3553,12 @@ void pg_8058(void* channelContext) {
                 sysIpcHandle_Close(workerHandle);
             }
 
-            pg_6DC0_g(thisCtx->m_pWorkerFence, 1, 0);
+            sysThread_ReleaseSemaphore(thisCtx->m_pWorkerFence, 1, nullptr);
             thisCtx->m_bHasWorkerThread = 0;
         }
     }
 
-    pg_6DC0_g(thisCtx->m_pReadFence, 1, 0);
+    sysThread_ReleaseSemaphore(thisCtx->m_pReadFence, 1, nullptr);
 }
 
 // @ 0x82426708 | size: 0xB8

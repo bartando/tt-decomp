@@ -23,7 +23,7 @@ CALLS = {
     'sysThread_ReleaseSemaphore': stub(ret=lambda c: state['status'], args=('r3', 'r4', 'r5')),
     'rage_debugLog': model(_log, args=('r3',)),
 }
-EXTERNS = {'rage_debugLog': 0x8240E6D0, '_pg_C3B8_g': 0x8242C3B8}
+EXTERNS = {'rage_debugLog': 0x8240E6D0, '_pg_C3B8_g': 0x8242C3B8, '_pg_6DC0_g': 0x82566DC0}
 
 
 def inputs(t):

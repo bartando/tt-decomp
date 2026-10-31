@@ -1,4 +1,5 @@
 #include "game/network_context.hpp"
+#include "rage/sys_callback.hpp"
 /**
  * pong_network_classes.cpp — Network utility classes implementation
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -13,7 +14,6 @@
 
 #include <stdint.h>
 #include <cstring>
-#include "rage/sys_callback.hpp"
 
 // Forward declarations
 extern "C" void rage_free(void* ptr);
