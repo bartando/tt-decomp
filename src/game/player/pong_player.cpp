@@ -2718,7 +2718,6 @@ void pongPlayer::ResetSwingTrackingState() {  // pongPlayer_FA40_g @ 0x8219FA40
  *   5. Clears byte at +5512 and sets +5504 to 1 (default shot type).
  *   6. Calls ref_fi_FCD8 to finalise the serve FSM transition.
  */
-extern void pongPlayer_5F70_g(void* charSlotEntry);  // copy shot data to char table
 extern void ref_fi_FCD8(void* self);                  // finalise serve FSM
 
 void pongPlayer::FinalizeServeSetup() {  // pongPlayer_F9C0_g @ 0x8219F9C0

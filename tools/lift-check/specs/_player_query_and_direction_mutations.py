@@ -23,6 +23,12 @@ CASES = [
     ("player_opponent_bound_transform", "cache destination", "    phBoundCapsule_0880_g(capsule, matrix, samplingState);\n    auto* destination = rage::load_ptr32<uint8_t>(player, 0x30) + 0x20;", "    auto* destination = rage::load_ptr32<uint8_t>(player, 0x30) + 0x20;\n    phBoundCapsule_0880_g(capsule, matrix, samplingState);"),
     ("player_opponent_bound_transform", "wrong transform size", "matrix, sizeof matrix", "matrix, sizeof matrix - 16"),
     ("player_opponent_bound_transform", "lose VMX alignment", "& ~uintptr_t(15)", "& ~uintptr_t(0)"),
+    ("player_shot_entry_reset", "wrong shot child", "entry) + 0x10", "entry) + 0x20"),
+    ("player_shot_entry_reset", "wrong half factor", "0x118) = 0.5f", "0x118) = 1.0f"),
+    ("player_shot_entry_reset", "retain vector lane", "__builtin_memset(aligned, 0, 16)", "__builtin_memset(aligned, 0, 12)"),
+    ("player_shot_entry_reset", "clear retained byte", "field<uint8_t>(entry, 0x152) = 0;", "field<uint8_t>(entry, 0x151) = 0; field<uint8_t>(entry, 0x152) = 0;"),
+    ("player_shot_entry_reset", "wrong ready flag", "field<uint8_t>(entry, 0xD8) = 1;", "field<uint8_t>(entry, 0xD8) = 0;"),
+    ("player_shot_entry_reset", "wrong initial flag", "field<float>(entry, 0x144) = 1.0f;", "field<float>(entry, 0x144) = 0.0f;"),
 ]
 
 def main():

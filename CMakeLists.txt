@@ -243,6 +243,7 @@ set(SOURCES
     src/game/player/player_shot_target_setup.cpp
     src/game/player/player_spin_helpers.cpp
     src/game/player/ai_swing_direction.cpp
+    src/game/player/player_shot_reset.cpp
     src/game/player/camera_node_cast.cpp
     src/game/player/player_camera_side.cpp
     src/game/player/player_camera_side_data.cpp
