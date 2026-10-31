@@ -308,20 +308,6 @@ bool cmNode_GetBool(const cmNodePort* port) {
     }
 }
 
-// ============================================================================
-// Graphics/Texture System Functions
-// ============================================================================
-
-/**
- * Release
- * 
- * Release a texture resource.
- */
-void Release(grcTexture* texture) {
-    // TODO: Implement proper texture release
-    (void)texture;
-}
-
 } // namespace rage
 
 // ═══════════════════════════════════════════════════════════════════════════
