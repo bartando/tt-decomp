@@ -143,4 +143,27 @@ void phBoundComposite_RebuildExtents(void* bound) {
     const float squared = difference >= 0.0f ? upperSquared : lowerSquared;
     values[3] = float(crt_sqrt(squared));
 }
+
+// @ 0x8228F3E0
+void phBoundComposite_Symmetrize(void* bound) {
+    auto* values = static_cast<float*>(bound);
+    for (unsigned axis = 0; axis < 3; ++axis) {
+        const float upper = values[4 + axis];
+        const float lower = values[8 + axis];
+        // Unordered and equal magnitudes retain the upper side.
+        if (__builtin_fabsf(upper) < __builtin_fabsf(lower))
+            values[4 + axis] = -lower;
+        else
+            values[8 + axis] = -upper;
+    }
+    float width[4];
+    for (unsigned lane = 0; lane < 4; ++lane)
+        width[lane] = subtractCompositeVmx(values[4 + lane], values[8 + lane]);
+    const float radius = refinedLength(width) * 0.5f;
+    values[2] = radius;
+    values[3] = radius;
+    // The original deliberately leaves the centroid-present byte at +5 alone.
+    std::memset(static_cast<uint8_t*>(bound) + 0x30, 0, 16);
+}
+
 }

@@ -9,7 +9,7 @@ from liftcheck.spec import *
 CALLS = {'crt_sqrt': run(),
          'rage::phBoundComposite_RebuildExtents': run(),
          'rage::phBoundComposite_ComputeRadius': run(),
-         'pongCreatureInst_F3E0_v12': stub(ret='void', args=('r3',), deref={'r3': 0x84})}
+         'rage::phBoundComposite_Symmetrize': run()}
 
 
 def inputs(t):

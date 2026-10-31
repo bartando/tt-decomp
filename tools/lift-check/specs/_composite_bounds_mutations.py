@@ -36,8 +36,17 @@ CASES = [
     ('ph_composite_refresh_bounds', 'src/game/creature/pong_creature.cpp', 'extern "C" void pongCreatureInst_E828_v12(', [
         ('skip AABB rebuild', 'rage::phBoundComposite_RebuildExtents(self);', '(void)self;'),
         ('wrong output radius field', 'values[2] =', 'values[3] ='),
-        ('test full mass flags', 'static_cast<uint8_t>(flags) != 0', 'flags != 0'),
+        ('test full symmetry flags', 'static_cast<uint8_t>(flags) != 0', 'flags != 0'),
     ]),
+    ('ph_composite_symmetrize_bounds', CORE, 'void phBoundComposite_Symmetrize(', [
+        ('wrong magnitude side', '__builtin_fabsf(upper) < __builtin_fabsf(lower)', '__builtin_fabsf(upper) > __builtin_fabsf(lower)'),
+        ('wrong magnitude tie', '__builtin_fabsf(upper) < __builtin_fabsf(lower)', '__builtin_fabsf(upper) <= __builtin_fabsf(lower)'),
+        ('leave Z asymmetric', 'axis < 3', 'axis < 2'),
+        ('omit half diagonal', 'refinedLength(width) * 0.5f', 'refinedLength(width)'),
+        ('leave origin radius', 'values[3] = radius;', '(void)radius;'),
+        ('leave centroid W', '+ 0x30, 0, 16', '+ 0x30, 0, 12'),
+    ]),
+
 ]
 
 

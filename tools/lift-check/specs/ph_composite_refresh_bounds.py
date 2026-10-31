@@ -1,4 +1,4 @@
-"""0x8228E828: compose both recovered bounds helpers and the low-byte mass gate."""
+"""0x8228E828: compose both recovered bounds helpers and the low-byte symmetry gate."""
 from liftcheck.spec import *
 from specs._composite_bounds_inputs import inputs as setup, CALLS
 FUNCTION = 'pongCreatureInst_E828_v12'

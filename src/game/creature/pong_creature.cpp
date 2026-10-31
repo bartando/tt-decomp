@@ -3451,9 +3451,6 @@ void pongCreatureInst_CopyTransform(void* dst, void* src, void* helper) {
     (void)dst; (void)src; (void)helper;
 }
 
-// @ 0x8228F3E0 — composite mass-property update.
-extern "C" void pongCreatureInst_F3E0_v12(phBoundView* bound);
-
 /**
  * pongCreatureInst_E828_v12 @ 0x8228E828 | size: 0x60
  *
@@ -3469,7 +3466,7 @@ extern "C" void pongCreatureInst_E828_v12(void* self, unsigned int flags) {
     auto* values = static_cast<float*>(self);
     values[2] = rage::phBoundComposite_ComputeRadius(self, rage::load_ptr32<float>(self, 0x78), values + 12);
     if (static_cast<uint8_t>(flags) != 0)
-        pongCreatureInst_F3E0_v12(static_cast<phBoundView*>(self));
+        rage::phBoundComposite_Symmetrize(self);
 }
 
 // ── pongCreature vtable slots (batch 2) ────────────────────────────────────
