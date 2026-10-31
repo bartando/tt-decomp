@@ -9,6 +9,7 @@ extern const float g_swfTwipScale = 0x1.99999ap-5f; // @ 0x820290F0
 }
 TT_DATA_ALIAS("_ZN4rage18g_swfTwipsToPixelsE", "_ZN4rage14g_swfTwipScaleE");
 extern "C" {
+extern const char g_localizedFallbackFont[] = "arial12"; // @ 0x82075804
 char g_swfInternedText[8192] = {}; // @ 0x82602848 — 128 slots of 64 bytes
 void (*g_swfBindFontTexture)(void*) = nullptr; // @ 0x82602820
 void* g_swfNodePool = nullptr; // @ 0x82604C5C

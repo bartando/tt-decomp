@@ -143,6 +143,7 @@ set(SOURCES
     src/rage/swf_bounds.cpp
     src/rage/swf_action_copy.cpp
     src/rage/swf_paint.cpp
+    src/rage/localized_font.cpp
     src/rage/swf_clip_events.cpp
     src/rage/core/timer.cpp
     src/rage/core/rage_core_utils.cpp
