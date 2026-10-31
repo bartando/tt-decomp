@@ -16,3 +16,6 @@ extern "C" int32_t rage_7BD0(void* device, uint32_t flush, uint32_t mask); // @ 
 uint32_t* grcDevice_WriteRegisterRunOverflow(void* device, uint32_t* cursor,
     uint32_t firstRegister, const uint32_t* valuesBeforeRun, uint32_t count,
     uint32_t stride); // @ 0x823625A0
+
+extern "C" void grcDevice_FlushDirtyRegisterGroup(void* device, uint64_t dirty,
+    uint32_t firstRegister, const uint32_t* values); // @ 0x82362658

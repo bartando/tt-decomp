@@ -5,8 +5,6 @@
 #include <cstring>
 
 extern "C" void grcDevice_SetViewport(void* device, const void* viewport); // @ 0x82355ED0
-void grcDevice_FlushDirtyRegisterGroup(void* device, uint64_t dirty, uint32_t firstRegister,
-                                      const uint32_t* values); // @ 0x82362658
 
 extern "C" const uint8_t g_shaderConstantData[440]; // @ 0x8202C328
 
