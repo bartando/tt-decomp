@@ -23,6 +23,7 @@
 #include <cmath>
 #include "game/template_registry.hpp"
 #include "rage/singleton.h"
+#include "rage/sys_callback.hpp"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Forward declarations
@@ -367,22 +368,43 @@ struct atRegistryPool {
 // @ 0x82618550
 atRegistryPool g_atRegistryPool = {};
 
-/**
- * sysCallback_Invoke — Invoke a system callback
- *
- * On Xbox 360, this loaded a function pointer from the callback object
- * and called it with the given code. The callback object layout:
- *   +0: parameter (void*)
- *   +4: function pointer
- */
-extern "C" void sysCallback_Invoke(void* a, int b) {
-    if (!a) return;
-    // Callback object: +0 = param, +4 = function pointer
-    void* param = *(void**)a;
-    typedef void (*CallbackFn)(void*);
-    CallbackFn fn = *(CallbackFn*)((uint8_t*)a + sizeof(void*));
-    if (fn) {
-        fn(param);
+// @ 0x8225FFF8 | size: 0xDC
+extern "C" void sysCallback_Invoke(void* object, uintptr_t argument) {
+    const auto* callback = static_cast<const SysCallback*>(object);
+    const uintptr_t mode = callback->mode;
+    if (mode == 0) return;
+    void* self = callback->self;
+    const uintptr_t target = callback->target;
+    if (self != nullptr) {
+        switch (mode) {
+        case 1:
+            reinterpret_cast<void (*)(void*)>(target)(self);
+            break;
+        case 2:
+            reinterpret_cast<void (*)(void*, uintptr_t)>(target)(self, callback->context);
+            break;
+        case 3:
+            reinterpret_cast<void (*)(void*, uintptr_t, uintptr_t)>(target)(self, callback->context, argument);
+            break;
+        case 4:
+            reinterpret_cast<void (*)(void*, uintptr_t)>(target)(self, argument);
+            break;
+        }
+    } else {
+        switch (mode) {
+        case 1:
+            reinterpret_cast<void (*)()>(target)();
+            break;
+        case 2:
+            reinterpret_cast<void (*)(uintptr_t)>(target)(callback->context);
+            break;
+        case 3:
+            reinterpret_cast<void (*)(uintptr_t, uintptr_t)>(target)(callback->context, argument);
+            break;
+        case 4:
+            reinterpret_cast<void (*)(uintptr_t)>(target)(argument);
+            break;
+        }
     }
 }
 
@@ -1017,7 +1039,6 @@ extern "C" const FakeTypeInfo _ZTI8hsmState = { nullptr, "hsmState" };
 extern void atArray_Clear(void* arr);
 extern void audControl_Destructor(void* pControl);
 extern void hsmContext_SetNextState(void* ctx, int state);
-extern void sysCallback_Invoke(void* callback, int code);
 
 extern "C" {
 

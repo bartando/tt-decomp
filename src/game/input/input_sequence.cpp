@@ -1,9 +1,9 @@
+#include "rage/sys_callback.hpp"
 // Timed input-sequence recognition, alongside the gdInputSeq data definitions.
 #include <cstdint>
 
 extern "C" int pongPlayer_0270_g(const void* input, int button);  // @ 0x821E0270
 extern bool CheckButtonPressed(void* record);                    // @ 0x821DFFF8
-extern "C" void sysCallback_Invoke(void* callback, void* argument);  // @ 0x8225FFF8
 
 namespace {
 
@@ -86,7 +86,7 @@ extern "C" void gdInputSeq_Update(void* statePtr, uint32_t /*unused*/, void* inp
                 state->step = stepIndex + 1;
                 if (state->step != data->stepCount) return;
                 state->flags |= 8;
-                sysCallback_Invoke(callback, const_cast<InputSequenceData*>(state->data));
+                sysCallback_Invoke(callback, reinterpret_cast<uintptr_t>(state->data));
             }
         } else if (!expectedPressed && !otherPressed) {
             return;

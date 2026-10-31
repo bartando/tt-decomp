@@ -77,7 +77,6 @@ int _stricmp(const char* a, const char* b);                          // crt_init
 float math_SafeReciprocal(float value, double fallback);             // rage_core_utils.cpp
 bool pongPlayer_DE98_g(void* state);                                 // pong_player.cpp
 void rage_27C0(void* obj);                                           // rage_core_utils.cpp
-void sysCallback_Invoke(void* callback, int code);
 void sysMemAllocator_Free(void* ptr);
 void sysMemAllocator_PlatformFree(void* ptr, unsigned int flags);
 void sysMemAllocator_InitThreadHeap(void);                           // entry.c
@@ -171,9 +170,6 @@ bool pongPlayer_DE98_g(void* state) { return c_linkage::pongPlayer_DE98_g(state)
 
 // pong_network.cpp (C++) vs rage_core_utils.cpp (extern "C").
 void rage_27C0(void* obj) { c_linkage::rage_27C0(obj); }
-
-// pong_network_classes.cpp (C++) vs rage_core_utils.cpp (extern "C").
-void sysCallback_Invoke(void* callback, int code) { c_linkage::sysCallback_Invoke(callback, code); }
 
 // gd_data.cpp, grc_device.cpp, pong_camera.cpp, pong_network_classes.cpp,
 // rage_memory.cpp, rage_xml.cpp (C++) vs rage_core_utils.cpp (extern "C").

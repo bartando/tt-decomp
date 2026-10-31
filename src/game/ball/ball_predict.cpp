@@ -1,3 +1,4 @@
+#include "rage/sys_callback.hpp"
 // ball_predict.cpp — gdBallPredictData, the ball trajectory predictor
 // Rockstar Presents Table Tennis (Xbox 360, 2006)
 
@@ -7,7 +8,6 @@
 
 extern void        rage_debugLog(const char* fmt, ...);                        // @ 0x8240E6D0
 extern const char* pongPlayer_1510_g(void* obj, int arg);                      // @ 0x82391510
-extern "C" void    sysCallback_Invoke(bpFunctor* fn, void* arg);               // @ 0x8225FFF8
 
 // What the replay keeps of the ball per frame (0x30 bytes; +0x08 is never written).
 struct bpReplayBall {
@@ -132,7 +132,7 @@ int gdBallPredictData::PopElapsed(bool recordReplay) {
             gdReplayMgr_RecordBallSample(g_pReplayStateData, &rec);
         }
         if (m_onPop.words[3] != 0) {
-            sysCallback_Invoke(&m_onPop, &At(0));
+            sysCallback_Invoke(&m_onPop, reinterpret_cast<uintptr_t>(&At(0)));
         }
         ++m_tail;
         --m_count;

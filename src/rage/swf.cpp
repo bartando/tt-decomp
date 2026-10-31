@@ -1,3 +1,4 @@
+#include "rage/sys_callback.hpp"
 /**
  * rage::swf* — Scaleform Flash UI System Implementation
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -53,7 +54,6 @@ extern "C" {
     extern void* g_sda_6404;  // @ 0x82606404 — shared texture lookup owner
     void hudFlashBase_76F8_g(int stage, int slot, void* texture);  // @ 0x820F76F8
     void hudFlashBase_B138_g();  // @ 0x8215B138
-    void sysCallback_Invoke(void* callback, void* argument);  // @ 0x8225FFF8
     void grcDevice_Present(uint32_t flags, int color, int clearDepth, float depth,
                            bool clearStencil, int stencil);  // @ 0x8214F088
     extern uint32_t g_grmShaderFx_flushRequired;  // @ 0x825EBB1C
@@ -2385,7 +2385,7 @@ void swfRenderInstanceTree(void* instance, const void* parentTransform) {
     if (*reinterpret_cast<int32_t*>(node + 0x98) >= 0) {
         auto* owner = static_cast<uint8_t*>(g_swfRenderCallbackOwner);
         if (*reinterpret_cast<int32_t*>(owner + 16) != 0) {
-            sysCallback_Invoke(owner + 4, node + 0x98);
+            sysCallback_Invoke(owner + 4, reinterpret_cast<uintptr_t>(node + 0x98));
             flags = g_grmShaderFx_flushRequired;
             appliedMode = g_swfAppliedRenderState[6];
         }
