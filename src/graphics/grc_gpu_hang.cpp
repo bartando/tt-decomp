@@ -1,3 +1,4 @@
+#include "grc/progress_state.h"
 /**
  * graphics/grc_gpu_hang.cpp — D3D Xenon GPU hang diagnostic printer
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -28,6 +29,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <cstdio>
 
 /* ── External debug strings (defined in grc_debug_strings.cpp) ─────────────── */
 namespace rage {
@@ -55,9 +57,6 @@ extern "C" uint32_t xe_GetCurrentThreadId(void);
 
 /* Flushes the accumulated debug buffer to the debug console — sub_823640E8's sink. */
 extern void rage_DebugBuf_Flush(void* pBuf);
-
-/* sprintf — libc. */
-extern int sprintf(char* pDst, const char* pFmt, ...);
 
 /* Kernel version struct read as 32-bit value at XboxKrnlVersion+4. */
 extern void* XboxKrnlVersion;
@@ -346,7 +345,6 @@ struct D3DDeviceXenon {
 };
 
 extern "C" void* g_sda_base;                 // @ 0x82600000 (r13)
-extern uint32_t g_gpuHangSentinel;            // @ 0x82606654
 
 int D3DDeviceXenon_ReportGPUHang(void* pHangState)
 {
@@ -388,10 +386,10 @@ int D3DDeviceXenon_ReportGPUHang(void* pHangState)
         uint32_t rollbackHead = pDevice->m_queueRollbackHead - 2;
         pDevice->m_hangFlags |= 0x06;
         *pDevice->m_pCommandQueueHead = rollbackHead;
-        uint32_t sentinel = g_gpuHangSentinel;
+        uintptr_t sentinel = g_grcProgressState;
         pDevice->m_pendingProgress = 0;
         if (sentinel == 0) {
-            g_gpuHangSentinel = 15;
+            g_grcProgressState = 15;
         }
         return 0;
     }

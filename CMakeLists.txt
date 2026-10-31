@@ -48,6 +48,7 @@ set(SOURCES
     src/crt/memory.c
     src/crt/rtti.cpp
     src/crt/startup.c
+    src/crt/version.c
     src/crt/string.c
     src/crt/xe_thread.c
     src/crt/xe_tls.c
@@ -82,6 +83,7 @@ set(SOURCES
     src/rage/audio/xaudio_effect.cpp
     src/rage/audio/xaudio_resampler.cpp
     src/rage/core/fsmMachine.c
+    src/rage/core/app_init.c
     src/rage/core/game_loop.c
     src/rage/core/hsm.cpp
     src/rage/core/indexed_registry.cpp
@@ -97,6 +99,7 @@ set(SOURCES
     src/rage/memory/sysMemSimpleAllocator.cpp
     src/rage/io/rage_par.cpp
     src/rage/io/rage_stream_manager.cpp
+    src/rage/io/fiDevice.cpp
     src/rage/io/fiAsciiTokenizer.cpp
     src/rage/io/fiStreamBuf.cpp
     src/rage/render_loop.c
@@ -138,6 +141,8 @@ set(SOURCES
     src/game/ball/ball_shot.cpp
     src/game/camera/pong_camera.cpp
     src/game/camera/pong_camera_helpers.cpp
+    src/game/camera/cm_cam_actions.cpp
+    src/game/camera/dcam_polar_cam.cpp
     src/game/creature/pong_creature.cpp
     src/game/drill/pong_drill.cpp
     src/game/input/button_edges.cpp
@@ -172,6 +177,9 @@ set(SOURCES
     # Graphics
     src/graphics/fx_crowd.cpp
     src/graphics/grc_debug_strings.cpp
+    src/graphics/grc_gpu_hang.cpp
+    src/graphics/grc_gpu_resources.cpp
+    src/graphics/fx_billboard.cpp
     src/graphics/grc_device.cpp
     src/graphics/grc_render.cpp
     src/graphics/texture_reference.cpp

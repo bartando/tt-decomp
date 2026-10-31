@@ -148,8 +148,8 @@ extern const char* g_str_hsm_setNextLogic;              // @ 0x820502B0
 extern const char* g_str_hsm_debugChannel;              // @ 0x82073E90 (alias of g_str_hsmDebug)
 extern const char* g_str_hsm_warn_popEmptyStack;
 extern const char* g_str_hsm_gmLogicNode;               // @ 0x820300DC
-extern const char* g_str_hsm_warn_actionFallback;
-extern const char* g_str_hsm_warn_actionFail;
+extern const char g_str_hsm_warn_actionFallback[];
+extern const char g_str_hsm_warn_actionFail[];
 
 // ── src/game/network/xonline_strings.cpp ────────────────────────────────────
 // Xbox Live XONLINE_E_* / XONLINE_S_* HRESULT name table. The individual

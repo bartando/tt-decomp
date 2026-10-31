@@ -15,35 +15,50 @@
 namespace rage {
 
 // 0x82065F26
-const char k_str_for_postmortem_debugging[] = "for postmortem debugging.";
+extern const char k_str_for_postmortem_debugging[] = "for postmortem debugging.";
 
 // 0x82065FA8 - Vertex Grouper/Tessellator debug block
-const char k_str_vgt_debug[] = "VGT_DEBUG";
+extern const char k_str_vgt_debug[] = "VGT_DEBUG";
 
 // 0x82065FB4 - Primitive Assembler Setup debug block
-const char k_str_pa_su_debug[] = "PA_SU_DEBUG";
+extern const char k_str_pa_su_debug[] = "PA_SU_DEBUG";
 
 // 0x82065FC0 - Primitive Assembler Scan debug block
-const char k_str_pa_sc_debug[] = "PA_SC_DEBUG";
+extern const char k_str_pa_sc_debug[] = "PA_SC_DEBUG";
 
 // 0x82065FCC - Register Block-Bus Manager debug block
-const char k_str_rbbm_debug[] = "RBBM DEBUG";
+extern const char k_str_rbbm_debug[] = "RBBM DEBUG";
 
 // 0x82065FD8 - Command Processor debug block (label form)
-const char k_str_cp_debug_label[] = "CP DEBUG";
+extern const char k_str_cp_debug_label[] = "CP DEBUG";
 
 // 0x8206602C - Render Backend debug register 0
-const char k_str_rb_debug_0[] = "RB_DEBUG_0";
+extern const char k_str_rb_debug_0[] = "RB_DEBUG_0";
 
 // 0x82066150 - Command Processor debug register (identifier form)
-const char k_str_cp_debug[] = "CP_DEBUG";
+extern const char k_str_cp_debug[] = "CP_DEBUG";
 
 // 0x82066510
-const char k_str_d3d_hang_try_instrumented[] =
+extern const char k_str_d3d_hang_try_instrumented[] =
     "ERR[D3D]: Try reproducing the hang with the debug or instrumented";
 
 // 0x820665E8
-const char k_str_d3d_hang_breaking_into_debugger[] =
+extern const char k_str_d3d_hang_breaking_into_debugger[] =
     "Breaking into the debugger.  The GPU is hung and can't be recovered";
 
 }  // namespace rage
+
+// @ 0x820661FC
+extern const char k_str_gpu_appears_to_be_hung[] = "The GPU appears to be hung!  Specifically: ";
+
+// @ 0x8206622C
+extern const char k_str_cpu_synchronization[] = "CPU Synchronization";
+
+// @ 0x8206626C
+extern const char k_str_ltcg[] = "LTCG";
+
+// @ 0x82066274
+extern const char k_str_d3d_version_banner[] = "\nD3D version is %i.%i %s, kernel is %i, frame is %i.\n\n";
+
+// @ 0x82066450
+extern const char k_str_hang_unknown_state[] = "The GPU state doesn't match any known hangs.  Please send a repro\nscenario to xboxds@xbox.com so that we can supply a workaround.\n\n";

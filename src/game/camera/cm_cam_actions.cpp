@@ -1,3 +1,4 @@
+#include "debug_strings.hpp"
 /**
  * cm_cam_actions.cpp — cmSampleCamActions camera parameter sampler functions
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -517,8 +518,6 @@ extern "C" void cmSampleCamActions_P_VelocityFollow_vfn_10(void* self, void* pos
 // static analysis and symbol cross-referencing).
 //   0x820521A0  "Warning: Can't run action '%s'. Using '%s' as a fallback"
 //   0x820521DC  "Warning: Can't run action '%s'"
-extern "C" const char kWarn_CmAction_UsingFallback[];  // @ 0x820521A0
-extern "C" const char kWarn_CmAction_CantRun[];        // @ 0x820521DC
 
 /**
  * cmAction_RunWithFallback @ 0x82260F90 | size: 0x90
@@ -562,12 +561,12 @@ extern "C" void cmAction_RunWithFallback(void* self) {
         // +0x58 = delegation active flag
         obj->m_delegateFlag = 1;
         const char* delegateName = *(const char**)((char*)delegate + 4);
-        rage_DebugLog(kWarn_CmAction_UsingFallback,
+        rage_DebugLog(g_str_hsm_warn_actionFallback,
                       obj->m_actionName, delegateName);
         return;
     }
 
-    rage_DebugLog(kWarn_CmAction_CantRun, obj->m_actionName);
+    rage_DebugLog(g_str_hsm_warn_actionFail, obj->m_actionName);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

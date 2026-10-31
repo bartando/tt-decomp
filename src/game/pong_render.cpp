@@ -1,3 +1,4 @@
+#include "grc/progress_state.h"
 /**
  * pong_render.cpp — Light state and render bucket implementation
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -851,7 +852,6 @@ extern void pongScrnTransFadeIn_EndTransition(void* obj);  // @ 0x82378460
 
 // Global pointers (accessed via SDA and absolute addresses)
 extern struct hudFlashBase* g_hudFlashBase;  // @ 0x82606454 (SDA, r2+25556)
-extern void* g_someRenderObj1;         // @ 0x82606654 (via r11+25844)
 extern void* g_someRenderObj2;         // @ 0x825FEAB0 (via r11-21712)
 
 // Random number generator state (for pattern selection)
@@ -914,7 +914,7 @@ void pongScrnTransSwipe::Begin() {
 
     // If this pattern has the pause flag set, disable rendering on two objects
     if (pattern->pauseFlag) {
-        *(uint8_t*)((uint8_t*)g_someRenderObj1 + 80) = 0;
+        *(uint8_t*)((uint8_t*)grcProgressRenderObject() + 80) = 0;
         *(uint8_t*)((uint8_t*)g_someRenderObj2 + 492) = 0;
     }
 }
@@ -1017,7 +1017,7 @@ void pongScrnTransSwipe::OnComplete() {
     
     // If this pattern had the pause flag, re-enable rendering
     if (pattern->pauseFlag) {
-        *(uint8_t*)((uint8_t*)g_someRenderObj1 + 80) = 1;
+        *(uint8_t*)((uint8_t*)grcProgressRenderObject() + 80) = 1;
         *(uint8_t*)((uint8_t*)g_someRenderObj2 + 492) = 1;
     }
 
