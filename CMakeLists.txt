@@ -168,6 +168,7 @@ set(SOURCES
     src/game/input/analog_axis.cpp
     src/game/input/input_sequence.cpp
     src/game/misc/cm_operators.cpp
+    src/game/misc/movie_worker_helpers.cpp
     src/game/misc/pong_misc.cpp
     src/game/network/pong_network.cpp
     src/game/network/pong_network_classes.cpp

@@ -1,3 +1,4 @@
+#include "game/movie_worker_helpers.hpp"
 #include "rage/rage_utils_simple.h"
 #include "rage/ref_counted_header.hpp"
 #include "xam/thread_sync.h"
@@ -895,26 +896,6 @@ int CCalMoviePlayer::DispatchSlot32() {  // EC68_p33
     return 0;
 }
 
-int CCalMoviePlayer::DispatchSlot34() {  // EC88_p33
-    MediaControl_Pause();
-    return 0;
-}
-
-int CCalMoviePlayer::DispatchSlot35() {  // ECB8_p33
-    MediaControl_Stop();
-    return 0;
-}
-
-int CCalMoviePlayer::DispatchSlot36() {  // ECE8_p33
-    MediaControl_GetState();
-    return 0;
-}
-
-int CCalMoviePlayer::DispatchSlot37() {  // ED18_p33
-    MediaControl_StopWhenReady();
-    return 0;
-}
-
 // ── Pattern F: Unimplemented stubs (2 functions, 56B each) ───────────────
 
 /**
@@ -1056,17 +1037,9 @@ extern "C" void* sysThread_Create(void* r3, uint32_t stackSize, void* entryPoint
                             void* context, uint32_t priority, void* r8) __asm__("_pg_6F88_w"); // @ 0x82566F88 - create thread
 extern "C" int xe_SetThreadProcessor(void* threadHandle, uint32_t proc); // @ 0x8242B8A8 - defined in src/rage/core/app_init.c (accepts thread handle pointer)
 
-// Thread entry points for CCalMoviePlayer worker threads
-extern "C" void CCalMoviePlayer_EC88_p33(void* ctx); // @ 0x8248EC88 - FillReadBufferA entry
-extern "C" void CCalMoviePlayer_ECB8_p33(void* ctx); // @ 0x8248ECB8 - FillReadBufferB entry
-extern "C" void CCalMoviePlayer_ECE8_p33(void* ctx); // @ 0x8248ECE8 - WriteThreadProcA entry
-extern "C" void CCalMoviePlayer_ED18_p33(void* ctx); // @ 0x8248ED18 - WriteThreadProcB entry
-
 // Helper functions used by write threads
 extern "C" uint32_t atSingleton_vfn_28_DBC8_1(void* obj); // @ 0x8248DBC8 - check has element
 extern "C" void* CCalRingBuffer_PeekWriteSlot(void* obj) __asm__("_CCalMoviePlayer_DBE0");         // @ 0x8248DBE0 - get next element
-extern "C" void CCalRingBuffer_AdvanceWriteIndex(void* obj) __asm__("_CCalMoviePlayer_DCC8");           // @ 0x8248DCC8 - advance read index atomic
-extern "C" void CCalMoviePlayer_AcquireFiberContext(void* obj) __asm__("_CCalMoviePlayer_EB30");           // @ 0x8235EB30 - save/replace fiber context
 extern "C" void CCalMoviePlayer_ReleaseFiberContext(void* obj) __asm__("_CCalMoviePlayer_EB70");           // @ 0x8235EB70 - clear fiber flag
 extern "C" void grcBuffer_Release(void* obj) __asm__("_grc_BDC0");  // @ 0x8235BDC0 - release grc resource
 
@@ -1081,19 +1054,6 @@ void CCalMoviePlayer::DtorIntermediate() {
     *(void**)this = (void*)0x820092C0;  // Restore CCalMoviePlayer vtable
     CleanupResources();                  // Clean up threads and resources
     datBase_ClearField12(this);                     // Destroy base class
-}
-
-/**
- * CCalMoviePlayer::SaveAndReplaceFiberContext @ 0x8235EB30 | size: 0x40
- *
- * Reads the current thread ID twice when the old ID is nonzero, then
- * stores the final ID at +10376.
- */
-void CCalMoviePlayer::SaveAndReplaceFiberContext() {
-    if (m_threadId != 0) {
-        xe_GetCurrentThreadId();
-    }
-    m_threadId = xe_GetCurrentThreadId();
 }
 
 /**
@@ -1124,58 +1084,6 @@ void CCalMoviePlayer::DeletingDestructor(int flags) {
     if (flags & 1) {
         _locale_register(this);          // Free object memory
     }
-}
-
-/**
- * CCalMoviePlayer::AdvanceReadIndexAtomic @ 0x8248DCC8 | size: 0x68
- *
- * Increments the read index at +56. If it reaches the buffer count at +52,
- * wraps to 0. Then atomically decrements the available-buffer counter at +68
- * using lwarx/stwcx. (PPC atomic CAS loop). This is the consumer side of
- * the lock-free ring buffer — signals one buffer consumed.
- */
-void CCalMoviePlayer::AdvanceReadIndexAtomic() {
-    int32_t readIdx = m_readIndex;
-    readIdx++;
-    m_readIndex = readIdx;
-
-    if ((uint32_t)readIdx >= (uint32_t)m_bufferCounterA) {
-        m_readIndex = 0;
-    }
-
-    // Atomic decrement of pending-buffer count (consumer side)
-    volatile int32_t* pPending = reinterpret_cast<volatile int32_t*>(&m_pendingCounter);
-    int32_t oldVal, newVal;
-    do {
-        oldVal = *pPending;
-        newVal = oldVal - 1;
-    } while (!__sync_bool_compare_and_swap(pPending, oldVal, newVal));
-}
-
-/**
- * CCalMoviePlayer::AdvanceWriteIndexAtomic @ 0x8248DD30 | size: 0x68
- *
- * Increments the write index at +60. If it reaches the buffer count at +52,
- * wraps to 0. Then atomically increments the available-buffer counter at +68.
- * This is the producer side of the lock-free ring buffer — signals one buffer
- * filled and ready for consumption.
- */
-void CCalMoviePlayer::AdvanceWriteIndexAtomic() {
-    int32_t writeIdx = m_writeIndex;
-    writeIdx++;
-    m_writeIndex = writeIdx;
-
-    if ((uint32_t)writeIdx >= (uint32_t)m_bufferCounterA) {
-        m_writeIndex = 0;
-    }
-
-    // Atomic increment of pending-buffer count (producer side)
-    volatile int32_t* pPending = reinterpret_cast<volatile int32_t*>(&m_pendingCounter);
-    int32_t oldVal, newVal;
-    do {
-        oldVal = *pPending;
-        newVal = oldVal + 1;
-    } while (!__sync_bool_compare_and_swap(pPending, oldVal, newVal));
 }
 
 /**
@@ -1942,7 +1850,6 @@ void CCalMoviePlayer::ProcessWriteBuffer() {
 // External helpers for buffer fill functions
 extern "C" uint32_t CCalRingBuffer_GetFillCount(void* obj) __asm__("_CCalMoviePlayer_DBD0");  // @ 0x8248DBD0 - get remaining sample count
 extern "C" void* CCalRingBuffer_PeekReadSlot(void* obj) __asm__("_CCalMoviePlayer_DC30");      // @ 0x8248DC30 - get/reset next element
-extern "C" void CCalRingBuffer_AdvanceReadIndex(void* obj) __asm__("_CCalMoviePlayer_DD30");       // @ 0x8248DD30 - advance iterator index
 extern "C" void sysIpcThread_Suspend(void* threadHandle) __asm__("_pg_B850");            // @ 0x8242B850 - suspend thread
 
 /**
@@ -2031,7 +1938,7 @@ void CCalMoviePlayer::FillReadBufferA() {
                     ((VFuncV)elVt[2])(element);
 
                     // Advance iterator to next sample
-                    CCalRingBuffer_AdvanceReadIndex(iterator);
+                    CCalRingBuffer_ReleaseRead(iterator);
 
                     // Signal event 6 (vslot 50)
                     SignalEvent2();
@@ -2175,7 +2082,7 @@ void CCalMoviePlayer::FillReadBufferB() {
                     ((VFuncV)elVt[2])(element);
 
                     // Advance iterator to next sample
-                    CCalRingBuffer_AdvanceReadIndex(iterator);
+                    CCalRingBuffer_ReleaseRead(iterator);
 
                     // Signal event 3 (vslot 51)
                     SignalEvent3();
@@ -2765,7 +2672,7 @@ void CCalMoviePlayer::WriteThreadProcA() {
 
                 if (insertResult >= 0) {
                     // Success — advance read index
-                    CCalRingBuffer_AdvanceWriteIndex(iterator);
+                    CCalRingBuffer_CommitWrite(iterator);
                 } else if (insertResult == (int32_t)0x8000000A) {
                     // Timeout/retry — undo
                     {
@@ -3093,7 +3000,7 @@ void CCalMoviePlayer::WriteThreadProcB() {
                         grcBuffer_Release(m_pBufferObject);
                     } else {
                         // Advance read index
-                        CCalRingBuffer_AdvanceWriteIndex(iterator);
+                        CCalRingBuffer_CommitWrite(iterator);
                         // Signal event for render dispatch
                         RenderFrame(0);    // vslot 31
                         grcBuffer_Release(m_pBufferObject);
