@@ -55,6 +55,7 @@ set(SOURCES
     # CRT layer
     src/crt/crt_init.c
     src/crt/ctrlfp.cpp
+    src/crt/fp_helpers.cpp
     src/crt/entry.c
     src/crt/exit.c
     src/crt/fmod.cpp
@@ -72,6 +73,8 @@ set(SOURCES
     # XAM (Xbox Application Model)
     src/xam/audio.c
     src/xam/input.c
+    src/platform/time_stamp.cpp
+    src/xam/time_stamp.cpp
     src/platform/host_imports.cpp
     src/platform/audio_frame.cpp
     src/platform/host_xma.cpp
@@ -117,6 +120,8 @@ set(SOURCES
     src/rage/memory/rage_memory.cpp
     src/rage/memory/singleton_array.cpp
     src/rage/memory/sysMemSimpleAllocator.cpp
+    src/rage/data/localized_text.cpp
+    src/rage/data/localized_text_data.cpp
     src/rage/data/parameter_node.cpp
     src/rage/io/rage_par.cpp
     src/rage/io/rage_stream_manager.cpp
@@ -186,6 +191,7 @@ set(SOURCES
     src/game/ball/ball_prediction_quaternion.cpp
     src/game/camera/pong_camera.cpp
     src/game/camera/pong_camera_helpers.cpp
+    src/game/camera/camera_transition_queries.cpp
     src/game/camera/cm_cam_actions.cpp
     src/game/camera/dcam_polar_cam.cpp
     src/game/creature/pong_creature.cpp
@@ -201,6 +207,7 @@ set(SOURCES
     src/game/network/pong_network.cpp
     src/game/network/pong_network_classes.cpp
     src/game/network/pong_network_io.cpp
+    src/game/network/network_timestamp.cpp
     src/game/network/score_payload.cpp
     src/game/network/network_context.cpp
     src/game/network/msg_msg_sink.cpp
@@ -236,6 +243,7 @@ set(SOURCES
     src/game/pong_render.cpp
     src/game/match/hsm_log_strings.cpp
     src/game/match/pong_match.cpp
+    src/game/match/replay_state_publish.cpp
     src/game/match/lvl_table.cpp
     src/game/match/pong_states.cpp
     src/game/match/match_rtti_strings.cpp
@@ -250,11 +258,13 @@ set(SOURCES
     src/anim/bone_transform_lookup.cpp
     src/anim/motion_lookup_data.cpp
     src/anim/pcr_anim_blenders.cpp
+    src/anim/look_at_controller.cpp
     src/anim/locomotion.cpp
     src/anim/angle_helpers.cpp
     src/anim/animation_timing.cpp
 
     # Physics
+    src/physics/collider_velocity.cpp
     src/physics/ph_float_property.cpp
     src/physics/ph_physics.cpp
     src/physics/bound_lookup.cpp
@@ -427,6 +437,17 @@ if(TT_BUILD_PLATFORM_TESTS)
         target_link_libraries(tt_host_contract_test pthread)
         add_test(NAME host_sdk_contracts COMMAND tt_host_contract_test)
     endif()
+    add_executable(tt_timestamp_test tests/host_timestamp_test.cpp
+        src/platform/time_stamp.cpp src/xam/time_stamp.cpp)
+    target_compile_options(tt_timestamp_test PRIVATE -UNDEBUG)
+    if(WIN32)
+        target_sources(tt_timestamp_test PRIVATE src/platform/win32.c)
+        target_link_libraries(tt_timestamp_test ntdll "${TT_WINPTHREAD_STATIC}")
+    else()
+        target_sources(tt_timestamp_test PRIVATE src/platform/posix_sync.c)
+        target_link_libraries(tt_timestamp_test pthread)
+    endif()
+    add_test(NAME host_timestamp COMMAND tt_timestamp_test)
     add_test(NAME host_synchronization COMMAND tt_platform_test)
 endif()
 install(TARGETS ${PROJECT_NAME}

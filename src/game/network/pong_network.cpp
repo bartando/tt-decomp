@@ -3801,19 +3801,15 @@ void ForceMatchTimeSyncMessage_Serialise(void* thisPtr, void* client) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ForceMatchTimeSyncMessage_Process  [vtable slot 3 @ 0x823B7608 | size: 0x34]
+// ForceMatchTimeSyncMessage_Process  [vtable slot 3 @ 0x823B7B50 | size: 0x34]
 // Applies the forced time sync by updating the session's time sync state.
 // Formats the result as a debug string and logs it (via no-op in retail).
 // ─────────────────────────────────────────────────────────────────────────────
+// @ 0x823B7B50 | size: 0x34
 void ForceMatchTimeSyncMessage_Process(void* thisPtr) {
-    uint8_t* obj = (uint8_t*)thisPtr;
-
-    // Format timestamp for debug: converts the sync timestamp to a string
-    char* formattedTime = FormatTimestampForLog(obj + 0x08);
-
-    // Log the formatted time string (no-op in retail build)
-    // String at 0x8206F298 references the sync debug output
-    rage_debugLog(formattedTime);
+    extern void nop_8240E6D0(const char*, ...); // @ 0x8240E6D0
+    char* formattedTime = FormatTimestampForLog(static_cast<uint8_t*>(thisPtr) + 8);
+    nop_8240E6D0("ForceSessionTimeSyncMessage %s", formattedTime);
 }
 
 

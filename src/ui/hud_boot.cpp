@@ -2,6 +2,7 @@
 #include "rage/hud_page_group.hpp"
 
 #include "game/pong_network_io.hpp"
+#include "rage/localized_text.hpp"
 #include "rage/game_loop_types.h"
 
 
@@ -97,7 +98,7 @@ void hudBoot::OnEnter() {
     SetNumericBootSetting(networkClient, k_bootEyMsgKey, 0u);
     SetNumericBootSetting(networkClient, k_bootSavingKey, 0u);
 
-    CopyNetworkString(k_bootNameTemplate, m_buffer, static_cast<int>(sizeof(m_buffer)));
+    rage_atStringCopy(k_bootNameTemplate, m_buffer, static_cast<int>(sizeof(m_buffer)));
     SetStringBootSetting(networkClient, k_bootNameKey, m_buffer);
 
     if (wasInputActive) {
