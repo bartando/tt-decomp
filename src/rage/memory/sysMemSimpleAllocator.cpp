@@ -1,3 +1,4 @@
+#include "rage/fi_stream.hpp"
 /**
  * sysMemSimpleAllocator.cpp — RAGE Simple Memory Allocator vtable methods
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -32,7 +33,6 @@
 
 // fiStream::Open — opens a file, returns stream handle (NULL on fail)
 // sysMemSimpleAllocator_3650 @ 0x822E3650 (aliased as fiStream_Open)
-extern "C" void* fiStream_Open(const char* path, int mode);
 
 // fiStream::Printf — formatted write to open stream
 // parStreamOutXml_vprintf @ 0x822E3E40
@@ -40,7 +40,6 @@ extern "C" void parStreamOutXml_vprintf(void* stream, const char* format, ...);
 
 // fiStream::Close — closes an open stream
 // fiStreamBuf_Close_stub @ 0x822E3B38
-extern "C" void fiStreamBuf_Close_stub(void* stream);
 
 // rage_debugLog — debug printf, compiled out (just blr)
 extern "C" void rage_debugLog(const char* format, ...);
@@ -388,7 +387,7 @@ void sysMemSimpleAllocator::DumpLeaks(const char* name, const char* logPath) {
 
     // Close log file if opened
     if (logFile != nullptr) {
-        fiStreamBuf_Close_stub(logFile);
+        fiStreamBuf_Close(logFile);
     }
 }
 
@@ -432,7 +431,7 @@ void sysMemSimpleAllocator::EndLogging() {
     // Close log stream if open
     void* stream = reinterpret_cast<void*>(static_cast<uintptr_t>(logStream));
     if (stream != nullptr) {
-        fiStreamBuf_Close_stub(stream);
+        fiStreamBuf_Close(stream);
         logStream = 0;
     }
 

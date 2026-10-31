@@ -128,6 +128,8 @@ set(SOURCES
     src/rage/io/fiDevice.cpp
     src/rage/io/fiAsciiTokenizer.cpp
     src/rage/io/fiStreamBuf.cpp
+    src/rage/io/fiPath.cpp
+    src/rage/io/fi_image_data.cpp
     src/rage/render_loop.c
     src/rage/scene_render.c
     src/rage/network/session_events.cpp
