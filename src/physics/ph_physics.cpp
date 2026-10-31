@@ -833,30 +833,6 @@ float ph_ClampAndSin(float inputValue) {
     return ph_Sinf(scaledValue);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ph_GetCapsuleRadius @ 0x820CB598 | size: 0x58
-//
-// Returns a capsule property based on flags at offset +64.
-// Checks bit 1 (0x02) and bit 4 (0x10) to determine which value to return.
-// ─────────────────────────────────────────────────────────────────────────────
-float ph_GetCapsuleRadius(void* capsule) {
-    uint8_t* obj = (uint8_t*)capsule;
-    uint8_t flags = obj[64];
-    
-    // Check bit 1 (0x02)
-    if (flags & 0x02) {
-        return g_floatOne;
-    }
-    
-    // Check bit 4 (0x10)
-    if (flags & 0x10) {
-        return g_floatOne;
-    }
-    
-    // Return field at offset +28
-    return *(float*)(obj + 28);
-}
-
 extern double crt_cos(double angle); // @ 0x824302B0
 extern double crt_sin(double angle); // @ 0x824301D8
 
@@ -1063,34 +1039,6 @@ void phBoundCapsule_FindFirstValid(void* container, int* outIndex, float* outX, 
 // External float constants
 extern const float g_floatOne;   // @ 0x8202D108 = 1.0f
 extern const float g_floatZero;  // @ 0x8202D110 = 0.0f
-
-// ─────────────────────────────────────────────────────────────────────────────
-// rage::phBoundCapsule::GetRadius @ 0x820CB598 | size: 0x58
-//
-// Returns the effective radius of the capsule based on its configuration flags.
-// Checks bit 1 (0x02) and bit 4 (0x10) of the flags byte at offset +64.
-//
-// Returns:
-//   - 1.0f if bit 1 is set (standard capsule)
-//   - 1.0f if bit 4 is set (alternate configuration)
-//   - m_radius (field at +28) otherwise (custom radius)
-// ─────────────────────────────────────────────────────────────────────────────
-float rage::phBoundCapsule::GetRadius() const {
-    uint8_t flags = *(const uint8_t*)((const char*)this + 0x40);  // +64
-
-    // Check bit 1 (0x02) - standard capsule flag
-    if (flags & 0x02) {
-        return g_floatOne;
-    }
-
-    // Check bit 4 (0x10) - alternate configuration flag
-    if (flags & 0x10) {
-        return g_floatOne;
-    }
-
-    // Return custom radius from field +28
-    return *(const float*)&m_fAABBMaxZ;  // +0x1C
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // rage::phBoundCapsule::ScaleRadius @ 0x820CB6A0 | size: 0x50

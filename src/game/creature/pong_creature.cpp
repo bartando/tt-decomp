@@ -207,6 +207,67 @@ extern uint8_t lbl_82606326; // @ 0x82606326 — enable velocity adjustment
 extern float lbl_825C9D64; // @ 0x825C9D64 — stationary speed/timer threshold
 }
 
+extern "C" float g_moverStartDelay; // @ 0x825C9D60
+extern "C" const float g_moverStopDelay; // @ 0x820290F0
+extern "C" void* g_gameDataMgr; // @ 0x8271A2E4
+extern void* pongMatch_GetCharacterForSlot(void* match, uint32_t playerSlot); // @ 0x821C9C00
+
+// These were misidentified as capsule flags/radius in two physics lifts.
+// pongMover_GetBlendWeight (was phBoundCapsule_B598_g) @ 0x820CB598 | size: 0x58
+float pongMover_GetBlendWeight(pongMover* mover) {
+    return (mover->m_flags & 0x12) ? 1.0f : mover->m_unk1C;
+}
+
+// pongMover_GetInputSpeed (was pg_B4D0_g) @ 0x820CB4D0 | size: 0xC8
+float pongMover_GetInputSpeed(pongMover* mover) {
+    const auto movementData = []() {
+        return *reinterpret_cast<const uint8_t* const*>(
+            static_cast<const uint8_t*>(g_gameDataMgr) + 0x14);
+    };
+    if (mover->m_flags & 4)
+        return *reinterpret_cast<const float*>(movementData() + 0x64);
+    auto* match = reinterpret_cast<const uint8_t*>(g_pInputArrayTable);
+    const uint32_t index = mover->m_creatureIndex;
+    if (match[uint32_t(index * 36 + 0xC4)] != 0)
+        return *reinterpret_cast<const float*>(movementData() + 0x58);
+    const auto* character = static_cast<const uint8_t*>(pongMatch_GetCharacterForSlot(
+        const_cast<uint8_t*>(match), index));
+    const auto* movement = *reinterpret_cast<const uint8_t* const*>(character + 0x28);
+    const float scale = *reinterpret_cast<const float*>(movement + 0x64);
+    return scale * *reinterpret_cast<const float*>(movementData() + 0x58);
+}
+
+// pongMover_UpdateMovementState (was game_A390) @ 0x820CA390 | size: 0xF4
+void pongMover_UpdateMovementState(pongMover* mover) {
+    if (__builtin_fabsf(mover->m_unk20) == 0.0f &&
+        __builtin_fabsf(mover->m_unk24) == 0.0f) {
+        if (!mover->m_bIsMoving) {
+            mover->m_targetTimer += g_kTransitionStep;
+            if (mover->m_targetTimer > g_moverStopDelay) {
+                mover->m_moveTimer = 0.0f;
+                mover->m_unk28 = 0.0f;
+                mover->m_unk2C = 0.0f;
+                mover->m_targetTimer = 0.0f;
+                mover->m_bIsMoving = 1;
+            }
+        } else {
+            mover->m_bHasTarget = 0;
+        }
+        return;
+    }
+    bool reset = mover->m_unk28 * mover->m_unk20 < 0.0f ||
+                 mover->m_unk2C * mover->m_unk24 < 0.0f;
+    if (!reset && mover->m_bIsMoving) {
+        mover->m_moveTimer += g_kTransitionStep;
+        reset = mover->m_moveTimer >= g_moverStartDelay;
+    }
+    if (reset) {
+        mover->m_bHasTarget = 0;
+        mover->m_bIsMoving = 0;
+    }
+    mover->m_targetTimer = 0.0f;
+}
+
 // Blend input and local/remote movement, mirror it for the court side, and
 // advance the stationary latch. +0x60 caches the creature's translation.
 // pongMover::UpdateVelocity (was phBoundCapsule_A080_g) @ 0x820CA080 | size: 0x30C
