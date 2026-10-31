@@ -93,6 +93,75 @@ extern void  game_4B60(void* scene, uint16_t handle);                           
 // r6 is never set by the caller nor read by the callee.
 extern void  ballPredict_ProcessHit(void* hit, const Vec4* vel, const Vec4* spin, int unusedR6, int one, uint32_t arg, float time);  // @ 0x82287B50
 
+extern void* pongMatch_GetCharacterForSlot(void* match, uint32_t playerSlot); // @ 0x821C9C00
+extern int32_t g_currentInputSlot;                                        // @ 0x82606578
+extern void* g_pCameraSharedState;                                         // @ 0x8271A32C
+extern "C" const float g_kFloatConst_D108;                                       // @ 0x8202D108
+extern "C" const float g_kFloatConst_D10C;                                       // @ 0x8202D10C
+extern "C" const float g_kFloatConst_D110;                                       // @ 0x8202D110
+extern "C" const float lbl_825C5938;                                       // @ 0x825C5938
+
+namespace {
+struct TrailCharacterView {
+    uint8_t _pad00[0x28];
+    struct Parameters {
+        uint8_t _pad00[0x10];
+        float topSpin;             // +0x10
+        float backSpin;            // +0x14
+        uint8_t _pad18[4];
+        float sideSpin;            // +0x1C
+    }* trail;
+};
+}
+
+// @ 0x821D61A8
+// Eight directions in the spin x/y plane, made relative to ball travel and
+// camera side. Index 8 is the neutral direction (also the unordered fallback).
+int pongBall_ClassifySpin(const Vec4* spin, const Vec4* velocity) {
+    const float direction = velocity->z > g_kFloatConst_D110 ? g_kFloatConst_D108 : lbl_825C5938;
+    const float x = spin->x * direction;
+    const uint8_t cameraSide = static_cast<const uint8_t*>(g_pCameraSharedState)[5];
+    const bool backwards = direction < g_kFloatConst_D110;
+    const float y = cameraSide == static_cast<uint8_t>(backwards)
+        ? spin->y * lbl_825C5938 : spin->y;
+
+    if (x > g_kFloatConst_D110) {
+        if (y < g_kFloatConst_D110) return 1;
+        if (y > g_kFloatConst_D110) return 7;
+        return 0;
+    }
+    if (x < g_kFloatConst_D110) {
+        if (y < g_kFloatConst_D110) return 3;
+        if (y > g_kFloatConst_D110) return 5;
+        return 4;
+    }
+    if (y < g_kFloatConst_D110) return 2;
+    if (y > g_kFloatConst_D110) return 6;
+    return 8;
+}
+
+// @ 0x82282508
+float game_2508(const Vec4* spin, const Vec4* velocity) {
+    const unsigned direction = static_cast<unsigned>(pongBall_ClassifySpin(spin, velocity));
+    if (direction > 7) return g_kFloatConst_D110;
+
+    // The original repeats the lookup on diagonals and loads both parameter
+    // pointers afterwards. Keep that order: the resolver can update live data.
+    void* const match = g_input_obj_ptr;
+    const uint32_t slot = static_cast<uint32_t>(g_currentInputSlot);
+    auto* first = static_cast<TrailCharacterView*>(pongMatch_GetCharacterForSlot(match, slot));
+    if ((direction & 1) == 0) {
+        if (direction == 0) return first->trail->topSpin;
+        if (direction == 4) return first->trail->backSpin;
+        return first->trail->sideSpin;
+    }
+    auto* second = static_cast<TrailCharacterView*>(pongMatch_GetCharacterForSlot(match, slot));
+    const float axial = (direction == 1 || direction == 7)
+        ? first->trail->topSpin : first->trail->backSpin;
+    const float combined = second->trail->sideSpin + axial;
+    return combined * g_kFloatConst_D10C;
+}
+
 // @ 0x822827E8
 int BallShot_Launch(void* entryPtr, int unusedR4, int unusedR5, uint32_t predictArg, uint32_t resetRally,
                     float time) {

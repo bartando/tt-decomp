@@ -3,6 +3,7 @@
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
  */
 
+#include "rage/indexed_registry.h"
 #include "fx_effects.hpp"
 #include "../anim/locomotion.hpp"
 #include "../rage/memory.hpp"
@@ -185,7 +186,6 @@ void fxCrowdGfx::vfn_2(int flags) {
 // External helpers used by fxSpecialFx methods
 extern void  rage_free(void*);
 extern void  atFactory_GetFactory(void*);
-extern void* pg_C2A0_g(void*, int);
 extern void  rage_7600(void* self, void* prev, int index);
 extern void  fxSpecialFx_8738_wrh(void* obj);
 extern void  sysMemSimpleAllocator_8838_fw(void* alloc, float f);

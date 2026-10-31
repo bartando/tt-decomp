@@ -16,9 +16,10 @@ CALLS = {
 def inputs(t):
     rng = t.rng
     d = t.alloc(DATA_SIZE, "predict", ctype="gdBallPredictData")
-    n = rng.choice([0, 1, 3, 8])
+    n = rng.choice([0, 1, 3, 8, 31])
     ids = t.alloc(max(4 * n, 4), "ids")
     t.w32(d + 0x2608, ids)
     t.w16(d + 0x260C, n)
-    t.w32(0x8261A0C0, rng.getrandbits(32))
+    for i in range(4):
+        t.w32(0x8261A0C0 + 4 * i, rng.getrandbits(32))
     t.args(r3=d, r4=t.alloc(8, "caller", fill=b"Caller\0\0"))

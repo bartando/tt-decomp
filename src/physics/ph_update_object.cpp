@@ -65,6 +65,105 @@ extern void pongBallInstance_4980_g(void* scene, uint16_t handle,
 // Removes/cleans up a game object by handle
 extern void game_4B60(void* scene, uint16_t handle); // @ 0x822C4B60
 
+namespace physicsDeactivate {
+
+// These interfaces describe the three calls made by phSimulator's removal path.
+// Keep the MSVC scalar destructor as one virtual slot (a C++ virtual destructor
+// would occupy two slots in the cross-compiler's ABI).
+struct Body {
+    virtual void ScalarDtor(int flags) = 0;
+    virtual void Slot1() = 0;
+    virtual void Slot2() = 0;
+    virtual void Slot3() = 0;
+    virtual void Slot4() = 0;
+    virtual void Slot5() = 0;
+    virtual void Slot6() = 0;
+    virtual void Slot7() = 0;
+    virtual void Slot8() = 0;
+    virtual void Slot9() = 0;
+    virtual void Slot10() = 0;
+    virtual void Slot11() = 0;
+    virtual void Slot12() = 0;
+    virtual void Slot13() = 0;
+    virtual void Slot14() = 0;
+    virtual void Slot15() = 0;
+    virtual void Slot16() = 0;
+    virtual void Slot17() = 0;
+    virtual void Deactivate() = 0;   // +0x48
+};
+
+struct ColliderSlot {
+    uint8_t _pad00[0x10];
+    Body* body;                    // +0x10
+    uint8_t _pad14[0x1D0 - 0x14];
+};
+
+struct Level {
+    virtual void ScalarDtor(int flags) = 0;
+    virtual void Slot1() = 0;
+    virtual void Slot2() = 0;
+    virtual void Slot3() = 0;
+    virtual ColliderSlot* GetActiveCollider(uint16_t handle) = 0; // +0x10
+    virtual void Slot5() = 0;
+    virtual void Slot6() = 0;
+    virtual void Slot7() = 0;
+    virtual void Slot8() = 0;
+    virtual void Slot9() = 0;
+    virtual void Slot10() = 0;
+    virtual void Slot11() = 0;
+    virtual void Slot12() = 0;
+    virtual void Slot13() = 0;
+    virtual void Slot14() = 0;
+    virtual void Slot15() = 0;
+    virtual void Slot16() = 0;
+    virtual void Slot17() = 0;
+    virtual void Slot18() = 0;
+    virtual void Slot19() = 0;
+    virtual void DeactivateObject(uint16_t handle) = 0; // +0x50
+};
+
+struct Simulator {
+    void* vtable;
+    Level* level;                  // +0x04
+    uint8_t _pad08[8];
+    int32_t capacity;              // +0x10
+    int32_t used;                  // +0x14
+    ColliderSlot* colliders;       // +0x18
+    uint8_t _pad1C[8];
+    uint16_t* freeIndices;         // +0x24
+};
+
+#if UINTPTR_MAX == 0xFFFFFFFFu
+static_assert(sizeof(ColliderSlot) == 0x1D0, "collider pool stride");
+static_assert(offsetof(Simulator, freeIndices) == 0x24, "simulator free list");
+#endif
+
+} // namespace physicsDeactivate
+
+// @ 0x822C4B60
+void game_4B60(void* scene, uint16_t handle) {
+    using namespace physicsDeactivate;
+    auto* sim = static_cast<Simulator*>(scene);
+    ColliderSlot* collider = sim->level->GetActiveCollider(handle);
+    Body* body = collider->body;
+
+    // A collider may belong to another pool. Integer subtraction avoids C++'s
+    // undefined subtraction of unrelated pointers; the signed divide matches
+    // the PPC's truncation toward zero, including negative partial strides.
+    intptr_t offset = static_cast<intptr_t>(reinterpret_cast<uintptr_t>(collider) -
+                                            reinterpret_cast<uintptr_t>(sim->colliders));
+    intptr_t index = offset / static_cast<intptr_t>(sizeof(ColliderSlot));
+    if (index >= 0 && index < sim->capacity) {
+        --sim->used;
+        sim->freeIndices[sim->used] = static_cast<uint16_t>(index);
+    }
+
+    // Reload the level after GetActiveCollider, but retain the body's pointer
+    // across DeactivateObject: either virtual can change simulator state.
+    sim->level->DeactivateObject(handle);
+    body->Deactivate();
+}
+
 // Adds a renderable to the deferred draw bucket
 extern void pongDrawBucket_AddEntry(void* bucket, void* renderable,
     void* priority); // @ 0x822278D8
