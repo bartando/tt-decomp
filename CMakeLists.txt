@@ -148,6 +148,7 @@ set(SOURCES
     src/game/ball/ball_prediction_queries.cpp
     src/game/ball/ball_prediction_hit_ids.cpp
     src/game/ball/ball_prediction_hit_queries.cpp
+    src/game/ball/ball_replay.cpp
     src/game/ball/ball_replay_update.cpp
     src/game/ball/ball_prediction_postprocess.cpp
     src/game/ball/ball_prediction_quaternion.cpp
