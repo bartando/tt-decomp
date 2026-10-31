@@ -69,7 +69,7 @@ CASES={
  ]),
  'network_sink_dispatch_clock':(SINK,[
   ('forward flags','target->Dispatch(flags);','target->Dispatch(0);'),
-  ('delegate offset','(owner, 0x24)','(owner, 0x20)'),
+  ('delegate offset','(owner, 0x24);\n    if (target) target->Dispatch(flags);','(owner, 0x20);\n    if (target) target->Dispatch(flags);'),
  ]),
  'network_sink_remove_peer':(SINK,[
   ('peer mask','(raw >> 5) & 7','(raw >> 4) & 7'),
