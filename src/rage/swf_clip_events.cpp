@@ -1,3 +1,4 @@
+#include "rage/swf_state.hpp"
 // SWF PlaceObject2 clip events: each placed instance keeps a singly linked list of
 // nodes pointing at its 12-byte clip-event records. Nodes come from one shared pool.
 #include <cstdint>
@@ -23,7 +24,6 @@ T* at(uint32_t address) {
 
 } // namespace
 
-extern uint32_t g_swfNodePool; // @ 0x82604C5C
 
 // Replace `instance`'s clip-event list (+0xC8) with one node per record, record 0
 // first, and store `events` at +0xC4. The pool is never checked for running dry:
@@ -62,10 +62,6 @@ void swfSetClipEvents(void* instance, uint32_t events, uint32_t records, int32_t
     }
 }
 
-extern uint32_t g_swfMemberNodePool; // @ 0x82604C54
-extern uint32_t g_swfPriorityMemberNames[13]; // @ 0x825C2D30
-extern uint32_t g_swfPriorityMemberHashes[13]; // @ 0x82604CE8
-extern uint8_t g_swfPriorityMemberHashesReady; // @ 0x826066C8
 
 uint32_t* swfFindMember(void* list, const char* name); // @ 0x823FB3B8
 // @ 0x8223A868
@@ -114,7 +110,7 @@ void swfSetMember(void* list, const char* name, const uint32_t* value) {
     }
     if (!g_swfPriorityMemberHashesReady) {
         for (int i = 0; i < 13; ++i) {
-            g_swfPriorityMemberHashes[i] = swfHashMemberName(at<const char>(g_swfPriorityMemberNames[i]));
+            g_swfPriorityMemberHashes[i] = swfHashMemberName(g_swfPriorityMemberNames[i]);
         }
         g_swfPriorityMemberHashesReady = 1;
     }

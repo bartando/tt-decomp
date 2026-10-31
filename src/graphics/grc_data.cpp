@@ -31,7 +31,7 @@ extern "C" void* g_grcRefCountedObjs[4] = {};
 extern "C" void* g_pGrcTextureFactoryString = nullptr;
 
 // @ 0x82617E60 (.data)
-extern "C" void* g_grcRenderObjects[2] = {};
+// g_grcRenderObjects is the complete shared context in network/image_data.cpp.
 
 uint32_t g_ambientStreamSlotCap = 0;  // @ 0x825C8F54
 uint32_t g_ambientMappedSlot = 0;     // @ 0x825EBB84

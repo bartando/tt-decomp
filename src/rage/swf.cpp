@@ -1,3 +1,5 @@
+#include "rage/swf_state.hpp"
+#include "grc/image_state.hpp"
 #include "crt/host_format.h"
 #include "grc/device_state.h"
 #include "rage/math.hpp"
@@ -66,20 +68,7 @@ extern bool CheckButtonPressed(void* record);  // @ 0x821DFFF8
 
 extern int rage_2A78(int primitiveType, int vertexCount);  // @ 0x82152A78
 extern void fxEmitVertex2D(float x, float y); // @ 0x82406010
-extern uint32_t g_fxVertexCursor;  // @ 0x825EBA74
-extern uint32_t g_fxCountOnly;     // @ 0x825EBA84
-extern uint32_t g_fxVertexCount;   // @ 0x825EBA88
-extern uint32_t g_fxCurrentColor; // @ 0x825CA604
-extern float g_fxVertexNormalX;   // @ 0x825EBA6C
-extern float g_fxVertexNormalY;   // @ 0x825EBA80
-extern float g_fxVertexNormalZ;   // @ 0x825EBA8C
-extern float g_fxVertexU;         // @ 0x825EBA78
-extern float g_fxVertexV;         // @ 0x825EBA70
 extern const float g_fxVertexDepth; // @ 0x8202D110
-extern const float g_swfAtlasUVScale; // @ 0x820290EC
-extern float g_swfPixelScaleX;    // @ 0x82602824
-extern float g_swfPixelScaleY;    // @ 0x8260283C
-extern void (*g_swfBindFontTexture)(void* texture); // @ 0x82602820
 extern void* g_binkVideoPlayer;   // @ 0x825EB988 — graphics device (legacy global name)
 extern void fxEmitVertex2D(float x, float y); // @ 0x82406010
 
@@ -237,19 +226,6 @@ struct swfFontAtlas {
     const uint8_t* textureIndices; // Optional per-glyph texture page; otherwise page 0.
 };
 
-struct swfGlyphRenderState {
-    float matrix[6]; // a, b, c, d, tx, ty
-    void* texture;
-};
-extern swfGlyphRenderState g_swfGlyphRenderState; // @ 0x82606120
-
-struct swfLineRenderState {
-    float uvMatrix[6]; // a, b, c, d, tx, ty
-    float matrix[6];
-};
-extern swfLineRenderState g_swfLineRenderState; // @ 0x8260613C
-extern const float g_swfTwipsToPixels; // @ 0x820290F0
-
 namespace {
 struct swfGlyphVertex {
     float position[3];
@@ -338,7 +314,6 @@ struct swfShapeFillState {
 };
 
 extern uint32_t swfSampleGradient(const void* gradient, float x, float y); // @ 0x824060B8
-extern const float g_swfTwipScale; // @ 0x820290F0
 
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC push_options
@@ -1313,7 +1288,6 @@ void swfCMD_PlaceObject2_ScalarDestructor(swfCMD_PlaceObject2* obj, int flags) {
 
 // @ 0x824081B0
 void swfCMD_PlaceObject2::Execute(swfINSTANCE* parent) {
-    extern void* g_swfCurrentFile;  // @ 0x82602838
     auto* command = reinterpret_cast<uint8_t*>(this);
     auto* container = reinterpret_cast<uint8_t*>(parent);
     const uint16_t resourceIndex = *reinterpret_cast<uint16_t*>(command + 0x14);

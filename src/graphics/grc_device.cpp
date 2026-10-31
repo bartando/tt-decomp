@@ -1,3 +1,5 @@
+#include "grc/render_context.hpp"
+#include "grc/image_state.hpp"
 #include "platform/video_imports.h"
 #include "grc/device_state.h"
 #include "xam/kernel.h"
@@ -69,7 +71,6 @@ extern uint32_t g_grcDeviceState[100];       /* @ 0x825EBB8C — device state fl
 extern void*    g_pGrcDeviceObj __asm__("_g_binkVideoPlayer");  /* @ 0x825EB988, defined in globals.c */
 extern void*    g_pGrcDeviceAlt;             /* @ 0x825EBA9C — alternate device object pointer */
 extern void*    g_pGrcTextureCache;          /* @ 0x825EBC40 — texture cache pointer */
-extern void*    g_grcRenderObjects[2];       /* @ 0x82617E60 — render object pair */
 extern void*    g_grcRefCountedObjs[4];      /* @ 0x826063E8 — refcounted render objects (2 pairs) */
 
 /* ── Structure Definitions ────────────────────────────────────────────────── */
@@ -290,7 +291,6 @@ extern "C" void grcDevice_SetScissorRect(void* device, int32_t left, int32_t top
 }
 
 extern const uint32_t g_grcAnisoFilterTable[17];  // @ 0x82065D10
-extern const float g_grcLodBiasScale;             // @ 0x82079AF0
 
 // The color half of RB_BLENDCONTROL lives at +0x2CB8; +0x2CBC holds blending
 // enabled (bit 31) and separate alpha (bit 30). Without separate alpha the
@@ -1118,18 +1118,7 @@ extern "C" {
     extern uint32_t g_grmShaderFx_flushRequired;       // @ 0x825EBB1C
     extern uint32_t g_grmShaderFx_forceResetFlag;      // @ 0x825EBAB4
     extern uint32_t g_grmShaderFx_variantTable[];      // @ 0x825EBBD8 — pending render state
-    extern uint32_t g_grcAppliedRenderState[22];      // @ 0x825EBB80
-    extern uint32_t g_grcPendingTextureState[24];     // @ 0x825EBB20 — eight 12-byte entries
-    extern uint32_t g_grcAppliedTextureState[24];     // @ 0x825EBAB8
-    extern uint8_t g_grcUsePendingTexture;            // @ 0x825C89E5
-    extern uint32_t g_grcTextureParameter;            // @ 0x825EB980
-    extern void* g_grcDefaultTexture;                 // @ 0x825EBA20
     extern uint32_t g_grcFormatId;                    // @ 0x825C9030
-    extern const uint32_t g_grcCullModeTable[3];       // @ 0x825D4CC4
-    extern const uint32_t g_grcColorWriteMaskTable[16]; // @ 0x825D4CD0
-    extern const uint32_t g_grcCompareFuncTable[8];    // @ 0x825D4D10
-    extern const uint32_t g_grcFillModeTable[3];       // @ 0x825D4D30
-    extern const uint32_t g_grcFormatCompareTable[8];  // @ 0x825D4D3C
     void hudFlashBase_A830_g(void* context, uint32_t parameter, void* texture); // @ 0x8215A830
 }
 
@@ -1276,17 +1265,6 @@ extern void rage_AD98(void* device);  // @ 0x8235AD98
 extern void grcDevice_FlushDirtyState(void* device);  // @ 0x82363C00
 extern uint32_t* grc_9B60(void* fixups);  // @ 0x82359B60 — grow the draw-fixup list
 }
-extern const float g_grcResolveConstants[];  // @ 0x8202D10C
-extern const uint16_t g_grcResolveFormatInfo[64];  // @ 0x82065C68
-extern const int32_t g_grcResolveOrigin[2];  // @ 0x82065E50
-extern const uint32_t g_grcResolveVertexProgram[15];  // @ 0x8202C12C
-extern const uint32_t g_grcResolveViewport[6];  // @ 0x82065CE8
-extern const uint32_t g_grcResolveScissor[4];  // @ 0x82065D00
-extern uint32_t g_grcResolveDisableWait;  // @ 0x82606640
-extern uint32_t g_grcResolveForceShaderControl;  // @ 0x82606644
-extern uint32_t g_grcResolveExtraWaits;  // @ 0x82606648
-extern uint32_t g_grcResolveSubmit;  // @ 0x8260664C
-extern uint32_t g_grcResolveSkipShaderControl;  // @ 0x82606650
 
 // Begin a draw from caller-filled vertex memory. Returns the 16-byte-aligned
 // allocation, or null on allocation failure; the caller fills it before submission.

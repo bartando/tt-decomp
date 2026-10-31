@@ -1,3 +1,4 @@
+#include "rage/float_channel_vtables.hpp"
 #include "rage/resource_fixup.hpp"
 #include "rage/operator_new.hpp"
 /**
@@ -65,9 +66,6 @@ void crAnimFrame_ApplyMatchingDofs(crAnimFrame* dst, const crAnimFrame* src,
     }
 }
 
-extern void* g_crAnimChannelStaticFloat_vtable[];   // @ 0x8204F8D4
-extern void* g_crAnimChannelQuantizeFloat_vtable[]; // @ 0x8204F9AC
-extern void* g_crAnimChannelRawFloat_vtable[];      // @ 0x8204F76C
 
 // The raw and quantized channels share an atArray header at +8. The
 // quantized channel's scale/bias at +16/+20 are left for its initializer.

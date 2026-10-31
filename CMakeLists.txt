@@ -114,6 +114,7 @@ set(SOURCES
     src/rage/network/snSessionStates.cpp
     src/rage/core/subsystem_init.c
     src/rage/swf.cpp
+    src/rage/swf_image_data.cpp
     src/rage/swf_vm.cpp
     src/rage/swf_clip_events.cpp
     src/rage/core/timer.cpp
@@ -211,16 +212,20 @@ set(SOURCES
     src/game/match/match_data.cpp
     src/game/misc/misc_data.cpp
     src/game/network/net_data.cpp
+    src/game/network/image_data.cpp
     src/game/network/ld_net_data.cpp
     src/game/player/player_data.cpp
     src/graphics/grc_data.cpp
+    src/graphics/image_data.cpp
     src/physics/ph_data.cpp
     src/physics/ld_ph_data.cpp
     src/rage/animation/anim_data.cpp
+    src/rage/animation/float_channel_vtables.cpp
     src/rage/audio/aud_data.cpp
     src/rage/audio/image_data.cpp
     src/rage/network/sn_data.cpp
     src/rage/rage_data.cpp
+    src/rage/time_state_data.cpp
     src/rage/ld_rage_data.cpp
     src/xam/xam_data.cpp
     src/link/linkage_bridges.cpp

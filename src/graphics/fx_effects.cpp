@@ -1,3 +1,5 @@
+#include "rage/time_state.hpp"
+#include "grc/image_state.hpp"
 /**
  * fx_effects.cpp — Visual effects system (ball trails, particles, etc.)
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -59,8 +61,6 @@ extern void rage_5908(void*);
 // ── Forward declarations of helpers referenced in implementations ──
 extern void util_C880(void* meshPtr);                 // mesh/resource releaser @ 0x8214C880
 extern int  rage_2A78(int primitiveType, int vertexCount); // begin immediate batch @ 0x82152A78
-extern uint32_t g_fxVertexCursor;                    // @ 0x825EBA74
-extern uint32_t g_fxCountOnly;                       // @ 0x825EBA84
 extern void* g_binkVideoPlayer;                      // @ 0x825EB988
 extern void pongDrawBucket_AddEntry(void* bucket, fxCrowdGfx* self, int handle);
 
@@ -196,7 +196,6 @@ extern void  pongDrawBucket_AddEntry(void* bucket, void* geom, int mode);
 extern uintptr_t lbl_82722798;
 extern uintptr_t lbl_8271A390;
 extern uintptr_t lbl_825D0080;
-extern float     lbl_825CAEB8[];
 extern void*     lbl_82606404;
 extern const char lbl_82079818[];   // class-name string
 extern const float lbl_82077EEC;    // float constant 2.0f-ish
@@ -356,7 +355,7 @@ void fxSpecialFx_vfn_26(void* thisPtr) {
  * path) on every inner entry with float at lbl_825CAEB8+8.
  *  - Outer loop: slot index < this+48
  *  - Inner loop: entry index < slot+132
- *    - callee(*(slot+128+j*4)+4, lbl_825CAEB8[2])
+ *    - callee(*(slot+128+j*4)+4, lbl_825CAEB8.frameSeconds)
  */
 void fxSpecialFx_vfn_27(void* thisPtr) {
     char* self = (char*)thisPtr;
@@ -367,7 +366,7 @@ void fxSpecialFx_vfn_27(void* thisPtr) {
         for (int j = 0; j < inner; ++j) {
             void* target = *(void**)(*(char**)(slot + 128) + j * 4);
             sysMemSimpleAllocator_88C0_fw(*(void**)((char*)target + 4),
-                                          /*lbl_825CAEB8[2]*/ lbl_825CAEB8[2]);
+                                          /*lbl_825CAEB8.frameSeconds*/ lbl_825CAEB8.frameSeconds);
         }
     }
 }

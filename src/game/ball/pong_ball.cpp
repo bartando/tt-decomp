@@ -1,3 +1,4 @@
+#include "rage/time_state.hpp"
 // pong_ball.cpp — Ball / robot classes | Rockstar Presents Table Tennis (Xbox 360, 2006)
 
 /**
@@ -1151,13 +1152,6 @@ struct LoopView {                  // *g_loop_obj_ptr (pong_misc.hpp: LoopObject
     uint8_t activeFlag;            // +0x242
 };
 
-struct TimeManagerView {           // rage::sysTimeManager at 0x825CAEB8
-    void**   vtable;               // +0x00
-    uint32_t _04;
-    float    frameSeconds;         // +0x08  1/60 in the image
-    uint8_t  _pad0C[0x1C];
-    uint32_t stamp28;              // +0x28  pongBallInstance stamps messages 1, 2 and 7 with it
-};
 
 // ── Effects ─────────────────────────────────────────────────────────────────
 // pongRenderable (vtable 0x82032404): each effect's constructor starts with
@@ -1343,7 +1337,6 @@ extern gmball::ReplayDataView*       lbl_8271A2EC;        // @ 0x8271A2EC
 extern gmball::FrameHistoryView*     lbl_825EB2FC;        // @ 0x825EB2FC
 extern "C" uint32_t                  g_phFrameIndex;      // @ 0x826065DC
 extern void*                         g_loop_obj_ptr;      // @ 0x825EAB30  a LoopView
-extern gmball::TimeManagerView       g_sysTimeManager;    // @ 0x825CAEB8
 extern uint8_t                       lbl_8260656D;        // @ 0x8260656D
 // Vector constants. 0x82619BF0 and 0x82606750 are zero in the image and filled at
 // startup; Normalize3 swaps an estimate equal to the first for the second.
@@ -1931,13 +1924,13 @@ void pongBallInstance_HandleMessage(void* sinkBase, const MessageView* msg) {
     switch (msg->id) {
     case 7:
         self->UpdatePhysicsState();
-        ball->stamp7 = g_sysTimeManager.stamp28;
+        ball->stamp7 = g_sysTimeManager.frameCount;
         break;
     case 1:
-        ball->stamp1 = g_sysTimeManager.stamp28;
+        ball->stamp1 = g_sysTimeManager.frameCount;
         break;
     case 2:
-        ball->stamp2 = g_sysTimeManager.stamp28;
+        ball->stamp2 = g_sysTimeManager.frameCount;
         break;
     case 0x11:
         ball->archetype->includeFlags &= ~4u;

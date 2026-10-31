@@ -1,3 +1,4 @@
+#include "game/network_static_node.hpp"
 #include "game/network_context.hpp"
 #include "rage/dat_bit_buffer.hpp"
 #include "rage/memory.h"
@@ -161,7 +162,6 @@ extern pongNetMessageHolder g_holderInstance_129C;          // @ 0x825D129C
 extern pongNetMessageHolder g_holderInstance_AudioRefCount; // @ 0x825D12B4
 extern uint8_t              g_holderInstance_InputDataMgr;  // @ 0x825D1960
 extern uint8_t              g_holderInstance_13A4;          // @ 0x825D13A4
-extern uint8_t              g_holderInstance_1948;          // @ 0x825D1948
 extern void*                g_holderInstance_MotionRangeMgr_ptr; // @ 0x825D164C
 extern void*                g_holderInstance_MotionRangeMgr;     // @ 0x825D1638
 extern void*                g_holderInstance_DataMgr;       // @ 0x825D1900
@@ -181,13 +181,7 @@ extern float g_fDefaultTimer;         // @ 0x825C5938 (-1.0f)
 extern const char g_szScoreMessageFmt[];  // @ 0x8206EE0C
 
 namespace {
-struct PongNetMessageHolderStaticNode {
-    uint32_t m_vtable;
-    uint32_t m_field4;
-    uint32_t m_field8;
-};
 
-static_assert(sizeof(PongNetMessageHolderStaticNode) == 0x0C);
 
 inline uint32_t& NetMessageHolderInitHead() {
     return g_netMessageHolderInitHead_raw;
@@ -625,7 +619,7 @@ void pongNetMessageHolder_4BF8_w() {
 static void PushStaticHolderNode(void* nodeAddr) {
     pongNetMessageHolder* holder = pongNetMessageHolder_FAE0_isl();
     auto* node = reinterpret_cast<PongNetMessageHolderStaticNode*>(nodeAddr);
-    node->m_field8 = (uint32_t)(uintptr_t)holder->m_pInternalArray;
+    node->next = holder->m_pInternalArray;
     holder->m_pInternalArray = nodeAddr;
     holder->m_refCount++;
 }
@@ -661,11 +655,12 @@ void pongNetMessageHolder_EAD8_sp() {
 // Registers the static holder dtor callback and tracks init ordering.
 // ===========================================================================
 void pongNetMessageHolder_08B0_p() {
-    auto* node = reinterpret_cast<PongNetMessageHolderStaticNode*>(&g_holderInstance_13A4);
+    struct InitLink { uint32_t vtable; uint32_t previous; };
+    auto* node = reinterpret_cast<InitLink*>(&g_holderInstance_13A4);
     const uint32_t previousHead = NetMessageHolderInitHead();
 
     NetMessageHolderInitHead() = (uintptr_t)&g_holderInstance_13A4;
-    node->m_field4 = previousHead;
+    node->previous = previousHead;
 
     ++NetMessageHolderLiveCount();
     std::atexit(pongNetMessageHolder_5038_w);

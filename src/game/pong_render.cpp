@@ -1,3 +1,4 @@
+#include "grc/image_state.hpp"
 #include "grc/progress_state.h"
 /**
  * pong_render.cpp — Light state and render bucket implementation
@@ -51,13 +52,6 @@ float flushLightVmx(float value) {
     return value;
 }
 }  // namespace
-
-extern pongLightState lbl_825CA610;             // @ 0x825CA610  applied light-state snapshot
-extern uint32_t lbl_825EBB18;                   // @ 0x825EBB18  Diffuse handle / initialization sentinel
-extern uint32_t lbl_825EBAAC;                   // @ 0x825EBAAC  Position handle
-extern uint32_t lbl_825EBC30;                   // @ 0x825EBC30  LightCount handle
-extern uint32_t lbl_825EBAB0;                   // @ 0x825EBAB0  LightType handle
-extern uint32_t lbl_825EBC34;                   // @ 0x825EBC34  Ambient handle
 extern ShaderTable* lbl_825EBC40;          // @ 0x825EBC40
 extern "C" const uint8_t g_shaderParameterDirtyMasks[8];           // @ 0x825D4C80  MSB-first dirty-bit masks
 extern const float lbl_825C5938;               // @ 0x825C5938  -1.0f
@@ -146,10 +140,6 @@ void pongLightState_Apply(const pongLightState* state) {
 extern "C" {
     extern uint32_t g_grmShaderFx_flushRequired;       // @ 0x825EBB1C
     extern uint32_t g_grmShaderFx_forceResetFlag;      // @ 0x825EBAB4
-    extern uint32_t g_grcAppliedRenderState[22];       // @ 0x825EBB80
-    extern uint32_t g_grcPendingTextureState[24];      // @ 0x825EBB20
-    extern uint32_t g_grcAppliedTextureState[24];      // @ 0x825EBAB8
-    extern void* g_grcDefaultTexture;                 // @ 0x825EBA20
     extern uint32_t g_grcFormatId;                    // @ 0x825C9030
     extern void* lbl_826063C8;                        // @ 0x826063C8
 }
@@ -295,12 +285,6 @@ static_assert(__builtin_offsetof(pongShadowConfig, mapSampleScale) == 2032, "map
 static_assert(__builtin_offsetof(pongShadowMap, m_config) == 8, "shadow config pointer");
 static_assert(__builtin_offsetof(pongShadowMap, m_draw_430) == 1072, "last shader handle");
 #endif
-
-extern void* lbl_825EBA20;                       // @ 0x825EBA20  fallback texture
-extern ShaderVector lbl_82617DF0;               // @ 0x82617DF0  softness upload scratch
-extern const float lbl_825CA430[2];             // @ 0x825CA430  half-texel offsets
-extern const ShaderVector lbl_825CA4A8[4];       // @ 0x825CA4A8  paired sampling taps
-extern const float lbl_825C4890;                // @ 0x825C4890  shadow blend (0.3)
 extern void* game_53C8(pongShadowMap* map, int32_t player, int32_t layer); // @ 0x821453C8
 extern void pongShadowMap_A5C8_g(uint32_t handle, void* texture);         // @ 0x8215A5C8
 extern void game_9AA0(ShaderTable* table, uint32_t handle, const ShaderVector* matrices,
@@ -1328,7 +1312,6 @@ void util_03C0(void* context, uint32_t* colorPtr) {
 
 extern void* g_loop_obj_ptr;                     // @ 0x825EAB30
 extern void* lbl_8271A310;                       // @ 0x8271A310 — lighting registry
-extern void* lbl_82606564;                       // @ 0x82606564 — active scene
 extern uint32_t g_ambientCubeXPosHandle;         // @ 0x82606380
 extern uint32_t g_ambientCubeXNegHandle;         // @ 0x82606384
 extern uint32_t g_ambientCubeYPosHandle;         // @ 0x82606388

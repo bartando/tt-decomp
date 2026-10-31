@@ -115,3 +115,5 @@ extern "C" alignas(16) const uint32_t g_affineHomogeneousW[4] = { // @ 0x82619BD
 };
 TT_DATA_ALIAS("lbl_82619BE0", "g_affineXYZMask");
 TT_DATA_ALIAS("lbl_82619BD0", "g_affineHomogeneousW");
+
+TT_DATA_ALIAS_AT("_ZN4rage13g_swfMinShearE", "g_slowTurnMul", 12); // @ 0x825C90C8
