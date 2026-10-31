@@ -1,8 +1,8 @@
 # Physics link wave G — completed and remaining
 
-This pass addresses 10 of the 85 ABI entries supplied in `/tmp/tt-wave-G/physics.txt`.
-It adds eight original PPC routines (one is a dependency absent from that list).
-The 75 entries below were not addressed by this pass.
+This pass addresses 14 of the 85 ABI entries supplied in `/tmp/tt-wave-G/physics.txt`.
+It adds thirteen original PPC routines (two are dependencies absent from that list).
+The 71 entries below were not addressed by this pass.
 
 ## Completed
 
@@ -76,7 +76,43 @@ Mutation runners live in `tools/lift-check/specs/`:
   `_articulated_timestep_mutations.py` catches 4/4. All are behavioral failures.
 - The native physics translation unit compiles with these changes.
 
-## Remaining input entries (75)
+## Continuation — joint clearing, propagation, and root rebasing
+
+- `0x82255A40` — `phArticulatedCollider_ResetForceAccumulators`: clears current
+  and saved body velocity vectors and calls each child joint's velocity-constraint
+  reset. The historical name describes these fields poorly. Spec
+  `ph_articulated_clear_velocities`: 400 trials on seeds 1 and 2.
+- `0x82258450` — `phArticulatedCollider_8450`: calls child joints' motion
+  propagation method, then rebuilds each affected body's angular/point velocity
+  caches. Spec `ph_articulated_propagate_motion`: 400 trials per seed.
+- `0x8224F0E0` — `phArticulatedCollider_F0E0`: publishes the root's transposed
+  transform, adds its position to the collider origin, rebases all body positions,
+  and adjusts cached point velocities. Root/collider aliasing is exercised.
+  Spec `ph_articulated_rebase_from_root`: 600 trials per seed.
+- `0x82126BD0` — `phArticulatedBody_ClearState`: zeros ten dynamic-state vectors
+  on one body, preserving the intervening force block. This dependency was named
+  `phArticulatedCollider_6BD0_2hr` in the symbol map. Spec
+  `ph_articulated_body_clear_state`: 300 trials per seed.
+- `0x822557F0` — `phArticulatedCollider_ResetJointChain`: clears dynamic state,
+  restores each body's saved pose, rebuilds velocity caches, and clears per-body
+  and per-child flags. Spec `ph_articulated_reset_joint_chain`: 600 trials per seed.
+- `src/physics/articulated_joint.hpp` supplies a real virtual dispatch interface
+  for propagation and constraint clearing; these lifts do not index vtables.
+- `_articulated_joint_state_mutations.py` catches 13/13 behavioral mutations;
+  `_articulated_chain_reset_mutations.py` catches 8/8.
+- In this continuation, seven additional original routines and two existing
+  callers were verified on both seeds, with 36/36 new mutations caught. Cumulative
+  coverage is 13 newly lifted originals, 14 resolved input ABI entries, and 60
+  caught mutations.
+- Native compilation succeeds through linking. None of this continuation's
+  completed symbols or renamed helpers remains in the native linker errors;
+  unrelated unresolved symbols still prevent the executable from linking.
+- The remaining integration entry below is tracked under the input list's old
+  signature. Its declaration and callers now correctly include a float timestep,
+  but its body at `0x82256968` is still unlifted. Next hot targets are that routine,
+  force preparation `0x82255FE0`, and solver rebuilding `0x82255D58`.
+
+## Remaining input entries (71)
 
 - `_phDemoWorld_67D0_g`
 - `_ph_2E08`
@@ -94,12 +130,8 @@ Mutation runners live in `tools/lift-check/specs/`:
 - `game_CE58(void*)`
 - `phArticulatedCollider_5D58(void*)`
 - `phArticulatedCollider_5FE0(void*)`
-- `phArticulatedCollider_8450(void*)`
 - `phArticulatedCollider_ApplyJointDelta(void*, int, float const*)`
 - `phArticulatedCollider_CreateJointConstraints(void*, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int)`
-- `phArticulatedCollider_F0E0(void*)`
-- `phArticulatedCollider_ResetForceAccumulators(void*)`
-- `phArticulatedCollider_ResetJointChain(void*)`
 - `phArticulatedCollider_ResetJointLink(void*, int)`
 - `phBoundCapsule_ACB0_p45(void*)`
 - `phBoundCapsule_ComputeAngleXZ(void*, float, float)`
