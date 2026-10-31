@@ -3,6 +3,7 @@
 #include <winternl.h>
 #include <stdlib.h>
 #include "platform/win32.h"
+#include "platform/time_stamp.h"
 
 /* These exports preserve NT relative/absolute 100ns timeouts and return codes,
  * including STATUS_USER_APC, without lossy millisecond conversions. */
@@ -116,3 +117,5 @@ int64_t tt_win_system_time(void) {
 void tt_win_yield(void) { if (!SwitchToThread()) Sleep(0); }
 int tt_win_spin_try(volatile uint32_t* lock) { return InterlockedCompareExchange((volatile LONG*)lock, 1, 0) == 0; }
 void tt_win_spin_unlock(volatile uint32_t* lock) { InterlockedExchange((volatile LONG*)lock, 0); }
+
+uint32_t tt_uptime_milliseconds(void) { return (uint32_t)GetTickCount64(); }

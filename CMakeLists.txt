@@ -72,6 +72,8 @@ set(SOURCES
     # XAM (Xbox Application Model)
     src/xam/audio.c
     src/xam/input.c
+    src/platform/time_stamp.cpp
+    src/xam/time_stamp.cpp
     src/platform/host_imports.cpp
     src/platform/audio_frame.cpp
     src/platform/host_xma.cpp
@@ -426,6 +428,17 @@ if(TT_BUILD_PLATFORM_TESTS)
         target_link_libraries(tt_host_contract_test pthread)
         add_test(NAME host_sdk_contracts COMMAND tt_host_contract_test)
     endif()
+    add_executable(tt_timestamp_test tests/host_timestamp_test.cpp
+        src/platform/time_stamp.cpp src/xam/time_stamp.cpp)
+    target_compile_options(tt_timestamp_test PRIVATE -UNDEBUG)
+    if(WIN32)
+        target_sources(tt_timestamp_test PRIVATE src/platform/win32.c)
+        target_link_libraries(tt_timestamp_test ntdll "${TT_WINPTHREAD_STATIC}")
+    else()
+        target_sources(tt_timestamp_test PRIVATE src/platform/posix_sync.c)
+        target_link_libraries(tt_timestamp_test pthread)
+    endif()
+    add_test(NAME host_timestamp COMMAND tt_timestamp_test)
     add_test(NAME host_synchronization COMMAND tt_platform_test)
 endif()
 install(TARGETS ${PROJECT_NAME}

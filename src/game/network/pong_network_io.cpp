@@ -1,5 +1,6 @@
 #include "audio/xact_sink_io.hpp"
 #include "rage/dat_bit_buffer.hpp"
+#include "rage/ptr32.hpp"
 #include "rage/hud_page_group.hpp"
 // pong_network_io.cpp — Network I/O helper functions | Rockstar Presents Table Tennis (Xbox 360, 2006)
 
@@ -457,7 +458,7 @@ uint32_t GetPlayerID(void* client, uint32_t reportInvalid) {
 #include <cstring>
 
 // ── Forward declarations for sibling-owned helpers ──────────────────────────
-extern void  atSingleton_6F98_g(void* sink);                          // @ 0x82566f98
+extern uint32_t atSingleton_6F98_g(); // @ 0x82566F98
 extern int32_t game_9D70_h(void* node, uint32_t flags);               // @ 0x82459d70
 extern int32_t atSingleton_9B98_p39(void* node, void* key);           // @ 0x82459b98
 extern int32_t game_3F68_h(void* sink);                               // @ 0x82453f68
@@ -491,56 +492,38 @@ extern "C" void snSession_AddNode_C068(void* nodeList, void* node);
  *
  * Iteratively updates a bit-field on the sink and, when it transitions, walks
  * the sink's child linked-list at +36 forwarding into game_9D70_h(child, flag).
- * The &0x20 bit in the byte at +52 tracks the "has-singleton-cached" state;
- * when it changes we (re)acquire the singleton at +108 and fix up relative
- * offsets stored by children. Mirror of the pass5_final recomp.
+ * Bit 0x20 at +52 pauses pending deadlines. Pausing stores the current
+ * millisecond tick at +108; resuming shifts the pending deadlines by the
+ * elapsed pause duration. Checked against the retail assembly.
  */
 uint32_t msgMsgSink_3C88_g(void* self, uint32_t flag)
 {
-    uint8_t* s = static_cast<uint8_t*>(self);
-    uint32_t result = 0;
-
-    int32_t stateWord = *reinterpret_cast<int32_t*>(s + 80);
-    if (stateWord <= 4) {
-        uint8_t bits = *(s + 52);
-        uint32_t maskBit = static_cast<uint32_t>(bits) & 0x20;
-        uint32_t curBit  = (maskBit == 0x20) ? 1 : 0;
-        if (curBit == flag) return 0;
-
-        uint32_t newBit = (flag != 0) ? 1 : 0;
-        uint8_t newBits = static_cast<uint8_t>((bits & ~0x20u) | (newBit << 5));
-        *(s + 52) = newBits;
-
-        uint32_t oldSingleton = *reinterpret_cast<uint32_t*>(s + 108);
-        atSingleton_6F98_g(self);
-        uint32_t newSingleton = *reinterpret_cast<uint32_t*>(s + 108);
-        if ((newBits & 0x20) != 0) {
-            // singleton freshly cached — first form also stores, already done
-        } else {
-            uint32_t delta = newSingleton - oldSingleton;
-            uint8_t* listHead = s + 56;
-            uint32_t cur = *reinterpret_cast<uint32_t*>(s + 60);
-            while (cur != static_cast<uint32_t>(reinterpret_cast<uintptr_t>(listHead))) {
-                uint8_t* node = reinterpret_cast<uint8_t*>(cur);
-                uint32_t next = *reinterpret_cast<uint32_t*>(node + 4);
-                uint32_t* off = reinterpret_cast<uint32_t*>(node + 20);
-                *off += delta;
-                cur = next;
-            }
-        }
-
-        // Walk child list and forward game_9D70_h(child, flag) early-exit on
-        // first non-negative result — but original keeps iterating. Match it.
-        uint8_t* childHead = s + 36;
-        uint32_t child = *reinterpret_cast<uint32_t*>(s + 40);
-        while (child != static_cast<uint32_t>(reinterpret_cast<uintptr_t>(childHead))) {
-            int32_t r = game_9D70_h(reinterpret_cast<void*>(child), flag);
-            result = static_cast<uint32_t>(r);
-            child = *reinterpret_cast<uint32_t*>(child + 4);
-            if (static_cast<int32_t>(result) < 0) break;
+    auto* bytes = static_cast<uint8_t*>(self);
+    if (*reinterpret_cast<int32_t*>(bytes + 0x50) > 4) return 0;
+    const uint8_t oldFlags = bytes[0x34];
+    if (((oldFlags & 0x20) != 0 ? 1u : 0u) == flag) return 0;
+    bytes[0x34] = static_cast<uint8_t>((oldFlags & ~0x20u) | (flag != 0 ? 0x20 : 0));
+    if (bytes[0x34] & 0x20) {
+        *reinterpret_cast<uint32_t*>(bytes + 0x6C) = atSingleton_6F98_g();
+    } else {
+        const uint32_t elapsed = atSingleton_6F98_g() - *reinterpret_cast<uint32_t*>(bytes + 0x6C);
+        auto* head = bytes + 0x38;
+        auto* node = rage::load_ptr32<uint8_t>(bytes, 0x3C);
+        while (node != head) {
+            auto* deadline = reinterpret_cast<uint32_t*>(node + 0x14);
+            node = rage::load_ptr32<uint8_t>(node, 4);
+            *deadline += elapsed;
         }
     }
-    return result;
+    auto* head = bytes + 0x24;
+    auto* child = rage::load_ptr32<uint8_t>(bytes, 0x28);
+    int32_t result = 0;
+    while (child != head) {
+        result = game_9D70_h(child, flag);
+        child = rage::load_ptr32<uint8_t>(child, 4);
+        if (result < 0) break;
+    }
+    return static_cast<uint32_t>(result);
 }
 
 
@@ -603,95 +586,100 @@ void msgMsgSink_4550_g(void* self)
  * virtual-call + linked-list walking. Translated to match behavior for
  * state==3 early path and state-transition paths. See pass5_final recomp.
  */
+namespace {
+// The session operations occupy their retail virtual slots; unknown methods
+// preserve the interface ordering and are never called by this lift.
+struct SinkSession {
+    virtual void Unknown00() = 0;
+    virtual void Unknown01() = 0;
+    virtual void Unknown02() = 0;
+    virtual void Unknown03() = 0;
+    virtual void Unknown04() = 0;
+    virtual void Unknown05() = 0;
+    virtual void Unknown06() = 0;
+    virtual void Unknown07() = 0;
+    virtual void Unknown08() = 0;
+    virtual void Unknown09() = 0;
+    virtual void Unknown10() = 0;
+    virtual void Unknown11() = 0;
+    virtual void Unknown12() = 0;
+    virtual void Unknown13() = 0;
+    virtual void Unknown14() = 0;
+    virtual void Unknown15() = 0;
+    virtual void Unknown16() = 0;
+    virtual void Unknown17() = 0;
+    virtual void Unknown18() = 0;
+    virtual void Unknown19() = 0;
+    virtual void Unknown20() = 0;
+    virtual void Unknown21() = 0;
+    virtual void Unknown22() = 0;
+    virtual void Unknown23() = 0;
+    virtual void Unknown24() = 0;
+    virtual void Unknown25() = 0;
+    virtual void Unknown26() = 0;
+    virtual void OnClosed() = 0;
+    virtual void OnReady() = 0;
+    virtual void Unknown29() = 0;
+    virtual void Unknown30() = 0;
+    virtual int32_t IsPending() = 0;
+};
+}
+
 uint32_t msgMsgSink_4EB8_g(void* self)
 {
-    uint8_t* s = static_cast<uint8_t*>(self);
-    int32_t state = *reinterpret_cast<int32_t*>(s + 80);
-    uint32_t result = 0;
-
-    if (state == 3) {
-        // slot 31: sessionProbe()
-        void* sessionRef = *reinterpret_cast<void**>(s + 48);
-        void** vt = *reinterpret_cast<void***>(sessionRef);
-        using FnProbe = int32_t(*)(void*);
-        int32_t probe = reinterpret_cast<FnProbe>(vt[31])(sessionRef);
-        if (probe != 0) {
-            // game_3FD0_h path
-            int32_t rc = game_3FD0_h(self);
-            if (rc == 1) {
-                int32_t sw = *reinterpret_cast<int32_t*>(s + 80);
-                if (sw < 6) {
-                    *reinterpret_cast<int32_t*>(s + 80) = 6;
-                    int32_t flag84 = *reinterpret_cast<int32_t*>(s + 84);
-                    if (flag84 != 0) {
-                        void* hdrSrc  = *reinterpret_cast<void**>(s + 28);
-                        uint16_t hdr  = *reinterpret_cast<uint16_t*>(
-                            reinterpret_cast<uint8_t*>(hdrSrc) + 1);
-                        void* sessRef = *reinterpret_cast<void**>(s + 32);
-                        *reinterpret_cast<int32_t*>(s + 84) = 0;
-                        msgMsgSink_8B90_g(sessRef, hdr);
-                    }
-                    void* sr = *reinterpret_cast<void**>(s + 48);
-                    void** vt2 = *reinterpret_cast<void***>(sr);
-                    int32_t probe2 = reinterpret_cast<FnProbe>(vt2[31])(sr);
-                    if (probe2 == 0) {
-                        using FnVoid = void(*)(void*);
-                        reinterpret_cast<FnVoid>(vt2[27])(sr);
-                    }
-                } else {
-                    *reinterpret_cast<int32_t*>(s + 80) = 6;
+    auto* bytes = static_cast<uint8_t*>(self);
+    auto& state = *reinterpret_cast<int32_t*>(bytes + 0x50);
+    if (state != 3) {
+        if (state < 4) {
+            bytes[0x34] |= 0x40;
+            return 0;
+        }
+        return 0x8AC70006u;
+    }
+    auto session = [&] { return rage::load_ptr32<SinkSession>(bytes, 0x30); };
+    auto notify = [&](bool closed) {
+        uint16_t header;
+        __builtin_memcpy(&header, rage::load_ptr32<uint8_t>(bytes, 0x1C) + 1, 2);
+        void* target = rage::load_ptr32<void>(bytes, 0x20);
+        if (closed) msgMsgSink_8B90_g(target, header);
+        else msgMsgSink_8B78_g(target, header);
+    };
+    if (session()->IsPending() == 0) {
+        const int32_t status = game_3FD0_h(self);
+        if (status == 1) {
+            if (state < 6) {
+                state = 6;
+                auto& needsNotification = *reinterpret_cast<int32_t*>(bytes + 0x54);
+                if (needsNotification) {
+                    needsNotification = 0;
+                    notify(true);
                 }
-                return (static_cast<uint32_t>(-30009) << 16) | 8;
-            } else if (rc != 2) {
-                // fall through to child loop
+                if (session()->IsPending() == 0) session()->OnClosed();
             } else {
-                return 0;
+                state = 6;
             }
+            return 0x8AC70008u;
         }
-        // Child-walk: game_9A48_h on each child
-        uint8_t* head = s + 36;
-        uint32_t cur  = *reinterpret_cast<uint32_t*>(s + 40);
-        while (cur != static_cast<uint32_t>(reinterpret_cast<uintptr_t>(head))) {
-            int32_t r = game_9A48_h(reinterpret_cast<void*>(cur));
-            result = static_cast<uint32_t>(r);
-            cur = *reinterpret_cast<uint32_t*>(cur + 4);
-            if (static_cast<int32_t>(result) < 0) return result;
-        }
-        if (static_cast<int32_t>(result) < 0) return result;
-
-        // Commit state transition to 4 when eligible
-        atSingleton_6F98_g(self);
-        int32_t sw = *reinterpret_cast<int32_t*>(s + 80);
-        // singleton ptr just written at +100 via tail of 6F98
-        if (sw < 4) {
-            *reinterpret_cast<int32_t*>(s + 80) = 4;
-            *reinterpret_cast<int32_t*>(s + 84) = 1;
-            void* hdrSrc = *reinterpret_cast<void**>(s + 28);
-            uint16_t hdr = *reinterpret_cast<uint16_t*>(
-                reinterpret_cast<uint8_t*>(hdrSrc) + 1);
-            void* sessRef = *reinterpret_cast<void**>(s + 32);
-            msgMsgSink_8B78_g(sessRef, hdr);
-            void* sr = *reinterpret_cast<void**>(s + 48);
-            void** vt2 = *reinterpret_cast<void***>(sr);
-            using FnProbe2 = int32_t(*)(void*);
-            int32_t p2 = reinterpret_cast<FnProbe2>(vt2[31])(sr);
-            if (p2 == 0) {
-                using FnVoid = void(*)(void*);
-                reinterpret_cast<FnVoid>(vt2[28])(sr);
-            }
-        } else {
-            *reinterpret_cast<int32_t*>(s + 80) = 4;
-        }
-        return result;
+        if (status == 2) return 0;
     }
-
+    auto* head = bytes + 0x24;
+    auto* child = rage::load_ptr32<uint8_t>(bytes, 0x28);
+    int32_t result = 0;
+    while (child != head) {
+        result = game_9A48_h(child);
+        child = rage::load_ptr32<uint8_t>(child, 4);
+        if (result < 0) return static_cast<uint32_t>(result);
+    }
+    *reinterpret_cast<uint32_t*>(bytes + 0x64) = atSingleton_6F98_g();
     if (state < 4) {
-        uint8_t b = *(s + 52);
-        *(s + 52) = static_cast<uint8_t>(b | 0x40);
-        return 0;
+        state = 4;
+        *reinterpret_cast<int32_t*>(bytes + 0x54) = 1;
+        notify(false);
+        if (session()->IsPending() == 0) session()->OnReady();
+    } else {
+        state = 4;
     }
-
-    return (static_cast<uint32_t>(-30009) << 16) | 6;
+    return static_cast<uint32_t>(result);
 }
 
 

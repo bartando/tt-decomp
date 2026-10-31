@@ -2534,7 +2534,7 @@ void msgMsgSink::DisconnectMatchingHandlers(void* key) {
 extern int32_t  msgMsgSink_vfn_35(void*, void*);                      // 0x8244E2A0
 extern void msgMsgSink_vfn_36_5FD0_1(void*);                          // 0x82455FD0
 extern void* atSingleton_64D8_g(void*);                               // 0x824564D8
-extern void* atSingleton_6F98_g();                                    // 0x82566F98
+extern uint32_t atSingleton_6F98_g(); // @ 0x82566F98
 extern void  jumptable_3A48(void*, uint32_t, uint32_t, uint32_t);
 extern uint32_t msgMsgSink_4EB8_g(void*);                             // 0x82454EB8
 extern int32_t  msgMsgSink_66B0_h(void*);                             // 0x824566B0
