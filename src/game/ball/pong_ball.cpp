@@ -1,3 +1,4 @@
+#include "rage/fi_asset.hpp"
 #include "rage/time_state.hpp"
 // pong_ball.cpp — Ball / robot classes | Rockstar Presents Table Tennis (Xbox 360, 2006)
 
@@ -1384,7 +1385,6 @@ extern "C" void  RegisterSerializedField(void* node, const char* name, void* fie
 extern void      sgRMDrawable_RegisterFields(void* node);                     // @ 0x823D8F18
 extern void      sgPhysicalObject_Initialize(void* node);                     // @ 0x823D9160  slot 23
 extern void      sgPhysicalObject_Destruct(void* node);                       // @ 0x823D90A0
-extern void      fiAssetFolders_Push(gmball::AssetManagerView* assets, const char* path);  // @ 0x822E2E60
 extern "C" void* RTDynamicCast(void* object, int32_t vfDelta, RTTITypeDescriptor* sourceType,
                                RTTITypeDescriptor* targetType, int32_t isReference);  // @ 0x82430978
 extern fxBallTrail*      fxBallTrail_Construct(void* mem);                    // @ 0x822812A8
@@ -1610,7 +1610,7 @@ void gmBallNode::LoadProperties() {
 
 // ── [23] Initialize @ 0x82280D48 ──────────────────────────────────────────────
 void gmBallNode::Initialize() {
-    fiAssetFolders_Push(&g_assetFolderStack, "$/props");
+    fiAssetManager_PushFolder(&g_assetFolderStack, "$/props");
     transform.d.x = 0.0f;
     transform.d.y = 4.0f;  // the float at 0x825C90BC
     transform.d.z = 0.0f;

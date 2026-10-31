@@ -1,3 +1,4 @@
+#include "rage/fi_asset.hpp"
 #include "game/game_message.hpp"
 #include "rage/fi_stream.hpp"
 #include "game/match_ai_array.hpp"
@@ -1516,7 +1517,6 @@ struct fiAssetManagerView {
 extern fiAssetManagerView g_fiAssetManager;  // @ 0x825D0080
 struct fiStream;
 // @ 0x822E2E60 — pushes a folder ("$/..." is taken as is).
-extern void fiAssetManager_PushFolder(fiAssetManagerView* assets, const char* path);
 // rage::fiTokenizer as the loaders build it on the stack (vtable 0x8205A594).
 struct fiTokenizerView {
     void**      vtable;        // +0x00

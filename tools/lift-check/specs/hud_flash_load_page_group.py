@@ -30,6 +30,8 @@ def snprintf(c):
 
 def load(c):
  assert c.in_stack(c.r(3)) and c.in_stack(c.r(5)) and c.in_stack(c.r(6))
+ expected=b'$/resource/flash/movie\0'
+ assert c.read(c.r(3),len(expected))==expected
  c.write(c.r(5),S['imageBase'].to_bytes(4,'big'))
  c.write(c.r(6),S['size'].to_bytes(4,'big'))
  c.ret(r3=S['loadedFile'])
