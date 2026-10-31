@@ -65,4 +65,5 @@ const char* g_str_dialog_searchFailedDecline    = "Search failed -- user didn't 
 
 extern const char g_legalsQuitKey[] = "quit"; // @ 0x8205DFB0
 extern const char g_legalsDoneKey[] = "done"; // @ 0x8205DFB8
+extern const char g_dialogDoneKey[] = "iDone"; // @ 0x820627E4
 extern const char g_flashSemaphoreError[] = "[*** FLASHBASE ERROR ***] Updating without grabbing flash sema!"; // @ 0x8205AE98

@@ -1,3 +1,4 @@
+#include "game/frontend_page_group.hpp"
 #include "rage/ptr32.hpp"
 #include "rage/swf_page_group.hpp"
 #include "rage/swf_value.hpp"
@@ -73,7 +74,6 @@ extern uint32_t g_mainAllocTable[];  // SDA global
 #define VCALL_ALLOC(obj, size, align) VTABLE_SLOT1(obj)(obj, size, align)
 
 
-extern void* PageGroup_SetState(void* pageGroup);                   // @ 0x820C0890 — page group state helper
 namespace rage {
     void ReleaseSingleton(void* obj);     // @ 0x821A9420
     void ClearPendingFlag(void* obj);     // HSM pending flag clear
@@ -86,12 +86,8 @@ extern void* CreditsRoll_NotifyEntry(void* obj, uint32_t count);       // credit
 extern void  atSingleton_QueryEventData(void* outData, void* table);    // @ 0x82017888 — event query
 extern void  FadePageGroup(void* mgr, int type, int mode, float fadeTime, float param2); // UI fade
 extern bool  CheckButtonPressed(void* record);                    // input button state check @ 0x821DFFF8
-extern uint8_t Dialog_IsComplete(void* pg);             // @ 0x820C2470 — dialog completion check
-extern void* LegalsPageGroup_Construct(void* mem);                   // page-group constructor @ 0x8230x
-extern void  PageGroup_Register(void* pg);              // @ 0x820C9510 — register page group
 extern void  HSM_QueueNotification(void* ctx);          // @ 0x820C0708 — queue HSM notification
 extern void  CreditsRoll_Deactivate(void* roll, int a, int b);    // credits roll toggle
-extern void* DialogPageGroup_Construct(void* mem);                   // dialog page-group constructor
 
 
 
@@ -388,7 +384,7 @@ void pongCreditsContext::OnEnterCredits() {
     }
 
     // Notify page group to open/present
-    PageGroup_SetState(m_pPageGroup);
+    CreditsPageGroup_PollInput(m_pPageGroup);
     m_pPageGroup->Open();   // vtable slot 2
 
     // Check page group active state (+152) and m_bActive (+28)
@@ -872,7 +868,7 @@ void* pongLegalsState::GetContext() {
  *   3. Stores the context in m_pContext (this+8).
  *   4. Allocates a 240-byte page group sub-object via LegalsPageGroup_Construct.
  *   5. Stores the page group in the context's m_pPageGroup (+20).
- *   6. Calls PageGroup_Register to register.
+ *   6. Calls LegalsPageGroup_Register to register.
  */
 void pongLegalsState::Init() {
     rage_AssertMainThread();
@@ -918,7 +914,7 @@ void pongLegalsState::Init() {
     }
 
     // Register with the state manager
-    PageGroup_Register(pageGroup);
+    LegalsPageGroup_Register(pageGroup);
 
     rage_debugLog("Legals screen loaded.");   // @ 0x8205F880
 }
@@ -1087,28 +1083,17 @@ void pongDialogContext::Register() {
  * Slot 16.  Checks whether the dialog is ready to advance.
  * If the page group exists:
  *   1. Calls Open (vtable slot 2) on the page group.
- *   2. Calls Dialog_IsComplete to check if dialog completed.
+ *   2. Calls DialogPageGroup_IsComplete to check if dialog completed.
  *   3. If completed, transitions to m_nextStateIdx via the HSM manager.
  */
+// @ 0x8230C8A8
 void pongDialogContext::Update() {
-    if (m_pPageGroup == nullptr) {
-        return;
-    }
-
-    // Open/present the dialog page group (vtable slot 2)
-    typedef void (*OpenFn)(void*);
-    OpenFn openFn = (OpenFn)(*(uint32_t*)(*(uint32_t*)m_pPageGroup + 8));
-    openFn(m_pPageGroup);
-
-    // Check if the dialog has finished
-    uint8_t isReady = Dialog_IsComplete(m_pPageGroup);
-    if ((isReady & 0xFF) == 0) {
-        return;   // Not yet ready
-    }
-
-    // Transition to the stored next state
-    extern void* g_hsmContextPtr;   // loaded from 0x825EAB30 area
-    hsmContext_SetNextState(g_hsmContextPtr, m_nextStateIdx);
+    auto* group = rage::load_ptr32<FrontendPageUpdate>(this, 0x18);
+    if (!group) return;
+    group->Update();
+    if (static_cast<uint8_t>(DialogPageGroup_IsComplete(rage::load_ptr32<void>(this, 0x18))) == 0) return;
+    const int32_t next = *reinterpret_cast<const int32_t*>(reinterpret_cast<const uint8_t*>(this) + 0x1C);
+    hsmContext_SetNextState(g_loop_obj_ptr, next);
 }
 
 /**

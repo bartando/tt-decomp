@@ -170,6 +170,8 @@ set(SOURCES
     src/game/data/player_manager_state.cpp
     src/game/template_registry.cpp
     src/game/game_message.cpp
+    src/game/frontend_input.cpp
+    src/game/frontend_page_group.cpp
     src/game/game_message_data.cpp
     src/game/data/gd_data_strings.cpp
     src/game/data/gd_logic_strings.cpp
