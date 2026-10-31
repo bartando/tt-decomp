@@ -1,3 +1,6 @@
+#include "rage/ptr32.hpp"
+#include "rage/swf_page_group.hpp"
+#include "rage/swf_value.hpp"
 #include "game/game_message.hpp"
 #include "rage/hsm_context.hpp"
 #include "game/network_context.hpp"
@@ -84,9 +87,6 @@ extern void  atSingleton_QueryEventData(void* outData, void* table);    // @ 0x8
 extern void  FadePageGroup(void* mgr, int type, int mode, float fadeTime, float param2); // UI fade
 extern bool  CheckButtonPressed(void* record);                    // input button state check @ 0x821DFFF8
 extern uint8_t Dialog_IsComplete(void* pg);             // @ 0x820C2470 — dialog completion check
-extern void*   PageGroup_LookupText(uint32_t table, const char* key); // @ 0x820C9318 — text lookup
-extern void*   PageGroup_GetTextEntry(void* pg, const char* key); // @ 0x820C9280 — text entry lookup
-extern int32_t TextEntry_GetValue(void* entry);         // @ 0x820CA5C8 — text entry value
 extern void* LegalsPageGroup_Construct(void* mem);                   // page-group constructor @ 0x8230x
 extern void  PageGroup_Register(void* pg);              // @ 0x820C9510 — register page group
 extern void  HSM_QueueNotification(void* ctx);          // @ 0x820C0708 — queue HSM notification
@@ -779,124 +779,57 @@ bool pongLegalsContext::CanTransition() {
     return true;
 }
 
-/**
- * pongLegalsContext_InputPoll  @ 0x82311098  |  size: 0x104
- *
- * Helper called by Update().  Polls all 4 controller ports for any
- * button input.  If any button is pressed on any controller, performs
- * additional state checks (loads page group, queries button state,
- * looks up "SAVING" string, and notifies the page group).
- * Sets m_bInputDetected to 1 when input is found.
- *
- * The input check examines three byte-string regions per controller
- * at offsets +8, +16, and +48 from each controller's 808-byte record.
- */
+extern "C" void* g_pPlayerDataTable; // @ 0x8271A31C
+extern "C" void* g_loop_obj_ptr; // @ 0x825EAB30
+extern "C" uint8_t g_bNetworkDebugFlag; // @ 0x826065EB
+extern const char g_legalsQuitKey[]; // @ 0x8205DFB0
+extern const char g_legalsDoneKey[]; // @ 0x8205DFB8
+extern const char g_flashSemaphoreError[]; // @ 0x8205AE98
+
+namespace {
+struct FrontendPageUpdate {
+    virtual void Reserved0() = 0;
+    virtual void Reserved1() = 0;
+    virtual void Update() = 0;
+};
+}
+
+// @ 0x82311098
 static void pongLegalsContext_InputPoll(pongLegalsContext* ctx) {
-    if (ctx->m_bInputDetected != 0) {
-        return;  // Already detected input
-    }
+    auto* bytes = reinterpret_cast<uint8_t*>(ctx);
+    if (bytes[0x18] != 0) return;
+    auto* record = static_cast<uint8_t*>(g_pPlayerDataTable) + 0x328;
+    for (int controller = 0; controller < 4; ++controller, record += 0x328) {
+        auto* buttons = rage::load_ptr32<uint8_t>(record, 0);
+        if (!CheckButtonPressed(buttons + 8) &&
+            !CheckButtonPressed(buttons + 16) &&
+            !CheckButtonPressed(buttons + 48)) continue;
 
-    // Controller array base: loaded from g_loop_obj_ptr (+808 offset)
-    extern uint32_t g_controllerArrayBase;   // @ 0x8271A31C → load → +808
-    uint32_t* controllerBase = (uint32_t*)(*(uint32_t*)(&g_controllerArrayBase) + 808);
-
-    for (int i = 0; i < 4; ++i) {
-        uint32_t controllerAddr = controllerBase[i * (808 / 4)];
-        // Check three button regions at +8, +16, +48
-        bool btn1 = CheckButtonPressed((uint8_t*)controllerAddr + 8);
-        if (btn1) goto input_found;
-
-        bool btn2 = CheckButtonPressed((uint8_t*)controllerAddr + 16);
-        if (btn2) goto input_found;
-
-        bool btn3 = CheckButtonPressed((uint8_t*)controllerAddr + 48);
-        if (btn3) goto input_found;
-    }
-    return;  // No input detected on any controller
-
-input_found:
-    {
-        void* pageGroup = ctx->m_pPageGroup;
-        uint8_t buttonState = hudFlashBase_IsNetworkDirty(pageGroup);
-
-        // Check HSM manager's context pointer (+556)
-        extern void* g_hsmMgrPtr;   // @ 0x825EAB30 (g_loop_obj_ptr)
-        void* hsmMgr = *(void**)(*(uint32_t*)&g_hsmMgrPtr + (-21712 & 0xFFFF));
-        // The compound `(*g_hsmMgrPtr + (-21712 & 0xFFFF))` reconstructs the
-        // PPC `lwz r11,-21712(r13)` SDA access — equivalent to reading the
-        // singleton slot at g_loop_obj_ptr+0x... . The +556 field check and
-        // flag 0x826065EB are retained verbatim from pass5; matches the
-        // same access pattern used below in pongLegalsState::OnEnter.
-
-        // Look up "SAVING" in the page group's text table
-        extern const char* k_SAVING;   // @ 0x8205DFB0
-        void* textEntry = PageGroup_LookupText(
-            *(uint32_t*)((uint8_t*)pageGroup + 92), k_SAVING);
-
-        uint32_t savingState = 1;
-        if (textEntry != nullptr) {
-            *(uint32_t*)textEntry = 1;
-            *(uint32_t*)((uint8_t*)textEntry + 4) = 3;
-        }
-
-        if ((buttonState & 0xFF) != 0) {
-            hudFlashBase_PublishPageGroup(pageGroup);
-        }
-
-        ctx->m_bInputDetected = 1;
+        void* group = rage::load_ptr32<void>(ctx, 0x14);
+        const uint8_t acquired = static_cast<uint8_t>(hudFlashBase_IsNetworkDirty(group));
+        if (rage::load_ptr32<void>(g_loop_obj_ptr, 0x22C) && g_bNetworkDebugFlag == 0)
+            rage_debugLog(g_flashSemaphoreError);
+        void* movie = rage::load_ptr32<void>(group, 0x5C);
+        auto* value = static_cast<SwfVmValue*>(swfGetOrCreatePageGroupValue(movie, g_legalsQuitKey));
+        if (value) { value->payload = 1; value->tag = 3; }
+        if (acquired != 0) hudFlashBase_PublishPageGroup(group);
+        bytes[0x18] = 1;
+        return;
     }
 }
 
-/**
- * pongLegalsContext::Update  @ 0x82310FB8  |  size: 0xB4
- *
- * Slot 16.  Main update for the legals screen.  If the page group exists:
- *   1. Polls all controllers for input via the InputPoll helper.
- *   2. Calls the page group's Update (vtable slot 2).
- *   3. Checks whether the user pressed a button (via B2A8 / B1E8).
- *   4. Looks for a "SAVING" text entry; if found and has positive value,
- *      transitions to state 6 (attract/main menu).
- */
+// @ 0x82310FB8
 void pongLegalsContext::Update() {
-    if (m_pPageGroup == nullptr) {
-        return;
-    }
-
-    // Poll all controllers for input
+    if (!rage::load_ptr32<void>(this, 0x14)) return;
     pongLegalsContext_InputPoll(this);
-
-    // Call page group Update (vtable slot 2)
-    typedef void (*UpdateFn)(void*);
-    UpdateFn updateFn = (UpdateFn)(*(uint32_t*)(*(uint32_t*)m_pPageGroup + 8));
-    updateFn(m_pPageGroup);
-
-    // Now working with the page group directly
-    void* pg = m_pPageGroup;
-    int32_t resultValue = 0;
-
-    // Check button state
-    uint8_t buttonState = hudFlashBase_IsNetworkDirty(pg);
-
-    // Process input
-    hudFlashBase_GetPageGroup(pg);
-
-    // Look up "SAVING" string in page group
-    extern const char* k_SAVING;   // @ 0x8205DFB8
-    void* savingEntry = PageGroup_GetTextEntry(pg, k_SAVING);
-    if (savingEntry != nullptr) {
-        resultValue = TextEntry_GetValue(savingEntry);
-    }
-
-    // If button was pressed, notify
-    if ((buttonState & 0xFF) != 0) {
-        hudFlashBase_PublishPageGroup(pg);
-    }
-
-    // If saving entry had a positive value, transition to state 6
-    if (resultValue > 0) {
-        extern void* g_hsmContextPtr;   // @ loaded from 0x825EAB30
-        hsmContext_SetNextState(g_hsmContextPtr, 6);
-    }
+    rage::load_ptr32<FrontendPageUpdate>(this, 0x14)->Update();
+    void* group = rage::load_ptr32<void>(this, 0x14);
+    const uint8_t acquired = static_cast<uint8_t>(hudFlashBase_IsNetworkDirty(group));
+    void* movie = hudFlashBase_GetPageGroup(group);
+    void* entry = swfFindPageGroupValue(movie, g_legalsDoneKey);
+    const int32_t done = entry ? swfValueToInteger(entry) : 0;
+    if (acquired != 0) hudFlashBase_PublishPageGroup(group);
+    if (done > 0) hsmContext_SetNextState(g_loop_obj_ptr, 6);
 }
 
 /**

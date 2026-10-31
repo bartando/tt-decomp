@@ -2300,38 +2300,6 @@ uint32_t SinglesNetworkClient_GetCoordinatorRoundValue(void* self)
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SinglesNetworkClient::LookupSessionPropertyValue @ 0x823F9808 | size: 0x5C
-//
-// Looks up a session property by key and stores its integer value.
-// Takes the session state and key, plus a pointer where the result
-// should be stored. If found, extracts the value via
-// snSession_GetPropertyInt, stores it, and returns true.
-//
-// Parameters:
-//   sessionState - Session state pointer
-//   key          - Property key string
-//   outValue     - Pointer to store the result
-//
-// Returns:
-//   true if property was found and value stored, false otherwise
-// ─────────────────────────────────────────────────────────────────────────────
-bool SinglesNetworkClient_LookupSessionPropertyValue(void* sessionState, const char* key, uint32_t* outValue)
-{
-    // Look up property
-    void* property = snSession_LookupProperty(sessionState, key);
-
-    if (property != nullptr) {
-        // Get property value and store it
-        int value = snSession_GetPropertyInt(property);
-        *outValue = (uint32_t)value;
-        return true;
-    }
-
-    return false;
-}
-
-
-// ─────────────────────────────────────────────────────────────────────────────
 // SinglesNetworkClient::InitMessageHandler @ 0x822EDA08 | size: 0x58
 //
 // Constructor for rage::snConnectionManager::MessageHandler.

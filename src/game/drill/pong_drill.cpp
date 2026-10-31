@@ -133,7 +133,7 @@ struct DrillHudEntry { int32_t value, type; };
 static void SetTrainingHudInteger(DrillTrainingHud* hud, const char* key, int32_t value) {
     uint8_t acquired = hudFlashBase_IsNetworkDirty(hud);
     void* group = hudFlashBase_GetPageGroup(hud);
-    auto* entry = static_cast<DrillHudEntry*>(SinglesNetworkClient_BindEntry(group, key));
+    auto* entry = static_cast<DrillHudEntry*>(swfGetOrCreatePageGroupValue(group, key));
     if (entry) {
         entry->value = value;
         entry->type = 3;
@@ -163,7 +163,7 @@ void hudTrainingHUD_PushArrowDirection(DrillTrainingHud* hud) {
     void* group = hudFlashBase_GetPageGroup(hud);
     int32_t direction = hud->m_arrowDirection;
     auto* entry = static_cast<DrillHudEntry*>(
-        SinglesNetworkClient_BindEntry(group, g_trainingHudArrowKey));
+        swfGetOrCreatePageGroupValue(group, g_trainingHudArrowKey));
     if (entry) {
         entry->value = direction;
         entry->type = 3;

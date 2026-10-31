@@ -1,6 +1,6 @@
 """Real context selection, hash lookup and pooled insertion; compare every write."""
 from specs._swf_group_integrated_inputs import CALLS, setup
-FUNCTION = 'SinglesNetworkClient_BindEntry'
+FUNCTION = 'swfGetOrCreatePageGroupValue'
 ADDRESS = 0x823F9318
 SOURCE = 'src/rage/swf_page_group.cpp'
 TRIALS = 1000

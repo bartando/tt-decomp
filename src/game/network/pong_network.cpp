@@ -917,7 +917,7 @@ setup_network:
     // Find available network message slot
     extern const char g_szMessageType[];  // @ 0x8205DFB0
     uint32_t clientState = *(uint32_t*)((uint8_t*)networkClient + 92);
-    void* messageSlot = SinglesNetworkClient_BindEntry((void*)clientState, g_szMessageType);
+    void* messageSlot = swfGetOrCreatePageGroupValue((void*)clientState, g_szMessageType);
 
     // Initialize message slot if found
     if (messageSlot != nullptr) {

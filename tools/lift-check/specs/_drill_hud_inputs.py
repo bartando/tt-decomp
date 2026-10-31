@@ -23,7 +23,7 @@ def _group(ctx):
 CALLS = {
     'hudFlashBase_IsNetworkDirty': stub(ret=lambda c: state['acquired'], args=('r3',)),
     'hudFlashBase_GetPageGroup': model(_group, args=('r3',)),
-    'SinglesNetworkClient_BindEntry': model(_lookup, args=('r3', 'r4')),
+    'swfGetOrCreatePageGroupValue': model(_lookup, args=('r3', 'r4')),
     'hudFlashBase_PublishPageGroup': stub(ret='void', args=('r3',)),
 }
 
