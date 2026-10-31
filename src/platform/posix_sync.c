@@ -1,4 +1,6 @@
 #include "platform/host_sync.h"
+#include "platform/time_stamp.h"
+#include <time.h>
 #include <pthread.h>
 #include <stdlib.h>
 
@@ -28,4 +30,10 @@ void tt_mutex_destroy(tt_mutex* mutex) {
         free(mutex->state); mutex->state = NULL;
     }
     pthread_mutex_unlock(&initialization_lock);
+}
+
+uint32_t tt_uptime_milliseconds(void) {
+    struct timespec now;
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) abort();
+    return (uint32_t)((uint64_t)now.tv_sec * 1000u + (uint64_t)now.tv_nsec / 1000000u);
 }

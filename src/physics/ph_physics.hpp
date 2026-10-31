@@ -428,7 +428,6 @@ struct phArticulatedCollider {
     void Update();
     void AddForceToJoint(const float* forceVector);
     void ApplyImpulse(void* param1, void* param2, void* param3);
-    void ScalarDestructor();
     void ResetActiveJoints();
     void ApplyScaledGravity(float scale);
     void AccumulateScaledForceX(float scale);
@@ -451,7 +450,7 @@ struct phArticulatedCollider {
     void BuildJointAngularResponse(int boneIndex);
     void DispatchJointSlot12(int jointIndex, float* outVec);
     void DispatchJointSlot7(int jointIndex);
-    void DelegateToBoundCapsule();
+    void DelegateToBoundCapsule(const float* delta);
     void DispatchJointSlot5(int jointIndex);
     float GetJointStiffness(int jointIndex);
     void AccumulateForceAtJoint(const float* forceVec, int boneIndex);
@@ -515,8 +514,7 @@ struct phArticulatedCollider {
     void UpdateChildJoints();
     void ApplyScaledForce(float scaleFactor);
     void SetVelocityAndSync(const float* velocityVec);
-    void SyncAfterBaseUpdate();
-    void Shutdown();
+    void SyncAfterBaseUpdate(const float* velocity);
     void ApplyScaledMatrixRowX(float scale);
     void ApplyScaledMatrixRowY(float scale);
     void ApplyScaledMatrixRowZ(float scale);

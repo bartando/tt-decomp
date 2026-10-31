@@ -51,7 +51,7 @@ if __name__ == "__main__":
         "wrong transition state": ("instance->state = 15", "instance->state = 16"),
         "wrong stopped flag": ("flags & 0x20", "flags & 0x40"),
         "reversed persistence state": ("instance->persistent ? 11 : 19", "instance->persistent ? 19 : 11"),
-        "wrong voice release argument": ("table[3])(voice)", "table[3])(nullptr)"),
+        "wrong voice release target": ("voice->Destroy();", "instance->voice = nullptr;"),
         "wrong spatial mask": ("61, instance->spatialOutput", "60, instance->spatialOutput"),
         "wrong distance": ("parameter, instance->distance", "parameter, 0.0f"),
         "skip parameter update": ("\n    audInstance_UpdateParameters(instance);", "\n    (void)instance;"),
