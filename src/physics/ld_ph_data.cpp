@@ -61,6 +61,9 @@ extern "C" const float g_capsuleInertiaThird = 0.333333343f;
 extern "C" const float g_capsuleVolK1 = 1.33333337f;
 TT_DATA_ALIAS("g_phTaperedCapsuleVolK1", "g_capsuleVolK1");
 
+// @ 0x82079C58 (.rdata) — rotation vector squared-length cutoff
+extern "C" const float g_phRotationMinSquared = 9.99999996e-13f;
+
 // @ 0x8207A04C (.rdata)
 extern "C" const float g_phJoint1Dof_maxCorr = -1.0e+08f;
 

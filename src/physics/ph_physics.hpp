@@ -420,7 +420,7 @@ struct phArticulatedCollider {
     // Non-virtual methods
     void* GetActiveJointsPointer();
     void DelegateToJointProcessor();
-    void DelegateToCapsuleHandler();
+    void ApplyAngularDisplacement(const float* rotationVector); // @ 0x8224FD50
     void DelegateToColliderHandler();
     float GetJointMass(int jointIndex);
     float GetJointInertia(int jointIndex);

@@ -10,6 +10,7 @@
 #include "ph_physics.hpp"
 #include "bound_lookup.hpp"
 #include "articulated_joint.hpp"
+#include "articulated_motion.hpp"
 #include "joint_initialization.hpp"
 #include "rage/math.hpp"
 #include "rage/mat33.hpp"
@@ -117,7 +118,6 @@ extern void phArticulatedCollider_5FE0(void* jointData); // @ 0x82255FE0
 extern void phArticulatedCollider_F0E0(void* collider); // @ 0x8224F0E0
 extern void phArticulatedCollider_8450(void* jointData); // @ 0x82258450
 extern void ph_Sqrtf_joint(rage::phJoint3Dof*, float);
-extern void ph_ApplyAngularVelocity(void* capsule);
 extern void phArticulatedCollider_8A30(void* jointData, const float* velocity); // @ 0x82258A30
 extern void phArticulatedCollider_8B10(void* jointData, const float* angularVelocity); // @ 0x82258B10
 extern void phBoundCapsule_ACB0_p45(void* capsule);
@@ -2081,15 +2081,13 @@ void rage::phArticulatedCollider::DelegateToJointProcessor() {
     phArticulatedCollider_ProcessJoints((void*)(uintptr_t)m_pJointArray);  // +464 (0x1D0)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// phArticulatedCollider::DelegateToCapsuleHandler (vfn_25) @ 0x8224FD50 | size: 0x8
-//
-// Delegates to capsule collision handler.
-// Used for capsule-based collision detection on articulated bodies.
-// ─────────────────────────────────────────────────────────────────────────────
-void rage::phArticulatedCollider::DelegateToCapsuleHandler() {
-    ph_ApplyAngularVelocity((void*)(uintptr_t)m_pJointArray);  // +464 (0x1D0)
+// phArticulatedCollider::ApplyAngularDisplacement @ 0x8224FD50 | size: 0x8
+void rage::phArticulatedCollider::ApplyAngularDisplacement(const float* rotationVector) {
+    phArticulatedCollider_ApplyAngularDisplacement(
+        reinterpret_cast<void*>(uintptr_t(*reinterpret_cast<const uint32_t*>(
+            reinterpret_cast<const uint8_t*>(this) + 0x1D0))), rotationVector);
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // phArticulatedCollider::DelegateToColliderHandler (vfn_59) @ 0x8224F218 | size: 0x8
@@ -9119,6 +9117,77 @@ void ph_IntegrateJointPositions(void* jointData, float timestep) {
 }
 } // namespace rage
 
+extern "C" const float g_phRotationMinSquared; // @ 0x82079C58 — 1e-12
+
+// Rotate in the transposed basis, then transpose back. Each basis W is sourced
+// from the translation row by the original four-lane transpose, not preserved.
+// phArticulatedBody_Rotate @ 0x82258FC0 | size: 0x144
+void phArticulatedBody_Rotate(void* object, const float* rotationVector) {
+    float vector[4];
+    memcpy(vector, rotationVector, sizeof(vector));
+    const float lengthSquared = phDotVmx(vector, vector, 3);
+    if (!(lengthSquared > g_phRotationMinSquared))
+        return;
+    const float length = static_cast<float>(crt_sqrt(lengthSquared));
+    float* basis = static_cast<float*>(object) + 0x90 / 4;
+    float previous[16];
+    memcpy(previous, basis, sizeof(previous));
+    for (unsigned row = 0; row < 3; ++row)
+        for (unsigned lane = 0; lane < 4; ++lane)
+            memcpy(basis + row * 4 + lane, previous + lane * 4 + row, 4);
+
+    const float reciprocal = phFlushVmx(static_cast<float>(1.0 / double(phFlushVmx(length))));
+    const float product = phFlushVmx(reciprocal * phFlushVmx(length));
+    alignas(16) float axis[4];
+    for (unsigned lane = 0; lane < 4; ++lane) {
+        const float residual = phFlushVmx(-(product - phFlushVmx(lbl_825CB7C0[lane])));
+        const float refined = phFlushVmx(phFlushVmx(reciprocal * residual) + reciprocal);
+        axis[lane] = phFlushVmx(phFlushVmx(vector[lane]) * refined);
+    }
+    alignas(16) float rotation[16];
+    rage::mat33RotationNormalizedAxis(rotation, axis, length);
+    rage::mat33ComposeInPlace(basis, rotation);
+    memcpy(previous, basis, sizeof(previous));
+    for (unsigned row = 0; row < 3; ++row)
+        for (unsigned lane = 0; lane < 4; ++lane)
+            memcpy(basis + row * 4 + lane, previous + lane * 4 + row, 4);
+}
+
+// Apply a rotation vector to every body and shift its cached point velocity
+// consistently with the displacement of its origin. Reload the body count and
+// position after the rotation helper, as the original does.
+// phArticulatedCollider_ApplyAngularDisplacement @ 0x82256C28 | size: 0x108
+void phArticulatedCollider_ApplyAngularDisplacement(void* jointData,
+                                                   const float* rotationVector) {
+    uint32_t* data = static_cast<uint32_t*>(jointData);
+    for (int i = 0; i < static_cast<int32_t>(data[1]); ++i) {
+        float* body = reinterpret_cast<float*>(uintptr_t(data[10 + i]));
+        float vector[4], position[4];
+        memcpy(vector, rotationVector, sizeof(vector));
+        memcpy(position, body + 0xC0 / 4, sizeof(position));
+        float displacement[4];
+        for (unsigned lane = 0; lane < 4; ++lane) {
+            const unsigned y = lane < 3 ? (lane + 1) % 3 : 3;
+            const unsigned z = lane < 3 ? (lane + 2) % 3 : 3;
+            const float first = phFlushVmx(phFlushVmx(position[z]) * phFlushVmx(vector[y]));
+            const float second = phFlushVmx(phFlushVmx(position[y]) * phFlushVmx(vector[z]));
+            displacement[lane] = phFlushVmx(-(second - first));
+        }
+        phArticulatedBody_Rotate(body, rotationVector);
+        for (unsigned lane = 0; lane < 4; ++lane)
+            body[0xC0 / 4 + lane] = phFlushVmx(phFlushVmx(body[0xC0 / 4 + lane]) + displacement[lane]);
+        float angular[4], point[3];
+        memcpy(angular, body + 0x130 / 4, sizeof(angular));
+        memcpy(point, body + 0x140 / 4, sizeof(point));
+        for (unsigned lane = 0; lane < 3; ++lane) {
+            const unsigned y = (lane + 1) % 3, z = (lane + 2) % 3;
+            const float product = angular[y] * displacement[z];
+            const float correction = __builtin_fmaf(angular[z], displacement[y], -product);
+            body[0x140 / 4 + lane] = correction + point[lane];
+        }
+    }
+}
+
 // Multiply the symmetric spatial tensor (three 3x4 blocks A, B, C) by a
 // vector pair: first = B^T * first + A * second, second = B * second + C * first.
 // Preserve the original four stages of loads/stores, including aliased inputs.
@@ -10758,16 +10827,6 @@ void phBoundCapsule_5138_g(void* out, const void* a, const void* b) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// phBoundCapsule_6C28_fw @ 0x82256C28 | size: 0x108
-//   Iterates the capsule list at r3 (m_nCount at +4, m_ppArray at +40) and,
-//   for each sub-capsule, rotates the input vector by the capsule's local
-//   basis and accumulates into the capsule's +320 'torque' triple.  Full
-//   lift deferred.
-// ─────────────────────────────────────────────────────────────────────────────
-void phBoundCapsule_6C28_fw(void* capsuleList, const void* vec) {
-    (void)capsuleList; (void)vec;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // phBoundOTGrid::Collide* — 2D/3D slab intersection tests.

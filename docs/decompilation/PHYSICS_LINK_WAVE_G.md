@@ -1,8 +1,8 @@
 # Physics link wave G — completed and remaining
 
-This pass addresses 19 of the 85 ABI entries supplied in `/tmp/tt-wave-G/physics.txt`.
-It adds 30 original PPC routines (15 are dependencies absent from that list).
-The 66 entries below were not addressed by this pass.
+This pass addresses 20 of the 85 ABI entries supplied in `/tmp/tt-wave-G/physics.txt`.
+It adds 32 original PPC routines (16 are dependencies absent from that list).
+The 65 entries below were not addressed by this pass.
 
 ## Completed
 
@@ -213,12 +213,35 @@ Verification and limits:
 - Native compilation succeeds; these completed names are absent from the
   remaining link errors. This is emulator verification, not console testing.
 
-## Remaining input entries (66)
+## Continuation — angular displacement and body rotation
+
+- Replaced the empty, misnamed `rage::phBoundCapsule_6C28_fw`
+  (`0x82256C28`) with `phArticulatedCollider_ApplyAngularDisplacement`.
+  It rotates each body, applies its position cross term and corrects cached
+  point velocity using the original rounded VMX/scalar fused operations.
+- Lifted `phArticulatedBody_Rotate` (`0x82258FC0`) using the existing normalized
+  axis rotation and matrix composition lifts. Both four-lane transposes and
+  the reciprocal refinement are retained. The cutoff also skips unordered
+  squared length, matching PPC's `ble` branch.
+- Corrected the caller at `0x8224FD50` to forward rotation vector r4 and read
+  joint-data from confirmed offset +1D0. Removed missing `ph_ApplyAngularVelocity`
+  declaration and the old no-argument caller spelling.
+- Specs `ph_articulated_body_rotate`, `ph_articulated_apply_angular_displacement`
+  and `ph_articulated_angular_displacement_caller` cover thresholds, nonfinite
+  inputs, signed counts, repeated bodies, live vector aliases, matrix W writes,
+  point corrections and all guards; all pass seeds 1 and 2
+  (600 / 400 / 200 trials per seed).
+  All finite float32 results compare exactly; NaN/zero encodings may differ.
+- `_articulated_rotation_mutations.py` covers threshold, normalization,
+  transposes, displacement/point signs, scalar fusion and caller dispatch;
+  all 12 mutations are caught as behavioral failures.
+- Reciprocal estimates follow the checker's true reciprocal; hardware estimate
+  bits and FP exception flags remain outside this emulator proof.
+
+## Remaining input entries (65)
 
 Next gameplay targets confirmed in `.text.s` (not lifted in this batch):
-`ph_ApplyAngularVelocity` is the empty, misnamed `rage::phBoundCapsule_6C28_fw`
-(`0x82256C28`), actually taking an additional vector in r4 and depending on
-`0x82258FC0`. The delta/reset helpers are `0x822577F0` / `0x82257918`, calling
+The delta/reset helpers are `0x822577F0` / `0x82257918`, calling
 `0x822571C8` / `0x82257368`. `phJoint_ApplyDelta` is `0x82257A30`; r6 is an output
 matrix pointer, despite the current `int` declaration/caller parameter.
 
@@ -268,7 +291,6 @@ matrix pointer, despite the current `int` declaration/caller parameter.
 - `ph_3760(void*, void*, void*, int, int, int)`
 - `ph_3760_4(void*, unsigned int, unsigned int, unsigned int)`
 - `ph_9BC0(void*)`
-- `ph_ApplyAngularVelocity(void*)`
 - `ph_CollideShapeAgainstWorld(unsigned int, unsigned int, int, int)`
 - `ph_DebugAssertPositive(char const*, double)`
 - `ph_ProfilerBegin(char const*, int)`
