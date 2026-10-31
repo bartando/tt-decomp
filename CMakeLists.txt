@@ -205,6 +205,7 @@ set(SOURCES
     src/game/network/pong_network.cpp
     src/game/network/pong_network_classes.cpp
     src/game/network/pong_network_io.cpp
+    src/game/network/network_timestamp.cpp
     src/game/network/score_payload.cpp
     src/game/network/network_context.cpp
     src/game/network/msg_msg_sink.cpp

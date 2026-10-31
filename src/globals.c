@@ -977,3 +977,6 @@ TT_DATA_ALIAS("g_swfZero", "g_kZero");
 TT_DATA_ALIAS("g_grcHalf", "g_lookAtRefAngle");
 // Both declarations are native device pointers, initially null in the image.
 TT_DATA_ALIAS("lbl_825EB988", "g_binkVideoPlayer"); // @ 0x825EB988
+
+// Shared retail timestamp formatting scratch. @ 0x8271A978
+char g_networkTimestampLogBuffer[50];
