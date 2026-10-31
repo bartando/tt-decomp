@@ -105,7 +105,7 @@ set(SOURCES
     src/rage/audio/xaudio_effect_buffer.cpp
     src/rage/audio/xaudio_effect.cpp
     src/rage/audio/xaudio_resampler.cpp
-    src/rage/core/fsmMachine.c
+    src/rage/core/fsmMachine.cpp
     src/rage/core/app_init.c
     src/rage/core/game_loop.c
     src/rage/core/hsm.cpp
@@ -176,6 +176,7 @@ set(SOURCES
     src/game/ball/ball_audio_envelope.cpp
     src/game/ball/ball_audio_impact.cpp
     src/game/ball/ball_flight.cpp
+    src/game/ball/ball_shot_initialize.cpp
     src/game/ball/ball_shot.cpp
     src/game/ball/ball_shot_solve.cpp
     src/game/ball/ball_shot_trajectory.cpp
@@ -213,6 +214,7 @@ set(SOURCES
     src/game/network/pong_network_classes.cpp
     src/game/network/pong_network_io.cpp
     src/game/network/network_timestamp.cpp
+    src/game/network/round_robin_state.cpp
     src/game/network/score_payload.cpp
     src/game/network/network_context.cpp
     src/game/network/msg_msg_sink.cpp
@@ -284,6 +286,7 @@ set(SOURCES
     src/graphics/grc_debug_strings.cpp
     src/graphics/grc_gpu_hang.cpp
     src/graphics/grc_cache.cpp
+    src/graphics/grc_state_helpers.cpp
     src/graphics/grc_command_stream.cpp
     src/graphics/grc_device.cpp
     src/graphics/grc_gpu_resources.cpp

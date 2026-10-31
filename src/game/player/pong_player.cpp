@@ -1,3 +1,5 @@
+#include "game/network_timestamp.hpp"
+#include "rage/ptr32.hpp"
 #include "rage/float_approach.hpp"
 /**
  * pongPlayer — Player state query functions
@@ -3145,33 +3147,28 @@ float pongPlayer_D238_g(void* self) {  // @ 0x820DD238
 /**
  * pongPlayer_1510_g(void* self)
  *
- * Processes a network client wrapper object.  Loads the inner object from
- * self+12, calls its virtual Process method (vtable slot 2) which returns
- * a float, stores that result at inner+12, then calls
- * SinglesNetworkClient_BE30_g(inner+16, 50) to update the network client.
- *
- * Returns: pointer to the network client sub-object (inner+16).
+ * Samples the clock referenced at self+12 through its slot-2 virtual.
+ * Caches that float at clock+12 and formats it into the buffer at clock+16.
+ * Returns the formatted buffer.
  */
-extern void SinglesNetworkClient_BE30_g(void* client, int param);  // @ 0x8239BE30
 
-void* pongPlayer_1510_g(void* self) {  // @ 0x82391510
-    uint8_t* base = reinterpret_cast<uint8_t*>(self);
-    void* innerObj = *reinterpret_cast<void**>(base + 12);
-    uint8_t* inner = reinterpret_cast<uint8_t*>(innerObj);
+namespace {
+struct PlayerClockSource {
+    virtual void Destroy() = 0;
+    virtual void Reset() = 0;
+    virtual float GetTime() = 0;
+};
+}
 
-    // Call vtable slot 2 (Process) on inner object — returns float
-    void** innerVtable = *reinterpret_cast<void***>(inner);
-    typedef float (*ProcessFn)(void*);
-    float result = reinterpret_cast<ProcessFn>(innerVtable[2])(innerObj);
-
-    // Store process result to inner+12
-    *reinterpret_cast<float*>(inner + 12) = result;
-
-    // Update network client at inner+16 with frame count param 50
-    void* netClient = reinterpret_cast<void*>(inner + 16);
-    SinglesNetworkClient_BE30_g(netClient, 50);
-
-    return netClient;
+// @ 0x82391510 | size: 0x5C
+void* pongPlayer_1510_g(void* self) {
+    auto* inner = rage::load_ptr32<PlayerClockSource>(self, 12);
+    const float value = inner->GetTime();
+    auto* bytes = reinterpret_cast<uint8_t*>(inner);
+    *reinterpret_cast<float*>(bytes + 12) = value;
+    auto* destination = reinterpret_cast<char*>(bytes + 16);
+    networkFormatElapsedTime(destination, 50, value);
+    return destination;
 }
 
 
@@ -6223,7 +6220,6 @@ extern void* g_game_state_ptr;       // @ 0x8271A2F8
 extern void* g_networkTimingObject;  // @ 0x8271A328
 
 // @ 0x82391480 — cached timestamp text for log lines.
-extern const char* util_1480(void* clock, int slot);
 // @ 0x821D3860 — records a named transition on the game state object.
 extern void game_3860(void* gameState, int kind, const char* name);
 // @ 0x82198A48 — StartServe's query callback: *answer = io_Input_poll_9D68 && +0x17EC != 0.
@@ -6795,7 +6791,7 @@ void shotTarget_AdjustAimDepthForBall(shotTargetLayout* target, const pongBallBo
 void pongPlayer_Serve(pongPlayer* player)
 {
     pongPlayerServeLayout* self = ServeLayout(player);
-    nop_8240E6D0("pongPlayer::Serve() %s", util_1480(g_networkTimingObject, 0));
+    nop_8240E6D0("pongPlayer::Serve() %s", networkClockTimestamp(g_networkTimingObject, 0));
 
     pongBallBody* ball = pongPlayer_GetServeBallBody(player);
     pongPlayer_PlaceBallInHand(player, ball);
@@ -6852,7 +6848,7 @@ void pongPlayer_Serve(pongPlayer* player)
 void pongPlayer_StartServe(pongPlayer* player)
 {
     pongPlayerServeLayout* self = ServeLayout(player);
-    nop_8240E6D0("pongPlayer::StartServe() %s", util_1480(g_networkTimingObject, 0));
+    nop_8240E6D0("pongPlayer::StartServe() %s", networkClockTimestamp(g_networkTimingObject, 0));
 
     if (io_Input_poll_9D68(g_pInputArrayTable) != 0) {
         self->field_17E8 = FLT_MAX;  // @ 0x82079AD8
@@ -6884,7 +6880,7 @@ void pongPlayer_StartServe(pongPlayer* player)
 void pongPlayer_SetupServe(pongPlayer* player)
 {
     pongPlayerServeLayout* self = ServeLayout(player);
-    nop_8240E6D0("pongPlayer::SetupServe %s", util_1480(g_networkTimingObject, 0));
+    nop_8240E6D0("pongPlayer::SetupServe %s", networkClockTimestamp(g_networkTimingObject, 0));
 
     pongShotRecord& shot = PlayerShotEntries()[self->playerIndex].shot;
     if (shot.shotType != 3)

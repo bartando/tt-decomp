@@ -1,3 +1,6 @@
+#include "../ball/ball_predict.hpp"
+#include "rage/ptr32.hpp"
+#include "rage/fsmMachine.hpp"
 #include "game/network_context.hpp"
 #include "rage/sys_callback.hpp"
 /**
@@ -790,7 +793,6 @@ void NetDataQuery_Destroy(NetDataQuery* self, int flags) {
     self->vtable = (void**)&NetDataQuery_vtable;
 
     // Call fsmMachine base destructor
-    extern void fsmMachine_Destructor_27A8(void* obj);
     fsmMachine_Destructor_27A8(self);
 
     // If bit 0 is set in flags, free the object memory
@@ -819,7 +821,6 @@ void NetDataQuery_InitNested(NetDataQuery* self) {
     // Initialize nested state object at offset +1508
     void** stateObj = (void**)((char*)self + 1508);
     *stateObj = (void**)&NetDataQuery_vtable;
-    extern void fsmMachine_Destructor_27A8(void* obj);
     fsmMachine_Destructor_27A8(stateObj);
     
     // Initialize state machine member at offset +1392
@@ -1057,18 +1058,16 @@ void NetDataQuery_InitStateSync(NetDataQuery* self) {
 }
 
 void NetDataQuery_InitNetworkStats(void* obj) {
-    extern void game_5128(void* obj);
-
     uint8_t* p = (uint8_t*)obj;
 
     extern void* NetworkStats_vtable;  /* 0x8206F500 (RTTI: HitDataMessage) */
-    *(void**)p = &NetworkStats_vtable;
+    *reinterpret_cast<rage::ptr32<void>*>(p) = &NetworkStats_vtable;
 
     // Store default timestamp at +4
     *(float*)(p + 4) = g_defaultTimestamp;
 
     // Initialize sub-object at +16
-    game_5128(p + 16);
+    ballPredict_InitialiseShot(reinterpret_cast<bpShot*>(p + 16));
 
     // Store default timeout at +208
     *(float*)(p + 208) = g_defaultTimeout;
@@ -1276,7 +1275,6 @@ void NetStateSync_Destroy(NetStateSync* self, int flags) {
     self->vtable = (void**)&NetStateSync_vtable;
     
     // Call fsmMachine base destructor
-    extern void fsmMachine_Destructor_27A8(void* obj);
     fsmMachine_Destructor_27A8(self);
     
     // If bit 0 is set in flags, free the object memory
@@ -1456,16 +1454,12 @@ uint8_t NetStateSync_GetName(NetStateSync* self, int stateIndex) {
 // External function declarations
 ////////////////////////////////////////////////////////////////////////////////
 
-// fsmMachine destructor — implemented in src/rage/fsmMachine.c
-void fsmMachine_Destructor_27A8(void* obj);
-
 // Network/rendering subsystem initializers
 void grcDevice_FinalizeRenderSetup_1(void* obj);
 void SinglesNetworkClient_51C8_g(void* obj);
 void SinglesNetworkClient_2E88_isl(void* obj);
 void SinglesNetworkClient_DA08(void* obj);
 void util_AA38(void* obj);
-void game_5128(void* obj);
 
 // Thread assertion
 void rage_AssertMainThread();
