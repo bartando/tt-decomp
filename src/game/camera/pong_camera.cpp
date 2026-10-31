@@ -377,89 +377,9 @@ bool pongCameraMgr::TryTransitionMode5_Variant3(void* gameState) {
     return pongCameraMgr_3650_fw(this, gameState, 5);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// pongCameraMgr::ValidateAndClampTransition()  @ 0x821F3500
-// Core transition validation with clamping logic
-// ─────────────────────────────────────────────────────────────────────────────
-bool pongCameraMgr::ValidateAndClampTransition(void* gameState, int mode) {
-    // Load current camera value (stored at offset 0, overlapping with vtable in union)
-    float currentValue = *(float*)this;
-    
-    // Load threshold constant
-    extern float g_cameraThreshold;  // @ 0x825C5EC0
-    float threshold = g_cameraThreshold;
-    
-    // Clamp value to threshold range using fsel pattern
-    float diffMin = threshold - currentValue;
-    float diffMax = currentValue - threshold;
-    
-    float clampedMin = (diffMin >= 0.0f) ? currentValue : threshold;
-    float clampedMax = (diffMax >= 0.0f) ? currentValue : threshold;
-    
-    // Prepare validation parameters
-    TransitionParams params;
 
-    params.value = clampedMin;
-    params.vtableOrState = *(uint32_t*)this;
 
-    uint8_t validationResult = pongCameraMgr_6E08(gameState, &params, mode, nullptr, 0);
-    
-    if (validationResult != 0) {
-        float modifiedValue = params.value;
-        
-        if (modifiedValue <= clampedMax) {
-            // Value is within range, store it
-            *(float*)this = modifiedValue;
-            return true;
-        }
-    }
-    
-    return false;
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// pongCameraMgr::ValidateAndClampTransitionWithFlags()  @ 0x821F3650
-// Transition validation with explicit flag parameters
-// ─────────────────────────────────────────────────────────────────────────────
-bool pongCameraMgr::ValidateAndClampTransitionWithFlags(void* gameState, int mode) {
-    // Load current camera value
-    float currentValue = *(float*)this;
-    
-    // Load threshold constant
-    extern float g_cameraThreshold;  // @ 0x825C5EC0
-    float threshold = g_cameraThreshold;
-    
-    // Clamp value to threshold range
-    float diffMin = threshold - currentValue;
-    float diffMax = currentValue - threshold;
-    
-    float clampedMin = (diffMin >= 0.0f) ? currentValue : threshold;
-    float clampedMax = (diffMax >= 0.0f) ? currentValue : threshold;
-    
-    // Prepare validation parameters with explicit flags
-    TransitionParams params;
-    TransitionFlags flags;
-
-    params.value = clampedMin;
-    params.vtableOrState = *(uint32_t*)this;
-
-    flags.flag1 = 3;
-    flags.flag2 = 1;
-
-    uint8_t validationResult = pongCameraMgr_6E08(gameState, &params, mode, &flags, 1);
-    
-    if (validationResult != 0) {
-        float modifiedValue = params.value;
-        
-        if (modifiedValue <= clampedMax) {
-            // Value is within range, store it
-            *(float*)this = modifiedValue;
-            return true;
-        }
-    }
-    
-    return false;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // pongCameraMgr::ValidateAndAdjustTransition()  @ 0x821F3780

@@ -8,7 +8,7 @@ from liftcheck.spec import *
 
 FUNCTION = "pongMover_GetInputSpeed"
 ADDRESS = 0x820CB4D0
-SOURCE = "src/game/creature/pong_creature.cpp"
+SOURCE = "src/game/creature/mover_input_speed.cpp"
 TRIALS = 600
 EXTERNS = {"g_pInputArrayTable": 0x825EAB28, "g_gameDataMgr": 0x8271A2E4}
 

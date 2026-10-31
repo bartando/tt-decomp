@@ -1,3 +1,4 @@
+#include "rage/ptr32.hpp"
 #include "game/camera_queries.hpp"
 /**
  * pong_camera_helpers.cpp
@@ -24,136 +25,152 @@ extern float g_cameraThreshold;
 extern uint8_t pg_ApplyTransition(void* gameState, TransitionParams* params,
                                   int mode, TransitionFlags* flags, int enable);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// pongCameraMgr_6E08 @ 0x82216E08 | size: 0x15C
-//
-// Core camera transition engine. Takes a pongCameraMgr-like state object
-// and a parameter block; walks the camera-slot ring buffer looking for the
-// matching slot, dispatches pongCameraMgr_5CE8_2hr on the hit, then writes
-// the resolved value back into params->value.
-//
-// Register map (from recomp):
-//   r3 = self, r4 = params, r5 = mode, r6 = flags, r7 = enable
-//   self+16 = m_slotLimit  (loop-break value)
-//   self+24 = m_slotStart  (ring head)
-//   self+28 = m_slotCount  (modulus)
-//   self+12 = m_slotData   (slot array base)
-//
-// Because the callsites in pong_camera.cpp treat this as "validate +
-// possibly update params->value", and the synthetic no-op stub short-circuits
-// the entire transition pipeline, we preserve the original contract: return
-// zero unless a match fires. The long-form ring-walk isn't reachable without
-// the referenced callees (pongCameraMgr_5CE8_2hr) being lifted.
-// ─────────────────────────────────────────────────────────────────────────────
-uint8_t pongCameraMgr_6E08(void* self, TransitionParams* params,
-                                      int /*mode*/, void* /*flags*/, int /*enable*/) {
-    if (!self || !params) return 0;
+// A transition is an eight-byte key, mode, and a slice of the condition ring.
+struct CameraTransitionEntry {
+    TransitionParams key;
+    int32_t mode;
+    int32_t firstCondition;
+    int32_t numConditions;
+};
+static_assert(sizeof(CameraTransitionEntry) == 20, "transition entry stride");
 
-    const uint8_t* mgr = static_cast<const uint8_t*>(self);
-    uint32_t limit    = *reinterpret_cast<const uint32_t*>(mgr + 16);
-    uint32_t head     = *reinterpret_cast<const uint32_t*>(mgr + 24);
-    uint32_t count    = *reinterpret_cast<const uint32_t*>(mgr + 28);
-    const float* data = *reinterpret_cast<const float* const*>(mgr + 12);
+extern "C" void* g_pReplayStateData; // @ 0x8271A2EC
 
-    if (count == 0 || data == nullptr) return 0;
+namespace {
+struct CameraConditionRing {
+    uint8_t unused00[8];
+    rage::ptr32<TransitionFlags> entries; // +0x08
+    uint32_t unused0C;
+    int32_t capacity;                    // +0x10
+};
+struct CameraTransitionRing {
+    uint8_t unused00[0x0C];
+    rage::ptr32<CameraTransitionEntry> entries;
+    int32_t end;                        // +0x10
+    uint32_t unused14;
+    int32_t head;                       // +0x18
+    int32_t capacity;                   // +0x1C
+};
+static_assert(offsetof(CameraConditionRing, capacity) == 0x10, "condition ring layout");
+static_assert(offsetof(CameraTransitionRing, capacity) == 0x1C, "transition ring layout");
+int32_t ringRemainder(int32_t index, int32_t capacity) {
+    if (capacity == 0 || (index == (-2147483647 - 1) && capacity == -1))
+        __builtin_trap();
+    return index % capacity;
+}
+int32_t nextRingIndex(int32_t index, int32_t capacity) {
+    return ringRemainder(static_cast<int32_t>(static_cast<uint32_t>(index) + 1u), capacity);
+}
+bool conditionEqual(const TransitionFlags& event, const TransitionFlags& required) {
+    if (event.flag1 != required.flag1) return false;
+    if (event.flag1 >= 1 && event.flag1 <= 5) return event.flag2 == required.flag2;
+    if (event.flag1 != 6) return false;
+    float a, b;
+    __builtin_memcpy(&a, &event.flag2, sizeof a);
+    __builtin_memcpy(&b, &required.flag2, sizeof b);
+    return a == b;
+}
+}
 
-    // Phase 1: find a slot whose stored value is < params->value.
-    const float pv = params->value;
-    uint32_t cursor = head;
-    while (cursor != limit) {
-        uint32_t idx = cursor + cursor * 4;  // rlwinm *2,0,29 — stride 12 floats
-        // Continue scanning until the inequality fires; we bail here because
-        // the match case needs pongCameraMgr_5CE8_2hr (not yet lifted).
-        if (data[idx] >= pv) break;
-        cursor = (cursor + 1) % count;
+// Every required condition must occur in the entry's event slice. Conditions
+// 1..5 compare integer bits; condition 6 compares float values (including NaNs).
+// @ 0x82215CE8 | size: 0x120
+uint8_t pongCameraMgr_5CE8(const CameraTransitionEntry* entry,
+                          const TransitionFlags* required, int requiredCount) {
+    if (required == nullptr || requiredCount <= 0) return 1;
+    const int32_t eventCount = entry->numConditions;
+    const auto* replay = static_cast<const uint8_t*>(g_pReplayStateData);
+    for (int i = 0; i < requiredCount; ++i) {
+        bool found = false;
+        if (eventCount > 0) {
+            const auto* ring = rage::load_ptr32<CameraConditionRing>(replay, 0x68D1C);
+            const auto* events = ring->entries.get();
+            const int32_t capacity = ring->capacity;
+            uint32_t index = static_cast<uint32_t>(entry->firstCondition);
+            for (int n = 0; n < eventCount; ++n, ++index) {
+                const int32_t offset = ringRemainder(static_cast<int32_t>(index), capacity);
+                if (conditionEqual(events[offset], required[i])) {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        if (!found) return 0;
     }
+    return 1;
+}
 
-    // Without the 5CE8_2hr dispatch the original would return 0.
+// Find the first eligible time, then search that suffix for a matching mode
+// and condition slice. The output's second word stays unchanged.
+// @ 0x82216E08 | size: 0x15C
+uint8_t pongCameraMgr_6E08(void* object, TransitionParams* key,
+                          int mode, void* flags, int requiredCount) {
+    const auto* ring = static_cast<const CameraTransitionRing*>(object);
+    const int32_t end = ring->end;
+    const int32_t capacity = ring->capacity;
+    int32_t cursor = ring->head;
+    while (cursor != end) {
+        const auto* entries = ring->entries.get();
+        if (entries[cursor].key.value >= key->value) break;
+        cursor = nextRingIndex(cursor, capacity);
+    }
+    if (cursor == end) return 0;
+    const auto* entries = ring->entries.get();
+    while (cursor != end) {
+        const auto* entry = entries + cursor;
+        if (entry->mode == mode && pongCameraMgr_5CE8(entry,
+                static_cast<const TransitionFlags*>(flags), requiredCount) != 0) {
+            key->value = entry->key.value;
+            return 1;
+        }
+        cursor = nextRingIndex(cursor, capacity);
+    }
     return 0;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// pongCameraMgr_3500_fw @ 0x821F3500 | size: 0x9C
-//
-// Lifted from recomp: reads the current float at self+0, computes clamp
-// bounds against g_cameraThreshold using fsel, calls pongCameraMgr_6E08,
-// and on success writes params->value back into self+0 iff value <= upper.
-// Returns true iff the update fires.
-// ─────────────────────────────────────────────────────────────────────────────
-bool pongCameraMgr_3500_fw(pongCameraMgr* self, void* gameState, int mode) {
-    if (!self) return false;
-
-    float current = *reinterpret_cast<float*>(self);
-    float thresh  = g_cameraThreshold;
-
-    float lower = (thresh - current >= 0.0f) ? current : thresh;
-    float upper = (current - thresh >= 0.0f) ? current : thresh;
-
-    TransitionParams params;
-    params.value         = lower;
-    params.vtableOrState = *reinterpret_cast<uint32_t*>(self);
-
-    uint8_t ok = pongCameraMgr_6E08(gameState, &params, mode, nullptr, -1);
-    if (ok == 0) return false;
-    if (params.value > upper) return false;
-
-    *reinterpret_cast<float*>(self) = params.value;
+// @ 0x821F3500 | size: 0x9C
+bool pongCameraMgr_3500_fw(pongCameraMgr* self, void* evaluator, int mode) {
+    const float current = *reinterpret_cast<const float*>(self);
+    const float threshold = g_cameraThreshold;
+    const float lower = threshold - current >= 0.0f ? current : threshold;
+    const float upper = current - threshold >= 0.0f ? current : threshold;
+    TransitionParams key;
+    __builtin_memcpy(&key, self, sizeof key);
+    key.value = lower;
+    if (pongCameraMgr_6E08(evaluator, &key, mode, nullptr, -1) == 0 || key.value > upper)
+        return false;
+    *reinterpret_cast<float*>(self) = key.value;
     return true;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// pongCameraMgr_35A0_fw @ 0x821F35A0 | size: 0xAC
-// pongCameraMgr_3650_fw @ 0x821F3650 | size: 0xAC
-//
-// Identical clamp-and-dispatch pattern as 3500_fw, but with a pre-populated
-// TransitionFlags block on the stack:
-//   3500: flags = {3, 0}
-//   35A0: flags = {3, 1}
-// Both pass flags through to pongCameraMgr_6E08. Our 6E08 ignores the flag
-// block today (the match path is disabled), so the difference collapses.
-// ─────────────────────────────────────────────────────────────────────────────
+// @ 0x821F35A0 | size: 0xAC
 bool pongCameraMgr_35A0_fw(pongCameraMgr* self, void* gameState, int mode) {
-    if (!self) return false;
-
-    float current = *reinterpret_cast<float*>(self);
-    float thresh  = g_cameraThreshold;
-
-    float lower = (thresh - current >= 0.0f) ? current : thresh;
-    float upper = (current - thresh >= 0.0f) ? current : thresh;
-
+    const float current = *reinterpret_cast<const float*>(self);
+    const float threshold = g_cameraThreshold;
+    const float lower = threshold - current >= 0.0f ? current : threshold;
+    const float upper = current - threshold >= 0.0f ? current : threshold;
     TransitionParams params;
-    params.value         = lower;
-    params.vtableOrState = *reinterpret_cast<uint32_t*>(self);
-
-    TransitionFlags flags = { 3u, 0u };
-
-    uint8_t ok = pongCameraMgr_6E08(gameState, &params, mode, &flags, 1);
-    if (ok == 0) return false;
-    if (params.value > upper) return false;
-
+    __builtin_memcpy(&params, self, sizeof params);
+    params.value = lower;
+    TransitionFlags flags = {3u, 0u};
+    if (pongCameraMgr_6E08(gameState, &params, mode, &flags, 1) == 0 || params.value > upper)
+        return false;
     *reinterpret_cast<float*>(self) = params.value;
     return true;
 }
 
+// @ 0x821F3650 | size: 0xAC
 bool pongCameraMgr_3650_fw(pongCameraMgr* self, void* gameState, int mode) {
-    if (!self) return false;
-
-    float current = *reinterpret_cast<float*>(self);
-    float thresh  = g_cameraThreshold;
-
-    float lower = (thresh - current >= 0.0f) ? current : thresh;
-    float upper = (current - thresh >= 0.0f) ? current : thresh;
-
+    const float current = *reinterpret_cast<const float*>(self);
+    const float threshold = g_cameraThreshold;
+    const float lower = threshold - current >= 0.0f ? current : threshold;
+    const float upper = current - threshold >= 0.0f ? current : threshold;
     TransitionParams params;
-    params.value         = lower;
-    params.vtableOrState = *reinterpret_cast<uint32_t*>(self);
-
-    TransitionFlags flags = { 3u, 1u };
-
-    uint8_t ok = pongCameraMgr_6E08(gameState, &params, mode, &flags, 1);
-    if (ok == 0) return false;
-    if (params.value > upper) return false;
-
+    __builtin_memcpy(&params, self, sizeof params);
+    params.value = lower;
+    TransitionFlags flags = {3u, 1u};
+    if (pongCameraMgr_6E08(gameState, &params, mode, &flags, 1) == 0 || params.value > upper)
+        return false;
     *reinterpret_cast<float*>(self) = params.value;
     return true;
 }

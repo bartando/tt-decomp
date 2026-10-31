@@ -92,13 +92,6 @@ uint32_t g_nScreenWidth = 1280;
 void* g_nonWsConfig = NULL;
 
 
-/* Shader constant data table @ 0x8202C328 (.rdata, 440 bytes)
- * Used by grc_CB48 for GPU shader constant initialization */
-const uint8_t g_shaderConstantData[440] = {
-    /* This is a placeholder - actual data would need to be extracted from binary */
-    0
-};
-
 // ============================================================================
 // Render Loop Globals
 // ============================================================================
@@ -977,3 +970,6 @@ TT_DATA_ALIAS("g_swfZero", "g_kZero");
 TT_DATA_ALIAS("g_grcHalf", "g_lookAtRefAngle");
 // Both declarations are native device pointers, initially null in the image.
 TT_DATA_ALIAS("lbl_825EB988", "g_binkVideoPlayer"); // @ 0x825EB988
+
+// Shared retail timestamp formatting scratch. @ 0x8271A978
+char g_networkTimestampLogBuffer[50];

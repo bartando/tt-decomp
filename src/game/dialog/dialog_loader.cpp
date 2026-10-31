@@ -61,7 +61,7 @@ extern "C" void xmlTree_LoadFromPath(void* tree, const char* filename,
 
 // atString 1024-char copy helper used to widen the line into the final
 // diagnostic message buffer.
-extern "C" void rage_atStringCopy(char* dst, const char* src, int cap);   // @ 0x82228990
+#include "rage/localized_text.hpp"
 
 // atSingleton tracked-destroy for the xmlTree factory shim stored at
 // sp+96 during the load.
@@ -241,7 +241,7 @@ void LoadDialogData(dialogData* pDialogTable) {
         std::snprintf(hdr, sizeof(hdr), g_str_dialog_negativeCountHdr, slot);
 
         char msgBuf[1024];
-        rage_atStringCopy(msgBuf, hdr, static_cast<int>(sizeof(msgBuf)));
+        rage_atStringCopy(hdr, msgBuf, static_cast<int>(sizeof(msgBuf)));
 
         rage_PrintDebugLine(g_str_dialog_invalidLineCount,
                             pDialogTable->m_lineCount[slot],

@@ -73,6 +73,8 @@ set(SOURCES
     # XAM (Xbox Application Model)
     src/xam/audio.c
     src/xam/input.c
+    src/platform/time_stamp.cpp
+    src/xam/time_stamp.cpp
     src/platform/host_imports.cpp
     src/platform/audio_frame.cpp
     src/platform/host_xma.cpp
@@ -118,6 +120,8 @@ set(SOURCES
     src/rage/memory/rage_memory.cpp
     src/rage/memory/singleton_array.cpp
     src/rage/memory/sysMemSimpleAllocator.cpp
+    src/rage/data/localized_text.cpp
+    src/rage/data/localized_text_data.cpp
     src/rage/data/parameter_node.cpp
     src/rage/io/rage_par.cpp
     src/rage/io/rage_stream_manager.cpp
@@ -134,6 +138,10 @@ set(SOURCES
     src/rage/hud_page_group.cpp
     src/rage/swf_page_group.cpp
     src/rage/swf_vm.cpp
+    src/rage/swf_value_helpers.cpp
+    src/rage/swf_text.cpp
+    src/rage/swf_bounds.cpp
+    src/rage/swf_action_copy.cpp
     src/rage/swf_clip_events.cpp
     src/rage/core/timer.cpp
     src/rage/core/rage_core_utils.cpp
@@ -163,6 +171,7 @@ set(SOURCES
     src/game/audio/pong_audio.cpp
     src/game/audio/pong_audio_effects.cpp
     src/game/ball/pong_ball.cpp
+    src/game/ball/ball_splash.cpp
     src/game/ball/ball_audio_emitters.cpp
     src/game/ball/ball_audio_envelope.cpp
     src/game/ball/ball_audio_impact.cpp
@@ -203,6 +212,7 @@ set(SOURCES
     src/game/network/pong_network.cpp
     src/game/network/pong_network_classes.cpp
     src/game/network/pong_network_io.cpp
+    src/game/network/network_timestamp.cpp
     src/game/network/score_payload.cpp
     src/game/network/network_context.cpp
     src/game/network/msg_msg_sink.cpp
@@ -238,6 +248,7 @@ set(SOURCES
     src/game/pong_render.cpp
     src/game/match/hsm_log_strings.cpp
     src/game/match/pong_match.cpp
+    src/game/match/match_ai_array.cpp
     src/game/match/replay_state_publish.cpp
     src/game/match/lvl_table.cpp
     src/game/match/pong_states.cpp
@@ -274,6 +285,7 @@ set(SOURCES
     src/graphics/grc_debug_strings.cpp
     src/graphics/grc_gpu_hang.cpp
     src/graphics/grc_cache.cpp
+    src/graphics/grc_state_helpers.cpp
     src/graphics/grc_command_stream.cpp
     src/graphics/grc_device.cpp
     src/graphics/grc_gpu_resources.cpp
@@ -433,6 +445,17 @@ if(TT_BUILD_PLATFORM_TESTS)
         target_link_libraries(tt_host_contract_test pthread)
         add_test(NAME host_sdk_contracts COMMAND tt_host_contract_test)
     endif()
+    add_executable(tt_timestamp_test tests/host_timestamp_test.cpp
+        src/platform/time_stamp.cpp src/xam/time_stamp.cpp)
+    target_compile_options(tt_timestamp_test PRIVATE -UNDEBUG)
+    if(WIN32)
+        target_sources(tt_timestamp_test PRIVATE src/platform/win32.c)
+        target_link_libraries(tt_timestamp_test ntdll "${TT_WINPTHREAD_STATIC}")
+    else()
+        target_sources(tt_timestamp_test PRIVATE src/platform/posix_sync.c)
+        target_link_libraries(tt_timestamp_test pthread)
+    endif()
+    add_test(NAME host_timestamp COMMAND tt_timestamp_test)
     add_test(NAME host_synchronization COMMAND tt_platform_test)
 endif()
 install(TARGETS ${PROJECT_NAME}

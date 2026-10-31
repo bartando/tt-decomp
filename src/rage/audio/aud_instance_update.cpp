@@ -1,7 +1,26 @@
 #include <cstddef>
 #include <cstdint>
+#include "rage/ptr32.hpp"
 
 namespace rage {
+
+// XACT cue interface. No virtual destructor: retail has one entry per SDK
+// method, with Stop/GetState/Destroy at slots 1/2/3.
+class audCue {
+public:
+    virtual void Reserved0() = 0;
+    virtual void Stop(uint32_t flags) = 0;
+    virtual void GetState(uint32_t* flags) = 0;
+    virtual void Destroy() = 0;
+    virtual void Reserved4() = 0;
+    virtual void Reserved5() = 0;
+    virtual void Reserved6() = 0;
+    virtual void Reserved7() = 0;
+    virtual uint32_t GetVariableIndex(const char* name) = 0;
+    virtual void SetVariable(uint32_t index, float value) = 0;
+    virtual void Reserved10() = 0;
+    virtual void Pause(uint32_t paused) = 0;
+};
 
 struct audInstanceSpatialInput {
     uint8_t reserved[28];
@@ -9,9 +28,8 @@ struct audInstanceSpatialInput {
     uint8_t remaining[84];
 };
 
-// The backend interface is only known at the slots used by this update.
 struct audInstance {
-    void* voice;
+    ptr32<audCue> voice;
     uint8_t state;
     uint8_t persistent;
     uint8_t spatial;
@@ -27,17 +45,18 @@ struct audInstance {
 };
 
 static_assert(sizeof(audInstanceSpatialInput) == 124);
-static_assert(sizeof(void*) != 4 || offsetof(audInstance, volume) == 28);
-static_assert(sizeof(void*) != 4 || offsetof(audInstance, spatialInput) == 96);
-static_assert(sizeof(void*) != 4 || offsetof(audInstance, distance) == 252);
+static_assert(offsetof(audInstance, volume) == 28);
+static_assert(offsetof(audInstance, spatialInput) == 96);
+static_assert(offsetof(audInstance, distance) == 252);
 
 extern uint8_t g_audListener[]; // @ 0x825EE258
 extern const char g_audDistanceParameter[]; // @ 0x8203B4E8
+extern const char g_audPitchParameter[]; // @ 0x8203B4E0
 extern void audCalculateSpatial(uint8_t*, uint8_t*, int, uint8_t*); // @ 0x82481920
 extern void audInstance_UpdateParameters(audInstance*); // @ 0x821AF860
 
-extern audInstance* g_audInstancePool2000[16]; // @ 0x825EE658
-extern audInstance* g_audInstancePool4000[240]; // @ 0x825EE298
+extern ptr32<audInstance> g_audInstancePool2000[16]; // @ 0x825EE658
+extern ptr32<audInstance> g_audInstancePool4000[240]; // @ 0x825EE298
 extern const char g_audInvalidXactCommand[]; // @ 0x8203B2B0
 extern "C" void nop_8240E6D0(const char*, ...); // @ 0x8240E6D0
 extern void aud_F098(audInstance*, uint32_t, uint32_t, uint32_t, uint32_t,
@@ -55,7 +74,7 @@ extern void aud_FD10(audInstance*, float); // @ 0x821AFD10
 void audXactSound_ProcessCommand(uint32_t command, const uint32_t* params) { // @ 0x821AEAE0
     uint32_t opcode = command & 0xffff;
     auto getInstance = [&]() {
-        return (opcode < 0x4000 ? g_audInstancePool2000 : g_audInstancePool4000)[params[0]];
+        return (opcode < 0x4000 ? g_audInstancePool2000 : g_audInstancePool4000)[params[0]].get();
     };
 
     switch (opcode) {
@@ -127,23 +146,52 @@ void audXactSound_ProcessCommand(uint32_t command, const uint32_t* params) { // 
     }
 }
 
+// @ 0x821AF5F0
+void aud_F5F0(audInstance* instance) {
+    if (!instance->voice) return;
+    uint32_t flags;
+    instance->voice->GetState(&flags);
+    if ((flags & 0x30u) == 0) instance->voice->Pause(1);
+}
+
+// @ 0x821AF670
+void aud_F670(audInstance* instance) {
+    if (!instance->voice) return;
+    uint32_t flags;
+    instance->voice->GetState(&flags);
+    if ((flags & 0x30u) == 0) instance->voice->Pause(0);
+}
+
+// @ 0x821AF6F0
+void aud_F6F0(audInstance* instance) {
+    if (!instance->voice) return;
+    uint32_t flags;
+    instance->voice->GetState(&flags);
+    if ((flags & 0x30u) == 0) instance->voice->Stop(0);
+}
+
+// @ 0x821AFD10
+void aud_FD10(audInstance* instance, float pitch) {
+    if (!instance->voice) return;
+    const uint32_t index = instance->voice->GetVariableIndex(g_audPitchParameter);
+    if (static_cast<uint16_t>(index) != 0xFFFFu) instance->voice->SetVariable(index, pitch);
+}
+
 // Poll an active voice, handle its state transitions and update its 3D mix.
 void audInstance_Update(audInstance* instance) { // @ 0x821AFD90
-    void* voice = instance->voice;
+    audCue* voice = instance->voice.get();
     if (!voice) return;
 
-    auto table = *reinterpret_cast<void***>(voice);
     uint32_t flags;
-    reinterpret_cast<void (*)(void*, uint32_t*)>(table[2])(voice, &flags);
+    voice->GetState(&flags);
     if (instance->state == 14 && (flags & 4)) {
         instance->state = 15;
         return;
     }
     if (flags & 0x20) {
-        voice = instance->voice;
+        voice = instance->voice.get();
         if (voice) {
-            table = *reinterpret_cast<void***>(voice);
-            reinterpret_cast<void (*)(void*)>(table[3])(voice);
+            voice->Destroy();
             instance->voice = nullptr;
         }
         instance->state = instance->persistent ? 11 : 19;
@@ -153,13 +201,10 @@ void audInstance_Update(audInstance* instance) { // @ 0x821AFD90
 
     audCalculateSpatial(g_audListener, reinterpret_cast<uint8_t*>(&instance->spatialInput),
                         61, instance->spatialOutput);
-    voice = instance->voice;
-    table = *reinterpret_cast<void***>(voice);
-    uint32_t parameter = reinterpret_cast<uint32_t (*)(void*, const char*)>(table[8])(
-        voice, g_audDistanceParameter);
-    voice = instance->voice;
-    table = *reinterpret_cast<void***>(voice);
-    reinterpret_cast<void (*)(void*, uint32_t, float)>(table[9])(voice, parameter, instance->distance);
+    voice = instance->voice.get();
+    uint32_t parameter = voice->GetVariableIndex(g_audDistanceParameter);
+    voice = instance->voice.get();
+    voice->SetVariable(parameter, instance->distance);
     audInstance_UpdateParameters(instance);
 }
 
