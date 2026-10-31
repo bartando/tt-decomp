@@ -1,8 +1,8 @@
 # Physics link wave G — completed and remaining
 
-This pass addresses 18 of the 85 ABI entries supplied in `/tmp/tt-wave-G/physics.txt`.
-It adds 29 original PPC routines (15 are dependencies absent from that list).
-The 67 entries below were not addressed by this pass.
+This pass addresses 19 of the 85 ABI entries supplied in `/tmp/tt-wave-G/physics.txt`.
+It adds 30 original PPC routines (15 are dependencies absent from that list).
+The 66 entries below were not addressed by this pass.
 
 ## Completed
 
@@ -183,10 +183,44 @@ Verification and limits:
   `ph_joint_chain_constructor` and `ph_joint_four_block_constructor` pass seeds
   1 and 2 (400, 400, 40 and 200 trials respectively).
 - `_joint_initialization_mutations.py` checks callback traversal, record writes,
-  both element/block strides, counts, flags and reset dispatch.
+  both element/block strides, counts, flags and reset dispatch; all 16 mutations are caught behaviorally.
 - Native compilation succeeds; remaining unrelated symbols still prevent linking.
 
-## Remaining input entries (67)
+## Continuation — capsule inertia and hidden result ABI
+
+- Replaced the zero-fill `ph_1B78` stub with `phCapsule_ComputeInertia`
+  (`0x82411B78`): mass in f1, radius in f2, cylinder full length in f3,
+  and diagonal inertia output in r6. Rounded products and fused sums match PPC.
+  Constants are named image globals; there are no guest-address casts.
+- Consolidated the two incorrect lifts of `0x822A3258` (`GetSupportPoint` and
+  `GetExtents`) into `rage::phBoundCapsule::ComputeInertia`. The missing
+  `ph_1B78_3` spelling was an incompatible declaration of that same core.
+- Corrected `0x8233AD38` to `rage::phBoundTaperedCapsule::ComputeInertia`.
+  Both shape methods return a three-float inertia vector: the PPC hidden result
+  pointer is r3, receiver r4, and mass f1. Geometry loads are +70/+80 for the
+  capsule and +70/+90 for the tapered variant.
+- The third original direct caller, `0x822DE24C`, explicitly supplies r6 output
+  independently of r3. The core therefore retains its r6 contract; r3-r5 are
+  unused. No existing C++ implementation of that caller was found.
+- Specs `ph_capsule_inertia`, `ph_bound_capsule_inertia` and
+  `ph_bound_tapered_capsule_inertia` pass seeds 1 and 2 (600, 400, 400 trials).
+  They cover sphere limit, zero/negative mass, degenerate/negative geometry,
+  nonfinite values, overlapping shape/result and untouched W/guard words.
+  Finite float32 comparisons are exact; equivalent NaNs/zeros are permitted.
+- `_capsule_inertia_mutations.py` checks the old zero stub, mass, polynomial,
+  fused rounding, per-axis scaling, geometry fields and wrapper arguments;
+  all 14 mutations are caught behaviorally.
+- Native compilation succeeds; these completed names are absent from the
+  remaining link errors. This is emulator verification, not console testing.
+
+## Remaining input entries (66)
+
+Next gameplay targets confirmed in `.text.s` (not lifted in this batch):
+`ph_ApplyAngularVelocity` is the empty, misnamed `rage::phBoundCapsule_6C28_fw`
+(`0x82256C28`), actually taking an additional vector in r4 and depending on
+`0x82258FC0`. The delta/reset helpers are `0x822577F0` / `0x82257918`, calling
+`0x822571C8` / `0x82257368`. `phJoint_ApplyDelta` is `0x82257A30`; r6 is an output
+matrix pointer, despite the current `int` declaration/caller parameter.
 
 - `_phDemoWorld_67D0_g`
 - `_ph_2E08`
@@ -230,7 +264,6 @@ Verification and limits:
 - `phObject_ReleaseSavedField(void*)`
 - `phObject_ReleaseStreamContext(void*)`
 - `phObject_WriteValue(void*, unsigned int)`
-- `ph_1B78_3(void*, float, float)`
 - `ph_1EF8(void*, unsigned int, unsigned int, unsigned char*, unsigned int, unsigned char*, unsigned int, unsigned int)`
 - `ph_3760(void*, void*, void*, int, int, int)`
 - `ph_3760_4(void*, unsigned int, unsigned int, unsigned int)`

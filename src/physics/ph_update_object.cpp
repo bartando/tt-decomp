@@ -544,14 +544,43 @@ void ph_snprintf(char* buf, int size, const char* fmt, const char* str,
     }
 }
 
-// ── ph_1B78 — capsule support-point generator ─────────────────────────────
-// Inputs: this, halfHeight (f2), radius (f3), outputVec3* (r6).
-// Writes a zeroed vec3 — the arithmetic path populates all three lanes with
-// the same scaled constant (see recomp — three stfs to r6+0/+4/+8 of the
-// same f0), so an aggregate clear approximates the observable contract.
-void ph_1B78(void* /*this_*/, float /*halfHeight*/, float /*radius*/,
-             void* outVec3) {
-    if (outVec3) std::memset(outVec3, 0, 12);
+extern "C" const float g_capsuleVolK1; // @ 0x82079BD0 — 4/3
+extern "C" const float g_capsuleInertiaRadialK; // @ 0x82079BCC — 8/5
+extern "C" const float g_capsuleInertiaMixedK; // @ 0x82079BC8 — 9/4
+extern "C" const float g_capsuleInertiaAxialK; // @ 0x82079BC4 — 16/15
+extern "C" const float g_capsuleInertiaThird; // @ 0x825C806C — 1/3
+extern "C" const float g_phClampMax; // @ 0x8202D108 — 1
+extern "C" const float g_phTwo; // @ 0x8202D10C — 1/2
+extern "C" float g_phCapsuleShapeK; // @ 0x825C8080 — 1/4
+
+// Capsule inertia about its center, with the cylinder on the Y axis. Preserve
+// each rounded product and fused sum; length is the cylinder's full length.
+// phCapsule_ComputeInertia @ 0x82411B78 | size: 0x9C
+void phCapsule_ComputeInertia(void*, const void*, void*, float* output,
+                             float mass, float radius, float length) {
+    const float radiusSquared = radius * radius;
+    const float lengthSquared = length * length;
+    const float denominator = __builtin_fmaf(radius, g_capsuleVolK1, length);
+    const float radiusCubed = radiusSquared * radius;
+    const float lengthSquaredRadius = lengthSquared * radius;
+    const float axialLength = __builtin_fmaf(radius, g_capsuleInertiaAxialK, length);
+    const float lengthCubed = lengthSquared * length;
+    const float radiusSquaredLength = radiusSquared * length;
+    const float inverseDenominator = g_phClampMax / denominator;
+    const float radialTerm = __builtin_fmaf(radiusCubed, g_capsuleInertiaRadialK,
+                                            lengthSquaredRadius);
+    const float axialNumerator = axialLength * radiusSquared;
+    const float lengthTerm = __builtin_fmaf(lengthCubed, g_phCapsuleShapeK, radialTerm);
+    const float normalizedAxial = axialNumerator * inverseDenominator;
+    const float transverseNumerator = __builtin_fmaf(radiusSquaredLength,
+                                                     g_capsuleInertiaMixedK, lengthTerm);
+    const float axialMass = normalizedAxial * mass;
+    const float normalizedTransverse = transverseNumerator * inverseDenominator;
+    output[1] = axialMass * g_phTwo;
+    const float transverseMass = normalizedTransverse * mass;
+    const float transverse = transverseMass * g_capsuleInertiaThird;
+    output[0] = transverse;
+    output[2] = transverse;
 }
 
 // ── ph_A330 — slot-7 thunk: forward to ph_A2A0, optional self-free ─────────
@@ -665,8 +694,6 @@ extern "C" void ke_DispatchPhysics(void* /*state*/) {}
 
 extern "C" const float lbl_825C5938; // @ 0x825C5938 — disabled sentinel, -1
 extern "C" const float g_kPercentScale[3]; // @ 0x8202D118 — first word is 100
-extern "C" float g_phCapsuleShapeK; // @ 0x825C8080 — default, 0.25
-extern "C" const float g_phClampMax; // @ 0x8202D108 — 1
 
 // Reset each 64-byte record and its common parameters. The original copies
 // three uninitialized scratch W lanes per record; preserve those padding words

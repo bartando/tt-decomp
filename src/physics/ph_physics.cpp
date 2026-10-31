@@ -103,7 +103,6 @@ extern void  phBoundCapsule_CopyEntries(void* a, void* b, int count);
 extern void  phBoundCapsule_9DA0_2h(void* a, void* b, int count);
 extern void  phBoundCapsule_F5F8_p39(void* data);
 extern void  phBoundCapsule_ForwardToSink_9C78_1(void* a, void* b, int count);
-extern void  ph_1B78(void* thisPtr, float f2, float f3, void* r6);
 extern void phArticulatedCollider_UpdateJointTransforms(void* activeJoints);
 extern void phArticulatedCollider_ProcessJoints(void* collider);
 extern void phArticulatedCollider_60F8(void* jointData, float linearLimit, float angularLimit, float timestep); // @ 0x822560F8
@@ -3922,15 +3921,15 @@ void rage::phBoundCapsule::UpdateBound() {
     fn(displayObj, matIdx);
 }
 
-// ---------------------------------------------------------------------------
-// 5. phBoundCapsule::GetSupportPoint (vfn_9) @ 0x822A3258 | size: 0x10
-//    Loads halfHeight (+112) and radius (+128) from the capsule, then
-//    tail-calls ph_1B78 to compute a support point.
-// ---------------------------------------------------------------------------
-void rage::phBoundCapsule::GetSupportPoint(void* direction, void* outPoint) {
-    float radius     = *(float*)&this->m_fRadius;       // +0x80
-    float halfHeight = *(float*)&this->m_pVertices;  // +0x70 (halfHeight for capsule)
-    ph_1B78(this, halfHeight, radius, outPoint);
+// phBoundCapsule::ComputeInertia @ 0x822A3258 | size: 0x10
+// r3 is the hidden result buffer, r4 the shape, and f1 the mass.
+rage::phInertiaDiagonal rage::phBoundCapsule::ComputeInertia(float mass) const {
+    const uint8_t* shape = reinterpret_cast<const uint8_t*>(this);
+    const float radius = *reinterpret_cast<const float*>(shape + 0x70);
+    const float length = *reinterpret_cast<const float*>(shape + 0x80);
+    phInertiaDiagonal result;
+    phCapsule_ComputeInertia(nullptr, nullptr, nullptr, result.xyz, mass, radius, length);
+    return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -8360,7 +8359,6 @@ void rage::phArticulatedCollider::AccumulateTorqueAtRootJoint(const float* force
 // ═════════════════════════════════════════════════════════════════════════════
 
 // External declarations
-extern void ph_1B78_3(void* outVec, float halfLength, float radius);
 extern void util_DA50(void* dst, const void* src);  // phBound::CopyFrom base
 extern void* g_display_obj_ptr;
 
@@ -8382,19 +8380,6 @@ uint32_t rage::phBoundCapsule::GetPolygonCount() const {
 // ─────────────────────────────────────────────────────────────────────────────
 void rage::phBoundCapsule::SetPolygonCount(uint32_t count) {
     this->m_nMaterialIndex = count;  // +0xC0 (reused as polygon count)
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// phBoundCapsule::GetExtents (vfn_9) @ 0x822A3258 | size: 0x10
-//
-// Computes the bounding extents of the capsule and stores them in the
-// output vector. Reads the half-length (+112) and radius (+128), then
-// tail-calls ph_1B78 which builds the axis-aligned extents vector.
-// ─────────────────────────────────────────────────────────────────────────────
-void rage::phBoundCapsule::GetExtents(float* outExtents, const void* params) {
-    float halfLength = *(float*)((char*)params + 112);
-    float radius = *(float*)((char*)params + 128);
-    ph_1B78_3(outExtents, halfLength, radius);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -10045,7 +10030,6 @@ int phInst_1488_sp(void* /*unused*/, uint32_t* outSize)
 
 extern const float g_phTaperedCapsuleVolK1;  // @ 0x82079BD0 (.rdata) 4/3; vfn_3/vfn_37 load 0.5 @ 0x8202D10C instead
 extern const float g_phTaperedCapsuleVolK2;  // @ 0x82079B30 (.rdata) pi
-extern void  ph_1B78(void* dst, void* src, float radius, float halfLen);
 extern void* g_phBoundTaperedCapsuleUpdateImpl; // @ 0x826066E4: object pointer, slot 5 of *its* vtable is called
 // Shared phBound helpers (deferred to ph_math consolidation batch).
 extern void phBound_TransformWorldCentroid(void* self, const float* matrix); // @ 0x8228D0E8
@@ -10085,17 +10069,14 @@ float phBoundTaperedCapsule::GetVolume() {
     return ((term * r) * r) * scl;
 }
 
-/**
- * phBoundTaperedCapsule::GetSupportPoint @ 0x8233AD38 | size: 0x10
- * Delegates to ph_1B78 with the direction-vector in r4 supplying the
- * two tapered radii (+0x70 and +0x90) as geometry parameters.
- */
-void phBoundTaperedCapsule::GetSupportPoint(void* direction, void* outPoint) {
-    phBoundTaperedCapsule* src = reinterpret_cast<phBoundTaperedCapsule*>(direction);
-    const float halfLen = src->m_fRadiusB;   // +0x90
-    const float radius  = src->m_fRadiusA;   // +0x70
-    ph_1B78(this, direction, radius, halfLen);
-    (void)outPoint;
+// phBoundTaperedCapsule::ComputeInertia @ 0x8233AD38 | size: 0x10
+phInertiaDiagonal phBoundTaperedCapsule::ComputeInertia(float mass) const {
+    const uint8_t* shape = reinterpret_cast<const uint8_t*>(this);
+    const float radius = *reinterpret_cast<const float*>(shape + 0x70);
+    const float length = *reinterpret_cast<const float*>(shape + 0x90);
+    phInertiaDiagonal result;
+    phCapsule_ComputeInertia(nullptr, nullptr, nullptr, result.xyz, mass, radius, length);
+    return result;
 }
 
 /**
