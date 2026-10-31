@@ -107,7 +107,15 @@ static inline float NextRandomBits() {
 
 extern "C" int _snprintf(char* buffer, size_t count, const char* format, ...);
 extern void PostPageGroupMessageFmt(uint32_t messageId, uint32_t mask, const char* format, ...);  // @ 0x8225E480
-extern int  RoundHalfAwayFromZero(float value);                                       // @ 0x8210CB88
+// @ 0x8210CB88 — fadds/fsubs round to float before truncating toward zero.
+int RoundHalfAwayFromZero(float value) {
+    float rounded = value >= 0.0f ? value + 0.5f : value - 0.5f;
+    // fctiwz saturates overflow and produces INT_MIN for NaN. Avoid C++'s
+    // undefined float-to-int conversion outside the representable range.
+    if (rounded != rounded || rounded < -2147483648.0f) return INT32_MIN;
+    if (rounded >= 2147483648.0f) return INT32_MAX;
+    return static_cast<int32_t>(rounded);
+}
 extern void hudTrainingHUD_SetCompleted(DrillTrainingHud* hud, int count);            // @ 0x822FA818
 extern void hudTrainingHUD_SetTimeLow(DrillTrainingHud* hud, bool low);               // @ 0x822FA878
 // Pushes the HUD's +0xB8 as "arrow_direction". Every caller passes 0 in r4;
@@ -224,6 +232,40 @@ bool pongTrainingDrill::IsFinished(bool* pPassed) {
     }
     *pPassed = m_numSuccesses >= m_pConfig->m_minNumSuccesses;
     return true;
+}
+
+// gmBallRobot singleton: NextAttempt publishes the drill's mode byte.
+struct DrillRobotView {
+    uint8_t _pad00[0x220];
+    uint8_t m_mode;
+};
+extern DrillRobotView* g_pBallRobot;  // @ 0x826063A4
+extern void hudTrainingHUD_SetRemaining(DrillTrainingHud* hud, int count); // @ 0x822FA7B8
+
+/**
+ * pongTrainingDrill::NextAttempt
+ * @ 0x8210D128 | size: 0x164
+ */
+void pongTrainingDrill::NextAttempt(int count) {
+    if (GetDrillTypeIndex() != 5 && m_numAttempts > 0 &&
+        m_prevSuccesses == m_numSuccesses && !m_completionFlag) {
+        // The original leaves r6 unspecified for this three-argument message.
+        NotifyUIEvent(0x5009, 0x40, 0, 0);
+        m_completionFlag = 1;
+    }
+    m_prevSuccesses = m_numSuccesses;
+    m_numAttempts = static_cast<int32_t>(static_cast<uint32_t>(m_numAttempts) + count);
+    m_completionFlag = 0;
+    g_pBallRobot->m_mode = GetRobotMode();
+    ApplyTargetSet();
+    hudTrainingHUD_SetRemaining(g_pTrainingHud, m_pConfig->m_totalNumTries - m_numAttempts + 1);
+    if (UseAlternateAttemptEvent()) {
+        NotifyUIEvent(0x23, 0x40, 0, 0);
+    } else {
+        NotifyUIEvent(0x0F, 0x40, 0, 0);
+        NotifyUIEvent(0x24, 0x40, 0, 0);
+    }
+    NotifyUIEvent(0x5005, 0x40, 0, 0);
 }
 
 /**
@@ -535,6 +577,49 @@ void pongTrainingDrill::OnRallyEnd(void* pRallyEvent) {
     float fRange  = fMax - fMin;
     float fResult = fRange * fNormalized + fMin;
     *(float*)((uint8_t*)pRallyEvent + 128) = fResult;
+}
+
+/**
+ * pongTrainingDrill::ChooseRobotTarget (slot 31)
+ * @ 0x8210D8B0 | size: 0x230
+ *
+ * Easy shots use the first centered target, then alternate among three
+ * configured pairs, with ProbSameShot allowing a repeat of the previous one.
+ */
+void pongTrainingDrill::ChooseRobotTarget(void* event) {
+    struct TargetPair { uint32_t x, z; };
+    const TargetPair* targets = reinterpret_cast<const TargetPair*>(
+        reinterpret_cast<const uint8_t*>(m_pConfig) + 0x48);
+    TargetPair* output = reinterpret_cast<TargetPair*>(static_cast<uint8_t*>(event) + 0x100);
+    if (m_numAttempts <= m_pConfig->m_numEasyShots) {
+        for (int i = 0; i < 3; ++i) {
+            float x;
+            __builtin_memcpy(&x, &targets[i].x, sizeof(x));
+            if (x == 0.0f) {
+                m_targetIndex = i;
+                *output = targets[i];
+                return;
+            }
+        }
+        rage_debugLog("pongTrainingDrill::ChooseRobotTarget() - unable to find centered target, pick first one");
+        m_targetIndex = 0;
+    } else {
+        int previous = static_cast<int32_t>(m_targetIndex);
+        if (previous >= 0 && NextRandomBits() * g_fPrngNormalize < m_pConfig->m_probSameShot) {
+            *output = targets[m_targetIndex];
+            return;
+        }
+        int choices[3], count = 0;
+        for (int i = 0; i < 3; ++i) {
+            if (i != previous) choices[count++] = i;
+        }
+        // The choice draw uses 31 low bits, unlike the 23-bit probability draw.
+        uint64_t next = static_cast<uint64_t>(g_prngState[0]) * 0x5CDCFAA7u + g_prngState[1];
+        g_prngState[0] = static_cast<uint32_t>(next);
+        g_prngState[1] = static_cast<uint32_t>(next >> 32);
+        m_targetIndex = choices[(g_prngState[0] & 0x7FFFFFFFu) % count];
+    }
+    *output = targets[m_targetIndex];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

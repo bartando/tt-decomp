@@ -852,6 +852,7 @@ void* g_pCamShotMgr = NULL;          // @ 0x8271A318  atSingleton<camShotMgr> in
 void* g_pCameraSharedState = NULL;   // @ 0x8271A32C  camera state gameplay reads (+0x06 CameraHasSides)
 
 // Drills
+void* g_pBallRobot = NULL;      // @ 0x826063A4  runtime-initialised by swing practice
 void* g_pPracticeTarget = NULL;  // @ 0x826063A8  runtime-initialised (0x821020D8 stores it)
 void* g_pTrainingHud    = NULL;  // @ 0x82606614  runtime-initialised
 void* g_gdDrillMovementData_classId = &g_gdDrillMovementData_classId;  // @ 0x825C6BC4  type token, see g_aiTypeId_3
