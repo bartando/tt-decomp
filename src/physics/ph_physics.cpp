@@ -11,6 +11,7 @@
 #include "bound_lookup.hpp"
 #include "articulated_joint.hpp"
 #include "rage/math.hpp"
+#include "rage/mat33.hpp"
 
 extern "C" void* rage_alloc(uint32_t size);  // RAGE heap alloc (defined in heap.c)
 
@@ -9073,6 +9074,72 @@ void phArticulatedCollider_RestoreVelocities(void* jointData) {
         }
     }
 }
+
+// Rodrigues rotation with the solver's scalar product/FMA ordering. All axis
+// components are captured before stores; row padding and final W stay untouched.
+// phArticulatedCollider_BuildRotation @ 0x82256D98 | size: 0xF8
+void phArticulatedCollider_BuildRotation(void*, float* out, const float* axis, double angle) {
+    const float cosine = static_cast<float>(crt_cos(angle));
+    const float sine = static_cast<float>(crt_sin(angle));
+    const float x = axis[0], y = axis[1], z = axis[2];
+    const float yy = y * y, yz = z * y, zz = z * z, xx = x * x;
+    const float scale = g_phClampMax - cosine;
+    const float xs = x * scale;
+    const float yzScale = yz * scale;
+    const float xyScale = y * xs, xzScale = z * xs;
+    const float sinX = x * sine, sinY = y * sine, sinZ = z * sine;
+    out[0] = __builtin_fmaf(xx, scale, cosine);
+    out[1] = xyScale - sinZ;
+    out[2] = sinY + xzScale;
+    out[5] = __builtin_fmaf(yy, scale, cosine);
+    out[4] = sinZ + xyScale;
+    out[6] = yzScale - sinX;
+    out[8] = xzScale - sinY;
+    out[9] = sinX + yzScale;
+    out[10] = __builtin_fmaf(zz, scale, cosine);
+    out[12] = out[13] = out[14] = g_phZeroFloat;
+}
+
+extern "C" const float lbl_825CB7C0[4]; // @ 0x825CB7C0 — (1, 1, 1, 0)
+extern "C" const float g_phBoundSphere_DirEps; // @ 0x82079B10 — angular speed squared threshold
+
+namespace rage {
+// Integrate positions and (above the angular threshold) rotate each body's
+// basis about its normalized angular velocity. VMX multiplies/adds round and
+// flush separately; the reciprocal's Newton step retains its masked W lane.
+// ph_IntegrateJointPositions @ 0x82256968 | size: 0x1D8
+void ph_IntegrateJointPositions(void* jointData, float timestep) {
+    uint32_t* data = static_cast<uint32_t*>(jointData);
+    for (int i = 0; i < static_cast<int32_t>(data[1]); ++i) {
+        float* body = reinterpret_cast<float*>(uintptr_t(data[10 + i]));
+        float angular[4];
+        memcpy(angular, body + 0x120 / 4, sizeof(angular));
+        const float lengthSquared = phDotVmx(angular, angular, 3);
+        for (unsigned lane = 0; lane < 4; ++lane) {
+            const float step = phFlushVmx(phFlushVmx(body[0x110 / 4 + lane]) * phFlushVmx(timestep));
+            body[0xC0 / 4 + lane] = phFlushVmx(step + phFlushVmx(body[0xC0 / 4 + lane]));
+        }
+        if (!(lengthSquared > g_phBoundSphere_DirEps))
+            continue;
+        const float speed = static_cast<float>(crt_sqrt(lengthSquared));
+        const float inverse = phFlushVmx(static_cast<float>(1.0 / static_cast<double>(speed)));
+        const float product = phFlushVmx(inverse * phFlushVmx(speed));
+        float axis[4];
+        for (unsigned lane = 0; lane < 4; ++lane) {
+            const float residual = phFlushVmx(-(product - phFlushVmx(lbl_825CB7C0[lane])));
+            const float refined = phFlushVmx(phFlushVmx(inverse * residual) + inverse);
+            axis[lane] = phFlushVmx(phFlushVmx(angular[lane]) * refined);
+        }
+        alignas(16) float rotation[16];
+        phArticulatedCollider_BuildRotation(jointData, rotation, axis, speed * timestep);
+        alignas(16) float transform[16], previous[16];
+        memcpy(previous, body + 0x90 / 4, sizeof(previous));
+        memcpy(transform, rotation, sizeof(transform));
+        mat33ComposeInPlace(transform, previous);
+        memcpy(body + 0x90 / 4, transform, 48);
+    }
+}
+} // namespace rage
 
 // Shift all body velocities by the root's change, preserving relative motion.
 // phArticulatedCollider_8A30 @ 0x82258A30 | size: 0xE0

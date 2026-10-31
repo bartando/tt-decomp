@@ -33,6 +33,23 @@ float flushRotationVmx(float value) {
 
 } // namespace
 
+// mat33ComposeInPlace (was phJoint_3BC8_g) @ 0x820C3BC8 | size: 0xA4
+void mat33ComposeInPlace(float* matrix, const float* rotation) {
+    float left[12], right[16], result[12];
+    __builtin_memcpy(left, matrix, sizeof(left));
+    __builtin_memcpy(right, rotation, sizeof(right));
+    for (unsigned row = 0; row < 3; ++row) {
+        for (unsigned col = 0; col < 3; ++col) {
+            double sum = 0.0;
+            for (unsigned k = 0; k < 3; ++k)
+                sum += static_cast<double>(flushRotationVmx(left[row * 4 + k])) * flushRotationVmx(right[k * 4 + col]);
+            result[row * 4 + col] = flushRotationVmx(static_cast<float>(sum));
+        }
+        __builtin_memcpy(result + row * 4 + 3, left + row * 4, 4);
+    }
+    __builtin_memcpy(matrix, result, sizeof(result));
+}
+
 // Formerly phBoundCapsule_40A8_g / phBoundCapsule::TransformByDirection.
 // Row-vector Rodrigues formula. fmuls rounds the square/scaled axis first;
 // fmadds/fmsubs fuse only the final multiply and add/subtract. Reload the axis

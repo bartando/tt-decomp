@@ -2,6 +2,10 @@
 
 namespace rage {
 
+// Compose the xyz basis in place; translation stays untouched. VMX shuffles
+// leave each input row's raw X bits in that output row's W lane.
+void mat33ComposeInPlace(float* matrix, const float* rotation); // @ 0x820C3BC8
+
 // Write the xyz entries of three 16-byte rows, preserving padding. Axis is an
 // aligned vec4 and need not be normalized; it may be null when angle is zero.
 // Output and axis must be disjoint. The original accepts a double angle in f1.
