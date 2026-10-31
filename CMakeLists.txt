@@ -317,6 +317,7 @@ set(SOURCES
     src/graphics/grc_resource_release.cpp
     src/graphics/grc_state_helpers.cpp
     src/graphics/grc_command_stream.cpp
+    src/graphics/grc_command_reserve.cpp
     src/graphics/grc_device.cpp
     src/graphics/grc_gpu_resources.cpp
     src/graphics/fx_billboard.cpp

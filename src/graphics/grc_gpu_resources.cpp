@@ -828,7 +828,6 @@ void grcDevice_FlushDirtySixteenRegisterGroups(void* device, uint64_t dirty, uin
 
 extern uint32_t KeGetCurrentProcessType(); // @ 0x82585E9C
 extern uint32_t xe_GetCurrentThreadId(); // @ 0x82566B78
-extern void rage_AA78(void* device, uint32_t* fence); // @ 0x8235AA78
 extern const uint32_t __imp_VdGlobalDevice; // @ 0x82000730
 extern const uint32_t __imp_VdGlobalXamDevice; // @ 0x82000734
 

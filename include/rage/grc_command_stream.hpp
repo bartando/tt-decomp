@@ -19,3 +19,8 @@ uint32_t* grcDevice_WriteRegisterRunOverflow(void* device, uint32_t* cursor,
 
 extern "C" void grcDevice_FlushDirtyRegisterGroup(void* device, uint64_t dirty,
     uint32_t firstRegister, const uint32_t* values); // @ 0x82362658
+
+extern "C" void grcDevice_UseEmergencyCommandBuffer(void* device); // @ 0x82359D38
+extern "C" void* rage_A150(void* device, uint32_t words); // @ 0x8235A150
+extern "C" void rage_AD98(void* device); // @ 0x8235AD98
+extern "C" void rage_AA78(void* device, uint32_t* fence); // @ 0x8235AA78

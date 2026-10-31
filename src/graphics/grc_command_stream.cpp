@@ -7,7 +7,6 @@ extern "C" uint32_t KeGetCurrentProcessType(); // @ 0x82585E9C
 extern const uint32_t __imp_VdGlobalDevice;    // @ 0x82000730
 extern const uint32_t __imp_VdGlobalXamDevice; // @ 0x82000734
 extern "C" uint32_t xe_GetCurrentThreadId(); // @ 0x82566B78
-extern "C" void rage_AA78(void* device, uint32_t* handle); // @ 0x8235AA78
 extern uint32_t g_grcThreadCommandTracking; // @ 0x8260663C
 extern "C" uint32_t KfAcquireSpinLock(void* lock); // @ 0x825862CC
 extern "C" void KfReleaseSpinLock(void* lock, uint32_t irql); // @ 0x825862EC
@@ -15,7 +14,6 @@ extern "C" void* rage_9C88(void* list, void* commands, uint32_t wordCount,
                            uint32_t gpuAddress); // @ 0x82359C88
 extern "C" void phInst_A340_p42(void* device, const uint32_t* packet, uint32_t flags); // @ 0x8235A340
 extern "C" void* phInst_A6A8_p42(void* device, void* cursor); // @ 0x8235A6A8
-extern "C" void rage_A150(void* device, uint32_t flags); // @ 0x8235A150
 extern "C" void grc_5E08(void* device, const void* rect); // @ 0x82355E08
 extern "C" void rage_6858(void* device, uint32_t index, const float* plane); // @ 0x82356858
 extern "C" void rage_7A20(uint32_t context); // @ 0x82367A20

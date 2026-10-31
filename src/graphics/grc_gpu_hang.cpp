@@ -1,3 +1,4 @@
+#include "grc/gpu_hang.hpp"
 #include "grc/progress_state.h"
 /**
  * graphics/grc_gpu_hang.cpp — D3D Xenon GPU hang diagnostic printer
@@ -330,7 +331,7 @@ struct D3DDeviceXenon {
     uint8_t     m_pad0000[0x2888];
     uint32_t    m_gpuThreadId;                /* +0x2888 */
     uint32_t    m_pad288C;
-    uint32_t*   m_pCommandQueueHead;         /* +0x2890 */
+    rage::ptr32<volatile uint32_t> m_pCommandQueueHead;         /* +0x2890 */
     uint8_t     m_pad2894[0x289C - 0x2894];
     uint32_t    m_queueRollbackHead;         /* +0x289C */
     uint8_t     m_pad28A0[0x28C1 - 0x28A0];
@@ -339,47 +340,45 @@ struct D3DDeviceXenon {
     uint32_t    m_progressGate;              /* +0x28F8 */
     uint32_t    m_pendingProgress;           /* +0x28FC */
     uint8_t     m_pad2900[0x354C - 0x2900];
-    void*       m_pDiagnosticContext;        /* +0x354C */
+    rage::ptr32<void> m_pDiagnosticContext;        /* +0x354C */
     uint8_t     m_pad3550[0x5010 - 0x3550];
     uint32_t    m_ltcgFlag;                  /* +0x5010 */
 };
+
+static_assert(offsetof(D3DDeviceXenon, m_queueRollbackHead) == 0x289C);
+static_assert(offsetof(D3DDeviceXenon, m_pDiagnosticContext) == 0x354C);
+static_assert(offsetof(D3DDeviceXenon, m_ltcgFlag) == 0x5010);
 
 extern "C" void* g_sda_base;                 // @ 0x82600000 (r13)
 
 int D3DDeviceXenon_ReportGPUHang(void* pHangState)
 {
-    struct HangState {
-        D3DDeviceXenon* m_pDevice;
-        uint32_t        m_lastGpuTick;
-        uint32_t        m_lastQueueHead;
-    };
-    HangState* pState = static_cast<HangState*>(pHangState);
-    D3DDeviceXenon* pDevice = pState->m_pDevice;
+    auto* pState = static_cast<grcGpuHangState*>(pHangState);
+    auto* pDevice = static_cast<D3DDeviceXenon*>(pState->device.get());
     if (pDevice->m_hangFlags & 0x04) {
         return 0;
     }
 
     // r13+0x100 points at the kernel thread block; +0x58 holds its tick.
-    const uint8_t* thread = *reinterpret_cast<uint8_t**>(
-        static_cast<uint8_t*>(g_sda_base) + 0x100);
+    const uint8_t* thread = rage::load_ptr32<uint8_t>(g_sda_base, 0x100);
     uint32_t curTick = *reinterpret_cast<const uint32_t*>(thread + 0x58);
     uint32_t queueHead = *pDevice->m_pCommandQueueHead;
-    if (pState->m_lastQueueHead != queueHead) {
-        pState->m_lastGpuTick = curTick;
-        pState->m_lastQueueHead = *pDevice->m_pCommandQueueHead;
+    if (pState->lastQueueHead != queueHead) {
+        pState->lastGpuTick = curTick;
+        pState->lastQueueHead = *pDevice->m_pCommandQueueHead;
     }
 
     // Compare the recorded GPU thread with the current thread.
     uint32_t threadId = xe_GetCurrentThreadId();
     if (pDevice->m_gpuThreadId == threadId && pDevice->m_progressGate != 0) {
-        pState->m_lastGpuTick = curTick;
+        pState->lastGpuTick = curTick;
     }
-    if (uint32_t(curTick - pState->m_lastGpuTick) < 2000u) {
+    if (uint32_t(curTick - pState->lastGpuTick) < 2000u) {
         return 1;
     }
 
     rage_DebugPrintf("+++++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
-    D3DDeviceXenon_DumpHangGpuState(pDevice->m_pDiagnosticContext, 0, 0,
+    D3DDeviceXenon_DumpHangGpuState(pDevice->m_pDiagnosticContext.get(), 0, 0,
                                    pDevice->m_ltcgFlag);
     // Reload the context after diagnostics, as the original does.
     if (pDevice->m_pDiagnosticContext != nullptr) {
@@ -398,6 +397,8 @@ int D3DDeviceXenon_ReportGPUHang(void* pHangState)
     rage_DebugPrintf(rage::k_str_d3d_hang_breaking_into_debugger);
 #if defined(__PPC__) || defined(__powerpc__)
     __asm__ volatile("twui 0, 0x16");
+#else
+    __builtin_trap();
 #endif
     return 0;
 }

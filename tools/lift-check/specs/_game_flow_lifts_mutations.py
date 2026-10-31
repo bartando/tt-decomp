@@ -33,7 +33,8 @@ CASES = {
         ]),
     "pong_match_get_character_for_slot": (
         "src/game/player/pong_player.cpp", [
-            ("ignore manager absence", "if (!g_plrPlayerMgr_state)", "if (false)"),
+            ("reject loaded manager on odd slots", "if (!g_plrPlayerMgr_state)",
+             "if (!g_plrPlayerMgr_state || (playerSlot & 1))"),
             ("omit missing-manager log", "nop_8240E6D0(g_pongMatchMissingPlayerMgr);",
              "/* missing diagnostic */"),
             ("wrong player slot", "pongMatch_GetCharacterIndex(playerSlot);",
