@@ -2766,19 +2766,6 @@ void LocomotionStateAnim::RebasePointers(void* relocator) {  // 51A8_p46
     }
 }
 
-/**
- * LocomotionStateAnim::IsAngleCloser @ 0x823DA190 | size: 0x64
- *
- * Compares two angular distances. Returns true if the absolute value
- * of angle2 is closer to the target than angle3.
- */
-bool LocomotionStateAnim::IsAngleCloser(float target, float angle2, float angle3) {  // A190_w
-    float diff2 = angle2 - target;
-    float diff3 = angle3 - target;
-    float abs2 = (diff2 >= 0.0f) ? diff2 : -diff2;
-    float abs3 = (diff3 >= 0.0f) ? diff3 : -diff3;
-    return abs2 < abs3;
-}
 
 /**
  * LocomotionStateAnim::AdvanceRingBuffer @ 0x823804C0 | size: 0x80

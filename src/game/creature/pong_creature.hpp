@@ -235,7 +235,7 @@ struct LocomotionStateAnim {
     void AccumulateOffset(void* accumulator);  // @ 0x8223BDB0
     void AccumulateList();  // @ 0x8214D480
     void RebasePointers(void* relocator);  // @ 0x823851A8
-    bool IsAngleCloser(float target, float angle2, float angle3);  // @ 0x823DA190
+    static bool IsAngleCloser(float target, float angle2, float angle3);  // @ 0x823DA190
     void AdvanceRingBuffer();  // @ 0x823804C0
     void PushBack(uint32_t key, const void* vecData);  // @ 0x82234190
     void ResetAccumulators();  // @ 0x820DB9F0
