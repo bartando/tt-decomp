@@ -416,7 +416,7 @@ extern "C" void hudLoadingScreen_vfn_0(void* pThis, uint32_t deleteFlag)
 // ─────────────────────────────────────────────────────────────────────────────
 
 extern "C" bool  rage_input_poll(void* pInput);                    // @ 0x821C9D68
-extern "C" void  rage_atStringCopy(void* src, void* dst, int cap); // @ 0x82228990
+#include "rage/localized_text.hpp"
 extern "C" void  rage_resource_release(void* pResource);           // @ 0x82566F10
 
 // rage global input object pointer @ 0x825EAB28
@@ -446,7 +446,7 @@ void hudLoadingScreen::vfn_11()
     if (!rage_input_poll(g_input_obj_ptr)) {
         // Destination buffer lives inline at +1469 (0x5BD) on the screen.
         void* tipDst = (void*)(self + 1469);
-        rage_atStringCopy((void*)g_hudLoading_TipTemplate, tipDst, 64);
+        rage_atStringCopy(static_cast<const char*>(g_hudLoading_TipTemplate), static_cast<char*>(tipDst), 64);
 
         void* pTip = SinglesNetworkClient_BindEntry(pageGroup,
                                                     static_cast<const char*>(g_hudLoading_KeyTipText));

@@ -85,20 +85,6 @@ void WriteInt8Bits(void* client, int8_t value, int bitWidth);
 // ══════════════════════════════════════════════════════════════════════════════
 
 /**
- * CopyNetworkString @ 0x82228990 | size: 0x15C
- * 
- * Copies a string for network transmission with proper formatting.
- * Handles null-termination and buffer size constraints.
- * 
- * @param src       Source string to copy
- * @param dest      Destination buffer
- * @param maxSize   Maximum size of destination buffer
- * 
- * Original symbol: rage_atStringCopy
- */
-void CopyNetworkString(const char* src, char* dest, int maxSize);
-
-/**
  * ComputeNetworkHash @ 0x822FA818 | size: 0x60
  * 
  * Computes a hash value for network data integrity checking.
