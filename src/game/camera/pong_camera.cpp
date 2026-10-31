@@ -2564,7 +2564,6 @@ extern const char kCamViewCS_DebugLabel[];    // @ 0x820362F8 "camViewCS"
 // for display mode gameLoop+0x200 in the 4-entry table at 0x825CB75C (1.0 when
 // the mode isn't listed). A leaf that leaves f6/f7 alone, which is why the
 // original keeps the clip planes in f6/f7 across the call.
-extern float gameLoop_GetDisplayAspect(void* gameLoop);
 
 // @ 0x825EAB30 — the gameLoop object (globals.c)
 extern "C" void* g_loop_obj_ptr;
