@@ -252,6 +252,17 @@ public:
     // add a second slot under Itanium and displace Render from retail slot 1.
     virtual void Destroy(uint32_t flags) = 0;
     virtual void Render(const void* transform, int mode) = 0;
+protected:
+    virtual void ReservedSlot2() = 0;
+    virtual void ReservedSlot3() = 0;
+    virtual void ReservedSlot4() = 0;
+    virtual void ReservedSlot5() = 0;
+    virtual void ReservedSlot6() = 0;
+    virtual void ReservedSlot7() = 0;
+    virtual void ReservedSlot8() = 0;
+public:
+    // Signed twip-coordinate rectangle {left, top, right, bottom}.
+    virtual const int32_t* GetBounds() = 0; // retail slot 9
     ~swfOBJECT();
 };
 
