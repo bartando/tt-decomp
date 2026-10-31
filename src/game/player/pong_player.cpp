@@ -1,3 +1,4 @@
+#include "game/player_manager_state.hpp"
 #include "game/network_timestamp.hpp"
 #include "rage/ptr32.hpp"
 #include "rage/float_approach.hpp"
@@ -4153,7 +4154,6 @@ void pongPlayer_06A0_g(float* outVec,
 // External forward declarations for batch 10
 // ---------------------------------------------------------------------------
 extern uint32_t pongMatch_GetCharacterIndex(uint32_t playerSlot); // @ 0x821C9B70
-extern uint32_t g_plrPlayerMgr_state;  // @ 0x82606430 — manager pointer
 extern void* g_gameDataMgr;           // @ 0x8271A2E4
 
 // @ 0x821C9C00 | size: 0x5C
@@ -4161,15 +4161,14 @@ extern void* g_gameDataMgr;           // @ 0x8271A2E4
 // and use character zero; the game-data manager and its array are still used.
 void* pongMatch_GetCharacterForSlot(void* /*match*/, uint32_t playerSlot) {
     uint32_t characterIndex = 0;
-    if (g_plrPlayerMgr_state == 0) {
-        nop_8240E6D0(
-            reinterpret_cast<const char*>(uintptr_t{0x8203CD80u}));
+    if (!g_plrPlayerMgr_state) {
+        nop_8240E6D0("PLAYERMANAGER does not exist yet, there is no loaded character!");
     } else {
         characterIndex = pongMatch_GetCharacterIndex(playerSlot);
     }
     auto* manager = static_cast<uint8_t*>(g_gameDataMgr);
-    void** characters = *reinterpret_cast<void***>(manager + 0x18);
-    return characters[characterIndex];
+    auto* characters = rage::load_ptr32<rage::ptr32<void>>(manager, 0x18);
+    return rage::load_ptr32<void>(characters, characterIndex * 4u);
 }
 
 extern void phBoundCapsule_0880_g(void* capsule, void* outMatrix, void* samplingState);

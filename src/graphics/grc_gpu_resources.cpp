@@ -1,3 +1,4 @@
+#include "grc/resource_release.hpp"
 #include "rage/grc_command_stream.hpp"
 /**
  * grc_gpu_resources.cpp — GPU resource management functions
@@ -57,65 +58,6 @@ extern int32_t lbl_825EB97C;  // g_nGPUFenceCounter
 // .rdata float constant (1.0f)
 // @ 0x8202D108 (.rdata, 4 bytes)
 extern const float lbl_8202D108;
-
-/**
- * grc_2CC8 @ 0x82352CC8 | size: 0xF0
- *
- * GPU memory tile/resolve management. Manages a pair of GPU memory regions
- * (tiles) used for render target resolve operations on the Xenos GPU.
- *
- * The function operates on a 16-byte control structure:
- *   +0x00  uint32_t m_nTileFlags    — tile state flags (decremented by 0x1000 each call)
- *   +0x04  (padding)
- *   +0x08  uint32_t m_nTileHandleA  — first tile handle (0xFFFF0000 = invalid)
- *   +0x0C  uint32_t m_nTileHandleB  — second tile handle (0xFFFF0000 = invalid)
- *
- * Parameters:
- *   a — pointer to the tile control structure
- *   b — GPU base address for tile A (physical address with format bits)
- *   c — GPU base address for tile B (physical address with format bits)
- *
- * On Xbox 360, this manages Xenos EDRAM tile resolve regions. On the host
- * platform, this is a no-op since we use standard framebuffer objects.
- */
-void grc_2CC8(void* a, uint32_t b, uint32_t c) {
-    if (!a) return;
-
-    uint32_t* ctrl = static_cast<uint32_t*>(a);
-
-    // Decrement tile flags by 0x1000 (one tile step)
-    uint32_t flags = ctrl[0];
-    flags -= 0x1000;
-    ctrl[0] = flags;
-
-    // Check if the low nibble of the upper 16 bits is zero
-    // (rlwinm. r10,r9,0,16,19 — tests bits 16-19)
-    if ((flags & 0xF000) != 0)
-        return;
-
-    // Process tile A if valid
-    uint32_t tileA = ctrl[2];  // +0x08
-    if (tileA != 0xFFFF0000u) {
-        ctrl[2] = 0xFFFF0000u;  // invalidate
-
-        // On Xbox 360, this would resolve the tile region.
-        // The address computation involves extracting width/height from the
-        // packed tile handle and computing physical addresses.
-        // On host platform, this is a no-op.
-    }
-
-    // Process tile B if requested (c != 0) and valid
-    if (c == 0)
-        return;
-
-    uint32_t tileB = ctrl[3];  // +0x0C
-    if (tileB == 0xFFFF0000u)
-        return;
-
-    ctrl[3] = 0xFFFF0000u;  // invalidate
-
-    // Same tile resolve logic for tile B — no-op on host
-}
 
 /**
  * grcSetNormalizedViewport @ 0x8214EB10 | size: 0x12C
