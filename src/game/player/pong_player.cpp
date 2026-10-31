@@ -4272,7 +4272,6 @@ void pongPlayer_06A0_g(float* outVec,
 extern uint32_t pongMatch_GetCharacterIndex(uint32_t playerSlot); // @ 0x821C9B70
 extern uint32_t g_plrPlayerMgr_state;  // @ 0x82606430 — manager pointer
 extern void* g_gameDataMgr;           // @ 0x8271A2E4
-extern "C" void pongMatch_LogMissingPlayerMgr(const char* message); // @ 0x8240E6D0
 
 // @ 0x821C9C00 | size: 0x5C
 // Read the selected character for a match slot. With no player manager, log
@@ -4280,7 +4279,7 @@ extern "C" void pongMatch_LogMissingPlayerMgr(const char* message); // @ 0x8240E
 void* pongMatch_GetCharacterForSlot(void* /*match*/, uint32_t playerSlot) {
     uint32_t characterIndex = 0;
     if (g_plrPlayerMgr_state == 0) {
-        pongMatch_LogMissingPlayerMgr(
+        nop_8240E6D0(
             reinterpret_cast<const char*>(uintptr_t{0x8203CD80u}));
     } else {
         characterIndex = pongMatch_GetCharacterIndex(playerSlot);

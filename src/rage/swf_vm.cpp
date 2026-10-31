@@ -25,7 +25,7 @@ extern "C" {
     void swfCallFunction(void* context, const char* name, int count, const SwfVmValue* args,
                          SwfVmValue* result, void* target);  // @ 0x82403090
     void* swfAllocateActionFunction(void* pool, uint32_t alignment);  // @ 0x824032F0
-    void swfVmLog(const char* text, ...);  // @ 0x8240E6D0
+    void nop_8240E6D0(const char* text, ...);  // @ 0x8240E6D0
     int32_t swfVmGetTimer();  // @ 0x82566F98
 }
 
@@ -90,7 +90,7 @@ extern "C" void util_F7E8(const uint8_t* code, void* target, void* context,
     };
     auto ensure = [&]() {
         if (!top) {
-            swfVmLog("Warning: Attempting to pop object from the stack but nothing is on the stack");
+            nop_8240E6D0("Warning: Attempting to pop object from the stack but nothing is on the stack");
             stack[0] = integer(0);
             top = 1;
         }
@@ -135,7 +135,7 @@ extern "C" void util_F7E8(const uint8_t* code, void* target, void* context,
         int32_t cursor = depth;
         for (int32_t i = 0; i < count; ++i) {
             if (!cursor) {
-                swfVmLog("Warning: Attempting to pop object from the stack but nothing is on the stack");
+                nop_8240E6D0("Warning: Attempting to pop object from the stack but nothing is on the stack");
                 stack[0] = integer(0);
                 cursor = 1;
             }
@@ -185,10 +185,10 @@ extern "C" void util_F7E8(const uint8_t* code, void* target, void* context,
                     reinterpret_cast<void (*)(const char*, const SwfVmValue*)>(
                         static_cast<uintptr_t>(commandHandler))(url, &argument);
                 } else {
-                    swfVmLog("FSCommand detected but no handler was specified: %s", url);
+                    nop_8240E6D0("FSCommand detected but no handler was specified: %s", url);
                 }
             } else {
-                swfVmLog(opcode == 0x83 ? "GetURL(%s)" : "URLs are not supported: %s", url);
+                nop_8240E6D0(opcode == 0x83 ? "GetURL(%s)" : "URLs are not supported: %s", url);
             }
             top = depth;
             break;
@@ -316,7 +316,7 @@ extern "C" void util_F7E8(const uint8_t* code, void* target, void* context,
                     int32_t b = swfValueToInteger(leftPtr);
                     push(boolean(a == b));
                 } else if (opcode == 0x49 && rightPtr->tag != 4 && leftPtr->tag != 4) {
-                    swfVmLog("Unsupported comparison types %d and %d");
+                    nop_8240E6D0("Unsupported comparison types %d and %d");
                     push(boolean(true));
                 } else {
                     float a, b;
@@ -418,7 +418,7 @@ extern "C" void util_F7E8(const uint8_t* code, void* target, void* context,
             }
             if (!handled) {
                 if (object.tag != 5) {
-                    swfVmLog("ActionGetMember: object being referenced is not an object!");
+                    nop_8240E6D0("ActionGetMember: object being referenced is not an object!");
                     depth = top;
                     push(integer(0));
                 } else {
@@ -438,7 +438,7 @@ extern "C" void util_F7E8(const uint8_t* code, void* target, void* context,
                 if (opcode == 0x52) {
                     ensure(); SwfVmValue* value = &stack[--top];
                     if (value->tag != 5) {
-                        swfVmLog("ActionCallMethod: object being referenced is not an object!");
+                        nop_8240E6D0("ActionCallMethod: object being referenced is not an object!");
                         stack[top] = integer(0); depth = ++top; break;
                     }
                     object = ptr(value->payload);
@@ -602,7 +602,7 @@ extern "C" void util_F7E8(const uint8_t* code, void* target, void* context,
         case 0x3A: { // Delete
             ensure(); const char* name = reinterpret_cast<const char*>(static_cast<uintptr_t>(stack[--top].payload));
             SwfVmValue object = *pop();
-            if (object.tag != 5) swfVmLog("ActionDelete: can't delete property %s from non-object", name);
+            if (object.tag != 5) nop_8240E6D0("ActionDelete: can't delete property %s from non-object", name);
             else {
                 SwfVmValue result{0, 7};
                 reinterpret_cast<void (*)(void*, const char*, SwfVmValue*)>(vfn(ptr(object.payload), 12))(
@@ -612,7 +612,7 @@ extern "C" void util_F7E8(const uint8_t* code, void* target, void* context,
             break;
         }
         default:
-            swfVmLog("Unhandled action code 0x%x in actionlist");
+            nop_8240E6D0("Unhandled action code 0x%x in actionlist");
             break;
         }
         code += remaining;
