@@ -6688,7 +6688,6 @@ extern void ph_TestCollisionPairDetailed(uint32_t, uint32_t, uint32_t, uint32_t,
                                           uint8_t*, uint32_t, uint8_t*, int);
 extern void ph_ProfilerBegin(const char*, int);
 extern void ph_ResolveCollisionConstraint(uint32_t, uint32_t, void*);
-extern void ph_DebugAssertPositive(const char*, double);
 
 // ---------------------------------------------------------------------------
 // 1. phMatrix34_TransposeDotProduct @ 0x821181C8 | size: 0xB0 (176 bytes)
@@ -6768,27 +6767,9 @@ void phCollisionResolver_ProfiledResolve(void* thisPtr, void* input) {
     ph_ProfilerBegin(g_phResolveProfileTagEnd, 1);
 }
 
+
 // ---------------------------------------------------------------------------
-// 5. phBound_ComputeClampedExtent @ 0x82123E78 | size: 0x9C (156 bytes)
-//    Computes safe collision margin from bound's vtable slot 8. Logs warning
-//    and takes abs if negative. Clamps result via fsel.
-// ---------------------------------------------------------------------------
-float phBound_ComputeClampedExtent(void* bound) {
-    float scale = g_phExtentScale;
-    float result = scale;
-    uint32_t extentSrc = *(uint32_t*)((uint8_t*)bound + 256);
-    if (extentSrc != 0) {
-        void** vt = *(void***)(uintptr_t)extentSrc;
-        typedef float (*GetExtFn)(void*);
-        result = ((GetExtFn)vt[8])((void*)(uintptr_t)extentSrc);
-        if (result < scale) {
-            ph_DebugAssertPositive("phBound extent negative", (double)result);
-            if (result < 0.0f) result = -result;
-        }
-    }
-    float clamped = result * g_phClampMax;
-    return (-clamped >= 0.0f) ? 0.0f : clamped;
-}
+
 
 // ---------------------------------------------------------------------------
 // 6. phJoint1Dof_Constructor @ 0x82126D00 | size: 0x98 (152 bytes)
@@ -8395,7 +8376,6 @@ extern void ph_1EF8(void* shapeKey, uint32_t materialOverride, uint32_t contactM
 extern void phBound_LockChannel(void* allocator, const char* tag, int alignment);
 extern void rage_CopyChannelData(void* pool, uint32_t handle, void* outPtr);
 extern void ph_ctor_ABE8(void* thisPtr);
-extern void rage_debugLog(const char* msg, uint64_t val);
 
 // External globals
 extern uint8_t g_phDisableFlag;          // @ 0x826064E0
@@ -8476,41 +8456,39 @@ void phPool_ResolveHandleLocked(void* outPtr, void* handle) {
     phBound_LockChannel((void*)(uintptr_t)allocator2, (const char*)0x8202766C, 1);
 }
 
-/**
- * ph_3E78 — Compute clamped contact impulse from virtual elasticity
- * @ 0x82123E78 | size: 0x9C (156 bytes)
- *
- * Computes the contact impulse magnitude for a collision response.
- * If the source object (r4) has a contact body at offset +256,
- * queries its elasticity via VCALL slot 8. Clamps the result to
- * be non-negative, scales by a constant factor (from rdata), and
- * returns the absolute value if negative (via fsel).
- *
- * Returns: Clamped impulse magnitude as float in f1.
- */
-// ph_3E78
-float phContact_ComputeImpulse(void* thisPtr, void* contactPair) {
-    void* contactBody = *(void**)((char*)contactPair + 256);
-    float zero = 0.0f;
-    float elasticity = zero;
+// Contact volume query: optional bound, negative-volume diagnostic, 300x scale.
+extern "C" const float g_phContactVolumeScale; // @ 0x8202D114
+extern "C" const char g_phNegativeVolumeWarning[]; // @ 0x82033020
+extern "C" void nop_8240E6D0(const char*, ...); // @ 0x8240E6D0
 
-    if (contactBody != nullptr) {
-        // VCALL slot 8: GetElasticity()
-        typedef float (*GetElasticityFn)(void*);
-        void** vt = *(void***)contactBody;
-        elasticity = ((GetElasticityFn)vt[8])(contactBody);
+namespace {
+struct phContactVolumeOps {
+    virtual void ReservedSlot0() = 0;
+    virtual void ReservedSlot1() = 0;
+    virtual void ReservedSlot2() = 0;
+    virtual void ReservedSlot3() = 0;
+    virtual void ReservedSlot4() = 0;
+    virtual void ReservedSlot5() = 0;
+    virtual void ReservedSlot6() = 0;
+    virtual void ReservedSlot7() = 0;
+    virtual float GetVolume() = 0;
+};
+}
 
-        if (elasticity < zero) {
-            rage_debugLog((const char*)0x82033420, *(uint64_t*)&elasticity);
-            elasticity = (elasticity < 0.0f) ? -elasticity : elasticity;
+// @ 0x82123E78
+float phContact_GetScaledVolume(void* /*unused*/, void* contactPair) {
+    auto* body = rage::load_ptr32<phContactVolumeOps>(contactPair, 0x100);
+    float volume = g_phZeroFloat;
+    if (body) {
+        volume = body->GetVolume();
+        if (volume < g_phZeroFloat) {
+            // Retail's diagnostic is a blr; it discards the payload.
+            nop_8240E6D0(g_phNegativeVolumeWarning);
+            volume = __builtin_fabsf(volume);
         }
     }
-
-    float scale = g_physOneF;  // 1.0f from rdata
-    float impulse = elasticity * scale;
-    float negImpulse = -impulse;
-    // fsel: if negImpulse >= 0 (i.e. impulse <= 0), return 0.0; else return impulse
-    return (negImpulse >= 0.0f) ? 0.0f : impulse;
+    const float scaled = volume * g_phContactVolumeScale;
+    return -scaled >= 0.0f ? 0.0f : scaled;
 }
 // VMX dot products accumulate in double before one float rounding; vector
 // operands/results flush subnormals. Bit shuffles must preserve raw input bits.

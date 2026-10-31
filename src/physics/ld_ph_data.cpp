@@ -139,3 +139,8 @@ RTTITypeDescriptor g_typeDescriptor_phBoundComposite = {
 
 // @ 0x8202D18C (.rdata) — trace-scaled symmetric-inverse pivot floor.
 extern "C" const float g_phInertiaPivotRatio = 9.999999747378752e-6f;
+
+// @ 0x8202D114 (.rdata) — volume-to-contact scale (not a unit constant)
+extern "C" const float g_phContactVolumeScale = 300.0f;
+// @ 0x82033020 (.rdata)
+extern "C" const char g_phNegativeVolumeWarning[] = "Bound part has volume %f!";

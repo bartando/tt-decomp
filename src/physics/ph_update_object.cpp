@@ -28,6 +28,7 @@
 
 #include "ph_physics.hpp"
 #include "joint_initialization.hpp"
+#include "rage/tokenizer_token.hpp"
 #include "rage/mat44.hpp"
 
 // ── Global Declarations ─────────────────────────────────────────────────────
@@ -497,9 +498,7 @@ void phUpdateObject::UpdateDrawable(void* frameData, uint32_t flags) {
 #include "ph_physics.hpp"
 
 extern "C" {
-// External helpers referenced by the lifted bodies. ph_5310 moves/copies a
-// name buffer; ph_A2A0 is the body of the +0 slot 7 thunk family.
-void ph_5310(void* self, void* dst, const char* src);
+// ph_A2A0 is the body of the +0 slot 7 thunk family.
 void ph_A2A0(void* self);
 void ph_DD28(void* worldOrFactory, void* archetype);
 void ph_vt5D38_15_0160(void* self, int flags, void* arg);
@@ -507,37 +506,6 @@ void ph_vt5D38_15_0160(void* self, int flags, void* arg);
 
 extern void util_F8E8(void* self);
 extern int _stricmp(const char* a, const char* b);
-
-// ── ph_59C8 — insert/replace a named entry in an archetype list ────────────
-// self->vfn_1() returns the existing name string (or null for new entry).
-// If present and case-insensitive equal, or caller passed replace=false,
-// forwards to ph_5310 with the fetched name. Returns 1 if name already
-// matched (logical "kept existing") and 0 / the replaced value otherwise.
-int ph_59C8(void* self, const char* name, int replaceIfDifferent) {
-    uint32_t existingVal = *reinterpret_cast<uint32_t*>(
-        static_cast<uint8_t*>(self) + 16);
-    void** vt = *reinterpret_cast<void***>(self);
-    typedef const char* (*GetNameFn)(void*);
-    const char* existing = reinterpret_cast<GetNameFn>(vt[1])(self);
-    if (existing) {
-        if (_stricmp(name, existing) == 0) {
-            ph_5310(self, /*dst=*/&existing, existing);
-            *reinterpret_cast<uint32_t*>(
-                static_cast<uint8_t*>(self) + 16) = existingVal;
-            return 0;
-        }
-        if ((replaceIfDifferent & 0xFF) == 0) {
-            ph_5310(self, &existing, existing);
-            *reinterpret_cast<uint32_t*>(
-                static_cast<uint8_t*>(self) + 16) = existingVal;
-        }
-        return 1;
-    }
-    ph_5310(self, nullptr, nullptr);
-    *reinterpret_cast<uint32_t*>(
-        static_cast<uint8_t*>(self) + 16) = existingVal;
-    return 0;
-}
 
 // ── ph_9E50 — swap material/archetype owner on a phInst slot ───────────────
 // If newArch != null and g_physicsInstrument is enabled, bump refcount at
