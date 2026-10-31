@@ -3,6 +3,7 @@
 #include "game/message_sink_time.hpp"
 #include "rage/xact_list.hpp"
 #include "audio/xact_fade.hpp"
+#include "audio/xact_volume.hpp"
 /**
  * msg_msg_sink.cpp — msgMsgSink constructor & destructor
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -1148,7 +1149,6 @@ void msgMsgSink::ProcessPendingMessages() {
         if (hasData != 0) {
             // Process pending messages from the message object
             void* msgObj = *(void**)((uint8_t*)this + 52);
-            extern void msgMsgSink_3DC8_g(void*);
             msgMsgSink_3DC8_g(msgObj);
         }
     }
