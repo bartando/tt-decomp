@@ -1,3 +1,4 @@
+#include "rage/hsm_context.hpp"
 /**
  * pong_logos.cpp — Boot Logos State & Context Implementation
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -29,7 +30,6 @@
 extern void rage_AssertMainThread();                     // @ 0x820C0038 — ensure TLS initialised
 
 // HSM helpers
-extern const char* hsmContext_GetStateName(void* hsmCtx, uint32_t stateIdx);
                                                             // @ 0x822228B8 — looks up state[idx]->GetName()
 extern void hsmContext_SetNextState(void* hsmCtx, uint32_t nextStateIdx);
                                                             // @ 0x82222800 — queue HSM transition

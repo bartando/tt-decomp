@@ -6760,12 +6760,6 @@ void QueueGameMessage(int eventCode, int arg1, void* payload, int arg3, void* ar
     (void)eventCode; (void)arg1; (void)payload; (void)arg3; (void)argA; (void)argB;
 }
 
-// Sends a 4-arg context message (short-int arg bundle) to the active
-// state-machine target. Wrapped by several network dispatch paths.
-void SendContextMessage(int ctx, int a, int b, int c) {
-    (void)ctx; (void)a; (void)b; (void)c;
-}
-
 // ── Raw net helpers (address unknown — documented placeholders) ───────────
 
 void ComputeNetworkHash(void* buf, int len) { (void)buf; (void)len; }

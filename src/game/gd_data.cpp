@@ -326,40 +326,6 @@ void gdUnlockGroupData::RegisterFields() {
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
- * PostStateTransitionRequest @ 0x822228B8 | size: 0x78
- * Original symbol: game_28B8
- * 
- * Posts a state transition request to the HSM (Hierarchical State Machine).
- * This is the core transition mechanism used by all game states.
- */
-void* PostStateTransitionRequest(void* hsmContext, int stateIndex) {
-    // Check if transition is allowed by calling vtable slot 6 (CanTransition)
-    typedef bool (*CanTransitionFn)(void*);
-    void** vtable = *(void***)hsmContext;
-    CanTransitionFn canTransition = (CanTransitionFn)vtable[6];
-    
-    bool allowed = canTransition(hsmContext);
-    
-    if (!allowed) {
-        // Transition blocked - return error string
-        // Static string @ 0x8203DC08: "Transition not allowed"
-        return (void*)0x8203DC08;
-    }
-    
-    // Transition allowed - get the target state object
-    // State array is at context+8, indexed by stateIndex * 4
-    void** stateArray = *(void***)((uint8_t*)hsmContext + 8);
-    void* targetState = stateArray[stateIndex];
-    
-    // Call vtable slot 13 on the target state (CreateTransitionRequest)
-    typedef void* (*CreateTransitionRequestFn)(void*);
-    void** stateVTable = *(void***)targetState;
-    CreateTransitionRequestFn createRequest = (CreateTransitionRequestFn)stateVTable[13];
-    
-    return createRequest(targetState);
-}
-
-/**
  * InitializePageGroup @ 0x8231F4C0 | size: 0x16C
  * Original symbol: game_F4C0
  * 

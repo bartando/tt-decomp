@@ -123,3 +123,5 @@ void* g_swfTextPool = nullptr;       // @ 0x82602844
 namespace rage {
 void* g_swfAuxiliaryScope = nullptr; // @ 0x82602834
 }
+
+extern "C" const char g_hsmUnknownState[] = "UNKNOWN"; // @ 0x8204DD08

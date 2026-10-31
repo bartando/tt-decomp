@@ -1,3 +1,5 @@
+#include "game/game_message.hpp"
+#include "rage/hsm_context.hpp"
 #include "game/network_context.hpp"
 #include "rage/hud_page_group.hpp"
 /**
@@ -77,10 +79,8 @@ namespace rage {
 extern void  hsmContext_SetNextState(void* ctx, int stateIdx); // HSM transition
 extern void  hsmContext_RequestTransition(void* ctx, int idx);      // HSM request
 extern bool  hsmContext_IsTransitioning(void* ctx);                 // HSM query
-extern void  SendContextMessage(int code, int mask, int a3, int a4);  // @ 0x8220E6E0 — broadcast msg
 extern void* CreditsRoll_NotifyEntry(void* obj, uint32_t count);       // credits-roll notify @ 0x8240AD40
 extern void  atSingleton_QueryEventData(void* outData, void* table);    // @ 0x82017888 — event query
-extern void* PostStateTransitionRequest(void* hsmCtx, int stateIdx); // @ 0x822228B8
 extern void  FadePageGroup(void* mgr, int type, int mode, float fadeTime, float param2); // UI fade
 extern bool  CheckButtonPressed(void* record);                    // input button state check @ 0x821DFFF8
 extern uint8_t Dialog_IsComplete(void* pg);             // @ 0x820C2470 — dialog completion check
@@ -612,7 +612,7 @@ void* pongCreditsState::GetContext() {
  * Also enables the page group's auto-advance (+85) if present.
  */
 void pongCreditsState::OnEnter(int prevStateIdx) {
-    SendContextMessage(2053 /*CREDITS_ENTER_MSG*/, 64, 0, 0);
+    PostGameMessage(2053 /*CREDITS_ENTER_MSG*/, 64, 0, 0);
 
     // Enable auto-advance on the page group if it exists
     if (m_pContext != nullptr && m_pContext->m_pPageGroup != nullptr) {
@@ -657,7 +657,7 @@ void pongCreditsState::OnEnter(int prevStateIdx) {
     }
 
     // Generic previous-state: post a transition request
-    void* transReq = PostStateTransitionRequest(m_pHSMContext, prevStateIdx);
+    const char* transReq = hsmContext_GetStateName(m_pHSMContext, prevStateIdx);
     // Notify credits-roll of transition (address of static table entry)
     extern void* g_creditsTransTable;   // @ lbl_8205F2D4 - 4712 area
     rage_debugLog(g_creditsTransTable, transReq, prevStateIdx);
@@ -675,7 +675,7 @@ void pongCreditsState::OnEnter(int prevStateIdx) {
  * Disables page group auto-advance on exit.
  */
 void pongCreditsState::OnExit(int nextStateIdx) {
-    SendContextMessage(2054 /*CREDITS_EXIT_MSG*/, 64, 0, 0);
+    PostGameMessage(2054 /*CREDITS_EXIT_MSG*/, 64, 0, 0);
 
     // Disable auto-advance on the page group
     if (m_pContext != nullptr && m_pContext->m_pPageGroup != nullptr) {
@@ -694,7 +694,7 @@ void pongCreditsState::OnExit(int nextStateIdx) {
     }
 
     // Generic next-state: post a transition request
-    void* transReq = PostStateTransitionRequest(m_pHSMContext, nextStateIdx);
+    const char* transReq = hsmContext_GetStateName(m_pHSMContext, nextStateIdx);
     extern void* g_creditsExitTable;   // @ lbl_8205F2D4 - 4660 area
     rage_debugLog(g_creditsExitTable, transReq, nextStateIdx);
 }
@@ -1004,7 +1004,7 @@ void pongLegalsState::Init() {
 void pongLegalsState::OnEnter(int prevStateIdx) {
     if (prevStateIdx != 3) {
         // Generic previous state: post a transition request
-        void* transReq = PostStateTransitionRequest(m_pHSMContext, prevStateIdx);
+        const char* transReq = hsmContext_GetStateName(m_pHSMContext, prevStateIdx);
         rage_debugLog("pongLegalsState::OnEnter generic", transReq, prevStateIdx);
         return;
     }
@@ -1059,7 +1059,7 @@ void pongLegalsState::OnEnter(int prevStateIdx) {
 void pongLegalsState::OnExit(int nextStateIdx) {
     if (nextStateIdx != 6) {
         // Generic next state
-        void* transReq = PostStateTransitionRequest(m_pHSMContext, nextStateIdx);
+        const char* transReq = hsmContext_GetStateName(m_pHSMContext, nextStateIdx);
         rage_debugLog("pongLegalsState::OnExit generic", transReq, nextStateIdx);
         return;
     }
@@ -1338,7 +1338,7 @@ void pongDialogState::Init() {
  *   other → Generic: posts a transition request via PostStateTransitionRequest.
  */
 void pongDialogState::OnEnter(int prevStateIdx) {
-    SendContextMessage(2051 /*DIALOG_ENTER_MSG*/, 64, 0, 0);
+    PostGameMessage(2051 /*DIALOG_ENTER_MSG*/, 64, 0, 0);
 
     // Save and set HSM overlay flag. Unlike the two call sites above this
     // one takes the singleton slot pointer *directly* (single deref) — the
@@ -1388,7 +1388,7 @@ void pongDialogState::OnEnter(int prevStateIdx) {
     }
 
     // Generic previous state: post transition
-    void* transReq = PostStateTransitionRequest(m_pHSMContext, prevStateIdx);
+    const char* transReq = hsmContext_GetStateName(m_pHSMContext, prevStateIdx);
     rage_debugLog("pongDialogState::OnEnter generic", transReq, prevStateIdx);
 }
 
@@ -1402,7 +1402,7 @@ void pongDialogState::OnEnter(int prevStateIdx) {
  *   - Otherwise: posts generic transition via PostStateTransitionRequest.
  */
 void pongDialogState::OnExit(int nextStateIdx) {
-    SendContextMessage(2052 /*DIALOG_EXIT_MSG*/, 64, 0, 0);
+    PostGameMessage(2052 /*DIALOG_EXIT_MSG*/, 64, 0, 0);
 
     // Restore HSM overlay if we changed it
     if (m_savedOverlay == 0) {
@@ -1422,7 +1422,7 @@ void pongDialogState::OnExit(int nextStateIdx) {
     }
 
     // Generic next state: post transition
-    void* transReq = PostStateTransitionRequest(m_pHSMContext, nextStateIdx);
+    const char* transReq = hsmContext_GetStateName(m_pHSMContext, nextStateIdx);
     rage_debugLog("pongDialogState::OnExit generic", transReq, nextStateIdx);
 }
 
