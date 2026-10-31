@@ -43,17 +43,25 @@ MUTATIONS = (
 def main():
     root = Path(__file__).resolve().parents[3]
     source = (root / "src/rage/math/polygon_clip.cpp").read_text()
+    signature = "\nvoid projectAabbToHorizontalPlane("
+    assert source.count(signature) == 1, "projection definition must be unique"
+    start = source.index(signature) + 1
+    end = source.index("\n}\n", start) + 2
+    body = source[start:end]
     spec = Path(__file__).with_name("rage_project_aabb_to_horizontal_plane.py")
     caught = 0
     for name, old, new in MUTATIONS:
-        assert source.count(old) == 1, f"mutation anchor changed: {name}"
+        assert body.count(old) == 1, f"mutation anchor changed: {name}"
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
-            rc = Checker(spec, Options(trials=300, seed=1, patches=((old, new),))).run()
-        first = output.getvalue().splitlines()[0]
-        print(f"{'CAUGHT' if rc == 1 else 'MISSED'} {name}: {first}", flush=True)
-        if rc != 1:
-            print(output.getvalue())
+            rc = Checker(spec, Options(trials=300, seed=1,
+                                      patches=((body, body.replace(old, new)),))).run()
+        report = output.getvalue()
+        first = report.splitlines()[0] if report else "no checker output"
+        detected = rc == 1 and first.startswith("FAIL ") and "faulted" not in report
+        print(f"{'CAUGHT' if detected else 'MISSED'} {name}: {first}", flush=True)
+        if not detected:
+            print(report)
             return 1
         caught += 1
     print(f"Caught {caught}/{len(MUTATIONS)} mutations")
