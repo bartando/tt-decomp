@@ -49,7 +49,7 @@ MUTATIONS = [
     ("late ramp wrong threshold", "(ratio - 0.4f)", "(ratio - 0.5f)"),
     ("early ramp wrong ratio", "const float ratio = progress / start;", "const float ratio = progress;"),
     ("wrong early channel curve", "ratio * 2.0f", "ratio * 1.0f"),
-    ("wrong easing selector", "case 1: weight = util_B6F0(weight)", "case 1: weight = phBoundCapsule_B6A0_g(weight)"),
+    ("wrong easing selector", "case 1: weight = util_B6F0(weight)", "case 1: weight = ph_ClampAndSin(weight)"),
     ("drop blend filter", "nullptr, filter, filterData, weight", "nullptr, nullptr, filterData, weight"),
     ("secondary overlay wrong scratch", "state->pose, state->secondaryPose,", "state->pose, state->pose,"),
     ("omit auxiliary postprocess", "if (state->auxiliary) LocomotionStateAnim_1E68_g", "if (false) LocomotionStateAnim_1E68_g"),
