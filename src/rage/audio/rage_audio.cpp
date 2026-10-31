@@ -11,6 +11,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <cmath>
+
+extern "C" double log(double value); // @ 0x82432458
 
 namespace rage {
 
@@ -1997,6 +2000,50 @@ void audVoiceSfx::SetVolume(float vol) {
     params[0] = voiceHandle;
     params[1] = static_cast<uint32_t>(scaledVol);
     audCommand_Enqueue(2, 16390, params, 2);
+}
+
+// @ 0x821637D8 | size: 0x8C
+void audVoiceSfx::SetPitch(float pitch) {
+    float cents = 0.0f;
+    // ble also skips unordered values.
+    if (pitch > 0.0f) {
+        const float logarithm = static_cast<float>(::log(pitch));
+        cents = logarithm * 1.4426950216293335f;
+    }
+    const float scaled = cents * 1200.0f;
+    int32_t command;
+    if (__builtin_isnan(scaled) || scaled <= -0x1p31f) command = INT32_MIN;
+    else if (scaled >= 0x1p31f) command = INT32_MAX;
+    else command = static_cast<int32_t>(scaled);
+    const uint32_t params[2] = {*static_cast<uint32_t*>(m_pSfxRef), static_cast<uint32_t>(command)};
+    audCommand_Enqueue(2, 16394, params, 2);
+}
+
+// @ 0x82163868 | size: 0xAC
+void audVoiceSfx::SetPan(float pan) {
+    // Preserve the two fsel comparisons, including their unordered behavior.
+    const double low = static_cast<float>(pan - -1.0f) >= 0.0f ? double(pan) : -1.0;
+    const double clamped = low - 3.0 >= 0.0 ? 3.0 : low;
+    float scaled;
+    if (clamped >= 0.0) scaled = static_cast<float>(clamped * 90.0f);
+    else scaled = static_cast<float>(__builtin_fma(clamped, 90.0, 360.0));
+    const uint32_t params[2] = {*static_cast<uint32_t*>(m_pSfxRef), static_cast<uint32_t>(static_cast<int32_t>(scaled))};
+    audCommand_Enqueue(2, 16391, params, 2);
+}
+
+// @ 0x82163938 | size: 0x64
+void audVoiceSfx::SetStereoVolume(float left, float right) {
+    // fctidz saturates to signed 64 bits, then stfiwx keeps the low word.
+    const auto commandWord = [](float volume) -> uint32_t {
+        const float scaled = volume * 1000.0f;
+        int64_t integer;
+        if (__builtin_isnan(scaled) || scaled <= -0x1p63f) integer = INT64_MIN;
+        else if (scaled >= 0x1p63f) integer = INT64_MAX;
+        else integer = static_cast<int64_t>(scaled);
+        return static_cast<uint32_t>(integer);
+    };
+    const uint32_t params[3] = {*static_cast<uint32_t*>(m_pSfxRef), commandWord(left), commandWord(right)};
+    audCommand_Enqueue(2, 16396, params, 3);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
