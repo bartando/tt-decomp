@@ -1,3 +1,4 @@
+#include "game/match_ai_array.hpp"
 #include "rage/time_state.hpp"
 /**
  * pong_match.cpp — Match logic and game mode implementations
@@ -1746,25 +1747,9 @@ void gdaiMeterLogic_RegisterSerializationFields(void* self) {
     RegisterSerializationField(self, "LearningModifier", &logic->m_learningModifier, floatType, 0);
 }
 
-// A child node of gdaiComeBackLogic (siblings linked through +0x08).
-struct gdaiNode {
-    void**    vtable;     // +0x00  slot 19 = name, slot 20 = IsA(typeId)
-    uint8_t   _pad04[4];
-    gdaiNode* m_next;     // +0x08
-    uint8_t   _pad0C[0x10];
-    int32_t   m_index;    // +0x1C  position in the list it was sorted into
-};
-
-// atArray<gdaiNode*>: data, count, capacity.
-struct gdaiNodeArray {
-    gdaiNode** m_data;      // +0x00
-    uint16_t   m_count;     // +0x04
-    uint16_t   m_capacity;  // +0x06
-};
-
 struct gdaiComeBackLogicView {
     uint8_t       _pad00[0x0C];
-    gdaiNode*     m_firstChild;  // +0x0C
+    rage::ptr32<gdaiNode> m_firstChild;  // +0x0C
     gdaiNodeArray m_leads;       // +0x10  children that are gdaiLead
     gdaiNodeArray m_deficits;    // +0x18  children that are gdaiDeficit
 };
@@ -1773,10 +1758,9 @@ struct gdaiComeBackLogicView {
 extern void* g_gdaiDeficitTypeId;  // @ 0x825C60CC
 extern void* g_gdaiLeadTypeId;     // @ 0x825C60D0
 extern void nop_8240E6D0(const char* format, ...);       // @ 0x8240E6D0, debug log (empty)
-extern void game_DB80(gdaiNodeArray* array, uint32_t capacity);  // @ 0x821EDB80, atArray::Reserve
 
 static bool gdaiNode_IsA(gdaiNode* node, void* typeId) {
-    return VirtualSlot<uint8_t (*)(gdaiNode*, void*)>(node, 20)(node, typeId) != 0;
+    return static_cast<uint8_t>(node->IsA(typeId)) != 0;
 }
 
 static void ReserveOrClear(gdaiNodeArray* array, uint32_t count) {
@@ -1800,13 +1784,13 @@ void gdaiComeBackLogic_SplitLeadAndDeficit(void* self) {
     uint32_t numDeficits = 0;
     uint32_t numLeads = 0;
 
-    for (gdaiNode* node = logic->m_firstChild; node != nullptr; node = node->m_next) {
+    for (gdaiNode* node = logic->m_firstChild.get(); node != nullptr; node = node->Next()) {
         if (gdaiNode_IsA(node, g_gdaiDeficitTypeId)) {
             numDeficits++;
         } else if (gdaiNode_IsA(node, g_gdaiLeadTypeId)) {
             numLeads++;
         } else {
-            const char* name = VirtualSlot<const char* (*)(gdaiNode*)>(node, 19)(node);
+            const char* name = node->GetName();
             nop_8240E6D0("unknown node type found in shots.xml: %s", name);
         }
     }
@@ -1816,15 +1800,15 @@ void gdaiComeBackLogic_SplitLeadAndDeficit(void* self) {
 
     int32_t leadIndex = 0;
     int32_t deficitIndex = 0;
-    for (gdaiNode* node = logic->m_firstChild; node != nullptr; node = node->m_next) {
+    for (gdaiNode* node = logic->m_firstChild.get(); node != nullptr; node = node->Next()) {
         if (gdaiNode_IsA(node, g_gdaiDeficitTypeId)) {
             gdaiNodeArray* list = &logic->m_deficits;
-            list->m_data[list->m_count++] = node;
-            node->m_index = deficitIndex++;
+            list->m_data.get()[list->m_count++] = node;
+            node->SetIndex(deficitIndex++);
         } else if (gdaiNode_IsA(node, g_gdaiLeadTypeId)) {
             gdaiNodeArray* list = &logic->m_leads;
-            list->m_data[list->m_count++] = node;
-            node->m_index = leadIndex++;
+            list->m_data.get()[list->m_count++] = node;
+            node->SetIndex(leadIndex++);
         }
     }
 }
