@@ -12,7 +12,7 @@ writes or float tolerance; translation copies include arbitrary raw w bits.
 """
 from liftcheck.spec import *
 
-FUNCTION = "LocomotionStateAnim_TransitionLocomotionState"
+FUNCTION = "LocomotionStateAnim_C288_g"
 ADDRESS = 0x8224C288
 SOURCE = "src/anim/locomotion.cpp"
 TRIALS = 1000
@@ -75,6 +75,6 @@ def inputs(t):
         t.w32(translation + 4 * i, rng.choice([0, 0x80000000, 1, 0x7F800000,
                                             0xFF800000, 0x7FC12345, rng.getrandbits(32)]))
         t.wf32(quaternion + 4 * i, rng.choice([0.0, -0.0, 1.0, -1.0, rng.uniform(-2, 2)]))
-    VECTORS.update(translation=translation, quaternion=quaternion)
+    VECTORS.update(translation=translation + t.index % 16, quaternion=quaternion)
     t.args(r3=entry, r4=rng.getrandbits(32), r5=skeleton,
            f1=rng.choice([0.0, -1.0, 1.0, float("nan"), rng.uniform(-10, 10)]))

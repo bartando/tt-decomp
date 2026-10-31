@@ -220,6 +220,8 @@ set(SOURCES
     src/anim/motion_lookup_data.cpp
     src/anim/pcr_anim_blenders.cpp
     src/anim/locomotion.cpp
+    src/anim/angle_helpers.cpp
+    src/anim/animation_timing.cpp
 
     # Physics
     src/physics/ph_physics.cpp
@@ -231,6 +233,8 @@ set(SOURCES
     src/graphics/fx_crowd.cpp
     src/graphics/grc_debug_strings.cpp
     src/graphics/grc_device.cpp
+    src/graphics/grc_gpu_resources.cpp
+    src/graphics/grc_vertex_buffer.cpp
     src/graphics/grc_render.cpp
     src/graphics/texture_reference.cpp
     src/graphics/grc_viewport_cull.cpp

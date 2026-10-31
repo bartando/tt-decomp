@@ -10,6 +10,7 @@
 #include "pong_creature.hpp"
 #include "../player/pong_player.hpp"
 #include "../../anim/locomotion.hpp"
+#include "../../anim/animation_channel.hpp"
 #include "globals.h"
 #include "rage/mat33.hpp"
 #include "game/pong_strings.hpp"
@@ -55,8 +56,6 @@ struct AnimSubData {
 };
 
 // LocomotionStateAnim helper functions
-extern void LocomotionStateAnim_SetupContainer(void* containerData, void* containerParams, float time, int p1, int p2);
-extern void LocomotionStateAnim_FinalizeProcessing(void* animationList);
 
 // Ref-counting helpers
 extern "C" void rage_AddRef(void* obj);
@@ -66,8 +65,6 @@ extern "C" void rage_Release(void* obj);
 extern "C" void pongCreature_BaseDtor(void* obj);  // @ 0x820C53E8
 extern "C" void pongCreature_Fixup(void* obj, void* relocator);
 extern "C" void pongCreatureInst_Cleanup(void* obj);  // @ 0x822C8FD0
-extern "C" void LocomotionStateAnim_SetSpeed(void* obj, float speed);
-extern "C" void LocomotionStateAnim_ApplySpeed(void* obj);
 extern "C" void LocomotionStateAnim_InitCapsuleImpl(void* obj, float radius, const void* center);
 extern "C" void* LocomotionState_FindFirstActive(void* list);
 extern "C" void* LocomotionStateAnim_FindAnim(void* obj);
@@ -704,44 +701,36 @@ void* LocomotionStateAnim::FindAnimationByID(uint32_t type, uint32_t id) {
     return nullptr;
 }
 
-namespace {
-// The shared channel vtable has vector/quaternion setters at slots 17/18.
-// Its deleting entry occupies one slot; a C++ destructor would add an ABI pair.
-struct AnimationPairChannel {
-    virtual void slot0() = 0;
-    virtual void slot1() = 0;
-    virtual void slot2() = 0;
-    virtual void slot3() = 0;
-    virtual void slot4() = 0;
-    virtual void slot5() = 0;
-    virtual void slot6() = 0;
-    virtual void slot7() = 0;
-    virtual void slot8() = 0;
-    virtual void slot9() = 0;
-    virtual void slot10() = 0;
-    virtual void slot11() = 0;
-    virtual void slot12() = 0;
-    virtual void slot13() = 0;
-    virtual void slot14() = 0;
-    virtual void slot15() = 0;
-    virtual void slot16() = 0;
-    virtual void SetVector(const float* value) = 0;     // slot 17
-    virtual void SetQuaternion(const float* value) = 0; // slot 18
-};
-}
-
 // Find both type channels with ID zero, then write translation and rotation.
 // Keep the unused integer slot so param remains in r7; IDs arrive as full words.
 // LocomotionStateAnim::SetupAnimationPair @ 0x8224C418 | size: 0x90
 bool LocomotionStateAnim::SetupAnimationPair(uint32_t animID1, uint32_t animID2,
                                             void* unusedR6, const void* param) {
     (void)unusedR6;
-    auto* first = static_cast<AnimationPairChannel*>(FindAnimationByID(animID1, 0));
-    auto* second = static_cast<AnimationPairChannel*>(FindAnimationByID(animID2, 0));
+    auto* first = static_cast<AnimationChannel*>(FindAnimationByID(animID1, 0));
+    auto* second = static_cast<AnimationChannel*>(FindAnimationByID(animID2, 0));
     if (!first || !second)
         return false;
     first->SetVector(reinterpret_cast<const float*>(static_cast<const uint8_t*>(param) + 16));
     second->SetQuaternion(static_cast<const float*>(param));
+    return true;
+}
+
+// Translation uses VMX alignment; quaternion stores use the exact output.
+// LocomotionStateAnim_C358_g @ 0x8224C358 | size: 0xBC
+bool LocomotionStateAnim_C358_g(void* self, uint32_t firstType, uint32_t secondType,
+                               uint32_t /*unusedR6*/, float* out) {
+    auto* list = static_cast<LocomotionStateAnim*>(self);
+    auto* first = static_cast<AnimationChannel*>(list->FindAnimationByID(firstType, 0));
+    auto* second = static_cast<AnimationChannel*>(list->FindAnimationByID(secondType, 0));
+    if (!first || !second) return false;
+    const float* translation = first->GetTranslation();
+    uint8_t vector[16];
+    std::memcpy(vector, reinterpret_cast<const void*>(reinterpret_cast<uintptr_t>(translation) & ~uintptr_t(15)), 16);
+    const uintptr_t position = (reinterpret_cast<uintptr_t>(out) + 16) & ~uintptr_t(15);
+    std::memcpy(reinterpret_cast<void*>(position), vector, 16);
+    const float* quaternion = second->GetQuaternion();
+    for (unsigned lane = 0; lane < 4; ++lane) out[lane] = quaternion[lane];
     return true;
 }
 
@@ -806,7 +795,7 @@ void LocomotionState::ValidateAnimationTiming(uint32_t& animSetIndex, uint32_t& 
 // 0x820DEDC0 — compose a bone transform with its parent matrix.
 void pongCreatureInst_EDC0_g(void* dst, void* bone, void* parent);
 
-// What 0x8214C8F8 reads from `this`. Its callers (pongCreature::UpdateReplay
+// What 0x8214C8F8 reads from its skeleton. Its callers (pongCreature::UpdateReplay
 // and UpdateAnimation, through LocomotionStateAnim_C8F8_g) pass a skeleton,
 // pongCreature+0xAC; LocomotionStateAnim's header layout (which also gets a
 // C++ vptr) doesn't describe it.
@@ -827,26 +816,36 @@ struct skeletonPoseView {
 };
 
 /**
- * LocomotionStateAnim::CopyAnimationData @ 0x8214C8F8 | size: 0xD0
- * (locomotion.cpp has the same address as LocomotionStateAnim_C8F8_g, a no-op)
+ * LocomotionStateAnim_C8F8_g @ 0x8214C8F8 | size: 0xD0
  *
  * Root bone: with a helper at +0x08, 0x820DEDC0(matrix 0, record 0, helper);
  * otherwise the record's leading 64 bytes become matrix 0. Every further bone
  * i goes through 0x820DEDC0(matrix i, record i, matrix of parents[i]).
  */
-void LocomotionStateAnim::CopyAnimationData() {
-    const skeletonPoseView* skel = reinterpret_cast<const skeletonPoseView*>(this);
+void LocomotionStateAnim_C8F8_g(void* skeleton) {
+    const skeletonPoseView* skel = static_cast<const skeletonPoseView*>(skeleton);
 
     if (skel->rootHelper != nullptr)
         pongCreatureInst_EDC0_g(skel->matrices, skel->bones, skel->rootHelper);
-    else
-        memcpy(skel->matrices, skel->bones, 64);
+    else {
+        // The original copies four aligned vectors in order, including overlap.
+        const uintptr_t sourceBase = reinterpret_cast<uintptr_t>(skel->bones);
+        const uintptr_t destinationBase = reinterpret_cast<uintptr_t>(skel->matrices);
+        for (unsigned row = 0; row < 4; ++row) {
+            uint8_t vector[16];
+            const uintptr_t source = (sourceBase + row*16) & ~uintptr_t(15);
+            const uintptr_t destination = (destinationBase + row*16) & ~uintptr_t(15);
+            std::memcpy(vector, reinterpret_cast<const void*>(source), 16);
+            std::memcpy(reinterpret_cast<void*>(destination), vector, 16);
+        }
+    }
 
     const skeletonPoseData* data = skel->data;
     const int boneCount = data->boneCount;
+    const uint32_t* parents = data->parents;
     for (int i = 1; i < boneCount; ++i) {
         pongCreatureInst_EDC0_g(skel->matrices + 0x40 * i, skel->bones + 0x50 * i,
-                                skel->matrices + 0x40 * data->parents[i]);
+                                skel->matrices + 0x40 * parents[i]);
     }
 }
 
@@ -864,56 +863,36 @@ void LocomotionStateAnim::CopyAnimationData() {
  * 
  * @param animationList Pointer to animation list structure containing animations to process
  */
+namespace {
+template<class T> T& animationField(void* object, uint32_t offset) {
+    return *reinterpret_cast<T*>(static_cast<uint8_t*>(object) + offset);
+}
+}
+extern const float g_floatZero; // @ 0x8202D110
+
+// Evaluate the saved clip/frame, apply its channels to the destination skeleton,
+// then rebuild that skeleton. C128/C288 and C8F8 are existing shared routines.
+// LocomotionStateAnim::ProcessAnimationList @ 0x82380540 | size: 0xD0
 void LocomotionStateAnim::ProcessAnimationList(void* animationList) {
-    if (!animationList) {
-        return;
-    }
-    
-    // Set up animation state with current parameters
-    void* animContainer = (void*)this->field_0x0024;  // Animation container at +0x24
-    void* containerData = *(void**)((char*)animContainer + 0);
-    void* containerParams = *(void**)((char*)animContainer + 4);
-    float currentTime = *(float*)&this->field_0x0008;
-
-    // Call setup function to prepare animations
-    LocomotionStateAnim_SetupContainer(containerData, containerParams, currentTime, 1, 0);
-    
-    // Determine which processing function to use based on animation flags
-    void* animListData = *(void**)((char*)animationList + 4);
-    uint32_t animFlags = *(uint32_t*)((char*)animListData + 20);
-    
-    // Function pointer for animation processing
-    typedef void (*AnimProcessFunc)(void*, void*, void*, float);
-    AnimProcessFunc processFunc;
-    
-    // Check bit 0 of flags to determine processing method
-    bool useSimpleProcessing = (animFlags & 0x1) == 0;
-    
-    if (useSimpleProcessing) {
-        processFunc = (AnimProcessFunc)0x8224C128;  // LocomotionStateAnim_C128_g - simple processing
-    } else {
-        processFunc = (AnimProcessFunc)0x8224C288;  // LocomotionStateAnim_C288_g - complex processing
-    }
-    
-    // Get animation array info
-    uint16_t animCount = *(uint16_t*)((char*)animListData + 12);
-    
-    if (animCount > 0) {
-        void** animArray = (void**)*(void**)((char*)animListData + 8);
-
-        // Load blend weight constant (typically 1.0f for full blend)
-        extern const float g_animBlendWeight;  // @ 0x8202D110
-        float blendWeight = g_animBlendWeight;
-        
-        // Process each animation in the array
-        for (uint16_t i = 0; i < animCount; i++) {
-            void* animation = animArray[i];
-            processFunc(animation, nullptr, animationList, blendWeight);
+    if (!animationList) return;
+    void* container = animationField<void*>(this, 0x24);
+    LocomotionStateAnim_88E0_g(animationField<void*>(container, 0), animationList,
+                               animationField<void*>(container, 4), 0, 1,
+                               animationField<float>(this, 8));
+    void* data = animationField<void*>(animationList, 4);
+    container = animationField<void*>(this, 0x24);
+    void* frame = animationField<void*>(container, 4);
+    const auto apply = (animationField<uint32_t>(data, 0x14) & 1)
+        ? LocomotionStateAnim_C288_g : LocomotionStateAnim_C128_g;
+    const uint32_t count = animationField<uint16_t>(frame, 0x0C);
+    if (count) {
+        const float weight = g_floatZero;
+        for (uint32_t i = 0; i < count; ++i) {
+            void** entries = animationField<void**>(frame, 8);
+            apply(entries[i], entries, animationList, weight);
         }
     }
-    
-    // Finalize animation processing
-    LocomotionStateAnim_FinalizeProcessing(animationList);
+    LocomotionStateAnim_C8F8_g(animationList);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1060,50 +1039,6 @@ void LocomotionStateAnim::Initialize() {
     this->field_0x0140 = 0;   // m_animData = null
     *(float*)&this->field_0x014c = zero;   // m_blendWeight
     this->field_0x0148 = 1;    // m_isComplete = false
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// LocomotionStateAnim::CalculateBlendFactor()  @ 0x820C1910
-// Calculates animation blend factor based on timing parameters
-// ─────────────────────────────────────────────────────────────────────────────
-float LocomotionStateAnim::CalculateBlendFactor(void* timingData) {
-    // Load global constants
-    const float zero = g_floatZero;
-    const float one = g_floatOne;
-    
-    // Get timing parameters from input data
-    float targetTime = *(float*)((char*)timingData + 20);
-    float blendInTime = *(float*)((char*)timingData + 12);
-    float blendOutTime = *(float*)((char*)timingData + 8);
-    
-    // If at target time, return zero blend
-    if (targetTime == one) {
-        targetTime = zero;
-    }
-    
-    // Calculate time until blend completes
-    float timeUntilBlend = one - blendInTime;
-    
-    // Check if we're in the blend-out phase
-    if (targetTime >= timeUntilBlend) {
-        // In blend-out phase: use blend-out time
-        blendOutTime = blendInTime;
-        targetTime = one - targetTime;
-    }
-    
-    // If past blend-out time, return full blend (1.0)
-    if (targetTime >= blendOutTime) {
-        return one;
-    }
-    
-    // If before blend-in time, return zero blend
-    if (targetTime <= one) {
-        return targetTime;
-    }
-    
-    // Calculate normalized blend factor
-    float blendFactor = targetTime / blendOutTime;
-    return blendFactor;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2540,19 +2475,6 @@ void LocomotionStateAnim::ResetAccumulators() {  // B9F0_w
 }
 
 /**
- * LocomotionStateAnim::SetAnimSpeed @ 0x820C2858 | size: 0x54
- *
- * Sets animation playback speed by multiplying speed × scale factor,
- * then calls the internal anim speed setter.
- */
-void LocomotionStateAnim::SetAnimSpeed(float speed, float scale) {  // 2858
-
-    float scaledSpeed = speed * scale;
-    LocomotionStateAnim_SetSpeed(this, scaledSpeed);
-    LocomotionStateAnim_ApplySpeed(this);
-}
-
-/**
  * LocomotionStateAnim::InitBoundCapsule @ 0x820C3D48 | size: 0x58
  *
  * Initializes a bounding capsule from float constants. Zeroes a vec128
@@ -2702,19 +2624,6 @@ void LocomotionStateAnim::RebasePointers(void* relocator) {  // 51A8_p46
     }
 }
 
-/**
- * LocomotionStateAnim::IsAngleCloser @ 0x823DA190 | size: 0x64
- *
- * Compares two angular distances. Returns true if the absolute value
- * of angle2 is closer to the target than angle3.
- */
-bool LocomotionStateAnim::IsAngleCloser(float target, float angle2, float angle3) {  // A190_w
-    float diff2 = angle2 - target;
-    float diff3 = angle3 - target;
-    float abs2 = (diff2 >= 0.0f) ? diff2 : -diff2;
-    float abs3 = (diff3 >= 0.0f) ? diff3 : -diff3;
-    return abs2 < abs3;
-}
 
 /**
  * LocomotionStateAnim::AdvanceRingBuffer @ 0x823804C0 | size: 0x80
@@ -2843,14 +2752,12 @@ extern void phBoundCapsule_ExtractPosition(void* matrix, float* outVec); // @ 0x
 extern float LocomotionStateAnim_A1F8_g(float value, float rangeMin, float rangeMax);
 extern void LocomotionStateAnim_B218_g(float* out, const float* matrix); // @ 0x8223B218
 extern void LocomotionStateAnim_6E90_w(void* self, float weight);
-extern bool LocomotionStateAnim_04F0_g(void* animData, uint16_t animID_high, uint16_t* outIndex);
 extern void util_BBB0(void* dst, float* src, float* work);
 extern void util_B9A8(void* dst, void* quat, void* axis);
 // @ 0x8224C128 / 0x8224C288 — apply one animation entry to a skeleton. Both read
 // the skeleton from r5 and never read r4; callers leave junk there.
 extern void LocomotionStateAnim_C128_g(void* entry, void* unusedR4, void* skeleton, float weight);
 extern void LocomotionStateAnim_C288_g(void* entry, void* unusedR4, void* skeleton, float weight);
-extern void LocomotionStateAnim_C358_g(void* animList, int p1, int p2, int p3, float* outVec);
 
 /**
  * QuaternionToMatrix3x3 @ 0x8223AD30 | size: 0xAC
@@ -2986,38 +2893,20 @@ void LocomotionStateAnim_8110_g(void* quat, float* minVec, float* maxVec) {
  * SetupAnimNode @ 0x820E10D8 | size: 0x9C
  *
  * Sets up an animation node: configures container data with timing
- * parameters, queries a position vector from the container, builds
- * a rotation matrix, and copies a row into dst+48.
+ * parameters, fetches a quaternion/translation pair, builds the rotation
+ * matrix, and copies the translation into dst+48.
  */
 // LocomotionStateAnim_10D8 @ 0x820E10D8
-void LocomotionStateAnim_10D8(void* self, void* dst, void* unused, void* container, float time) {
-    LocomotionStateAnim* lsa = (LocomotionStateAnim*)self;
-
-    // Default container to lsa->field_0x0140 if null
-    if (container == nullptr) {
-        container = (void*)lsa->field_0x0140;
-    }
-
-    // If time < 0.0, use fallback from lsa->field_0x00b8
-    if (time < 0.0f) {
-        time = *(float*)&lsa->field_0x00b8;
-    }
-
-    // Get animation list from lsa->field_0x001c
-    void* animList = (void*)lsa->field_0x001c;
-
-    // Configure container with timing: LocomotionStateAnim_SetupContainer(container, animList, time, 1, 0)
-    LocomotionStateAnim_SetupContainer(container, animList, time, 1, 0);
-
-    // Query position from container
-    float posVec[4];
-    LocomotionStateAnim_C358_g(animList, 0, 1, 0, posVec);
-
-    // Build rotation matrix from posVec into dst
-    LocomotionStateAnim_AD30_g((float*)dst, posVec);
-
-    // Copy 16 bytes from matrix output (row 0) into dst+48 (via lvx/stvx)
-    memcpy((char*)dst + 48, dst, 16);
+void LocomotionStateAnim_10D8(void* self, void* dst, void* /*unusedR5*/, void* container, float time) {
+    if (!container) container = animationField<void*>(self, 0x140);
+    if (time < g_floatZero) time = animationField<float>(self, 0xB8);
+    LocomotionStateAnim_88E0_g(container, dst, animationField<void*>(self, 0x1C), 0, 1, time);
+    alignas(16) float pair[8] = {};
+    LocomotionStateAnim_C358_g(animationField<void*>(self, 0x1C), 0, 1, 0, pair);
+    LocomotionStateAnim_AD30_g(static_cast<float*>(dst), pair);
+    // The second pair row is translation; AD30 builds only the rotation rows.
+    const uintptr_t destination = (reinterpret_cast<uintptr_t>(dst) + 0x30) & ~uintptr_t(15);
+    std::memcpy(reinterpret_cast<void*>(destination), pair + 4, 16);
 }
 
 /**
@@ -3065,13 +2954,15 @@ void LocomotionStateAnim_5340_p46(void* self, void* relocator) {
  * blend weight from the weight array. Returns true if weight > 0.0.
  */
 // LocomotionStateAnim_81A8 @ 0x822481A8
-bool LocomotionStateAnim_81A8(void* self, uint8_t type, uint16_t animID, void** animPair, float* outWeight) {
-    // Only types 0 and 1 are valid
-    if (type != 0 && type != 1) {
+uint32_t LocomotionStateAnim_81A8(void* /*self*/, uint32_t type, uint32_t animID,
+                                  void* userdata, float* outWeight) {
+    const uint8_t channel = static_cast<uint8_t>(type);
+    if (channel != 0 && channel != 1) {
         return false;
     }
 
-    // Look up animation index via 04F0_g
+    // Forward the entire ID word; 04F0 narrows it inside its lookup.
+    auto** animPair = static_cast<void**>(userdata);
     uint16_t index;
     bool found = LocomotionStateAnim_04F0_g(animPair[0], animID, &index);
 
@@ -3086,7 +2977,7 @@ bool LocomotionStateAnim_81A8(void* self, uint8_t type, uint16_t animID, void** 
 
     *outWeight = weight;
 
-    return weight > 0.0f;
+    return weight > g_floatZero;
 }
 
 /**

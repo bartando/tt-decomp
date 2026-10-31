@@ -40,3 +40,11 @@ uint32_t g_ambientCurSlot = 0;        // @ 0x825EBBDC
 // Shared normalized color clamp bounds from the image.
 extern const float g_colorClampMin = 0.0f; // @ 0x8202D110
 extern const float g_colorClampMax = 1.0f; // @ 0x8202D108
+
+// @ 0x8260640C (.data) — use the resource locking path for CPU mappings
+extern "C" uint8_t g_grcUseResourceLocks = 0;
+
+namespace rage {
+// @ 0x82606562 (.data) — suppress resource unlock while endian data is dirty
+uint8_t g_bTextureEndianDirty = 0;
+}

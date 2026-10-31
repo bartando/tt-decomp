@@ -224,7 +224,6 @@ struct LocomotionStateAnim {
     // ── implemented methods ──
     void* FindAnimationByID(uint32_t type, uint32_t id);  // @ 0x8224BEF8
     bool SetupAnimationPair(uint32_t animID1, uint32_t animID2, void* unusedR6, const void* param);  // @ 0x8224C418
-    void CopyAnimationData();       // @ 0x8214C8F8
     void ProcessAnimationList(void* animationList);  // @ 0x82380540
     float CalculateBlendFactor(void* timingData);  // @ 0x820C1910
     void UpdateAnimationState(void* outputState);  // @ 0x82380268
@@ -235,11 +234,10 @@ struct LocomotionStateAnim {
     void AccumulateOffset(void* accumulator);  // @ 0x8223BDB0
     void AccumulateList();  // @ 0x8214D480
     void RebasePointers(void* relocator);  // @ 0x823851A8
-    bool IsAngleCloser(float target, float angle2, float angle3);  // @ 0x823DA190
+    static bool IsAngleCloser(float target, float angle2, float angle3);  // @ 0x823DA190
     void AdvanceRingBuffer();  // @ 0x823804C0
     void PushBack(uint32_t key, const void* vecData);  // @ 0x82234190
     void ResetAccumulators();  // @ 0x820DB9F0
-    void SetAnimSpeed(float speed, float scale);  // @ 0x820C2858
     void InitBoundCapsule();  // @ 0x820C3D48
 };
 
