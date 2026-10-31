@@ -1072,7 +1072,7 @@ extern uint8_t  g_sceneSlotTagTable[];       // @ 0x825F3A68 (byte per slot)
 extern void*    g_sceneSlotPtrTable[];       // @ 0x825F3868 (4 bytes per slot)
 extern uint32_t g_sceneSlotTypeTable[];      // @ 0x825F3968 (4 bytes per slot)
 extern void*    g_gameDataMgr;               // @ 0x82645A44 — +24 holds select-gate byte
-extern void*    g_selectionKillSignal;       // @ 0x825C9F28 — +4 non-zero = force deactivate
+extern "C" uint32_t g_selectionKillSignal[2];       // @ 0x825C9F28 — +4 non-zero = force deactivate
 
 /**
  * pongCharViewContext::RegisterSceneSlot (vfn_11)

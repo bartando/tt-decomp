@@ -855,11 +855,11 @@ const char* RequestDataMessage::vfn_7() {
 // Each player slot has button state fields that are checked via CheckButtonPressed.
 //
 // Network setup involves:
-//  - Acquiring the loop guard via PollButtonState
+//  - Acquiring the loop guard via hudFlashBase_IsNetworkDirty
 //  - Checking a global singleton flag
 //  - Finding a network message slot via snSession_FindProperty
 //  - Initializing the message slot with values 1 and 3
-//  - Releasing the acquired guard via InitiateConnection
+//  - Releasing the acquired guard via hudFlashBase_PublishPageGroup
 //  - Setting the ready flag at this+24 to 1
 // ===========================================================================
 void SinglesNetworkClient::CheckAllPlayersReady()
@@ -899,7 +899,7 @@ setup_network:
     void* networkClient = (void*)(uintptr_t)m_pNetworkSession;
 
     // Query network status
-    uint8_t networkStatus = PollButtonState(networkClient);
+    uint8_t networkStatus = hudFlashBase_IsNetworkDirty(networkClient);
 
     // Check global singleton flag at offset +556
     extern void* g_pAtSingleton;  // @ 0x821EAB08
@@ -929,7 +929,7 @@ setup_network:
 
     // Perform network client update if status is non-zero
     if (networkStatus != 0) {
-        InitiateConnection(networkClient);
+        hudFlashBase_PublishPageGroup(networkClient);
     }
 
     // Mark all players as ready

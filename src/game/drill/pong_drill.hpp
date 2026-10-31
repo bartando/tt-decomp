@@ -419,7 +419,7 @@ public:
     virtual uint32_t GetProgressTarget();                     // vfn_16 @ 0x8210D360
     virtual int  GetDrillTypeIndex() { return 0; }           // vfn_17 — drill type ID (overridden per subclass)
     virtual const char* GetConfigName() { return ""; }       // vfn_18
-    virtual void vfn_19() {}
+    virtual uint8_t GetRobotMode() { return 1; }              // vfn_19
     virtual void vfn_20() {}
     virtual bool HasActiveTarget() { return false; }         // vfn_21
     virtual bool IsOver() { return false; }                  // vfn_22 — pongDrillMovement: its finished byte
@@ -431,6 +431,8 @@ public:
     virtual void OnBallMiss() {}                             // vfn_28
     virtual void OnRallyEnd(void* pRallyEvent);              // vfn_29 @ 0x8210D660
     virtual void OnPointScored() {}                          // vfn_30
+    virtual void ChooseRobotTarget(void* event);             // vfn_31 @ 0x8210D8B0
+    virtual uint8_t UseAlternateAttemptEvent() { return 1; } // vfn_32
 
 protected:
     // Inline in the original's subclasses too, so no addresses of their own.
@@ -657,7 +659,7 @@ public:
 
     virtual void Init() override {}
 
-    void ChooseRobotTarget(); // 0x82111A98
+    void ChooseRobotTarget(void* event) override; // vfn_31 @ 0x82111A98
 
 private:
     pongTrainingDrillConfig* m_pDrillConfig;  // +0x24 (overrides base class config field, or additional)

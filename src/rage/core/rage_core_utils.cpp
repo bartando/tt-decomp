@@ -25,6 +25,7 @@
 #include <cmath>
 #include "game/template_registry.hpp"
 #include "rage/singleton.h"
+#include "rage/sys_callback.hpp"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Forward declarations
@@ -369,22 +370,58 @@ struct atRegistryPool {
 // @ 0x82618550
 atRegistryPool g_atRegistryPool = {};
 
-/**
- * sysCallback_Invoke — Invoke a system callback
- *
- * On Xbox 360, this loaded a function pointer from the callback object
- * and called it with the given code. The callback object layout:
- *   +0: parameter (void*)
- *   +4: function pointer
- */
-extern "C" void sysCallback_Invoke(void* a, int b) {
-    if (!a) return;
-    // Callback object: +0 = param, +4 = function pointer
-    void* param = *(void**)a;
-    typedef void (*CallbackFn)(void*);
-    CallbackFn fn = *(CallbackFn*)((uint8_t*)a + sizeof(void*));
-    if (fn) {
-        fn(param);
+namespace {
+struct SystemCallback {
+    void* target;
+    void (*function)();
+    void* storedArgument;
+    uint32_t kind;
+};
+#if UINTPTR_MAX == 0xFFFFFFFFu
+static_assert(offsetof(SystemCallback, kind) == 0x0C, "callback kind offset");
+#endif
+}
+
+// A bound callback prepends its target. Kinds 2 and 3 pass the stored
+// argument, kinds 3 and 4 pass the runtime argument; kind 1 passes neither.
+// Unknown kinds, including the empty callback (0), do nothing.
+// @ 0x8225FFF8 | size: 0xE0
+extern "C" void sysCallback_Invoke(void* object, void* argument) {
+    const auto* callback = static_cast<const SystemCallback*>(object);
+    if (callback->target) {
+        switch (callback->kind) {
+        case 1:
+            reinterpret_cast<void (*)(void*)>(callback->function)(callback->target);
+            break;
+        case 2:
+            reinterpret_cast<void (*)(void*, void*)>(callback->function)(
+                callback->target, callback->storedArgument);
+            break;
+        case 3:
+            reinterpret_cast<void (*)(void*, void*, void*)>(callback->function)(
+                callback->target, callback->storedArgument, argument);
+            break;
+        case 4:
+            reinterpret_cast<void (*)(void*, void*)>(callback->function)(
+                callback->target, argument);
+            break;
+        }
+    } else {
+        switch (callback->kind) {
+        case 1:
+            callback->function();
+            break;
+        case 2:
+            reinterpret_cast<void (*)(void*)>(callback->function)(callback->storedArgument);
+            break;
+        case 3:
+            reinterpret_cast<void (*)(void*, void*)>(callback->function)(
+                callback->storedArgument, argument);
+            break;
+        case 4:
+            reinterpret_cast<void (*)(void*)>(callback->function)(argument);
+            break;
+        }
     }
 }
 
@@ -1019,7 +1056,6 @@ extern "C" const FakeTypeInfo _ZTI8hsmState = { nullptr, "hsmState" };
 extern void atArray_Clear(void* arr);
 extern void audControl_Destructor(void* pControl);
 extern void hsmContext_SetNextState(void* ctx, int state);
-extern void sysCallback_Invoke(void* callback, int code);
 
 extern "C" {
 

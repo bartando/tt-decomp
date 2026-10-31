@@ -10,8 +10,10 @@
  */
 
 #include "pong_gameplay_queries.hpp"
+#include "game/game_message.hpp"
 #include "pong_player.hpp"
 #include "../creature/pong_creature.hpp"
+#include "../../anim/locomotion.hpp"
 #include <cstring>   // memset
 #include <cmath>     // fabsf
 #include <cfloat>    // FLT_MAX
@@ -34,10 +36,6 @@ extern void pongPlayer_UpdateLocomotionState(pongPlayer* state);  // @ 0x820CC67
 
 // LocomotionStateAnim helpers — update animation list entries.
 // C128 = standard transition, C288 = alternate (flag-gated) transition.
-extern void LocomotionStateAnim_BlendLocomotionAnims(uint32_t entry, void* unusedR4,
-                                                   void* skeleton, float weight);
-extern void LocomotionStateAnim_TransitionLocomotionState(uint32_t entry, void* unusedR4,
-                                                        void* skeleton, float weight);
 
 
 // ── External game helpers referenced by pong_player.cpp ───────────────────
@@ -51,6 +49,7 @@ extern const float g_kZero;              // zero float constant
 extern float g_pInputScoreTable[];       // @ 0x825EAB40  float per input slot
 extern void* g_pLerpQueue;               // lerp queue global
 extern void* g_pInputObj;               // input object global
+extern "C" void* g_input_obj_ptr;        // @ 0x825EAB28
 extern void* g_pButtonStateTable;        // button state table (int32_t array)
 extern const float g_kOneMinusAlpha;     // constant
 // pongPlayer_ClampSwingToBounds: r3=playerState ptr, r4=swingVec, r5=uint8_t suppressFlip
@@ -58,7 +57,6 @@ extern void pongPlayer_ClampSwingToBounds(void* playerState, vec3* swingVec, uin
 // pongPlayer_SelectSwingTarget: returns int; r3=playerState, r4=int, r5=swingStr*, r6=targetDir*, r7=int
 extern int  pongPlayer_SelectSwingTarget(void* playerState, int r4, vec3* swingStrength, vec3* targetDir, int r5);
 extern void game_D468(void* obj, vec3* v);               // geometry helper
-extern bool pongPlayer_IsLocoStateReady(void* locoState);          // loco check
 extern int  io_Input_poll_9D68(void* inputObj);           // 0=active input
 extern void pongLerpQueue_Update(void* queue);            // lerp queue update
 
@@ -95,7 +93,6 @@ extern float     g_kFrameToSecScale;             // frames-to-seconds   @ 0x8202
 
 extern bool CheckButtonPressed(void* record);                              // pg_FFF8_g @ 0x821DFFF8
 extern void PostPageGroupMessage(void* rec, int code, int mask, int a3, int opActive); // pg_E6E0
-extern void pongPlayer_ComputeStepDelta(void* obj, int maxSteps, float* outDelta);   // @ 0x821E0508
 extern bool pongPlayer_CheckServeInput(pongPlayer* p);                            // @ 0x82195B60
 extern void pongPlayer_InitActionState(void* actionState, int released);            // @ 0x821A1460
 
@@ -141,7 +138,7 @@ extern void  nop_8240E6D0(const char* fmt, ...);                                
 extern void  pongPlayer_Deactivate(void* entry);                                         // @ 0x8218BDC0
 extern void  pongPlayer_5C00_g(void* playerPtr, int32_t param);                          // @ 0x82195C00
 extern bool  pongPlayer_99B0_g(float* valuePtr, float startVal, float ratio, float step);// @ 0x820C99B0
-extern float pongPlayer_0508_g(void* obj, int channel, float inputVal);                  // @ 0x821E0508
+extern float pongPlayer_0508_g(void* obj, int channel);                                  // @ 0x821E0508
 
 // ── External globals for batch 10 implementations ────────────────────────
 extern void*       g_pCourtGeomSingleton;     // @ 0x8271A304 — court geometry singleton
@@ -150,7 +147,6 @@ extern const float g_kFloatConst_D168;        // @ 0x8202D168 — grid reset flo
 extern float       g_swingSlotGridDefault;    // @ 0x825CAF7C — writable grid default
 extern const float g_kPositiveSideSign;       // @ 0x825C5938 — positive court side sign
 extern const float g_kTransitionStep;         // @ 0x825CAEC0 — transition blend step size
-extern const float g_kSwingTargetConst;       // @ 0x825C80FC — swing target input constant
 extern void*       g_pPlayerSlotLookup;       // @ 0x8271A32C — player slot lookup global
 
 // Forward declarations for functions implemented at end of file
@@ -168,7 +164,7 @@ void pongPlayer_06A0_g(float* outVec, pongPlayer* player);  // ComputeSwingTarge
 
 // Swing/target helpers
 extern void pongPlayer_ComputeTargetPosition(vec3* outVec, void* targetStruct);
-extern float fiAsciiTokenizer_ParseFloat(float input);
+extern double crt_tan(double input); // @ 0x82432628
 extern void pongPlayer_ComputeCourtPosition(vec3* outVec, void* targetData);
 extern void pongPlayer_GetCourtBounds(void* self, int r4, void* p3, void* p4, int p5, void* p6, void* p7, uint8_t metadataByte);
 extern void pongPlayer_InterpolateCourtPoint(void* adjustedVec, void* gridBase, void* p3, void* p4, void* p5);
@@ -244,23 +240,24 @@ bool pongPlayer::IsCreatureStateReady() const {
     if (!m_bActive) {
         return false;
     }
-    return m_pCreatureState->IsReady();   // vtable slot 7
+    return m_pCreatureState->IsReady() != 0;
 }
 
 /**
  * pongPlayerState::IsCreatureState2Active()  @ 0x820CD6B8 | size: 0x80
  *
  * Checks the secondary creature-state object (m_pCreatureState2) via two
- * virtual queries: IsActive (slot 6) then IsReady (slot 7).  Both must pass.
+ * virtual queries: IsActive (slot 6) must be false, then IsReady (slot 7)
+ * must be true. The second query reloads the state pointer after the first.
  */
 bool pongPlayer::IsCreatureState2Active() const {
     if (!m_pCreatureState2) {
         return false;
     }
-    if (!m_pCreatureState2->IsActive()) {  // vtable slot 6
+    if (m_pCreatureState2->IsActive() != 0) {
         return false;
     }
-    return m_pCreatureState2->IsReady();   // vtable slot 7
+    return m_pCreatureState2->IsReady() != 0;
 }
 
 
@@ -329,15 +326,15 @@ void pongPlayer::UpdateAnimationState() {
     void* listObj = inRange ? *reinterpret_cast<void**>(reinterpret_cast<uint8_t*>(this) + 0x50)
                             : m_pLocoState2;
     uint32_t* listWords = static_cast<uint32_t*>(listObj);
-    uint32_t* entries   = reinterpret_cast<uint32_t*>(listWords[2]);  // +8
+    void** entries = *reinterpret_cast<void***>(static_cast<uint8_t*>(listObj) + 8);
     uint16_t  count     = static_cast<uint16_t>(listWords[3]);        // +12
 
     for (int i = 0; i < (int)count; ++i) {
         if (useBlend) {
-            LocomotionStateAnim_BlendLocomotionAnims(entries[i], nullptr, m_pParent,
+            LocomotionStateAnim_C128_g(entries[i], nullptr, m_pParent,
                                                    g_recoveryTimerThreshold);
         } else {
-            LocomotionStateAnim_TransitionLocomotionState(entries[i], nullptr, m_pParent,
+            LocomotionStateAnim_C288_g(entries[i], nullptr, m_pParent,
                                                         g_recoveryTimerThreshold);
         }
     }
@@ -768,7 +765,7 @@ bool pongPlayer::IsActionComplete() const
 
 // ===========================================================================
 // SECTION 15 — SetSwingActiveState  @ 0x820C7C78 | size: 0x6C
-// Called from: pongPlayer_StartSwing, pongPlayer_7038_g, pongPlayer_SetPlayMode,
+// Called from: pongPlayer_StartSwing, pongPlayer_7038_g, pongPlayer_5C00_g,
 //              pg_6CF8, pongPlayer_BEE0_g, ref_PostLoadProperties_CCB0
 //
 // Updates the m_bSwingActive flag at +197 (+0xC5) with transition logging.
@@ -866,7 +863,7 @@ bool pongPlayer::CheckOpponentSwingApex() const
 //         is also active. Call PostPageGroupMessage to fire the "button down" event
 //         with code 2125.
 //       - If held (not new): accumulate a float into the record via
-//         pongPlayer_ComputeStepDelta (reads swing data) and fmadds/fadds into the
+//         pongPlayer_0508_g (reads analog input) and fmadds/fadds into the
 //         record's score field. This implements "power charging" while
 //         the button is held.
 //
@@ -920,9 +917,8 @@ void pongPlayer::CheckButtonInput()
                 /*unused*/ 0, /*opponentActive*/ (int)opponentActive);
     } else {
         // Button held: accumulate power into the record's score float.
-        // Compute delta via pongPlayer_ComputeStepDelta then blend via fmadds or fadds.
-        float delta = 0.0f;
-        pongPlayer_ComputeStepDelta(record, /*maxSteps*/ 30, &delta);
+        // Read the analog-axis float return, then blend via fmadds or fadds.
+        const float delta = pongPlayer_0508_g(record, 30);
 
         // Blend constant from global table: g_kPowerBlend @ 0x825C2EA0
         float blend = g_kPowerBlend;
@@ -1221,7 +1217,7 @@ void pongPlayer::UpdateSwingTimingAdjustment() {
     float timingFactor = clockValue * g_kTimingConstant;
 
     // Step 4: Call math function
-    float mathResult = fiAsciiTokenizer_ParseFloat(scaledPhase * g_kFloatConst_79BAC);  // was g_kAdjustmentScale @ 0x82079BAC
+    float mathResult = static_cast<float>(crt_tan(scaledPhase * g_kFloatConst_79BAC));  // was g_kAdjustmentScale @ 0x82079BAC
     
     // Step 5: Compute adjustment magnitude
     float adjustment = mathResult * timingFactor;
@@ -1755,49 +1751,6 @@ float pongPlayer::GetSwingPhaseValue() const {
 }
 
 /**
- * pongPlayer::IsSwingInputBlocked()  @ 0x820CD660 | size: 0x54
- *
- * Returns true when swing input should be blocked due to creature state.
- * Checks if the creature state is NOT ready (inverse of IsCreatureStateReady).
- *
- * Note: This is a wrapper that inverts the logic for clarity at call sites.
- */
-bool pongPlayer::IsSwingInputBlocked() const {
-    if (!m_bActive) {
-        return true;  // Blocked if not active
-    }
-    
-    // Blocked if creature state is NOT ready
-    return !m_pCreatureState->IsReady();
-}
-
-/**
- * pongPlayer::GetAnimationBlendWeight()  @ 0x820CD6B8 | size: 0x80
- *
- * Returns the animation blend weight from the secondary creature state.
- * Used for blending between animation states during transitions.
- *
- * Returns 0.0f if the creature state doesn't exist or isn't active.
- */
-float pongPlayer::GetAnimationBlendWeight() const {
-    if (!m_pCreatureState2) {
-        return 0.0f;
-    }
-    
-    if (!m_pCreatureState2->IsActive()) {
-        return 0.0f;
-    }
-    
-    if (!m_pCreatureState2->IsReady()) {
-        return 0.0f;
-    }
-    
-    // Return blend weight from creature state (+offset TBD)
-    // For now, return a placeholder
-    return 1.0f;
-}
-
-/**
  * pongPlayer::GetCurrentSwingStrength()  @ 0x820CD5F0 | size: 0x70
  *
  * Returns the current swing strength value from the anim state.
@@ -1834,11 +1787,7 @@ float pongPlayer::GetCurrentSwingStrength() const {
 extern void pongPlayer_EF38_g(void* self, uint8_t r9, uint8_t r10, uint32_t r6,
                                uint32_t r3, float f3, float f2, float f1);
 extern void pongPlayer_F2A0_g(void* self, void* subObj);
-extern void pongPlayer_SetPlayMode(pongPlayer* p, int param);
-extern void pongMover_CalcInitMatrix(void* out, void* inst);
-extern void pongPlayer_SetupShotTarget(void* target, float f1, float f2);
-extern void pg_E6E0(int code, uint8_t mask, int p3, int p4);
-extern void pongPlayer_9108_g(void* target, void* syncData);
+extern uint32_t pongPlayer_SetupShotTarget(void* target, vec3* position, float f1, float f2); // @ 0x821A5DF8
 
 // g_pCamShotMgr @ 0x8271A318 and g_pCameraSharedState @ 0x8271A32C declared at file scope
 
@@ -1972,39 +1921,27 @@ void pongPlayer::UpdateCreatureSlotAnims(uint8_t resetFlag) {  // pongPlayer_87B
  *
  * Called from pongPlayer_Process. Initializes movement state and checks
  * for ball contact readiness:
- *   1. Calls pongPlayer_SetPlayMode(0) to reset movement state.
+ *   1. Calls pongPlayer_5C00_g(0) to reset movement state.
  *   2. If slot is null in validation table, or IsInputActiveAndReady
  *      returns true, computes the initial position matrix and sets up
  *      the contact zone parameters.
  */
 void pongPlayer::InitMovementAndContact() {  // pongPlayer_5D50_g @ 0x82195D50
-    pongPlayer_SetPlayMode(this, 0);
+    pongPlayer_5C00_g(this, 0);
+    auto* player = reinterpret_cast<uint8_t*>(this);
+    const uint32_t slot = *reinterpret_cast<uint32_t*>(player + 0x1D0);
+    const auto* settings = static_cast<const int32_t*>(g_input_obj_ptr);
+    if (settings[slot + 14] != 0 && !pongPlayer_CheckServeInput(this)) return;
 
-    uint32_t slotIndex = m_slotIndex;  // +464
-    uint32_t* validationTable = g_pPlayerSlotTable;
-    uint32_t slotEntry = validationTable[slotIndex + 14];
-
-    bool needsInit = (slotEntry == 0);
-
-    if (!needsInit) {
-        if (!pongPlayer_CheckServeInput(this)) {
-            return;
-        }
-    }
-
-    // Compute initial position matrix from creature instance (+452 -> +168)
-    void* creatureState = m_pCreatureState;  // +452
-    void* creatureInst = *reinterpret_cast<void**>(
-        static_cast<uint8_t*>(static_cast<void*>(creatureState)) + 168);
-
-    float localMatrix[16];
-    pongMover_CalcInitMatrix(localMatrix, creatureInst);
-
-    // Set up contact zone with scale constants
-    extern const float g_kContactScale1;  // @ 0x825C8A50
-    extern const float g_kContactScale2;  // @ 0x825C8080
-    void* shotState = m_pShotState;  // +496
-    pongPlayer_SetupShotTarget(shotState, g_kContactScale1, g_kContactScale2);
+    void* creature = *reinterpret_cast<void**>(player + 0x1C4);
+    auto* mover = *reinterpret_cast<pongMover**>(static_cast<uint8_t*>(creature) + 0xA8);
+    alignas(16) float matrix[16];
+    pongMover::CalcInitMatrix(matrix, mover, 0);
+    extern const float g_kContactScale1; // @ 0x825C8A50
+    extern const float g_kContactScale2; // @ 0x825C8080
+    void* shotState = *reinterpret_cast<void**>(player + 0x1F0);
+    pongPlayer_SetupShotTarget(shotState, reinterpret_cast<vec3*>(matrix + 12),
+                              g_kContactScale1, g_kContactScale2);
 }
 
 
@@ -2041,7 +1978,7 @@ void pongPlayer::ResetSwingSlotEntries(void* slotsBase) {  // pongPlayer_6080_p3
  *
  * When a slot's dirty byte is clear, sends a page-group notification
  * (code 4130 with slot mask | 64) and marks it dirty. Then synchronises
- * via pongPlayer_9108_g (SyncByteField).
+ * via SyncByteField.
  *
  * Used for network synchronisation of player slot state changes.
  */
@@ -2067,7 +2004,7 @@ void pongPlayer::NotifySlotChangeAndSync(void* slotsBase, uint32_t slotIndex,
 
     if (dirtyFlag == 0) {
         uint8_t slotMask = static_cast<uint8_t>(1 << slotIndex) | 64;
-        pg_E6E0(4130, slotMask, 1, static_cast<int>(columnIndex));
+        PostGameMessage(4130, slotMask, 1, &columnIndex);
 
         *(base + slotIndex + 288) = 1;
     }
@@ -2075,7 +2012,7 @@ void pongPlayer::NotifySlotChangeAndSync(void* slotsBase, uint32_t slotIndex,
     // Sync byte field
     uint8_t syncBuf[4];
     syncBuf[0] = 1;
-    pongPlayer_9108_g(dirtyAddr, syncBuf);
+    SyncByteField(dirtyAddr, syncBuf);
 }
 
 
@@ -2306,7 +2243,7 @@ int pongPlayer::CompareTypeNames(void* a, void* b) {  // pongPlayer_F0B8_p46 @ 0
  *
  * Checks whether the player's locomotion sub-system is in a ready state.
  * Traverses: this+452 -> +188 -> +120 to get a locomotion object.
- * If null, returns false.  Otherwise calls pongPlayer_IsLocoStateReady on that
+ * If null, returns false.  Otherwise calls pongAnimClip_IsPlaybackReady on that
  * object+32 and returns true if it succeeds, false otherwise.
  */
 bool pongPlayer::IsLocomotionReady() const {  // pongPlayer_2578_g @ 0x82192578
@@ -2323,7 +2260,7 @@ bool pongPlayer::IsLocomotionReady() const {  // pongPlayer_2578_g @ 0x82192578
         return false;
     }
     void* locoState = static_cast<uint8_t*>(locoObj) + 32;
-    return pongPlayer_IsLocoStateReady(locoState);
+    return pongAnimClip_IsPlaybackReady(locoState);
 }
 
 
@@ -2337,34 +2274,21 @@ bool pongPlayer::IsLocomotionReady() const {  // pongPlayer_2578_g @ 0x82192578
  *  1. Checking a handedness flag via the geometry singleton (byte at
  *     field+464+global_offset+64), converting to a "flip" boolean.
  *  2. Calling pongPlayer_3628_g(this, flipFlag) to set serve-side.
- *  3. Calling game_C690(this) to compute the reset position.
- *  4. Calling pongMover_Reset on the mover sub-object at (this+452)->+168
- *     with the position result.
+ *  3. Querying game_C690(this) for the alternate rest-pose flag.
+ *  4. Resetting the mover at (this+452)->+168 using that flag.
  */
 // pongPlayer_3628_g (SetServeSideFlip) — implemented at end of file
-extern void* game_C690(pongPlayer* player);
-extern void pongMover_Reset(void* mover, void* position);
-extern uint32_t g_kGeomOffset;  // @ 0x825EAB28  a pointer in the asm (lwz, then added to the slot index)
+extern uint8_t game_C690(pongPlayer* player); // @ 0x8218C690
 
 void pongPlayer::ResetServePosition() {  // pongPlayer_36D8_g @ 0x821936D8
-    uint32_t fieldOffset = static_cast<uint32_t>(this->m_inputSlotIdx);
-    uint8_t* geomBase = reinterpret_cast<uint8_t*>(
-        static_cast<uintptr_t>(fieldOffset + g_kGeomOffset));
-    uint8_t handFlag = geomBase[64];
-    // cntlzw + rlwinm: convert 0 -> 1, nonzero -> 0
-    uint8_t flip = (handFlag == 0) ? 1 : 0;
-
-    pongPlayer_3628_g(this, flip);
-
-    void* posResult = game_C690(this);
-
-    // NOTE: opponent (+452) holds a pongMover at +168 (+0xA8) inside its
-    //       own player state — used here to snap the opponent's serve-side
-    //       mover to the result of game_C690. Opponent chain confirmed via
-    //       the class-context field map.
-    uint8_t* sub = reinterpret_cast<uint8_t*>(this->m_pOpponent);
-    void* mover = *reinterpret_cast<void**>(sub + 168);
-    pongMover_Reset(mover, posResult);
+    auto* player = reinterpret_cast<uint8_t*>(this);
+    const uint32_t slot = *reinterpret_cast<uint32_t*>(player + 0x1D0);
+    const uint8_t handedness = static_cast<const uint8_t*>(g_input_obj_ptr)[slot + 64];
+    pongPlayer_3628_g(this, handedness == 0);
+    const bool alternate = game_C690(this) != 0;
+    void* creature = *reinterpret_cast<void**>(player + 0x1C4);
+    auto* mover = *reinterpret_cast<pongMover**>(static_cast<uint8_t*>(creature) + 0xA8);
+    mover->Reset(alternate);
 }
 
 
@@ -2464,7 +2388,7 @@ void pongPlayer::ComputePositionWithOffset() {  // pongPlayer_6308_g @ 0x821D630
 
 
 // 0x821E0270 maps a button id through a pad record's flags.
-extern int pongPad_RemapButton(void* pad, int32_t button);  // @ 0x821E0270
+extern "C" int pongPlayer_0270_g(const void* pad, int32_t button);  // @ 0x821E0270
 
 // ===========================================================================
 // SECTION 33 — pongPlayer_04B0_g  @ 0x821E04B0 | size: 0x54 (84 bytes)
@@ -2478,7 +2402,7 @@ extern int pongPad_RemapButton(void* pad, int32_t button);  // @ 0x821E0270
  * bit 7 differs between bytes 0 and 3 of that entry.
  */
 bool pongPlayer_04B0_g(void* pad, int32_t button) {
-    int index = pongPad_RemapButton(pad, button);
+    int index = pongPlayer_0270_g(pad, button);
     const uint8_t* entries = *reinterpret_cast<uint8_t* const*>(static_cast<uint8_t*>(pad) + 0x31C);
     const uint8_t* entry = entries + index * 4;
     return static_cast<uint8_t>(entry[3] ^ entry[0]) > 127;
@@ -2496,7 +2420,7 @@ bool pongPlayer_04B0_g(void* pad, int32_t button) {
  * Compares byte[0] of target with byte[0] of source.  If different:
  *   - If field +8 (callback pointer) is non-null, invokes the callback
  *     with field +4 as the argument (marks the field dirty for network sync).
- *   - Copies the new byte value from source to target.
+ *   - Reloads the source byte after the callback, then copies it to target.
  */
 void pongPlayer::SyncByteField(void* target, void* source) {  // pongPlayer_9108_g @ 0x82199108
     uint8_t* tgt = static_cast<uint8_t*>(target);
@@ -2509,7 +2433,7 @@ void pongPlayer::SyncByteField(void* target, void* source) {  // pongPlayer_9108
             void* arg = *reinterpret_cast<void**>(tgt + 4);
             reinterpret_cast<void(*)(void*)>(callback)(arg);
         }
-        tgt[0] = newVal;
+        tgt[0] = *static_cast<uint8_t*>(source);
     }
 }
 
@@ -3389,14 +3313,14 @@ void pongPlayer::FindRegisteredListener(void* unused, void* target) {
 extern void  pongPlayer_FD20_g(void* a, int b, void* c, void* d,
                                int e, void* f, void* g, unsigned char h); // @ 0x821EFD20
 // pongPlayer_InterpolateCourtGridPosition — forward declared at top of file with correct 6-param signature
-// Clock/config query — returns timing/state data from match config
-extern void* pongPlayer_7CC0_g(void* matchConfig);                     // @ 0x821E7CC0
+// Camera-side predicate — returns a byte, not a pointer
+extern uint8_t pongPlayer_7CC0_g(void* matchConfig);                   // @ 0x821E7CC0
 // Player record entry setup — configures a slot in the player data table
 extern void  pongPlayer_05A8_g(void* entry, uint8_t metaByte,
-                               void* clockData);                       // @ 0x821E05A8
-// Normalize sub-struct extent vector (float param = threshold via f1)
-extern void  pongPlayer_4EA0_g(void* sub, float normalizeVal);         // @ 0x821D4EA0
-// Compute interpolated position into output buffer
+                               uint8_t cameraSide);                     // @ 0x821E05A8
+// Clamp the vector length between f1 and f2.
+extern void  pongPlayer_4EA0_g(void* sub, float minLength, float maxLength);         // @ 0x821D4EA0
+// Convert the local spin axis into world space
 extern void  pongPlayer_5010_g(void* sub, void* output,
                                void* parent, int flag);                // @ 0x821D5010
 
@@ -3411,7 +3335,7 @@ extern const float g_kPercentScale;      // flt_8202D118 @ 0x8202D118 (100.0f, .
 /**
  * Registers a value into a player record slot.
  *
- * Queries match config for a clock/timing value via pongPlayer_7CC0_g,
+ * Queries the camera-side flag via pongPlayer_7CC0_g,
  * reads a metadata byte from the caller's data region, looks up a slot
  * index from the player records table at [index+1], and — if valid
  * (0–3) — stores the value at entry+20 and calls pongPlayer_05A8_g
@@ -3422,8 +3346,8 @@ extern const float g_kPercentScale;      // flt_8202D118 @ 0x8202D118 (100.0f, .
  * @param value  Value to store at the record entry's offset +20
  */
 extern "C" void pongPlayer_9C60_g(void* base, int index, uint32_t value) {
-    // Get timing state from match config
-    void* clockData = pongPlayer_7CC0_g(g_pCameraSharedState);
+    // Get the camera-side flag
+    uint8_t cameraSide = pongPlayer_7CC0_g(g_pCameraSharedState);
 
     // Read metadata byte from caller's data region
     uint8_t metaByte = *reinterpret_cast<uint8_t*>(
@@ -3437,7 +3361,7 @@ extern "C" void pongPlayer_9C60_g(void* base, int index, uint32_t value) {
         uint8_t* entry = reinterpret_cast<uint8_t*>(g_pPlayerRecords)
                          + slotIdx * 808;
         *reinterpret_cast<uint32_t*>(entry + 20) = value;
-        pongPlayer_05A8_g(entry + 12, metaByte, clockData);
+        pongPlayer_05A8_g(entry + 12, metaByte, cameraSide);
     }
 }
 
@@ -3658,9 +3582,9 @@ extern "C" void pongPlayer_6360_g(void* self, void* bounds) {
     *reinterpret_cast<float*>(sub + 4) = widthDiff;
 
     // Normalize extent vector
-    pongPlayer_4EA0_g(sub, g_swingPhaseThreshold);
+    pongPlayer_4EA0_g(sub, 0.0f, 1.0f);
 
-    // Compute interpolated position → output at sub+16
+    // Convert to world-space spin → output at sub+16
     pongPlayer_5010_g(sub, sub + 16, self, 1);
 }
 
@@ -3728,9 +3652,9 @@ extern "C" void pongPlayer_62C0_g(pongPlayer* self, uint8_t resetFlag) {
  *   sub[0] += depthDiff  (z1 - z0)
  *   sub[4] += widthDiff  (x0 - x1)
  *
- * Then normalizes and recomputes interpolated position.
+ * Then clamps its length and recomputes world-space spin.
  */
-extern "C" void pongPlayer_63E8_g(void* self, void* bounds) {
+extern "C" void pongPlayer_63E8_g(void* self, void* bounds, float /*unused*/, float maxLength) {
     uint8_t* base = reinterpret_cast<uint8_t*>(self);
     float* rect   = reinterpret_cast<float*>(bounds);
 
@@ -3752,9 +3676,9 @@ extern "C" void pongPlayer_63E8_g(void* self, void* bounds) {
     *reinterpret_cast<float*>(sub + 0) = oldDepth + depthDiff;
 
     // Normalize extent vector
-    pongPlayer_4EA0_g(sub, g_swingPhaseThreshold);
+    pongPlayer_4EA0_g(sub, 0.0f, maxLength);
 
-    // Compute interpolated position → output at sub+16
+    // Convert to world-space spin → output at sub+16
     pongPlayer_5010_g(sub, sub + 16, self, 1);
 }
 
@@ -3935,7 +3859,7 @@ void pongPlayer_3628_g(pongPlayer* player, uint8_t flip) {  // SetServeSideFlip 
         uint32_t opponentEntry = dataEntries[slotIdx + 1];
 
         // Get player handedness from slot lookup
-        void* handedness = pongPlayer_7CC0_g(g_pPlayerSlotLookup);
+        uint8_t handedness = pongPlayer_7CC0_g(g_pPlayerSlotLookup);
 
         // Compute opponent record base: table + entry*808 + 12
         void* recordBase = g_pPlayerDataTable + opponentEntry * 808 + 12;
@@ -4232,7 +4156,6 @@ void pongPlayer_D6C8_fw(void* animTransObj) {  // ResetAnimTransitionState @ 0x8
  */
 void pongPlayer_06A0_g(float* outVec,
                        pongPlayer* player) {  // ComputeSwingTargetDelta @ 0x821906A0
-    float inputConst = g_kSwingTargetConst;   // @ 0x825C80FC
     int32_t slotIdx = player->m_inputSlotIdx;
 
     // Look up opponent record from player data table
@@ -4241,22 +4164,22 @@ void pongPlayer_06A0_g(float* outVec,
     void* recordBase = g_pPlayerDataTable + opponentEntry * 808 + 12;
 
     // Get swing deltas for channels 31 and 30
-    float delta1 = pongPlayer_0508_g(recordBase, 31, inputConst);
-    float delta2 = pongPlayer_0508_g(recordBase, 30, inputConst);
+    float delta1 = pongPlayer_0508_g(recordBase, 31);
+    float delta2 = pongPlayer_0508_g(recordBase, 30);
 
     // Store negated deltas
     outVec[1] = -delta1;
     outVec[0] = -delta2;
 
     // Get computed handedness from global slot lookup
-    void* computedHandedness = pongPlayer_7CC0_g(g_pPlayerSlotLookup);
+    uint8_t computedHandedness = pongPlayer_7CC0_g(g_pPlayerSlotLookup);
 
     // Read stored handedness from geometry table
     uint8_t* geomBase = static_cast<uint8_t*>(g_pInputObj) + slotIdx;
     uint8_t storedHandedness = geomBase[64];
 
     // If handedness matches (XOR == 0): negate again → original direction
-    if ((storedHandedness ^ static_cast<uint8_t>(reinterpret_cast<uintptr_t>(computedHandedness) & 0xFF)) == 0) {
+    if ((storedHandedness ^ computedHandedness) == 0) {
         outVec[0] = -outVec[0];
         outVec[1] = -outVec[1];
     }
@@ -4289,7 +4212,7 @@ void* pongMatch_GetCharacterForSlot(void* /*match*/, uint32_t playerSlot) {
     return characters[characterIndex];
 }
 
-extern void phBoundCapsule_0880_g(void* capsule, void* outMatrix, uint32_t param);
+extern void phBoundCapsule_0880_g(void* capsule, void* outMatrix, void* samplingState);
 extern float pongPlayer_C7A8_g(pongPlayer* player);
 extern void pongPlayer_B088_2hr(void* timingData, float dir, float power);
 extern void pongPlayer_E2C8_g(void* obj, int a, int b, int c, int d);
@@ -4298,7 +4221,6 @@ extern bool pongPlayer_D6B8_IsCreatureReady(void* characterSub);
 extern void ServeStartedMessage_CFE8_2h(void* msgObj, void* targetData, int param);
 extern void PlayerMovementMessage_D258_2hr(void* msgObj, float posX, float posZ);
 extern void pongPlayer_B208_g(void* state, vec3* swingVec, uint8_t suppressFlip);
-extern void pg_E6E0_msg(int messageId, int flags, int count, void* data);
 
 extern uint32_t g_rngState[2];              // RNG state (lo, hi) @ 0x825CA2C8
 extern const float g_kFloatConst_79E68;     // random scale factor @ 0x82079E68
@@ -4337,8 +4259,8 @@ void pongPlayer::UpdateOpponentBoundTransform() {  // pongPlayer_4C08_g @ 0x8219
     void* boundCapsule = *reinterpret_cast<void**>(chainEntry + 324);
 
     // Compute transform matrix from bound capsule
-    vec3 transformMatrix[4];  // 4x16 = 64 bytes
-    uint32_t meshParam = *reinterpret_cast<uint32_t*>(characterSub + 28);
+    alignas(16) vec3 transformMatrix[4];  // 4x16 = 64 bytes
+    void* meshParam = *reinterpret_cast<void**>(characterSub + 28);
     phBoundCapsule_0880_g(boundCapsule, transformMatrix, meshParam);
 
     // Copy matrix to locomotion state data at +32
@@ -4413,9 +4335,9 @@ void pongPlayer::ResetButtonSlotTrackingData(
             slotResult = flag1 ? 1 : (flag2 ? 2 : 0);
         }
 
-        // Post tracking reset event (pg_E6E0 @ 0x8225E6E0)
+        // Post tracking reset event (PostGameMessage @ 0x8225E6E0)
         uint8_t bitMask = static_cast<uint8_t>((1 << slotIndex) & 0xFF) | 64;
-        pg_E6E0_msg(4131, static_cast<int>(bitMask), 1, &slotResult);
+        PostGameMessage(4131, static_cast<int>(bitMask), 1, &slotResult);
     }
 
     // Clear float at computed offset (slotIndex + 61) * 4
@@ -4424,7 +4346,7 @@ void pongPlayer::ResetButtonSlotTrackingData(
     // Clear 3 tracking entries (12 bytes apart) via SyncByteField
     uint8_t clearByte = 0;
     for (int i = 0; i < 3; i++) {
-        pongPlayer_9108_g(trackBase + i * 12, &clearByte);
+        SyncByteField(trackBase + i * 12, &clearByte);
     }
 
     // Clear float at computed offset (slotIndex + 63) * 4
@@ -5924,7 +5846,7 @@ void game_D468(void* player, vec3* targetPos) {
 // Offsets in comments are the game's 32-bit ones.
 
 // 16-byte AltiVec matrix, rows a, b, c and the translation d (rage::Matrix34).
-struct pongMatrix34 {
+struct alignas(16) pongMatrix34 {
     vec3 a, b, c, d;
 };
 
@@ -6097,7 +6019,7 @@ struct pongCreatureServeView {
 };
 
 // @ 0x820DD1C0 — world position of the swing animation's hit point.
-extern void game_D1C0(vec3* outPos, pongSwingAnimView* swingAnim);
+extern vec3* game_D1C0(vec3* outPos, pongSwingAnimView* swingAnim);
 // @ 0x820CE090 — a bone matrix from the creature's skeleton (bone id at +0x1C
 // of the blender), translation pushed a little along the bone's motion.
 extern void game_E090(pongServeBlenderView* blender, pongMatrix34* outMatrix);
@@ -6341,9 +6263,6 @@ extern void* g_networkTimingObject;  // @ 0x8271A328
 extern const char* util_1480(void* clock, int slot);
 // @ 0x821D3860 — records a named transition on the game state object.
 extern void game_3860(void* gameState, int kind, const char* name);
-// @ 0x8225E6E0 — posts a game message (same declaration as message.cpp;
-// PostPageGroupMessage above gives it a fifth argument it doesn't take).
-extern void PostGameMessage(uint32_t messageId, uint32_t flags, uint32_t param1, uint32_t param2);
 // @ 0x82198A48 — StartServe's query callback: *answer = io_Input_poll_9D68 && +0x17EC != 0.
 extern void io_8A48(pongPlayer* player, int32_t* answer);
 // Flags argument of PostGameMessage: one bit per player.
@@ -6426,10 +6345,10 @@ bool pongServeBlender_Start(pongSwingAnimView* blender, const vec3* position, bo
 
     blender->fieldA8 = 0.0f;   // @ 0x8202D110
     blender->progress = 0.0f;
-    PostGameMessage(0x1004, (uint8_t)(1u << playerIndex) | 0x40, 0, 0);
+    PostGameMessage(0x1004, (uint8_t)(1u << playerIndex) | 0x40, 0, nullptr);
     if (lbl_825C9A2C != 1)
         game_E0F0(lbl_8271A2EC);
-    PostGameMessage(0x1002, (uint8_t)(1u << blender->field_04) | 0x40, 0, 0);
+    PostGameMessage(0x1002, (uint8_t)(1u << blender->field_04) | 0x40, 0, nullptr);
     return false;
 }
 
@@ -6519,7 +6438,7 @@ int32_t pongPlayer_SelectShotType(pongServeTypeFlags* flags, int32_t playerIndex
 {
     int32_t shotType = 5;
     if (flags->flag4) {
-        PostGameMessage(0x101A, (uint8_t)(1u << playerIndex) | 0x40, 0, 0);
+        PostGameMessage(0x101A, (uint8_t)(1u << playerIndex) | 0x40, 0, nullptr);
         shotType = 9;
     }
     if (flags->flag6)
@@ -6954,7 +6873,7 @@ void pongPlayer_Serve(pongPlayer* player)
     ball->inst->archetype->vfn_15(1.0f);  // 1.0f @ 0x8202D108
     pongPlayer_TossServeBall(player, ball, hitDelay);
 
-    PostGameMessage(0x820, PlayerMessageBit(self->playerIndex), 0, 0);
+    PostGameMessage(0x820, PlayerMessageBit(self->playerIndex), 0, nullptr);
     shotTarget_AdjustAimDepthForBall(self->shotTarget, ball);
     self->field_18BA = 0;
 }
@@ -6984,7 +6903,7 @@ void pongPlayer_StartServe(pongPlayer* player)
     pongCreature_StartServeBlender(self->creature, &serveCallback, &queryCallback);
 
     self->field_18C8 = 1;
-    PostGameMessage(0x380B, PlayerMessageBit(self->playerIndex) | 0x40, 0, 0);
+    PostGameMessage(0x380B, PlayerMessageBit(self->playerIndex) | 0x40, 0, nullptr);
 
     PlayerShotEntries()[self->playerIndex].flag04 = 0;
     PlayerShotEntries()[self->playerIndex].flag05 = 0;

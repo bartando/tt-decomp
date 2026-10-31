@@ -11,8 +11,8 @@ extern const float g_swfTwipsToPixels; // Same constant.
 }
 extern "C" {
 extern void (*g_swfBindFontTexture)(void*); // @ 0x82602820
-extern uint32_t g_swfNodePool; // @ 0x82604C5C — guest VM pool identity
-extern uint32_t g_swfMemberNodePool; // @ 0x82604C54
+extern void* g_swfNodePool; // @ 0x82604C5C
+extern void* g_swfMemberNodePool; // @ 0x82604C54
 extern uint32_t g_swfPriorityMemberHashes[13]; // @ 0x82604CE8
 extern uint8_t g_swfPriorityMemberHashesReady; // @ 0x826066C8
 extern const char* const g_swfPriorityMemberNames[13]; // @ 0x825C2D30

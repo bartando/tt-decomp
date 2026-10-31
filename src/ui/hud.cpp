@@ -1,3 +1,4 @@
+#include "rage/hud_page_group.hpp"
 /**
  * hud.cpp — HUD and Flash-based UI implementations
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -306,9 +307,6 @@ extern "C" void hudShell_vfn_0(void* pThis, uint32_t deleteFlag)
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Opaque SinglesNetworkClient helpers exposed from the network layer
-extern "C" bool   hudFlashBase_IsNetworkDirty(void* pThis);        // @ 0x822EB2A8
-extern "C" void*  hudFlashBase_GetPageGroup(void* pThis);          // @ 0x822EB1E8
-extern "C" void   hudFlashBase_PublishPageGroup(void* pThis);      // @ 0x822EB320
 extern "C" void*  SinglesNetworkClient_FindParam(void* pageGroup,
                                                  const void* key); // @ 0x823F9280
 extern "C" int    SinglesNetworkClient_ReadInt(void* pParam);      // @ 0x823FA5C8
@@ -417,8 +415,6 @@ extern "C" void hudLoadingScreen_vfn_0(void* pThis, uint32_t deleteFlag)
 // shared resource releaser at 0x82566F10 regardless of the branch taken.
 // ─────────────────────────────────────────────────────────────────────────────
 
-extern "C" void* SinglesNetworkClient_BindEntry(void* pageGroup,
-                                                const void* key);  // @ 0x823F9318
 extern "C" bool  rage_input_poll(void* pInput);                    // @ 0x821C9D68
 extern "C" void  rage_atStringCopy(void* src, void* dst, int cap); // @ 0x82228990
 extern "C" void  rage_resource_release(void* pResource);           // @ 0x82566F10
@@ -440,7 +436,7 @@ void hudLoadingScreen::vfn_11()
 
     // Bind "status" entry — value 1, kind 3.
     void* pStatus = SinglesNetworkClient_BindEntry(pageGroup,
-                                                   g_hudLoading_KeyStatus);
+                                                   static_cast<const char*>(g_hudLoading_KeyStatus));
     if (pStatus != nullptr) {
         *(uint32_t*)((uint8_t*)pStatus + 0) = 1;
         *(uint32_t*)((uint8_t*)pStatus + 4) = 3;
@@ -453,7 +449,7 @@ void hudLoadingScreen::vfn_11()
         rage_atStringCopy((void*)g_hudLoading_TipTemplate, tipDst, 64);
 
         void* pTip = SinglesNetworkClient_BindEntry(pageGroup,
-                                                    g_hudLoading_KeyTipText);
+                                                    static_cast<const char*>(g_hudLoading_KeyTipText));
         if (pTip != nullptr) {
             *(void**  )((uint8_t*)pTip + 0) = tipDst;
             *(uint32_t*)((uint8_t*)pTip + 4) = 1;

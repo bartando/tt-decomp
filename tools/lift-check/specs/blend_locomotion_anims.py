@@ -7,7 +7,7 @@ translation lanes are copied as raw bits; quaternion conversion and ID lookup
 execute their original code. The unused r4 and f1 inputs vary independently.
 
 Limits: synthetic readable objects and sorted ID maps, aligned skeleton records
-and channel vectors, no concurrent mutation or invalid-pointer behavior. Only
+and arbitrary translation-pointer alignment, no concurrent mutation or invalid-pointer behavior. Only
 the entry's two virtual getters are modeled, returning readable test vectors;
 their calls and receiver are compared. No ignored writes or float tolerance.
 The odd rlwimi tests at C1B0/C254 always produce a nonzero value: they do not
@@ -15,7 +15,7 @@ filter channels based on record flags, skeleton flags, or a nonzero ID.
 """
 from liftcheck.spec import *
 
-FUNCTION = "LocomotionStateAnim_BlendLocomotionAnims"
+FUNCTION = "LocomotionStateAnim_C128_g"
 ADDRESS = 0x8224C128
 SOURCE = "src/anim/locomotion.cpp"
 TRIALS = 1000
@@ -85,6 +85,6 @@ def inputs(t):
         t.w32(translation + 4 * i, rng.choice([0, 0x80000000, 1, 0x7F800000,
                                             0xFF800000, 0x7FC12345, rng.getrandbits(32)]))
         t.wf32(quaternion + 4 * i, rng.choice([0.0, -0.0, 1.0, -1.0, rng.uniform(-2, 2)]))
-    VECTORS.update(translation=translation, quaternion=quaternion)
+    VECTORS.update(translation=translation + t.index % 16, quaternion=quaternion)
     t.args(r3=entry, r4=rng.getrandbits(32), r5=skeleton,
            f1=rng.choice([0.0, -1.0, 1.0, float("nan"), rng.uniform(-10, 10)]))

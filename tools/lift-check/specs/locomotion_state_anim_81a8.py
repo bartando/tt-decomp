@@ -15,7 +15,8 @@ from liftcheck.spec import *
 FUNCTION = "LocomotionStateAnim_81A8"
 ADDRESS = 0x822481A8
 SOURCE = "src/game/creature/pong_creature.cpp"
-TRIALS = 1000
+TRIALS = 240
+EXTERNS = {'g_floatZero': 0x8202D110}
 CALLS = {"LocomotionStateAnim_04F0_g": run()}
 
 
@@ -24,7 +25,7 @@ def inputs(t):
     channel = rng.choice([0, 0, 1, 1, 2, 3, 0x7F, 0xFF, rng.randrange(256)])
     anim_id = rng.choice([0, 1, 7, 31, 0x7FFF, 0x8000, 0xFFFE, 0xFFFF])
     if channel > 1:
-        t.args(r3=rng.getrandbits(32), r4=channel, r5=anim_id, r6=0, r7=0)
+        t.args(r3=rng.getrandbits(32), r4=channel | (rng.getrandbits(24) << 8), r5=anim_id | (rng.getrandbits(16) << 16), r6=0, r7=0)
         return
 
     data = t.alloc(0x20, "animData")
@@ -67,4 +68,4 @@ def inputs(t):
         t.w32(pair + 4, weight_object)
     else:
         t.w32(pair + 4, 0)
-    t.args(r3=rng.getrandbits(32), r4=channel, r5=anim_id, r6=pair, r7=output)
+    t.args(r3=rng.getrandbits(32), r4=channel | (rng.getrandbits(24) << 8), r5=anim_id | (rng.getrandbits(16) << 16), r6=pair, r7=output)

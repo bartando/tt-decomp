@@ -16,10 +16,10 @@
  *   LocomotionStateAnim::GetAnimTransform → vfn_9           @ 0x820E0DF8 (size 0x0EC)
  *   LocomotionStateAnim_88E0_g           → 0x822488E0 (size 0x214) — clip bundle dispatch
  *   LocomotionStateAnim_C8F8_g           → 0x8214C8F8 (size 0x0D0) — SIMD 48-byte block copy
- *   LocomotionStateAnim_BlendLocomotionAnims       → project-internal name (sub_table entry)
- *   LocomotionStateAnim_TransitionLocomotionState  → project-internal name (sub_table entry)
- *   LocomotionStateAnim_AccumNode / ApplySpeed / ComputeOffset / FindAnim /
- *     GrowArray / InitCapsuleImpl / ProcessNode / SetSpeed
+ *   LocomotionStateAnim_C128_g       → project-internal name (sub_table entry)
+ *   LocomotionStateAnim_C288_g  → project-internal name (sub_table entry)
+ *   LocomotionStateAnim_AccumNode / ComputeOffset / FindAnim /
+ *     GrowArray / InitCapsuleImpl / ProcessNode
  *                                  — all referenced as externs by pong_creature.cpp
  *   LocomotionStateMf_ApplyConstraints / BlendPoses / Finish / ScaleWeights /
  *     UpdateTransforms             — referenced as externs by pong_creature.cpp
@@ -33,6 +33,7 @@
 #include <cstring>
 #include <cmath>
 #include "locomotion.hpp"
+#include "animation_channel.hpp"
 
 // Forward decls matching stubs.cpp / stubs_final.cpp for ABI compatibility.
 struct vec3;
@@ -141,7 +142,8 @@ bool LocomotionStateAnim::GetAnimTransform(void* outMatrix)
 // ── Free-function helpers (cross-unit externs) ──────────────────────────────
 
 // @ 0x821D04F0
-bool LocomotionStateAnim_04F0_g(void* animData, uint16_t animID, uint16_t* outIndex) {
+bool LocomotionStateAnim_04F0_g(void* animData, uint32_t id, uint16_t* outIndex) {
+    const uint16_t animID = static_cast<uint16_t>(id);
     const uint8_t* data = static_cast<const uint8_t*>(animData);
     const uint32_t flags = *reinterpret_cast<const uint32_t*>(data + 0x14);
     if ((flags & 2) == 0) {
@@ -281,7 +283,6 @@ void LocomotionStateAnim_BBA8_g(void* channel, void* /*unused*/, const void* pos
 }
 
 extern "C" void LocomotionStateAnim_AccumNode(void* self, void* node) { (void)self; (void)node; }
-extern "C" void LocomotionStateAnim_ApplySpeed(void* self) { (void)self; }
 extern "C" void LocomotionStateAnim_ComputeOffset(void* self, void* out) { (void)self; (void)out; }
 extern "C" void* LocomotionStateAnim_FindAnim(void* self) { (void)self; return nullptr; }
 extern "C" void LocomotionStateAnim_GrowArray(void* self) { (void)self; }
@@ -290,7 +291,6 @@ extern "C" void LocomotionStateAnim_InitCapsuleImpl(void* self, float radius, co
     (void)self; (void)radius; (void)desc;
 }
 extern "C" void LocomotionStateAnim_ProcessNode(void* self, void* node) { (void)self; (void)node; }
-extern "C" void LocomotionStateAnim_SetSpeed(void* self, float speed) { (void)self; (void)speed; }
 
 /**
  * LocomotionStateAnim_88E0_g @ 0x822488E0 | size 0x214
@@ -367,12 +367,12 @@ extern void LocomotionStateAnim_AD30_g(float* dst, const float* quaternion); // 
  * skeleton in r5; r4 and the weight in f1 are unused.
  */
 // @ 0x8224C128
-void LocomotionStateAnim_BlendLocomotionAnims(uint32_t entry, void* unusedR4,
-                                            void* skeleton, float weight)
+void LocomotionStateAnim_C128_g(void* entry, void* unusedR4,
+                               void* skeleton, float weight)
 {
     (void)unusedR4;
     (void)weight;
-    auto* channel = reinterpret_cast<uint8_t*>(entry);
+    auto* channel = static_cast<uint8_t*>(entry);
     const uint8_t type = channel[5];
     if (type > 1) {
         return;
@@ -388,53 +388,36 @@ void LocomotionStateAnim_BlendLocomotionAnims(uint32_t entry, void* unusedR4,
 
     // C1B0 inserts 7 << 1; C254 inserts 3 << 8. Both rlwimi results
     // are always nonzero, regardless of the record/skeleton flags or ID.
-    using GetVector = const float* (*)(void*);
-    auto* vtable = *reinterpret_cast<GetVector**>(channel);
     if (type == 1) {
-        const float* quaternion = vtable[15](channel);
+        const float* quaternion = static_cast<AnimationChannel*>(entry)->GetQuaternion();
         LocomotionStateAnim_AD30_g(reinterpret_cast<float*>(record), quaternion);
     } else {
-        const float* translation = vtable[14](channel);
+        const float* translation = static_cast<AnimationChannel*>(entry)->GetTranslation();
         // lvx/stvx load the whole vector before storing (including its w lane).
         uint8_t vector[16];
-        std::memcpy(vector, translation, sizeof(vector));
+        std::memcpy(vector, reinterpret_cast<const void*>(reinterpret_cast<uintptr_t>(translation) & ~uintptr_t(15)), sizeof(vector));
         std::memcpy(record + 0x30, vector, sizeof(vector));
     }
 }
 
-/**
- * LocomotionStateAnim_C8F8_g  @ 0x8214C8F8 | size 0x0D0
- *
- * SIMD copy of a 48-byte animation node from src+{0,16,32,48} to
- * dst+{0,16,32,48} (post-apply release).  When the node's child list is
- * non-empty it recurses via pongCreatureInst_EDC0_g for each of N entries
- * spaced 80 bytes apart.
- *
- * Referenced as extern from graphics/fx_effects.cpp:978.
- */
-void LocomotionStateAnim_C8F8_g(void* animNode)
-{
-    (void)animNode;
-}
 
 /**
  * Apply a rotation channel by skeleton ID, or a root translation (ID zero).
  * Unlike C128, non-root translation channels are skipped without a lookup.
  */
 // @ 0x8224C288
-void LocomotionStateAnim_TransitionLocomotionState(uint32_t entry, void* unusedR4,
-                                                 void* skeleton, float weight)
+void LocomotionStateAnim_C288_g(void* entry, void* unusedR4,
+                                    void* skeleton, float weight)
 {
     (void)unusedR4;
     (void)weight;
-    auto* channel = reinterpret_cast<uint8_t*>(entry);
+    auto* channel = static_cast<uint8_t*>(entry);
     const uint8_t type = channel[5];
     if (type > 1) {
         return;
     }
 
     auto* skel = static_cast<uint8_t*>(skeleton);
-    using GetVector = const float* (*)(void*);
     if (type == 1) {
         uint16_t index;
         void* data = *reinterpret_cast<void**>(skel + 4);
@@ -442,15 +425,13 @@ void LocomotionStateAnim_TransitionLocomotionState(uint32_t entry, void* unusedR
             return;
         }
         auto* record = *reinterpret_cast<uint8_t**>(skel + 0xC) + index * 0x50;
-        auto* vtable = *reinterpret_cast<GetVector**>(channel);
-        const float* quaternion = vtable[15](channel);
+        const float* quaternion = static_cast<AnimationChannel*>(entry)->GetQuaternion();
         LocomotionStateAnim_AD30_g(reinterpret_cast<float*>(record), quaternion);
     } else if (*reinterpret_cast<uint16_t*>(channel + 6) == 0) {
         auto* records = *reinterpret_cast<uint8_t**>(skel + 0xC);
-        auto* vtable = *reinterpret_cast<GetVector**>(channel);
-        const float* translation = vtable[14](channel);
+        const float* translation = static_cast<AnimationChannel*>(entry)->GetTranslation();
         uint8_t vector[16];
-        std::memcpy(vector, translation, sizeof(vector));
+        std::memcpy(vector, reinterpret_cast<const void*>(reinterpret_cast<uintptr_t>(translation) & ~uintptr_t(15)), sizeof(vector));
         std::memcpy(records + 0x30, vector, sizeof(vector));
     }
 }
@@ -522,17 +503,6 @@ int32_t pcrPostPointBlender_GetActiveClipIndex(pcrPostPointBlender* self)
 // stubs.cpp definitions so call sites bound to those signatures keep
 // linking unchanged.
 // ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * crAnimBlenderState_Init  @ 0x8224C810 | size 0x120
- *
- * Resets a crAnimBlenderState sub-structure to defaults.  See
- * src/anim/anim_blender_init.cpp for the full lifted body.
- */
-void crAnimBlenderState_Init(void* state)
-{
-    (void)state;
-}
 
 /**
  * pcrAnimBlender_ApplyClipWeights  @ 0x820CF420 | size 0x178

@@ -1,4 +1,5 @@
 #include "audio/xact_sink_io.hpp"
+#include "rage/hud_page_group.hpp"
 // pong_network_io.cpp — Network I/O helper functions | Rockstar Presents Table Tennis (Xbox 360, 2006)
 
 /**
@@ -469,7 +470,6 @@ extern "C" {
     }
     
     // SinglesNetworkClient_A818_g — lifted in src/game/network.cpp
-
     // Original name: SinglesNetworkClient_GetPlayerID_E408
     void SinglesNetworkClient_GetPlayerID_E408(void* client, uint32_t param) {
         GetPlayerID(client, param);

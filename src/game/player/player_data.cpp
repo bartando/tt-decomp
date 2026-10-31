@@ -153,3 +153,6 @@ TT_DATA_ALIAS("g_pCourtGeomSingleton", "g_pTableDims");
 extern "C" void* g_pPlayerRecords = nullptr;
 
 TT_DATA_ALIAS("g_controllerPointerArray", "g_pPlayerRecords");  // @ 0x8271A31C
+
+// @ 0x82606498 (.data) — spin-axis rotation, filled by gameplay at runtime
+extern "C" float g_spinAxisRotation = 0.0f;

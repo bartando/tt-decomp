@@ -117,3 +117,9 @@ TT_DATA_ALIAS("lbl_82619BE0", "g_affineXYZMask");
 TT_DATA_ALIAS("lbl_82619BD0", "g_affineHomogeneousW");
 
 TT_DATA_ALIAS_AT("_ZN4rage13g_swfMinShearE", "g_slowTurnMul", 12); // @ 0x825C90C8
+// SWF execution pools selected temporarily by a Flash page group.
+void* g_swfStringPool = nullptr;     // @ 0x82604C50
+void* g_swfTextPool = nullptr;       // @ 0x82602844
+namespace rage {
+void* g_swfAuxiliaryScope = nullptr; // @ 0x82602834
+}

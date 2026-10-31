@@ -30,7 +30,7 @@ extern void rage_debugLog(const void*, const void*, uint32_t);
 // Indirect call dispatcher: loads vtable[0] from the object and calls it.
 // Used as the "invoke" half of each callback pair in the blender state.
 // @ 0x821E7BC0 | size: 0xC
-extern void rage_IndirectCallDispatch(void* obj);
+extern void sysCallback_Destroy(void* obj);
 
 // PJW-style string hash used by RAGE's atHashMap.
 // Iterates through each byte, accumulating a 32-bit hash with overflow folding.
@@ -43,13 +43,11 @@ extern uint32_t rage_atStringHash(const char* str);
 extern uint8_t pcrBlender_ApplyWeight(void* blenderEntry, void* animSystem,
                                        float weightA, float weightB);
 
-// Extracts the world-space displacement vector from a locomotion clip
-// at the given phase values.  Result is written to outDisplacement (vec3).
+// Samples a 32-byte rotation/translation pair through r6; r4/r5 are unused.
 // @ 0x82248C58 | size: 0x158
-extern void LocomotionStateAnim_ExtractDisplacement(void* locomotionClip,
-                                                     float phaseAbsolute,
-                                                     float phaseDelta,
-                                                     float* outDisplacement);
+extern uint32_t LocomotionStateAnim_ExtractDisplacement(
+    void* locomotionClip, void* unusedR4, void* unusedR5, void* outSample,
+    float phaseAbsolute, float phaseDelta);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Global constants & data
@@ -79,162 +77,8 @@ extern void* g_input_obj_ptr;
 // @ 0x82606750 (.data, 32 bytes) — SDA offset 26448
 extern const float g_playerMirrorPlane[4];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Clip index sentinel
-// ─────────────────────────────────────────────────────────────────────────────
+// The shared clip lifecycle implementation lives in anim_blender_state.cpp.
 
-static const uint16_t CLIP_INDEX_NONE = 0xFFFF;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// crAnimBlenderState — Animation blender sub-structure
-//
-// Embedded at offset +0x10 inside pcrEmoteBlender and pcrPostPointBlender.
-// Total sub-struct size: 160 bytes (padded from offset +16 through +175).
-// The Init function writes fields at the following offsets from the
-// sub-struct base (which itself starts at +0x10 from the owning object):
-//
-//   Offset shown below is from the owning pcrEmoteBlender/pcrPostPointBlender,
-//   which is what the scaffold uses (r3 = owning object pointer at entry,
-//   then r3 += 16 via `addi r3,r3,16` in the caller).
-//
-//   +0x00..+0x0F  (16 bytes) : m_blendVector    — initial blend position (vec4)
-//   +0x10..+0x1F  (16 bytes) : m_callbacksA     — callback pair A (4 void*)
-//   +0x20..+0x2F  (16 bytes) : m_callbacksB     — callback pair B (4 void*)
-//   +0x30         ( 4 bytes) : m_frameCount      — zeroed on reset
-//   +0x34         ( 4 bytes) : m_updateCount     — zeroed on reset
-//   +0x38         ( 2 bytes) : m_blendFlags      — zeroed on reset
-//   +0x3A         ( 2 bytes) : m_blendMode       — zeroed on reset
-//   +0x40         ( 4 bytes) : m_blendWeightA    — set to kDefaultBlend
-//   +0x44         ( 4 bytes) : m_blendWeightB    — set to kDefaultBlend
-//   +0x58..+0x6F  (gap)      : intermediate state (not written by Init)
-//   +0x68         ( 4 bytes) : m_phaseA          — set to kZeroPhase
-//   +0x6C         ( 4 bytes) : m_targetPhaseA    — set to kDefaultBlend
-//   +0x70         ( 4 bytes) : m_phaseB          — set to kZeroPhase
-//   +0x74         ( 4 bytes) : m_targetPhaseB    — set to kDefaultBlend
-//   +0x78         ( 4 bytes) : m_phaseC          — set to kZeroPhase
-//   +0x7C         ( 2 bytes) : m_clipFlags       — zeroed
-//   +0x7E         ( 2 bytes) : m_clipSlotA       — CLIP_INDEX_NONE
-//   +0x80         ( 2 bytes) : m_clipSlotB       — CLIP_INDEX_NONE
-//   +0x82         ( 2 bytes) : m_clipSlotC       — CLIP_INDEX_NONE
-//   +0x88         ( 4 bytes) : m_finalBlendA     — set to kDefaultBlend
-//   +0x8C         ( 4 bytes) : m_finalBlendB     — set to kDefaultBlend
-// ─────────────────────────────────────────────────────────────────────────────
-
-struct crAnimBlenderState {
-    // +0x00: Blend position vector (vec4) — copied from g_identityBlendVector
-    float        m_blendVector[4];
-
-    // +0x10: Callback pair A — [trace, dispatcher, context, dispatcher]
-    void*        m_callbacksA[4];
-
-    // +0x20: Callback pair B — same layout as pair A
-    void*        m_callbacksB[4];
-
-    // +0x30: State counters
-    uint32_t     m_frameCount;
-    uint32_t     m_updateCount;
-    uint16_t     m_blendFlags;
-    uint16_t     m_blendMode;
-
-    // +0x3C: padding (4 bytes to align to +0x40)
-    uint8_t      _pad3C[4];
-
-    // +0x40: Blend weights
-    float        m_blendWeightA;
-    float        m_blendWeightB;
-
-    // +0x48..+0x67: Intermediate fields (24 bytes, not touched by Init)
-    uint8_t      _pad48[32];
-
-    // +0x68: Phase timers (alternating phase / target pairs)
-    float        m_phaseA;
-    float        m_targetPhaseA;
-    float        m_phaseB;
-    float        m_targetPhaseB;
-    float        m_phaseC;
-
-    // +0x7C: Clip slot control
-    uint16_t     m_clipFlags;
-    uint16_t     m_clipSlotA;        // active clip index A, CLIP_INDEX_NONE = none
-    uint16_t     m_clipSlotB;        // active clip index B, CLIP_INDEX_NONE = none
-    uint16_t     m_clipSlotC;        // active clip index C, CLIP_INDEX_NONE = none
-
-    // +0x84: padding (4 bytes)
-    uint8_t      _pad84[4];
-
-    // +0x88: Final computed blend weights
-    float        m_finalBlendA;
-    float        m_finalBlendB;
-};
-
-
-/**
- * crAnimBlenderState_Init @ 0x8224C810 | size: 0x120
- *
- * Resets an animation blender sub-structure to its default state.
- * Called by pcrEmoteBlender::Reset() and pcrPostPointBlender::ResetState()
- * to clear all animation state when a blender is recycled.
- *
- * Sets:
- *   - Blend position vector to the identity from g_identityBlendVector
- *   - Both callback pairs to [trace_stub, dispatcher, nullptr, dispatcher]
- *   - All counters and flags to zero
- *   - Blend weights to kDefaultBlend (1.0f)
- *   - Phase timers alternating kZeroPhase / kDefaultBlend
- *   - All three clip slots to CLIP_INDEX_NONE (0xFFFF)
- *   - Final blend weights to kDefaultBlend
- *
- * Callers:
- *   pcrEmoteBlender_vfn_3 (Reset), pcrPostPointBlender_vfn_3 (ResetState),
- *   LocomotionStateAnim_BBC8_g, pongPlayer_D908_g, game_E2B8, util_CDF0
- */
-void crAnimBlenderState_Init(crAnimBlenderState* state)
-{
-    // Copy identity blend vector from global constant data
-    memcpy(state->m_blendVector, g_identityBlendVector, 16);
-
-    // Install callback pairs — each pair is:
-    //   [0] = debug trace stub (no-op in release)
-    //   [1] = indirect call dispatcher (calls vtable[0] on the target)
-    //   [2] = nullptr (context / target — not set until activation)
-    //   [3] = indirect call dispatcher (backup/secondary)
-    state->m_callbacksA[0] = (void*)rage_debugLog;
-    state->m_callbacksA[1] = (void*)rage_IndirectCallDispatch;
-    state->m_callbacksA[2] = nullptr;
-    state->m_callbacksA[3] = (void*)rage_IndirectCallDispatch;
-
-    state->m_callbacksB[0] = (void*)rage_debugLog;
-    state->m_callbacksB[1] = (void*)rage_IndirectCallDispatch;
-    state->m_callbacksB[2] = nullptr;
-    state->m_callbacksB[3] = (void*)rage_IndirectCallDispatch;
-
-    // Clear state counters and flags
-    state->m_frameCount  = 0;
-    state->m_updateCount = 0;
-    state->m_blendFlags  = 0;
-    state->m_blendMode   = 0;
-
-    // Initialize blend weights to full (1.0f)
-    state->m_blendWeightA = kDefaultBlend;
-    state->m_blendWeightB = kDefaultBlend;
-
-    // Initialize phase timers: phase = 0.0f, target = 1.0f
-    state->m_phaseA       = kZeroPhase;
-    state->m_targetPhaseA = kDefaultBlend;
-    state->m_phaseB       = kZeroPhase;
-    state->m_targetPhaseB = kDefaultBlend;
-    state->m_phaseC       = kZeroPhase;
-
-    // Reset all clip slots to inactive
-    state->m_clipFlags = 0;
-    state->m_clipSlotA = CLIP_INDEX_NONE;
-    state->m_clipSlotB = CLIP_INDEX_NONE;
-    state->m_clipSlotC = CLIP_INDEX_NONE;
-
-    // Initialize final blend weights to full
-    state->m_finalBlendA = kDefaultBlend;
-    state->m_finalBlendB = kDefaultBlend;
-}
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -435,7 +279,9 @@ void pcrAnimState_ComputePosition(float* outPosition, pcrAnimState* animState)
     }
 
     // Temporary displacement vector (16-byte aligned for SIMD)
-    float displacement[4] = { kZeroPhase, kZeroPhase, kZeroPhase, 0.0f };
+    struct MotionSample { float rotation[4], translation[4]; };
+    alignas(16) MotionSample sample = {};
+    const float* displacement = sample.translation;
 
     // Only compute displacement when in active locomotion with a valid clip
     if (animState->m_locomotionMode == 1 && animState->m_pLocomotionClip != nullptr) {
@@ -449,10 +295,8 @@ void pcrAnimState_ComputePosition(float* outPosition, pcrAnimState* animState)
         float phaseRelative = phaseDelta * duration;
 
         LocomotionStateAnim_ExtractDisplacement(
-            animState->m_pLocomotionClip,
-            phaseAbsolute,
-            phaseRelative,
-            displacement);
+            animState->m_pLocomotionClip, nullptr, nullptr, &sample,
+            phaseAbsolute, phaseRelative);
     }
 
     // Write computed displacement to output

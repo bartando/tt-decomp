@@ -61,6 +61,5 @@ void pongLerpQueue_InterpolateSmooth(pongLerpQueue* result, const pongLerpQueue*
                                      const pongLerpQueue* end, float t);
 int pongLerpQueue_CalculateFrameOffset(const pongLerpQueue* queue, int totalFrames, float divisor);
 bool pongLerpQueue_PushEntry(pongLerpQueue* queue, const uint32_t* entryData);
-bool pongLerpQueue_PushFullEntry(pongLerpQueue* queue, const pongLerpQueue* entry);
 void pongLerpQueue_ProcessLargeUpdate(pongLerpQueue* dest, pongPlayer* player, 
                                       pongLerpQueue* tempEntry, const pongLerpQueue* sourceData);

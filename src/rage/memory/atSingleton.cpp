@@ -16,7 +16,7 @@
  *   InitializeNetSystem  — network singleton init (stub)
  *   NotifyObservers      — broadcast singleton events
  *   ClearPendingFlag     — clear bit 0 of state flags
- *   CallVirtualDestructor — vtable slot 0 dispatch
+ *   sysCallback_Destroy — direct callback cleanup (anim_blender_state.cpp)
  *   GetFactory           — factory registry lookup (stub)
  *   atSingleton_ScrambleData — data transform using magic-constant division
  */
@@ -275,25 +275,6 @@ void ClearPendingFlag(atSingleton* singleton)
         return;
 
     singleton->m_flags &= ~0x1;
-}
-
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  CallVirtualDestructor
-//
-//  @ 0x821E7BC0 | size: 0x0C
-//
-//  Dispatches vtable slot 0 (virtual destructor) on the given object.
-// ═══════════════════════════════════════════════════════════════════════════════
-void CallVirtualDestructor(void* obj)
-{
-    if (!obj)
-        return;
-
-    void** vtable = *reinterpret_cast<void***>(obj);
-    typedef void (*VirtualFn)(void*);
-    VirtualFn fn = reinterpret_cast<VirtualFn>(vtable[0]);
-    fn(obj);
 }
 
 
@@ -736,27 +717,6 @@ uint32_t atSingleton_vfn_9_8C18_1(atSingleton* self)
 //  layout for +12/+16/+20 and its vfn_1/vfn_2/vfn_3 signatures is class-
 //  specific and varies per instantiation (1341 candidate atSingleton derivs
 //  remain).  Leaving unlifted pending a concrete derived-class identification.
-// ═══════════════════════════════════════════════════════════════════════════════
-// (intentionally left unlifted — see TODO above)
-
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  atSingleton_9A08_h  @ 0x82289A08 | size: 0x104 (260 bytes)
-//  Resets a managed state slot at `g_atSingletonCtx->m_pSlotBase + 9736`:
-//    - Zeroes each of m_nCountA entries in array at +0 (stride 4).
-//    - Stores float(1.0f) at +8.
-//    - Calls atSingleton_9B10(slot) to publish the reset.
-//    - If bit 0 of *vtable (read back from +0) is CLEAR → calls
-//      atSingleton_9E90_h(1) to seed follow-up state.
-//    - Reload vtable at +0.  If bit 0 of *vtable is STILL CLEAR → emits a
-//      trace via nop_8240E6D0(const char* "<trace template>"), clears bit 0
-//      of *vtable on both the derived-vtable word and the outer vtable word
-//      (via not/xor mask dance), and stamps float(<k_resetFloat>) into +8.
-//
-//  TODO: Requires concrete derived-class identification — the "+20" path is
-//  a vtable@+0 bitfield re-written in-place, which is a known pongBall-style
-//  pattern but the ownership is ambiguous without its RTTI class.  Leaving
-//  unlifted pending class resolution.
 // ═══════════════════════════════════════════════════════════════════════════════
 // (intentionally left unlifted — see TODO above)
 

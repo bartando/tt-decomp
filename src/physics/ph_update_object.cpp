@@ -27,6 +27,7 @@
  */
 
 #include "ph_physics.hpp"
+#include "joint_initialization.hpp"
 #include "rage/mat44.hpp"
 
 // ── Global Declarations ─────────────────────────────────────────────────────
@@ -642,14 +643,43 @@ void ph_snprintf(char* buf, int size, const char* fmt, const char* str,
     }
 }
 
-// ── ph_1B78 — capsule support-point generator ─────────────────────────────
-// Inputs: this, halfHeight (f2), radius (f3), outputVec3* (r6).
-// Writes a zeroed vec3 — the arithmetic path populates all three lanes with
-// the same scaled constant (see recomp — three stfs to r6+0/+4/+8 of the
-// same f0), so an aggregate clear approximates the observable contract.
-void ph_1B78(void* /*this_*/, float /*halfHeight*/, float /*radius*/,
-             void* outVec3) {
-    if (outVec3) std::memset(outVec3, 0, 12);
+extern "C" const float g_capsuleVolK1; // @ 0x82079BD0 — 4/3
+extern "C" const float g_capsuleInertiaRadialK; // @ 0x82079BCC — 8/5
+extern "C" const float g_capsuleInertiaMixedK; // @ 0x82079BC8 — 9/4
+extern "C" const float g_capsuleInertiaAxialK; // @ 0x82079BC4 — 16/15
+extern "C" const float g_capsuleInertiaThird; // @ 0x825C806C — 1/3
+extern "C" const float g_phClampMax; // @ 0x8202D108 — 1
+extern "C" const float g_phTwo; // @ 0x8202D10C — 1/2
+extern "C" float g_phCapsuleShapeK; // @ 0x825C8080 — 1/4
+
+// Capsule inertia about its center, with the cylinder on the Y axis. Preserve
+// each rounded product and fused sum; length is the cylinder's full length.
+// phCapsule_ComputeInertia @ 0x82411B78 | size: 0x9C
+void phCapsule_ComputeInertia(void*, const void*, void*, float* output,
+                             float mass, float radius, float length) {
+    const float radiusSquared = radius * radius;
+    const float lengthSquared = length * length;
+    const float denominator = __builtin_fmaf(radius, g_capsuleVolK1, length);
+    const float radiusCubed = radiusSquared * radius;
+    const float lengthSquaredRadius = lengthSquared * radius;
+    const float axialLength = __builtin_fmaf(radius, g_capsuleInertiaAxialK, length);
+    const float lengthCubed = lengthSquared * length;
+    const float radiusSquaredLength = radiusSquared * length;
+    const float inverseDenominator = g_phClampMax / denominator;
+    const float radialTerm = __builtin_fmaf(radiusCubed, g_capsuleInertiaRadialK,
+                                            lengthSquaredRadius);
+    const float axialNumerator = axialLength * radiusSquared;
+    const float lengthTerm = __builtin_fmaf(lengthCubed, g_phCapsuleShapeK, radialTerm);
+    const float normalizedAxial = axialNumerator * inverseDenominator;
+    const float transverseNumerator = __builtin_fmaf(radiusSquaredLength,
+                                                     g_capsuleInertiaMixedK, lengthTerm);
+    const float axialMass = normalizedAxial * mass;
+    const float normalizedTransverse = transverseNumerator * inverseDenominator;
+    output[1] = axialMass * g_phTwo;
+    const float transverseMass = normalizedTransverse * mass;
+    const float transverse = transverseMass * g_capsuleInertiaThird;
+    output[0] = transverse;
+    output[2] = transverse;
 }
 
 // ── ph_A330 — slot-7 thunk: forward to ph_A2A0, optional self-free ─────────
@@ -732,16 +762,17 @@ void phJoint1Dof_AFF8_p42(rage::phJoint3Dof* self, int index, float* outBounds) 
     outBounds[3] = 0.0f;
 }
 
-// ── phJoint3Dof_0170_g — iterate a joint template over a strided block ────
-// for (int i = count-1; i >= 0; --i) { ctorFn(dst); dst += stride; }
-typedef void (*JointCtorFn)(void*);
-void phJoint3Dof_0170_g(void* dst, int stride, int count,
-                         void* ctorFn) {
-    JointCtorFn fn = reinterpret_cast<JointCtorFn>(ctorFn);
-    uint8_t* p = static_cast<uint8_t*>(dst);
-    for (int i = count - 1; i >= 0; --i) {
-        fn(p);
-        p += stride;
+// Vector constructor iterator. Advance in address order, invoking the callback
+// using the signed, decremented count used by the original iterator.
+// phJoint3Dof_0170_g @ 0x820C0170 | size: 0x48
+void phJoint3Dof_0170_g(void* dst, int32_t stride, int32_t count,
+                      phElementConstructor constructor) {
+    int32_t remaining = static_cast<int32_t>(static_cast<uint32_t>(count) - 1);
+    uint8_t* current = static_cast<uint8_t*>(dst);
+    while (remaining >= 0) {
+        constructor(current);
+        --remaining;
+        current += stride;
     }
 }
 
@@ -760,28 +791,32 @@ void phJoint_PreSyncState(rage::phJoint3Dof* /*self*/) {}
 // ── ke_DispatchPhysics — thunk into the global physics state dispatcher ───
 extern "C" void ke_DispatchPhysics(void* /*state*/) {}
 
-// ── util_4628 — reset a phJoint3Dof's 16-slot cache + clamp values ────────
-// Iterates `n = *(int16*)(joint+528)` entries starting at +32, zeroing the
-// 64-byte block, stamping flag bytes at +25/+26, and setting scalar field
-// at +16/+20.  Then writes 4 floats at +512.
-void util_4628(void* joint) {
-    uint8_t* j = static_cast<uint8_t*>(joint);
-    int16_t count = *reinterpret_cast<int16_t*>(j + 528);
-    if (count > 0) {
-        uint8_t* slot = j + 32;
-        for (int i = 0; i < count; ++i) {
-            std::memset(slot, 0, 32);
-            *reinterpret_cast<float*>(slot + 16) = 0.0f;
-            *reinterpret_cast<float*>(slot + 20) = 1.0f;
-            slot[25] = 1;
-            slot[26] = 0;
-            slot += 64;
-        }
+extern "C" const float lbl_825C5938; // @ 0x825C5938 — disabled sentinel, -1
+extern "C" const float g_kPercentScale[3]; // @ 0x8202D118 — first word is 100
+
+// Reset each 64-byte record and its common parameters. The original copies
+// three uninitialized scratch W lanes per record; preserve those padding words
+// instead of reading undefined C++ memory.
+// util_4628 @ 0x82154628 | size: 0xB0
+void util_4628(void* object) {
+    uint8_t* block = static_cast<uint8_t*>(object);
+    const int16_t count = *reinterpret_cast<const int16_t*>(block + 0x210);
+    for (int i = 0; i < count; ++i) {
+        float* record = reinterpret_cast<float*>(block + i * 64);
+        record[0] = record[2] = lbl_8202D110;
+        record[1] = lbl_825C5938;
+        for (unsigned vector = 1; vector < 3; ++vector)
+            for (unsigned lane = 0; lane < 3; ++lane)
+                record[vector * 4 + lane] = lbl_8202D110;
+        record[12] = g_phClampMax;
+        record[13] = g_kPercentScale[0];
+        uint8_t* flags = reinterpret_cast<uint8_t*>(record);
+        flags[57] = 1;
+        flags[58] = 0;
     }
-    *reinterpret_cast<float*>(j + 512) = 0.0f;
-    *reinterpret_cast<float*>(j + 516) = 0.0f;
-    *reinterpret_cast<float*>(j + 520) = 0.0f;
-    *reinterpret_cast<float*>(j + 524) = 1.0f;
+    float* defaults = reinterpret_cast<float*>(block + 0x200);
+    defaults[0] = defaults[1] = defaults[2] = g_phCapsuleShapeK;
+    defaults[3] = g_phClampMax;
 }
 
 // ── Physics-world vtable thunks ────────────────────────────────────────────

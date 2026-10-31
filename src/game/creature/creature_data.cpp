@@ -44,3 +44,6 @@ extern "C" float g_moverStartDelay = 1.75f;
 
 // @ 0x820290F0 (.rdata) — zero-input delay before restoring the latch
 extern "C" const float g_moverStopDelay = 0.05000000074505806f;
+
+// @ 0x825C9F54 (.data) — skin worker poses relative to the selected root bone
+extern "C" uint32_t g_creatureWorkerRelativePose = 0;

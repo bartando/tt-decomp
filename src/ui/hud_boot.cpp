@@ -1,4 +1,5 @@
 #include "hud.hpp"
+#include "rage/hud_page_group.hpp"
 
 #include "game/pong_network_io.hpp"
 #include "rage/game_loop_types.h"
@@ -87,8 +88,8 @@ void hudBoot::OnEnter() {
 
     m_bInitialized = 0;
 
-    const bool wasInputActive = (PollButtonState(this) != 0);
-    void* networkClient = GetNetworkClient(this);
+    const bool wasInputActive = (hudFlashBase_IsNetworkDirty(this) != 0);
+    void* networkClient = hudFlashBase_GetPageGroup(this);
 
     // PPC logic writes 1 only when the +0x200 gameLoop field equals 1.
     const uint32_t modeFlag =
@@ -102,7 +103,7 @@ void hudBoot::OnEnter() {
     SetStringBootSetting(networkClient, k_bootNameKey, m_buffer);
 
     if (wasInputActive) {
-        InitiateConnection(this);
+        hudFlashBase_PublishPageGroup(this);
     }
 }
 

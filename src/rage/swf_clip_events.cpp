@@ -37,7 +37,7 @@ void swfSetClipEvents(void* instance, uint32_t events, uint32_t records, int32_t
     auto& list = *reinterpret_cast<uint32_t*>(fields + 0xC8);
     uint32_t node = list;
     list = 0;
-    auto* pool = at<SwfNodePool>(g_swfNodePool);
+    auto* pool = static_cast<SwfNodePool*>(g_swfNodePool);
     while (node != 0) {
         auto* released = at<SwfListNode>(node);
         const uint32_t next = released->next;
@@ -88,7 +88,7 @@ void swfSetMember(void* list, const char* name, const uint32_t* value) {
         return;
     }
 
-    auto* pool = at<SwfNodePool>(g_swfMemberNodePool);
+    auto* pool = static_cast<SwfNodePool*>(g_swfMemberNodePool);
     const uint32_t node = pool->freeHead;
     const uint32_t nextFree = *at<uint32_t>(node);
     --pool->freeCount;

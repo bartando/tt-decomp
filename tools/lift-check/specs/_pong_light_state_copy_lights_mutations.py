@@ -38,7 +38,7 @@ def main():
     spec = Path(__file__).with_name("pong_light_state_copy_lights.py")
     caught = 0
     for name, old, new in MUTATIONS:
-        assert source.count(old) == 1, f"mutation anchor changed: {name}"
+        assert source.count(old) == (2 if old == "    return dst;" else 1), f"mutation anchor changed: {name}"
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             rc = Checker(spec, Options(trials=200, seed=1, patches=((old, new),))).run()

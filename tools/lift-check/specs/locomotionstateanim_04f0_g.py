@@ -57,4 +57,4 @@ def inputs(t):
     t.w32(data + 0x14, flags)
     t.w32(data + 0x18, table)
     t.w16(data + 0x1C, count)
-    t.args(r3=data, r4=anim_id, r5=output)
+    t.args(r3=data, r4=anim_id | (rng.getrandbits(16) << 16), r5=output)

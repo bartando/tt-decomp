@@ -817,7 +817,7 @@ static void pongLegalsContext_InputPoll(pongLegalsContext* ctx) {
 input_found:
     {
         void* pageGroup = ctx->m_pPageGroup;
-        uint8_t buttonState = PollButtonState(pageGroup);
+        uint8_t buttonState = hudFlashBase_IsNetworkDirty(pageGroup);
 
         // Check HSM manager's context pointer (+556)
         extern void* g_hsmMgrPtr;   // @ 0x825EAB30 (g_loop_obj_ptr)
@@ -840,7 +840,7 @@ input_found:
         }
 
         if ((buttonState & 0xFF) != 0) {
-            InitiateConnection(pageGroup);
+            hudFlashBase_PublishPageGroup(pageGroup);
         }
 
         ctx->m_bInputDetected = 1;
@@ -875,10 +875,10 @@ void pongLegalsContext::Update() {
     int32_t resultValue = 0;
 
     // Check button state
-    uint8_t buttonState = PollButtonState(pg);
+    uint8_t buttonState = hudFlashBase_IsNetworkDirty(pg);
 
     // Process input
-    GetNetworkClient(pg);
+    hudFlashBase_GetPageGroup(pg);
 
     // Look up "SAVING" string in page group
     extern const char* k_SAVING;   // @ 0x8205DFB8
@@ -889,7 +889,7 @@ void pongLegalsContext::Update() {
 
     // If button was pressed, notify
     if ((buttonState & 0xFF) != 0) {
-        InitiateConnection(pg);
+        hudFlashBase_PublishPageGroup(pg);
     }
 
     // If saving entry had a positive value, transition to state 6

@@ -191,3 +191,23 @@ extern "C" uint8_t g_sda_660D = 0x0u;
 uint32_t g_assetVersions_verA = 0x825C5864u;      // @ 0x825C5864
 uint32_t g_assetVersionsChar_verA = 0x825C5868u;  // @ 0x825C5868
 uint32_t g_assetVersionsCS_verA = 0x825C586Cu;    // @ 0x825C586C
+
+// Practice target grid is filled from table dimensions by 0x821132B0.
+float g_practiceTargetGrid[9][8] = {};       // @ 0x82617C90 (.data)
+int32_t g_practiceTargetActiveZones[9] = {}; // @ 0x825EB280 (.data)
+float g_practiceTargetHitPadding = 0.025f;   // @ 0x825C8144 (.data)
+float g_practiceTargetLastPadding = 0.0f;    // @ 0x8271A360 (.data)
+
+// Normalized target boundaries selected from the practice-target data file.
+float g_practiceTargetGridShape[8] = {  // @ 0x825C99E0 (.data)
+    -1.0f, -0.33f, 0.33f, 1.0f, -1.0f, -0.78f, -0.59f, -0.4f
+};
+int32_t g_practiceTargetSelectedIndex = 0; // @ 0x826063B0 (.data)
+
+extern const float g_practiceTargetNearEdge = -0.2f; // @ 0x82079EB4 (.rdata)
+
+// SWF members retain these string pointers, so share the image's key objects.
+extern "C" const char g_trainingHudPossibleKey[] = "possible";   // @ 0x8205C83C
+extern "C" const char g_trainingHudCompletedKey[] = "completed"; // @ 0x8205C848
+extern "C" const char g_trainingHudTimeLowKey[] = "time_low";     // @ 0x8205C860
+extern "C" const char g_trainingHudArrowKey[] = "arrow_direction"; // @ 0x8205C86C

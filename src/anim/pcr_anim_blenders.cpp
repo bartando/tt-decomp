@@ -74,7 +74,7 @@ extern void rage_DebugLog(const void*, const void*, uint32_t);
 // Animation blender control functions
 extern void crAnimBlenderState_Init(void* obj);  // @ 0x8224C810  reset/clear
 extern void util_C930(void* obj);                // @ 0x8224C930  query active clip
-extern void util_CDF0(void* blender,
+extern uint32_t util_CDF0(void* blender,
                       const void* clipDesc,
                       uint32_t flags);           // @ 0x8224CDF0  start clip
 extern void SetPageGroupVisible(void* obj);              // @ 0x8224CFE0  GetCurrentClip
@@ -677,11 +677,6 @@ bool pcrPostPointBlender::IsFinished() const
 // ============================================================================
 // Animation utility stubs — moved from stubs.cpp
 // ============================================================================
-
-/** util_CDF0 @ 0x8224CDF0 | size: 0xB4 — animation data copy */
-void util_CDF0(void* dest, const void* src, unsigned int size) {
-    (void)dest; (void)src; (void)size;
-}
 
 /** util_C930 @ 0x8224C930 | size: 0x4C0 — animation blend state update */
 void util_C930(void* blendState) { (void)blendState; }

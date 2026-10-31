@@ -115,6 +115,8 @@ set(SOURCES
     src/rage/core/subsystem_init.c
     src/rage/swf.cpp
     src/rage/swf_image_data.cpp
+    src/rage/hud_page_group.cpp
+    src/rage/swf_page_group.cpp
     src/rage/swf_vm.cpp
     src/rage/swf_clip_events.cpp
     src/rage/core/timer.cpp
@@ -132,6 +134,8 @@ set(SOURCES
     src/game/cutscene/pong_cutscene.cpp
     src/game/data/gd_data.cpp
     src/game/template_registry.cpp
+    src/game/game_message.cpp
+    src/game/game_message_data.cpp
     src/game/data/gd_data_strings.cpp
     src/game/data/gd_logic_strings.cpp
     src/game/data/gd_vib_event.cpp
@@ -144,15 +148,37 @@ set(SOURCES
     src/game/audio/pong_audio.cpp
     src/game/audio/pong_audio_effects.cpp
     src/game/ball/pong_ball.cpp
+    src/game/ball/ball_audio_emitters.cpp
+    src/game/ball/ball_audio_envelope.cpp
+    src/game/ball/ball_audio_impact.cpp
     src/game/ball/ball_flight.cpp
     src/game/ball/ball_shot.cpp
+    src/game/ball/ball_shot_solve.cpp
+    src/game/ball/ball_shot_trajectory.cpp
+    src/game/ball/ball_shot_simulation.cpp
+    src/game/ball/ball_process_hit.cpp
+    src/game/ball/ball_playback.cpp
+    src/game/ball/ball_visual_spin.cpp
+    src/game/ball/ball_prediction_stream.cpp
+    src/game/ball/ball_prediction_step.cpp
+    src/game/ball/ball_prediction_queries.cpp
+    src/game/ball/ball_prediction_hit_ids.cpp
+    src/game/ball/ball_prediction_hit_queries.cpp
+    src/game/ball/ball_prediction_outcome_helpers.cpp
+    src/game/ball/ball_replay.cpp
+    src/game/ball/ball_replay_update.cpp
+    src/game/ball/ball_prediction_postprocess.cpp
+    src/game/ball/ball_prediction_quaternion.cpp
     src/game/camera/pong_camera.cpp
     src/game/camera/pong_camera_helpers.cpp
     src/game/camera/cm_cam_actions.cpp
     src/game/camera/dcam_polar_cam.cpp
     src/game/creature/pong_creature.cpp
+    src/game/creature/mover_input_speed.cpp
+    src/game/creature/creature_pose.cpp
     src/game/drill/pong_drill.cpp
     src/game/input/button_edges.cpp
+    src/game/input/analog_axis.cpp
     src/game/input/input_sequence.cpp
     src/game/misc/cm_operators.cpp
     src/game/misc/pong_misc.cpp
@@ -164,6 +190,30 @@ set(SOURCES
     src/game/network/xonline_strings.cpp
     src/game/player/pong_player.cpp
     src/game/player/pong_player_swing.cpp
+    src/game/player/player_swing_phase.cpp
+    src/game/player/player_shot_interpolation.cpp
+    src/game/player/player_move_mode.cpp
+    src/game/player/creature_move_mode.cpp
+    src/game/player/player_action_groups.cpp
+    src/game/player/player_control_queries.cpp
+    src/game/player/player_control_queries_data.cpp
+    src/game/player/player_mode_data.cpp
+    src/game/player/player_mode_animation.cpp
+    src/game/player/player_animation_reset_helpers.cpp
+    src/game/player/player_auxiliary_pose.cpp
+    src/game/player/player_auxiliary_animation_helpers.cpp
+    src/game/player/player_animation_clock.cpp
+    src/game/player/player_swing_pose_helpers.cpp
+    src/game/player/player_apply_movement_target.cpp
+    src/game/player/player_pose_easing.cpp
+    src/game/player/player_serve_callbacks.cpp
+    src/game/player/player_serve_hit_point.cpp
+    src/game/player/player_serve_hit_point_data.cpp
+    src/game/player/player_shot_target_setup.cpp
+    src/game/player/player_spin_helpers.cpp
+    src/game/player/camera_node_cast.cpp
+    src/game/player/player_camera_side.cpp
+    src/game/player/player_camera_side_data.cpp
     src/game/player/player_animation_state.cpp
     src/game/player/pong_gameplay_queries.cpp
     src/game/pong_render.cpp
@@ -175,11 +225,22 @@ set(SOURCES
     src/rage/rtti_class_strings.cpp
     
     # Animation
+    src/anim/anim_blender_state.cpp
+    src/anim/root_motion_blend.cpp
+    src/anim/clip_mover_displacement.cpp
+    src/anim/clip_mover_delta.cpp
+    src/anim/bone_matrix_lookup.cpp
+    src/anim/bone_transform_lookup.cpp
+    src/anim/motion_lookup_data.cpp
     src/anim/pcr_anim_blenders.cpp
     src/anim/locomotion.cpp
+    src/anim/angle_helpers.cpp
+    src/anim/animation_timing.cpp
 
     # Physics
     src/physics/ph_physics.cpp
+    src/physics/bound_lookup.cpp
+    src/physics/articulated_constraints.cpp
     src/physics/ph_update_object.cpp
     
     # Graphics
@@ -190,6 +251,7 @@ set(SOURCES
     src/graphics/grc_gpu_resources.cpp
     src/graphics/fx_billboard.cpp
     src/graphics/grc_device.cpp
+    src/graphics/grc_vertex_buffer.cpp
     src/graphics/grc_render.cpp
     src/graphics/texture_reference.cpp
     src/graphics/grc_viewport_cull.cpp
@@ -240,7 +302,8 @@ set(SOURCES
     src/rage/math/swf_matrix.cpp
     src/rage/math/mat44.cpp
     src/rage/math/mat33.cpp
-    src/game/input/button_edges.cpp
+    src/rage/math/mat33_orthonormalize.cpp
+    src/rage/math/mat34_transform.cpp
     src/game/player/player_state_queries.cpp
     src/game/misc/ccal_ring_buffer.cpp
     src/game/misc/ccal_movie_player.cpp
