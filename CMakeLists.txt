@@ -146,6 +146,7 @@ set(SOURCES
     src/game/ball/ball_shot_trajectory.cpp
     src/game/ball/ball_shot_simulation.cpp
     src/game/ball/ball_process_hit.cpp
+    src/game/ball/ball_prediction_copy_locked.cpp
     src/game/ball/ball_playback.cpp
     src/game/ball/ball_visual_spin.cpp
     src/game/ball/ball_prediction_stream.cpp
