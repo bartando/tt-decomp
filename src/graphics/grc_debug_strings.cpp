@@ -15,7 +15,9 @@
 namespace rage {
 
 // 0x82065F26
-extern const char k_str_for_postmortem_debugging[] = "for postmortem debugging.";
+extern const char k_str_for_postmortem_debugging[] =
+    "for postmortem debugging.\n"
+    "\n";
 
 // 0x82065FA8 - Vertex Grouper/Tessellator debug block
 extern const char k_str_vgt_debug[] = "VGT_DEBUG";
@@ -40,11 +42,16 @@ extern const char k_str_cp_debug[] = "CP_DEBUG";
 
 // 0x82066510
 extern const char k_str_d3d_hang_try_instrumented[] =
-    "ERR[D3D]: Try reproducing the hang with the debug or instrumented";
+    "ERR[D3D]: Try reproducing the hang with the debug or instrumented\n"
+    "          versions of D3D (D3D9D.LIB or D3D9I.LIB) to capture a\n"
+    "          crash-dump PIX file that can be sent to Xbox developer\n"
+    "          support.\n"
+    "\n";
 
 // 0x820665E8
 extern const char k_str_d3d_hang_breaking_into_debugger[] =
-    "Breaking into the debugger.  The GPU is hung and can't be recovered";
+    "Breaking into the debugger.  The GPU is hung and can't be recovered\n"
+    "without doing a cold boot.\n";
 
 }  // namespace rage
 
