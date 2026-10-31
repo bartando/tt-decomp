@@ -103,6 +103,7 @@ set(SOURCES
     src/rage/audio/ld_xaudio_data.cpp
     src/rage/audio/xact_fade.cpp
     src/rage/audio/xact_volume.cpp
+    src/rage/audio/xact_buffer.cpp
     src/rage/audio/xact_sound.cpp
     src/rage/audio/xaudio_effect_buffer.cpp
     src/rage/audio/xaudio_effect.cpp
@@ -138,6 +139,7 @@ set(SOURCES
     src/rage/network/session_events.cpp
     src/rage/network/snSessionStates.cpp
     src/rage/network/session_state_helpers.cpp
+    src/rage/network/hsm_transition.cpp
     src/rage/core/subsystem_init.c
     src/rage/swf.cpp
     src/rage/swf_image_data.cpp
@@ -233,6 +235,7 @@ set(SOURCES
     src/game/network/msg_msg_sink.cpp
     src/game/network/msg_sink_timing.cpp
     src/game/network/msg_sink_children.cpp
+    src/game/network/msg_sink_key.cpp
     src/game/network/xonline_strings.cpp
     src/game/player/pong_player.cpp
     src/game/player/pong_player_swing.cpp

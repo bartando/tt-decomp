@@ -4,6 +4,7 @@
 #include "rage/xact_list.hpp"
 #include "audio/xact_fade.hpp"
 #include "audio/xact_volume.hpp"
+#include "audio/xact_buffer.hpp"
 /**
  * msg_msg_sink.cpp — msgMsgSink constructor & destructor
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -18,7 +19,6 @@
  * drop the slot-index body (second column). Tracked for a follow-up batch.
  *       - 0x8244DCF0 (vslot 25): GenerateAndCleanup / GenerateWithLock
  *       - 0x8244DB58 (vslot 52): SendEvent / ResetEventDispatch
- *       - 0x8244E148 (vslot 46): GetNestedObjectValue / GetConnectionCount
  *       - 0x8244E628 (vslot 49): FlushAndDisconnect / OnDisconnect
  *       - 0x8244E680 (vslot 50): BeginDisconnect / OnReconnect
  *       - 0x8244E6D0 (vslot 30): FindValidMessageSlot / FindGamerByIndex
@@ -32,7 +32,7 @@
  *       - 0x8244F7B8 (vslot 115): GetNameLength / GetMessageBufferPtr
  *       - 0x8244F768 (vslot 119): SendPulseToConnection / GetSessionLock
  *       - 0x824564A0 (vslot 120): DispatchEventWithSessionInfo / NotifyStateChange
- *       - 0x8244DCF0 / 0x8244E0C0 / 0x8244E138 / 0x8244E148 also appear as
+ *       - 0x8244DCF0 / 0x8244E0C0 / 0x8244E138 also appear as
  *         free-function msgMsgSink_XXXX_g alongside method versions.
  *       These should be consolidated; most represent the same function body
  *       renamed during incremental decomp passes.
@@ -601,21 +601,6 @@ void msgMsgSink::ClearPointers() {
     *(void**)((uint8_t*)this + 40) = nullptr;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// msgMsgSink::GetNestedObjectValue() [vtable slot 46 @ 0x8244E148]
-// Returns value from nested object or 0 if null
-// ─────────────────────────────────────────────────────────────────────────────
-uint32_t msgMsgSink::GetNestedObjectValue() {
-    void* nestedObj = *(void**)((uint8_t*)this + 52);
-    
-    if (nestedObj == nullptr) {
-        return 0;
-    }
-    
-    // Call helper function on nested object
-    extern uint32_t msgMsgSink_3D70_p39(void*);
-    return msgMsgSink_3D70_p39(nestedObj);
-}
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1495,7 +1480,6 @@ extern void game_0388_h(void*, uint16_t);
 extern uint32_t game_8CF8_h(void*, uint16_t);
 extern void* msgMsgSink_8D10_g(void*, uint16_t);
 extern void jumptable_3A48(void*, uint32_t, uint16_t, uint32_t);
-extern uint32_t msgMsgSink_3D70_p39(void*);
 extern void atSingleton_B0E8_sp(void*, uint32_t, uint32_t);
 extern uint32_t RtlEnterCriticalSection_A158_h(void*, void*, uint32_t, uint32_t, uint32_t);
 
@@ -1555,21 +1539,6 @@ void msgMsgSink::ResetEventDispatch() {
     jumptable_3A48(eventSink, 2, 0, 0);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// msgMsgSink::GetConnectionCount() [vfn_46 @ 0x8244E148 | 24B]
-//
-// Returns the active connection count from the delegate object at +52.
-// If the delegate pointer is null, returns 0.
-// ─────────────────────────────────────────────────────────────────────────────
-uint32_t msgMsgSink::GetConnectionCount() {
-    void* delegate = *(void**)((uint8_t*)this + 52);
-
-    if (delegate == nullptr) {
-        return 0;
-    }
-
-    return msgMsgSink_3D70_p39(delegate);
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // msgMsgSink::ForwardMessageToSession() [vfn_68 @ 0x82456F28 | 20B]
@@ -2482,8 +2451,6 @@ extern uint32_t msgMsgSink_1D30_g(void*);                             // 0x82451
 extern uint32_t msgMsgSink_1D80_g(void*);                             // 0x82451D80
 // msgMsgSink_1C08_g / _1BE0_g defined earlier in file as uint32_t; reused here.
 extern uint32_t msgMsgSink_1D20_g(void*);                             // 0x82451D20
-extern void* msgMsgSink_BF40_g();                                     // 0x8245BF40
-extern void  atSingleton_BFA0_g(void*);                               // 0x8245BFA0
 extern int32_t msgMsgSink_BFC0_g(void*, uint32_t, uint32_t);          // 0x8245BFC0
 extern int32_t msgMsgSink_7EF8_g(void*, uint32_t);                    // 0x82457EF8
 extern void RtlLeaveCriticalSection_8F18_h(void*);                    // 0x82458F18
@@ -2815,7 +2782,7 @@ void msgMsgSink::vfn_109() {
 void msgMsgSink::vfn_113() {
     uint8_t* self = reinterpret_cast<uint8_t*>(this);
     uint32_t cmd = 0;            // args unavailable at this vtable signature
-    uint32_t vec[16] = {0};
+    rage::ptr32<void> vec[16]{};
     uint32_t count = 1;
     bool wideFlag = false;
     uint32_t scratch[16] = {0};
@@ -2863,8 +2830,8 @@ void msgMsgSink::vfn_113() {
     int32_t status = 0;
     for (int32_t i = 0; i < finalCount && i < 16; ++i) {
         void* entry = rage_01B8(140, 545521664 | 32804);
-        void* obj = entry ? msgMsgSink_BF40_g() : nullptr;
-        vec[i] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(obj));
+        void* obj = entry ? msgMsgSink_BF40_g(entry) : nullptr;
+        vec[i] = obj;
         if (obj == nullptr) {
             status = 0x80070000 | 14;
         }
@@ -2873,12 +2840,10 @@ void msgMsgSink::vfn_113() {
     // On failure, roll back partial allocations
     if (status < 0) {
         for (int32_t i = 0; i < finalCount && i < 16; ++i) {
-            if (vec[i] != 0) {
-                atSingleton_BFA0_g(reinterpret_cast<void*>(
-                    static_cast<uintptr_t>(vec[i])));
-                _locale_register(reinterpret_cast<void*>(
-                    static_cast<uintptr_t>(vec[i])), 545521664 | 32804);
-                vec[i] = 0;
+            if (vec[i]) {
+                atSingleton_BFA0_g(vec[i].get());
+                _locale_register(vec[i].get(), 545521664 | 32804);
+                vec[i] = nullptr;
             }
         }
     }
@@ -2925,7 +2890,7 @@ void msgMsgSink::vfn_114() {
     msgMsgSink_1C08_g(scratch);
 
     void* entry = rage_01B8(140, 545521664 | 32804);
-    void* newObj = entry ? msgMsgSink_BF40_g() : nullptr;
+    void* newObj = entry ? msgMsgSink_BF40_g(entry) : nullptr;
     if (newObj == nullptr) return;
 
     int32_t rc = msgMsgSink_BFC0_g(newObj, 0, 0);
