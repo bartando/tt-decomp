@@ -6,9 +6,6 @@
 extern "C" const float g_identityMatrixRef[16]; // @ 0x825CB800
 extern void game_0A30(void*, void*, void*); // @ 0x821D0A30
 extern void phMatrix_RotateZ(float*, double); // @ 0x82175D88
-namespace rage {
-extern void mat33RotateY(float*, double); // @ 0x82111EA0
-}
 
 namespace {
 struct MatrixRow { float lane[4]; };
