@@ -1,3 +1,4 @@
+#include "platform/video_imports.h"
 #include "grc/device_state.h"
 #include "xam/kernel.h"
 /**
@@ -503,11 +504,8 @@ void grcDevice_setSamplerLodBias(void* device, uint32_t sampler, uint32_t biasBi
 
 extern "C" void grcTexture_ReleaseResource(void* texture); // @ 0x82352708
 
-extern "C" uint32_t KeGetCurrentProcessType();   // @ 0x82585E9C
 extern "C" uint32_t xe_GetCurrentThreadId();     // @ 0x82566B78
 extern "C" void rage_AA78(void* gpuDevice, uint32_t* handle);  // @ 0x8235AA78
-extern const uint32_t __imp_VdGlobalDevice;      // @ 0x82000730
-extern const uint32_t __imp_VdGlobalXamDevice;   // @ 0x82000734
 
 // Drop a reference to a GPU resource. On the last one, hand its handle (+0x08)
 // back to the kernel video device (the title's or, in a system process, XAM's)
@@ -523,9 +521,7 @@ static uint32_t releaseGpuResource(void* resource, uint32_t dataWord, uint32_t f
         return references;
     }
     if (words[dataWord] != 0) {
-        const uint32_t slot = KeGetCurrentProcessType() == 2 ? __imp_VdGlobalXamDevice : __imp_VdGlobalDevice;
-        void* gpuDevice = reinterpret_cast<void*>(static_cast<uintptr_t>(
-            *reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(slot))));
+        void* gpuDevice = *(KeGetCurrentProcessType() == 2 ? __imp_VdGlobalXamDevice : __imp_VdGlobalDevice);
         if (gpuDevice != nullptr) {
             uint32_t handle = words[2];
             xe_GetCurrentThreadId();
