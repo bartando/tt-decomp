@@ -1,3 +1,4 @@
+#include "rage/float_approach.hpp"
 /**
  * pong_game.cpp — Game state and context management
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -1360,7 +1361,6 @@ extern float g_pongControlGroupDeltaTime;         // @ 0x825CAEC0
 extern "C" {
     void pg_6E58_wrh(void* group); // @ 0x821B6E58
     void game_6B90(void* group);   // @ 0x821B6B90
-    bool pongControlGroup_Approach(float* current, float target, float rate, float dt); // @ 0x820C99B0
     // Xenon varargs pass the promoted double's bits in r5, not an FP argument.
     void pongControlGroup_LogMultiplier(const char* format, const char* name, uint64_t bits); // @ 0x8240E6D0
 }
@@ -1429,7 +1429,7 @@ void pongControlGroup::Update(uint8_t skipStateChanges) {
     for (int i = 0; i < 4; ++i) {
         auto& control = group->controls[i];
         if (__builtin_fabsf(control.current - control.target) > epsilon) {
-            pongControlGroup_Approach(&control.current, control.target, control.rate, g_pongControlGroupDeltaTime);
+            pongPlayer_99B0_g(&control.current, control.target, control.rate, g_pongControlGroupDeltaTime);
             if (reinterpret_cast<const uint8_t*>(this)[165] != 0) {
                 const double value = control.current;
                 uint64_t bits;

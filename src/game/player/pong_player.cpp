@@ -1,3 +1,4 @@
+#include "rage/float_approach.hpp"
 /**
  * pongPlayer — Player state query functions
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -137,7 +138,6 @@ extern uint8_t  g_ballSplashArray[];         // @ 0x8261A3D0  (416-byte-per-entr
 extern void  nop_8240E6D0(const char* fmt, ...);                                        // debug no-op @ 0x8240E6D0
 extern void  pongPlayer_Deactivate(void* entry);                                         // @ 0x8218BDC0
 extern void  pongPlayer_5C00_g(void* playerPtr, int32_t param);                          // @ 0x82195C00
-extern bool  pongPlayer_99B0_g(float* valuePtr, float startVal, float ratio, float step);// @ 0x820C99B0
 extern float pongPlayer_0508_g(void* obj, int channel);                                  // @ 0x821E0508
 
 // ── External globals for batch 10 implementations ────────────────────────
@@ -1646,43 +1646,6 @@ void pongPlayer::SetPlayerSide(uint8_t side) {
         // Update the side
         m_courtSide = side;
     }
-}
-
-/**
- * pongPlayer::LerpTowardsTarget(float target, float rate, float deltaTime)
- *   @ 0x820C99B0 | size: 0x5C
- *
- * Smoothly interpolates a value towards a target using linear interpolation.
- * Clamps the result to exactly the target when close enough.
- *
- * @param target - Target value to lerp towards
- * @param rate - Interpolation rate (0-1, higher = faster)
- * @param deltaTime - Frame delta time
- * @return true if target was reached, false otherwise
- *
- * Note: This operates on the first float field of the object (offset +0)
- */
-bool pongPlayer::LerpTowardsTarget(float target, float rate, float deltaTime) {
-    float current = m_lerpValue;  // field at +0
-    
-    if (current < target) {
-        // Lerp upwards
-        current += rate * deltaTime;
-        if (current > target) {
-            current = target;
-        }
-    } else if (current > target) {
-        // Lerp downwards
-        current -= rate * deltaTime;
-        if (current < target) {
-            current = target;
-        }
-    }
-    
-    m_lerpValue = current;
-    
-    // Return true if we've reached the target
-    return (current == target);
 }
 
 /**

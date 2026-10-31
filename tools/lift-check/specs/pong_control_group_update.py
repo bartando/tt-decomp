@@ -36,7 +36,7 @@ CALLS = {
     "pg_C2A0_g": model(lookup, args=("r3", "r4")),
     "pg_6E58_wrh": model(select_state, args=("r3",)),
     "game_6B90": model(select_state, args=("r3",)),
-    "pongControlGroup_Approach": run(args=("r3", "f1", "f2", "f3"), deref={"r3": 4}),
+    "pongPlayer_99B0_g": run(args=("r3", "f1", "f2", "f3"), deref={"r3": 4}),
     "pongControlGroup_LogMultiplier": stub(ret="void", args=("r3", "r4", "r5")),
 }
 
