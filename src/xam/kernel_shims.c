@@ -31,7 +31,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
+#include "platform/host_sync.h"
 
 /*=========================================================================
  * Forward declarations for TLS functions implemented in xam/kernel.c
@@ -119,7 +119,7 @@ int ObReferenceObjectByHandle(void* handle, void* type, void** obj) {
  * implemented in xam/kernel.c with proper pthread mutex support.
  *=========================================================================*/
 
-static pthread_mutex_t g_rtl_cs_mutex = PTHREAD_MUTEX_INITIALIZER;
+static tt_mutex g_rtl_cs_mutex = TT_MUTEX_INITIALIZER;
 
 /**
  * ke_EnterCriticalSection
@@ -129,7 +129,7 @@ static pthread_mutex_t g_rtl_cs_mutex = PTHREAD_MUTEX_INITIALIZER;
  */
 void ke_EnterCriticalSection(uint32_t a) {
     (void)a;
-    pthread_mutex_lock(&g_rtl_cs_mutex);
+    tt_mutex_lock(&g_rtl_cs_mutex);
 }
 
 /**
@@ -139,7 +139,7 @@ void ke_EnterCriticalSection(uint32_t a) {
  */
 void ke_LeaveCriticalSection(uint32_t a) {
     (void)a;
-    pthread_mutex_unlock(&g_rtl_cs_mutex);
+    tt_mutex_unlock(&g_rtl_cs_mutex);
 }
 
 /*=========================================================================

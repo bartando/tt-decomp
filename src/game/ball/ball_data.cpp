@@ -86,7 +86,7 @@ extern "C" void* g_ballAudioListener = nullptr;
 extern "C" float g_ballTableSurfaceOffset = 0.0f;
 
 // @ 0x82606564 (.data) — active scene used by prediction collision queries
-extern "C" void* lbl_82606564 = nullptr;
+// @ 0x82606564 is shared with rendering; storage is in graphics/image_data.cpp.
 
 // @ 0x82606570 (.data)
 extern "C" void* g_activeBallNode = nullptr;

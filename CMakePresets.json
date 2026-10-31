@@ -1,0 +1,15 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "windows-x86-clang",
+      "displayName": "32-bit Windows (clang / mingw-w64)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/windows-x86-clang",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/i686-windows-clang.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "CMAKE_EXPORT_COMPILE_COMMANDS": "ON", "TT_BUILD_PLATFORM_TESTS": "ON" }
+    }
+  ],
+  "buildPresets": [ { "name": "windows-x86-clang", "configurePreset": "windows-x86-clang" } ]
+}

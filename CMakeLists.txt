@@ -22,9 +22,23 @@ else()
 endif()
 
 # Find required packages
+if(TT_WINDOWS_X86)
+    set(SDL2_NO_MWINDOWS ON)
+endif()
 find_package(SDL2 REQUIRED)
+if(TT_WINDOWS_X86)
+    # We use the host CRT's console entry, not SDL's WinMain adapter.
+    set(SDL2_LIBRARIES SDL2::SDL2)
+endif()
 find_package(OpenGL REQUIRED)
-find_package(GLEW REQUIRED)
+if(TT_WINDOWS_X86 AND EXISTS "${GLEW_ROOT}/src/glew.c")
+    add_library(tt_glew STATIC "${GLEW_ROOT}/src/glew.c")
+    target_include_directories(tt_glew PUBLIC "${GLEW_ROOT}/include")
+    target_compile_definitions(tt_glew PUBLIC GLEW_STATIC)
+    add_library(GLEW::GLEW ALIAS tt_glew)
+else()
+    find_package(GLEW REQUIRED)
+endif()
 
 # Include directories
 include_directories(${SDL2_INCLUDE_DIRS})
@@ -61,9 +75,8 @@ set(SOURCES
     src/platform/host_imports.cpp
     src/platform/audio_frame.cpp
     src/platform/host_xma.cpp
-    src/platform/host_sync.cpp
     src/platform/host_memory.cpp
-    src/xam/kernel.c
+    src/xam/kernel_common.c
     src/xam/thread_sync.cpp
     src/xam/kernel_shims.c
     src/xam/network.c
@@ -317,14 +330,34 @@ set(SOURCES
 )
 
 # Create executable
+if(WIN32)
+    list(APPEND SOURCES src/xam/kernel_win32.c src/xam/kernel_critical_section.c src/platform/win32.c)
+else()
+    list(APPEND SOURCES src/xam/kernel.c src/platform/host_sync.cpp src/platform/posix_sync.c)
+endif()
 add_executable(${PROJECT_NAME} ${SOURCES})
+
+if(TT_WINDOWS_X86)
+    if(NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
+        message(FATAL_ERROR "TT_WINDOWS_X86 requires a 32-bit compiler and dependencies")
+    endif()
+    target_compile_definitions(${PROJECT_NAME} PRIVATE TT_WINDOWS_X86=1 SDL_MAIN_HANDLED)
+    target_compile_options(${PROJECT_NAME} PRIVATE -include "${CMAKE_CURRENT_SOURCE_DIR}/include/platform/layout.h")
+    # Keep the full missing-lift inventory in one link attempt.
+    target_link_options(${PROJECT_NAME} PRIVATE -Wl,--error-limit=0)
+    # Homebrew's mingw libstdc++ / SJLJ runtime uses winpthreads internally.
+    # Keep that runtime static so the offline Windows PC needs no extra DLL.
+    find_library(TT_WINPTHREAD_STATIC NAMES libwinpthread.a winpthread
+        HINTS ${CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES} "${TT_MINGW_ROOT}/i686-w64-mingw32/lib"
+        NO_CMAKE_FIND_ROOT_PATH REQUIRED)
+    target_link_libraries(${PROJECT_NAME} "${TT_WINPTHREAD_STATIC}")
+endif()
 
 # Link libraries
 target_link_libraries(${PROJECT_NAME}
     ${SDL2_LIBRARIES}
     ${OPENGL_LIBRARIES}
     GLEW::GLEW
-    pthread  # For POSIX threads on Linux/macOS
 )
 
 # Platform-specific linking
@@ -332,11 +365,11 @@ if(WIN32)
     # Windows-specific libraries
     target_link_libraries(${PROJECT_NAME}
         opengl32
-        glew32
-        SDL2main
-        SDL2
+        ws2_32
+        ntdll
     )
 elseif(APPLE)
+    target_link_libraries(${PROJECT_NAME} pthread)
     # macOS-specific libraries
     find_library(COCOA_LIBRARY Cocoa)
     find_library(IOKIT_LIBRARY IOKit)
@@ -347,6 +380,7 @@ elseif(APPLE)
         ${COREVIDEO_LIBRARY}
     )
 elseif(UNIX)
+    target_link_libraries(${PROJECT_NAME} pthread)
     # Linux-specific libraries
     target_link_libraries(${PROJECT_NAME}
         GL
@@ -361,15 +395,37 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 )
 
 # Copy SDL2 DLLs on Windows
-if(WIN32)
+if(WIN32 AND TARGET SDL2::SDL2)
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${SDL2_LIBRARY_DIRS}/SDL2.dll
+        $<TARGET_FILE:SDL2::SDL2>
         $<TARGET_FILE_DIR:${PROJECT_NAME}>
     )
 endif()
 
 # Install rules
+option(TT_BUILD_PLATFORM_TESTS "Build standalone host synchronization tests" OFF)
+if(TT_BUILD_PLATFORM_TESTS)
+    enable_testing()
+    if(WIN32)
+        add_executable(tt_platform_test tests/win32_kernel_test.c
+            src/xam/kernel_win32.c src/xam/kernel_common.c src/xam/thread_sync.cpp
+            src/xam/kernel_critical_section.c src/platform/win32.c
+            src/platform/host_memory.cpp src/platform/host_imports.cpp)
+        target_link_libraries(tt_platform_test ntdll "${TT_WINPTHREAD_STATIC}")
+    else()
+        add_executable(tt_platform_test tests/host_critical_section_test.c
+            src/platform/host_sync.cpp src/platform/posix_sync.c)
+        target_link_libraries(tt_platform_test pthread)
+        add_executable(tt_host_contract_test tools/host-tests/sync.cpp
+            src/xam/kernel.c src/xam/kernel_common.c src/xam/thread_sync.cpp
+            src/platform/host_sync.cpp src/platform/host_memory.cpp src/platform/host_imports.cpp)
+        target_compile_options(tt_host_contract_test PRIVATE -UNDEBUG)
+        target_link_libraries(tt_host_contract_test pthread)
+        add_test(NAME host_sdk_contracts COMMAND tt_host_contract_test)
+    endif()
+    add_test(NAME host_synchronization COMMAND tt_platform_test)
+endif()
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION bin
 )

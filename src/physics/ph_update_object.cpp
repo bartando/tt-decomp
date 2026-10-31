@@ -789,7 +789,8 @@ void phJoint_1388(rage::phJoint3Dof* /*self*/, int /*index*/, float /*val*/,
 void phJoint_PreSyncState(rage::phJoint3Dof* /*self*/) {}
 
 // ── ke_DispatchPhysics — thunk into the global physics state dispatcher ───
-extern "C" void ke_DispatchPhysics(void* /*state*/) {}
+// Defined in its owning module; do not duplicate the export here.
+
 
 extern "C" const float lbl_825C5938; // @ 0x825C5938 — disabled sentinel, -1
 extern "C" const float g_kPercentScale[3]; // @ 0x8202D118 — first word is 100
