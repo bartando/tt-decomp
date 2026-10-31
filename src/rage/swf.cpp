@@ -1759,10 +1759,7 @@ int swfINSTANCE::VisitMembers() {
  * The inner object is stored at offset +7332.
  */
 uint32_t swfACTIONFUNC::SetMember(const char* name, void* value) {
-    swfINSTANCE* innerObj = *reinterpret_cast<swfINSTANCE**>(reinterpret_cast<char*>(this) + 0x1CA4);
-    using Setter = uint32_t (*)(swfINSTANCE*, const char*, void*);
-    void** vtable = *reinterpret_cast<void***>(innerObj);
-    return reinterpret_cast<Setter>(vtable[11])(innerObj, name, value);
+    return m_pInnerObject->SetMember(name, value);
 }
 
 /**
