@@ -116,3 +116,6 @@ extern "C" const float g_segmentTriangleMinArea = 0.00000762939453125f;
 RTTITypeDescriptor g_typeDescriptor_phBoundComposite = {
     nullptr, nullptr, ".?AVphBoundComposite@rage@@"
 };
+
+// @ 0x8202D18C (.rdata) — trace-scaled symmetric-inverse pivot floor.
+extern "C" const float g_phInertiaPivotRatio = 9.999999747378752e-6f;

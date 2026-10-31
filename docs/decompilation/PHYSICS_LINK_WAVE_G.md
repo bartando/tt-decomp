@@ -1,8 +1,8 @@
 # Physics link wave G — completed and remaining
 
-This pass addresses 14 of the 85 ABI entries supplied in `/tmp/tt-wave-G/physics.txt`.
-It adds thirteen original PPC routines (two are dependencies absent from that list).
-The 71 entries below were not addressed by this pass.
+This pass addresses 17 of the 85 ABI entries supplied in `/tmp/tt-wave-G/physics.txt`.
+It adds 29 original PPC routines (15 are dependencies absent from that list).
+The 68 entries below were not addressed by this pass.
 
 ## Completed
 
@@ -107,12 +107,65 @@ Mutation runners live in `tools/lift-check/specs/`:
 - Native compilation succeeds through linking. None of this continuation's
   completed symbols or renamed helpers remains in the native linker errors;
   unrelated unresolved symbols still prevent the executable from linking.
-- The remaining integration entry below is tracked under the input list's old
-  signature. Its declaration and callers now correctly include a float timestep,
-  but its body at `0x82256968` is still unlifted. Next hot targets are that routine,
-  force preparation `0x82255FE0`, and solver rebuilding `0x82255D58`.
+- Integration's declaration and callers were corrected in this continuation;
+  its body, force preparation and solver rebuild are completed below.
 
-## Remaining input entries (71)
+## Continuation — complete articulated integration and solver math
+
+The three requested hot entries are now implemented, including their previously
+unlifted dependencies. These changes are in `src/physics/ph_physics.cpp`,
+`src/rage/math/mat33.cpp`, `include/rage/mat33.hpp`, and the existing creature caller.
+
+- `0x82256968` — `rage::ph_IntegrateJointPositions(void*, float)`: integrates all
+  four position lanes, thresholds angular speed, normalizes the rotation axis with
+  the VMX reciprocal refinement, and applies rotation * old basis.
+- `0x82255FE0` — `phArticulatedCollider_5FE0`: resolves force responses, adds them
+  to cached velocities, and recovers current angular/origin linear velocity.
+- `0x82255D58` — `phArticulatedCollider_5D58`: builds spatial inertia, reduces child
+  solvers backwards, applies parent state forwards, and inverts each body tensor.
+
+Recovered helpers, all with their own seed-1/seed-2 specs:
+
+- `0x82256D98` — `phArticulatedCollider_BuildRotation`: solver axis-angle matrix.
+- `0x820C3BC8` — `rage::mat33ComposeInPlace`: shared basis composition. Replaces
+  the declared-only `phJoint_3BC8_g`; `pongCreature::ReplayStarting` now calls the
+  shared declaration and passes its existing spec on both seeds.
+- `0x822556E0` — `phSpatialTensor_Multiply`: staged coupled-block vector product.
+- `0x82256300` — `phArticulatedCollider_PrepareForceResponse`: local force response
+  and backward/forward joint response virtuals.
+- `0x82255F10` — `phSpatialTensor_Copy`: all twelve rows in vector-store order.
+- `0x82255478` — `phSpatialTensor_Add`: nine coefficient rows, preserving padding.
+- `0x82255558` — `phSpatialTensor_Difference`: staged negate/add in A/C/B order.
+- `0x820D4F88` — `phMatrix_Multiply3x3`: basis product with original output W shuffles.
+- `0x8225B7E0` — `phMatrix_InvertSymmetric`: lower-triangle cofactor inverse.
+- `0x82350808` — `phMatrix_InvertRegularized`: strided inverse with trace-scaled pivots.
+- `0x82259108` — `phMatrix_RotateDiagonal`: rotated diagonal inertia tensor.
+- `0x82258E48` — `phArticulatedBody_BuildInertia`: mass, skew and parallel-axis terms.
+- `0x8225B498` — `phSpatialTensor_Invert`: Schur-complement block inverse.
+
+Verification and limits:
+
+- All 16 new original routines pass seeds 1 and 2 (300–800 trials per spec).
+- `ph_articulated_timestep_pipeline` additionally passes 96 trials per seed,
+  executing the complete original pipeline with deterministic child-joint virtual
+  models. Individual helper lifts are checked separately.
+- `_articulated_integration_mutations.py` catches 11/11 mutations;
+  `_articulated_force_mutations.py` catches 13/13;
+  `_spatial_solver_mutations.py` catches 23/23, including the full pipeline case.
+- The factored origin-velocity recovery keeps the earlier restore spec passing on
+  both seeds. Native compilation succeeds; linking still fails on other symbols.
+  These three hot entries, all new helpers, and `phJoint_3BC8_g` are absent from
+  the final unresolved-symbol log.
+- The original block inverse copies an uninitialized scratch fourth row into
+  its output C block. The C++ lift preserves that unused destination padding
+  instead of reading uninitialized C++ memory. Inverse, rebuild and pipeline
+  specs ignore exactly that 16-byte fourth row per output tensor; every actual
+  coefficient row and its W lane is compared. Other new specs ignore no bytes.
+- VMX reciprocal accuracy is the harness model; this is not console evidence.
+- Cumulative progress: 29 original routines lifted, 17/85 supplied ABI entries
+  resolved, 107 deliberate mutations caught, and 68 input entries left.
+
+## Remaining input entries (68)
 
 - `_phDemoWorld_67D0_g`
 - `_ph_2E08`
@@ -128,8 +181,6 @@ Mutation runners live in `tools/lift-check/specs/`:
 - `_sub_823517F8`
 - `aud_2478(double)`
 - `game_CE58(void*)`
-- `phArticulatedCollider_5D58(void*)`
-- `phArticulatedCollider_5FE0(void*)`
 - `phArticulatedCollider_ApplyJointDelta(void*, int, float const*)`
 - `phArticulatedCollider_CreateJointConstraints(void*, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int)`
 - `phArticulatedCollider_ResetJointLink(void*, int)`
@@ -174,7 +225,6 @@ Mutation runners live in `tools/lift-check/specs/`:
 - `ph_ctor_FFD8(void*, void*)`
 - `pongShadowMap_F010_g(void*, void*, void const*, void*)`
 - `rage::phLevelNew_E648_wrh(rage::phQueryVector3 const*, rage::phQueryVector3 const*, rage::phQueryVector3 const*)`
-- `rage::ph_IntegrateJointPositions(void*)`
 - `rage_4CD0(void*)`
 - `rage_A518(void*, void*, void*)`
 - `rage_CopyChannelData(void*, unsigned int, void*)`

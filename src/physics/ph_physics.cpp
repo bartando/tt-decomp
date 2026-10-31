@@ -112,7 +112,7 @@ extern void phArticulatedCollider_ProcessColliderState(void* collider);
 extern void phArticulatedCollider_ApplyJointDelta(void* jointData, int linkIndex, const float* delta);
 extern void phArticulatedCollider_ResetJointLink(void* jointData, int linkIndex);
 extern void phArticulatedCollider_ResetJointChain(void* jointArray); // @ 0x822557F0
-extern void phArticulatedCollider_5D58(void* jointArray);
+extern void phArticulatedCollider_5D58(void* jointArray); // @ 0x82255D58
 extern void phArticulatedCollider_ResetForceAccumulators(void* jointArray); // @ 0x82255A40
 extern void phArticulatedCollider_5FE0(void* jointData); // @ 0x82255FE0
 extern void phArticulatedCollider_F0E0(void* collider); // @ 0x8224F0E0
@@ -5723,7 +5723,6 @@ int32_t phObject_UnbindResource(void* thisPtr) {
 // ═════════════════════════════════════════════════════════════════════════════
 
 // External subroutines used by the articulated collider
-extern void phArticulatedCollider_5D58(void* jointArray);      // Reset joint integration state
 
 extern void phArticulatedCollider_F0E0(void* collider);        // Update articulated internal state
 extern void phCollider_CDF0_p39(void* collider);               // Update collider position from velocity
@@ -7508,7 +7507,6 @@ void phBoundCapsule_DecomposeMatrixToEuler(const float* matrix, float* outEuler)
 
 // External functions used by phArticulatedCollider methods
 extern void phCollider_vfn_1(void* collider);
-extern void phArticulatedCollider_5D58(void* jointData);
 extern void* phArticulatedCollider_CreateJointConstraints(void* jointData, uint32_t boneMap,
     uint32_t constraintMap, uint32_t jointParamA, uint32_t jointParamB, uint32_t jointParamC);
 
@@ -9224,6 +9222,269 @@ void phArticulatedCollider_5FE0(void* jointData) {
         memcpy(body + 0x120 / 4, body + 0x130 / 4, 16);
         memcpy(body + 0x110 / 4, body + 0x140 / 4, 16);
         phRecoverOriginVelocity(body);
+    }
+}
+
+// Copy all twelve spatial-tensor rows in the original forward vector order.
+// phSpatialTensor_Copy @ 0x82255F10 | size: 0xCC
+void phSpatialTensor_Copy(float* out, const float* input) {
+    for (unsigned row = 0; row < 12; ++row) {
+        float value[4];
+        memcpy(value, input + row * 4, sizeof(value));
+        memcpy(out + row * 4, value, sizeof(value));
+    }
+}
+
+// Add the three coefficient rows of each block; fourth rows are padding.
+// phSpatialTensor_Add @ 0x82255478 | size: 0xDC
+void phSpatialTensor_Add(float* out, const float* input) {
+    for (unsigned block = 0; block < 3; ++block)
+        for (unsigned row = 0; row < 3; ++row)
+            for (unsigned lane = 0; lane < 4; ++lane) {
+                const unsigned i = block * 16 + row * 4 + lane;
+                out[i] = phFlushVmx(phFlushVmx(out[i]) + phFlushVmx(input[i]));
+            }
+}
+
+// Negate, then add, in A/C/B order. The two separate rounds and intermediate
+// stores are observable when the source overlaps the destination.
+// phSpatialTensor_Difference @ 0x82255558 | size: 0x184
+void phSpatialTensor_Difference(float* out, const float* input) {
+    const unsigned blocks[3] = {0, 32, 16};
+    for (unsigned block : blocks) {
+        for (unsigned row = 0; row < 3; ++row)
+            for (unsigned lane = 0; lane < 4; ++lane) {
+                const unsigned i = block + row * 4 + lane;
+                out[i] = phFlushVmx(phFlushVmx(lbl_82606750[lane]) - phFlushVmx(out[i]));
+            }
+        for (unsigned row = 0; row < 3; ++row)
+            for (unsigned lane = 0; lane < 4; ++lane) {
+                const unsigned i = block + row * 4 + lane;
+                out[i] = phFlushVmx(phFlushVmx(out[i]) + phFlushVmx(input[i]));
+            }
+    }
+}
+
+// Multiply xyz bases, retaining the old output row's X bits in output W.
+// Snapshot both inputs and the old output before any writes.
+// phMatrix_Multiply3x3 @ 0x820D4F88 | size: 0xB8
+void phMatrix_Multiply3x3(float* out, const float* left, const float* right) {
+    float a[12], b[16], old[12], result[12];
+    memcpy(a, left, sizeof(a));
+    memcpy(b, right, sizeof(b));
+    memcpy(old, out, sizeof(old));
+    for (unsigned row = 0; row < 3; ++row) {
+        for (unsigned col = 0; col < 3; ++col) {
+            const float column[3] = {b[col], b[4 + col], b[8 + col]};
+            result[row * 4 + col] = phDotVmx(a + row * 4, column, 3);
+        }
+        memcpy(result + row * 4 + 3, old + row * 4, 4);
+    }
+    memcpy(out + 4, result + 4, 16);
+    memcpy(out, result, 16);
+    memcpy(out + 8, result + 8, 16);
+}
+
+// Invert a symmetric matrix from its lower triangle, with scalar float32
+// products and fused cofactors. No singularity check; padding stays untouched.
+// phMatrix_InvertSymmetric @ 0x8225B7E0 | size: 0xA0
+void phMatrix_InvertSymmetric(const float* m, float* out) {
+    const float a = m[0], b = m[4], c = m[8], d = m[5], e = m[9], f = m[10];
+    const float bb = b * b, cc = c * c, ee = e * e;
+    const float bf = b * f, cd = c * d, ae = a * e;
+    const float co01 = __builtin_fmaf(c, e, -bf);
+    const float co02 = __builtin_fmaf(b, e, -cd);
+    const float co00 = __builtin_fmaf(d, f, -ee);
+    const float co12 = __builtin_fmaf(b, c, -ae);
+    const float co11 = __builtin_fmaf(a, f, -cc);
+    const float co22 = __builtin_fmaf(a, d, -bb);
+    const float determinant = __builtin_fmaf(c, co02, __builtin_fmaf(a, co00, b * co01));
+    const float inverse = g_phClampMax / determinant;
+    out[1] = out[4] = inverse * co01;
+    out[2] = out[8] = inverse * co02;
+    out[0] = inverse * co00;
+    out[5] = inverse * co11;
+    out[10] = inverse * co22;
+    out[6] = out[9] = inverse * co12;
+}
+
+extern "C" const float g_phInertiaPivotRatio; // @ 0x8202D18C — 1e-5
+
+// LDL-style symmetric inverse with trace-scaled minimum pivots. Stride counts
+// floats, normally four. fsel keeps the unregularized value on unordered input.
+// phMatrix_InvertRegularized @ 0x82350808 | size: 0xF4
+void phMatrix_InvertRegularized(float* m, uint32_t stride) {
+    const float trace = (m[stride + 1] + m[2 * stride + 2]) + m[0];
+    const float minimum = trace * g_phInertiaPivotRatio;
+    const float pivot0 = minimum - m[0] >= 0.0f ? minimum : m[0];
+    m[0] = pivot0;
+    const float x = m[stride], y = m[2 * stride];
+    const float b = m[stride + 1], c = m[2 * stride + 1], d = m[2 * stride + 2];
+    const float inverse0 = g_phClampMax / pivot0;
+    const float l10 = x * inverse0, l20 = y * inverse0;
+    const float schur11 = -__builtin_fmaf(x, l10, -b);
+    const float schur12 = -__builtin_fmaf(x, l20, -c);
+    const float schur22 = -__builtin_fmaf(y, l20, -d);
+    const float pivot1 = minimum - schur11 >= 0.0f ? minimum : schur11;
+    const float inverse1 = g_phClampMax / pivot1;
+    const float l21 = inverse1 * schur12;
+    const float firstTerm = inverse1 * l10;
+    const float reduced22 = -__builtin_fmaf(l21, schur12, -schur22);
+    const float mixed = __builtin_fmaf(l21, l10, -l20);
+    const float pivot2 = minimum - reduced22 >= 0.0f ? minimum : reduced22;
+    const float quadratic = firstTerm * l10;
+    const float inverse2 = g_phClampMax / pivot2;
+    m[2 * stride + 2] = inverse2;
+    const float out02 = mixed * inverse2;
+    const float out12 = -(inverse2 * l21);
+    const float correction = out02 * l21;
+    m[stride + 2] = m[2 * stride + 1] = out12;
+    m[stride + 1] = -__builtin_fmaf(out12, l21, -inverse1);
+    m[2] = m[2 * stride] = out02;
+    m[1] = m[stride] = -correction - firstTerm;
+    m[0] = __builtin_fmaf(m[2 * stride], mixed, quadratic) + inverse0;
+}
+
+// Rotate diagonal inertia into the current basis. Reload inputs after each
+// coefficient pair because output may overlap either input.
+// phMatrix_RotateDiagonal @ 0x82259108 | size: 0x16C
+void phMatrix_RotateDiagonal(const float* r, const float* d, float* out) {
+    const auto diagonal = [&](unsigned row) {
+        const float x = r[row], y = r[row + 1], z = r[row + 2];
+        const float dx = d[0] * x, dy = d[1] * y, dz = d[2] * z;
+        return __builtin_fmaf(dx, x, __builtin_fmaf(dz, z, dy * y));
+    };
+    out[0] = diagonal(0);
+    {
+        const float z = r[2] * d[2], x = r[0] * d[0], y = r[1] * d[1];
+        const float value = __builtin_fmaf(y, r[5], __builtin_fmaf(x, r[4], z * r[6]));
+        out[4] = out[1] = value;
+    }
+    {
+        const float z = r[10] * r[2], y = r[1] * d[1], x = r[8] * r[0];
+        const float value = __builtin_fmaf(x, d[0], __builtin_fmaf(y, r[9], z * d[2]));
+        out[8] = out[2] = value;
+    }
+    out[5] = diagonal(4);
+    {
+        const float z = r[10] * d[2], y = d[1] * r[5], x = r[8] * d[0];
+        const float value = __builtin_fmaf(x, r[4], __builtin_fmaf(y, r[9], z * r[6]));
+        out[9] = out[6] = value;
+    }
+    out[10] = diagonal(8);
+}
+
+// Build the body's spatial inertia about the current origin: mass identity,
+// mass-weighted position skew, and rotated inertia plus parallel-axis terms.
+// phArticulatedBody_BuildInertia @ 0x82258E48 | size: 0x178
+void phArticulatedBody_BuildInertia(void* object) {
+    float* body = static_cast<float*>(object);
+    float* a = body + 0x190 / 4;
+    float* b = body + 0x1D0 / 4;
+    float* c = body + 0x210 / 4;
+    const float mass = body[0x70 / 4];
+    for (unsigned row = 0; row < 4; ++row)
+        for (unsigned col = 0; col < 3; ++col)
+            a[row * 4 + col] = row == col ? mass : g_phZeroFloat;
+    const float mx = body[0xC0 / 4] * mass;
+    const float my = body[0xC4 / 4] * mass;
+    const float mz = body[0xC8 / 4] * mass;
+    b[0] = b[5] = b[10] = b[12] = b[13] = b[14] = g_phZeroFloat;
+    b[1] = -mz; b[2] = my;
+    b[4] = mz; b[6] = -mx;
+    b[8] = -my; b[9] = mx;
+    phMatrix_RotateDiagonal(body + 0x90 / 4, body + 0x80 / 4, c);
+    const float xmx = body[0xC0 / 4] * mx;
+    const float ymy = body[0xC4 / 4] * my;
+    const float zmz = body[0xC8 / 4] * mz;
+    c[10] = (c[10] + ymy) + xmx;
+    c[5] = (zmz + xmx) + c[5];
+    c[0] = (c[0] + zmz) + ymy;
+    c[1] = c[4] = -__builtin_fmaf(body[0xC4 / 4], mx, -c[1]);
+    c[2] = c[8] = -__builtin_fmaf(body[0xC8 / 4], mx, -c[2]);
+    c[6] = c[9] = -__builtin_fmaf(body[0xC8 / 4], my, -c[6]);
+    memset(c + 12, 0, 16);
+}
+
+// Block inverse through the C inverse and Schur complement. The PPC copies an
+// uninitialized scratch fourth row into output C padding; preserve that padding
+// here instead of introducing undefined C++ reads. All coefficient rows match.
+// phSpatialTensor_Invert @ 0x8225B498 | size: 0x274
+void phSpatialTensor_Invert(const float* input, float* out) {
+    alignas(16) float inverseC[16] = {}, transposedB[16], product[16] = {};
+    phMatrix_InvertSymmetric(input + 32, inverseC);
+    memcpy(transposedB, input + 16, sizeof(transposedB));
+    float b[16];
+    memcpy(b, transposedB, sizeof(b));
+    for (unsigned row = 0; row < 3; ++row)
+        for (unsigned col = 0; col < 4; ++col)
+            transposedB[row * 4 + col] = b[col * 4 + row];
+    phMatrix_Multiply3x3(product, transposedB, inverseC);
+    memcpy(out + 32, product, 48);
+    rage::mat33ComposeInPlace(out + 32, input + 16);
+    for (unsigned row = 0; row < 3; ++row)
+        for (unsigned lane = 0; lane < 4; ++lane) {
+            const unsigned i = row * 4 + lane;
+            out[32 + i] = phFlushVmx(phFlushVmx(lbl_82606750[lane]) - phFlushVmx(out[32 + i]));
+        }
+    for (unsigned row = 0; row < 3; ++row)
+        for (unsigned lane = 0; lane < 4; ++lane) {
+            const unsigned i = row * 4 + lane;
+            out[32 + i] = phFlushVmx(phFlushVmx(input[i]) + phFlushVmx(out[32 + i]));
+        }
+    phMatrix_InvertRegularized(out + 32, 4);
+    phMatrix_Multiply3x3(out + 16, out + 32, product);
+    memcpy(out, input + 16, 64);
+    rage::mat33ComposeInPlace(out, out + 16);
+    out[0] += g_phClampMax;
+    out[5] += g_phClampMax;
+    out[10] += g_phClampMax;
+    memcpy(transposedB, out, 48);
+    phMatrix_Multiply3x3(out, inverseC, transposedB);
+    for (unsigned row = 0; row < 3; ++row)
+        for (unsigned lane = 0; lane < 4; ++lane) {
+            const unsigned i = row * 4 + lane;
+            out[16 + i] = phFlushVmx(phFlushVmx(lbl_82606750[lane]) - phFlushVmx(out[16 + i]));
+        }
+}
+
+// Rebuild spatial inertia, reduce child solvers backwards, apply parent state
+// forwards, then invert the resolved tensor for every body.
+// phArticulatedCollider_5D58 @ 0x82255D58 | size: 0x1B8
+void phArticulatedCollider_5D58(void* jointData) {
+    uint32_t* data = static_cast<uint32_t*>(jointData);
+    const int initialCount = static_cast<int32_t>(data[1]);
+    for (int i = 0; i < initialCount; ++i) {
+        uint8_t* body = reinterpret_cast<uint8_t*>(uintptr_t(data[10 + i]));
+        phArticulatedBody_BuildInertia(body);
+        phSpatialTensor_Copy(reinterpret_cast<float*>(body + 0x250), reinterpret_cast<const float*>(body + 0x190));
+    }
+    const int backwardCount = static_cast<int32_t>(data[1]);
+    for (int child = backwardCount - 1; child > 0; --child) {
+        auto* joint = reinterpret_cast<rage::phArticulatedJointOps*>(uintptr_t(data[41 + child]));
+        const uint8_t* body = reinterpret_cast<const uint8_t*>(uintptr_t(data[10 + child]));
+        uint8_t* parent = reinterpret_cast<uint8_t*>(uintptr_t(data[10 + data[72 + child]]));
+        float* jointMatrix = reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(joint) + 0x30);
+        phSpatialTensor_Copy(reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(joint) + 0xF0), reinterpret_cast<const float*>(body + 0x250));
+        joint->PrepareBackwardSolve();
+        joint->GetBackwardMatrix(jointMatrix);
+        phSpatialTensor_Add(reinterpret_cast<float*>(parent + 0x250), jointMatrix);
+    }
+    const int forwardCount = static_cast<int32_t>(data[1]);
+    for (int child = 1; child < forwardCount; ++child) {
+        auto* joint = reinterpret_cast<rage::phArticulatedJointOps*>(uintptr_t(data[41 + child]));
+        const uint8_t* parent = reinterpret_cast<const uint8_t*>(uintptr_t(data[10 + data[72 + child]]));
+        uint8_t* body = reinterpret_cast<uint8_t*>(uintptr_t(data[10 + child]));
+        phSpatialTensor_Difference(reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(joint) + 0x30), reinterpret_cast<const float*>(parent + 0x250));
+        joint->PrepareForwardSolve();
+        alignas(16) float response[48];
+        joint->GetForwardMatrix(response);
+        phSpatialTensor_Add(reinterpret_cast<float*>(body + 0x250), response);
+    }
+    const int finalCount = static_cast<int32_t>(data[1]);
+    for (int i = 0; i < finalCount; ++i) {
+        uint8_t* body = reinterpret_cast<uint8_t*>(uintptr_t(data[10 + i]));
+        phSpatialTensor_Invert(reinterpret_cast<float*>(body + 0x250), reinterpret_cast<float*>(body + 0x310));
     }
 }
 
