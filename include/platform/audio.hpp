@@ -1,6 +1,9 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#if !defined(__powerpc__) && !defined(__ppc__)
+#include <atomic>
+#endif
 
 struct AudioFrame {
     uint8_t format, channels;
@@ -24,8 +27,16 @@ struct AudioFrameBuffer {
     void* allocator;
 };
 struct XAudioLock {
-    uint32_t spinLock, depth;
+    uint32_t spinLock;
+#if defined(__powerpc__) || defined(__ppc__)
+    uint32_t depth;
     uintptr_t owner;
+#else
+    // Ownership is inspected before acquiring the spin word. Those observations
+    // must be atomic on a concurrent host; the retail PPC layout stays unchanged.
+    std::atomic<uint32_t> depth{0};
+    std::atomic<uintptr_t> owner{0};
+#endif
     uint8_t savedIrql, reserved[3];
 };
 struct XmaLoopRegion {
