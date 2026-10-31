@@ -1,6 +1,7 @@
 #pragma once
 
 double crt_asin(double value); // @ 0x82430E88
+double crt_fmod(double value, double divisor); // @ 0x82431D78
 
 namespace rage {
 

@@ -1,4 +1,5 @@
 #include "debug_strings.hpp"
+#include "rage/math.hpp"
 /**
  * cm_cam_actions.cpp — cmSampleCamActions camera parameter sampler functions
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -100,9 +101,6 @@ void cmSimple_vfn_4(void* node, float* out);
 // cmSampleCamActions_H_SmoothLookAt_LimitedTilt_vfn_10 @ 0x822774B8 | size: 0x90
 void cmSampleCamActions_H_SmoothLookAt_LimitedTilt_vfn_10(void* node, void* data);
 
-// fmod_safe @ 0x82431D78 | size: 0x128
-float fmod_safe(float value, float range);
-
 // rage_DebugLog @ 0x8240E6D0 | size: 0x4 (nop in retail build)
 void rage_DebugLog(const char* fmt, ...);
 
@@ -151,15 +149,15 @@ extern "C" float WrapValueInRange(float value, float min, float max) {
     if (value < min) {
         float range = max - min;
         float dist = min - value;
-        float wrapped = fmod_safe(dist, range);
+        float wrapped = static_cast<float>(crt_fmod(dist, range));
         return max - wrapped;
     }
-    if (value <= max) {
+    if (!(value > max)) {
         return value;
     }
     float range = max - min;
     float dist = value - max;
-    float wrapped = fmod_safe(dist, range);
+    float wrapped = static_cast<float>(crt_fmod(dist, range));
     return wrapped + min;
 }
 

@@ -43,6 +43,7 @@ set(SOURCES
     src/crt/ctrlfp.cpp
     src/crt/entry.c
     src/crt/exit.c
+    src/crt/fmod.cpp
     src/crt/heap.c
     src/crt/host_format.cpp
     src/crt/memory.c

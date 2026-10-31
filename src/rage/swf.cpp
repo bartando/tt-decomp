@@ -1912,7 +1912,6 @@ uint32_t swfINSTANCE::SetMember(const char* name, void* value) {
     extern void swfReleaseText(void* text, int freeStorage); // @ 0x823F8A38
     extern void* swfCopyText(const char* text); // @ 0x823FABC0
     extern void* swfFindTexture(void* dictionary, const char* name); // @ 0x82151990
-    extern double swfRotationRemainder(double angle, double period); // @ 0x82431D78
 
     const char* property = util_A768_1(name, &g_swfStringBuffer, SWF_INTERN_BUFFER_SIZE);
     char* instance = reinterpret_cast<char*>(this);
@@ -1963,7 +1962,7 @@ uint32_t swfINSTANCE::SetMember(const char* name, void* value) {
     if (strcmp(property, "_rotation") == 0) {
         float angle = swfValueToFloat(value);
         *reinterpret_cast<float*>(instance + 0x54) =
-            static_cast<float>(swfRotationRemainder(angle, 360.0));
+            static_cast<float>(crt_fmod(angle, 360.0));
         instance[0x95] = 1;
         return 1;
     }
