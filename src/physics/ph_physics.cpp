@@ -11738,3 +11738,13 @@ void ReverbAllpass<kLength>::Process(float* in, float* out) {
 }
 
 template void ReverbAllpass<512>::Process(float*, float*);  // @ 0x82462A28
+
+// Cache the transformed local centroid at +0x40 only when enabled at byte 7.
+// Shares the transform (including its shuffled W lane) with the output variant.
+// phBound_TransformWorldCentroid @ 0x8228D0E8 | size: 0x90
+void phBound_TransformWorldCentroid(void* self, const float* matrix) {
+    if (static_cast<const uint8_t*>(self)[7] != 0) {
+        rage::phBound_TransformCentroid(static_cast<const float*>(self), matrix,
+                                      reinterpret_cast<float*>(static_cast<char*>(self) + 0x40));
+    }
+}
