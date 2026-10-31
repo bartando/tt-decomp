@@ -7,6 +7,7 @@
 
 #include "rage/indexed_registry.h"
 #include "pong_ball.hpp"
+#include "ball_audio.hpp"
 #include <cstddef>   // offsetof
 #include <cstring>   // memcpy, memset
 #include <cmath>     // fabs
@@ -1400,7 +1401,6 @@ extern void      rage_3E10(void* gameState);                                  //
 extern void      pg_70C8_g();                                                 // @ 0x822870C8  walks the ball prediction
 extern void      util_2038(const gmBallNode::Matrix34* m, gmBallNode::Vec4* point);  // @ 0x820D2038  point = m * (x, y, z, 1)
 extern void      fxBallSplash2D_Update(fxBallSplash2D* splash);               // @ 0x82389FD8
-extern void      pg_0C98_g(gmball::AudioEmitterView* emitter, const gmBallNode::Vec4* position);  // @ 0x82160C98
 extern void      msgMessage_ReadArgs(const gmball::MessageView* msg, const char* format, ...);  // @ 0x8225E998
 void pongBallInstance_4980_g(void* instance, unsigned short s, int a, int b, int c, int d);  // @ 0x822C4980  activates the object
 
@@ -1826,7 +1826,7 @@ void gmBallNode::Update() {
     BallInstView* published = View(*g_ppBallInst);
     if (BallAudioView* audio = published->audio) {
         if (audio->emitterAActive) {
-            pg_0C98_g(&audio->emitterA, &published->matrix.d);
+            BallAudio_SetEmitterPosition(&audio->emitterA, &published->matrix.d.x);
         }
         const Vec4* position = &published->matrix.d;
         Vec4 shifted;
@@ -1835,7 +1835,7 @@ void gmBallNode::Update() {
             shifted.x = audio->offsetXB + shifted.x;
             position = &shifted;
         }
-        pg_0C98_g(&audio->emitterB, position);
+        BallAudio_SetEmitterPosition(&audio->emitterB, &position->x);
     }
 
     if (fxFadeTime >= 0.0f) {
