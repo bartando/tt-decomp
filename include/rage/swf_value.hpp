@@ -11,6 +11,7 @@ struct SwfVmValue {
 static_assert(sizeof(SwfVmValue) == 8);
 
 extern "C" {
+int32_t swfValueToInteger(const void* value); // @ 0x823FA5C8
 uint8_t swfValueIsInteger(const SwfVmValue* value); // @ 0x823FA4C8
 uint8_t swfValuesEqual(const SwfVmValue* a, const SwfVmValue* b); // @ 0x823FA928
 void swfMathSin(void* unusedR3, void* unusedR4, const SwfVmValue* input, SwfVmValue* output); // @ 0x823FD888

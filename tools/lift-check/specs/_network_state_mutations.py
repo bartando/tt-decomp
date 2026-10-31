@@ -36,11 +36,19 @@ def main():
     total=0
     for spec,(path,mutations) in CASES.items():
         source=(root/path).read_text()
+        if spec == 'network_shot_initialize':
+            start = source.index('\nvoid ballPredict_InitialiseShot(') + 1
+            end = source.index('\n}\n', start) + 2
+            scope = source[start:end]
+            assert source.count(scope) == 1
+        else:
+            scope = source
         for label,old,new in mutations:
-            assert source.count(old)==1,(spec,label)
+            assert scope.count(old)==1,(spec,label)
+            patch = (scope, scope.replace(old, new, 1)) if spec == 'network_shot_initialize' else (old, new)
             output=io.StringIO()
             with contextlib.redirect_stdout(output):
-                rc=Checker(Path(__file__).with_name(spec+'.py'),Options(trials=128,seed=1,patches=((old,new),))).run()
+                rc=Checker(Path(__file__).with_name(spec+'.py'),Options(trials=128,seed=1,patches=(patch,))).run()
             print(f"{spec}: {'CAUGHT' if rc==1 else 'MISSED'} {label}: {output.getvalue().splitlines()[0]}",flush=True)
             if rc!=1:
                 print(output.getvalue())

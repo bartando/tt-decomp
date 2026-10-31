@@ -15,7 +15,6 @@ extern void game_E2B8(void*); // @ 0x820CE2B8
 extern "C" void LocomotionStateAnim_BBC8_g(void*); // @ 0x820CBBC8
 extern float pongMover_GetInputSpeed(pongMover*); // @ 0x820CB4D0
 extern int io_Input_poll_9D68(void*); // @ 0x821C9D68
-extern void PostPageGroupMessageFmt(uint32_t, uint32_t, const char*, ...); // @ 0x8225E480
 
 namespace {
 struct ModeAnimation {
@@ -102,7 +101,7 @@ void pg_6CF8(void* creature, int32_t mode) {
     if (at<int32_t>(creature, 0xC8) == 3) {
         const uint32_t slot = at<uint32_t>(creature, 0xCC);
         const uint32_t bit = (slot & 0x20) ? 0 : (1u << (slot & 31));
-        PostPageGroupMessageFmt(0x101C, 0x80 | (bit & 0x7F), "i", mode == 2 ? 1 : 0);
+        PostGameMessageFmt(0x101C, 0x80 | (bit & 0x7F), "i", mode == 2 ? 1 : 0);
     }
     if (mode != 7 && mode != 0) {
         at<uint8_t>(creature, 0xE6) = 0;

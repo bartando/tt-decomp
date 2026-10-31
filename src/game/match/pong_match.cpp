@@ -1,3 +1,4 @@
+#include "game/game_message.hpp"
 #include "rage/fi_stream.hpp"
 #include "game/match_ai_array.hpp"
 #include "rage/time_state.hpp"
@@ -195,8 +196,6 @@ dispatch_to_state:
 // External functions used by statePostGame methods
 extern "C" {
     void stateServeBounce_OnEnter_Spectator(void* state); // @ 0x8238D9A8
-    void PostPageGroupMessage(int msgCode, int mask,
-                              int paramCount, void* params);  // pg_E6E0 @ 0x8225E6E0
     bool IsNetworkClientActive(void* client);  // pg_10E0_g @ 0x821010E0
     void RemoveNodeFromList(void* container, void* node); // SinglesNetworkClient_F508_g @ 0x823CF508
     void* FindPostPointMessage(void* container);           // statePostPoint_E7E0_g @ 0x823CE7E0
@@ -374,12 +373,12 @@ void statePostGame_OnEvent_Spectator(void* self, void* event) { // @ 0x823901A0
         hsmContext_SetNextState(hsmContext, 16);
     } else {
         // Offline — send cleanup messages and return to lobby
-        PostPageGroupMessage(MSG_EXIT_MATCH, 64, 0, nullptr);
+        PostGameMessage(MSG_EXIT_MATCH, 64, 0, nullptr);
 
         uint32_t fadeParam = 1;
-        PostPageGroupMessage(MSG_FADE_TRANSITION, 64, 1, &fadeParam);
+        PostGameMessage(MSG_FADE_TRANSITION, 64, 1, &fadeParam);
 
-        PostPageGroupMessage(MSG_CLEANUP_MATCH, 64, 0, nullptr);
+        PostGameMessage(MSG_CLEANUP_MATCH, 64, 0, nullptr);
 
         void* hsmContext = *(void**)((char*)self + 0x04);
         hsmContext_SetNextState(hsmContext, 3);
@@ -448,13 +447,13 @@ void statePostGame_OnEnter_Spectator(void* self) { // @ 0x8238FFD0
     stateServeBounce_OnEnter_Spectator(self);
 
     // Send "enter post-game" message
-    PostPageGroupMessage(MSG_ENTER_POST_GAME, 64, 0, nullptr);
+    PostGameMessage(MSG_ENTER_POST_GAME, 64, 0, nullptr);
 
     // If not in network mode, also send the spectator-specific message
     void* networkFlags = g_pNetworkStateFlags;
     int networkMode = *(int*)((char*)networkFlags + 8);
     if (networkMode == 0) {
-        PostPageGroupMessage(MSG_POST_GAME_SPECTATOR, 64, 0, nullptr);
+        PostGameMessage(MSG_POST_GAME_SPECTATOR, 64, 0, nullptr);
     }
 
     // Process ExitPostGameMessage driver setup
@@ -713,7 +712,7 @@ void statePostMatch_OnEnter(void* self) { // @ 0x8210C368
     bool isNetworkMatch = (gameMode == 4) || (gameMode == 5);
 
     // Send match completion message (2130) to page group system
-    PostPageGroupMessage(2130, 64, 0, nullptr);
+    PostGameMessage(2130, 64, 0, nullptr);
 
     // Re-read game mode for post-match logic
     void* inputObj2 = g_input_obj_ptr;
@@ -760,7 +759,7 @@ void statePostMatch_OnEnter(void* self) { // @ 0x8210C368
     }
 
     // Send post-match enter message (8198) to page group
-    PostPageGroupMessage(8198, 64, 0, nullptr);
+    PostGameMessage(8198, 64, 0, nullptr);
 
     // Check network session state
     void* networkState = g_pNetworkStateFlags;
@@ -768,7 +767,7 @@ void statePostMatch_OnEnter(void* self) { // @ 0x8210C368
 
     if (networkMode == 0) {
         // Offline mode: also send spectator dismiss message (10253)
-        PostPageGroupMessage(10253, 64, 0, nullptr);
+        PostGameMessage(10253, 64, 0, nullptr);
     }
 
     // Configure per-player data blocks
@@ -856,7 +855,7 @@ void stateHelpTips_Update(void* self) { // @ 0x8210A930
     }
 
     // Send dismiss help tips message (2138) to page group system
-    PostPageGroupMessage(2138, 64, 0, nullptr);
+    PostGameMessage(2138, 64, 0, nullptr);
 
     // Mark as dismissed
     *(uint8_t*)(state + 17) = 1;
@@ -1200,7 +1199,6 @@ extern void gmPracticeTarget_PlaceRandomly(gmPracticeTarget* target, int unused)
 void game_3860(void* gameState, int kind, const char* name);
 // @ 0x8225E480 (pg_E480) — posts a message whose arguments follow a format
 // string ('i' and 'f', 32 bits each); floats travel as their bit patterns.
-extern void PostPageGroupMessageFmt(uint32_t messageId, uint32_t mask, const char* format, ...);
 
 static uint32_t FloatBits(float value) {
     uint32_t bits;
@@ -1351,7 +1349,7 @@ void gmLogicSwingPractice::stateAim::OnEnter() {
     m_timeInState = zero;
     field_10 = 0;
     game_3860(g_game_state_ptr, 1, "gmLogicSwingPractice::stateAim::onEnterState");
-    PostPageGroupMessage(0x83C, 0x40, 0, nullptr);
+    PostGameMessage(0x83C, 0x40, 0, nullptr);
 
     if (g_swingPracticeMoveTarget != 0) {
         gmPracticeTarget* target = m_pLogic->m_pTarget;
@@ -1363,11 +1361,11 @@ void gmLogicSwingPractice::stateAim::OnEnter() {
 
     gmLogicSwingPractice* logic = m_pLogic;
     if (logic->m_hasAimPoint != 0) {
-        PostPageGroupMessageFmt(0x1017, 1, "fff", FloatBits(logic->m_aimPoint[0]),
+        PostGameMessageFmt(0x1017, 1, "fff", FloatBits(logic->m_aimPoint[0]),
                                 FloatBits(logic->m_aimPoint[1]), FloatBits(logic->m_aimPoint[2]));
     }
 
-    PostPageGroupMessageFmt(0x29, 0x80, "ff", FloatBits(one), FloatBits(zero));
+    PostGameMessageFmt(0x29, 0x80, "ff", FloatBits(one), FloatBits(zero));
 
     logic = m_pLogic;
     if (logic->HasActiveChild()) {

@@ -9,7 +9,7 @@ CALLS = {**SWF_CALLS,
     'hudFlashBase_IsNetworkDirty': run(args=('r3',)),
     'hudFlashBase_GetPageGroup': run(args=('r3',)),
     'hudFlashBase_PublishPageGroup': run(args=('r3',)),
-    'SinglesNetworkClient_BindEntry': run(args=('r3', 'r4')),
+    'swfGetOrCreatePageGroupValue': run(args=('r3', 'r4')),
     0x8242C3B8: stub(ret=0, args=('r3', 'r4')),
     0x82566DC0: stub(ret=1, args=('r3', 'r4', 'r5')),
 }

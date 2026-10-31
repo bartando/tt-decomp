@@ -62,3 +62,7 @@ const char* g_str_dialog_unlockItemNoName       = "no item name specified";
 const char* g_str_dialog_unlockItemNameTooLong  = "unlock item name [%s] is too long by %d characters!";
 const char* g_str_dialog_searchFailedCreate     = "Search failed -- user chose to create new match";
 const char* g_str_dialog_searchFailedDecline    = "Search failed -- user didn't want to create match";
+
+extern const char g_legalsQuitKey[] = "quit"; // @ 0x8205DFB0
+extern const char g_legalsDoneKey[] = "done"; // @ 0x8205DFB8
+extern const char g_flashSemaphoreError[] = "[*** FLASHBASE ERROR ***] Updating without grabbing flash sema!"; // @ 0x8205AE98

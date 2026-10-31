@@ -14,7 +14,7 @@ def heap(t):
     t.w32(thread + 4, allocator)
     t.w32(allocator, t.vtable("heap", 3))
     t.w32(0x82600000, sda)
-    return sda
+    return sda, thread, allocator
 
 
 def linked(t, target):
@@ -86,7 +86,7 @@ def clear_inputs(t):
     rng = t.rng
     _owned = {}
     font = t.alloc(0x17C, "font")
-    sda = heap(t)
+    sda, thread, allocator = heap(t)
     textures = rng.randrange(5)
     effects = rng.randrange(5)
     for offset, count in ((0, textures), (16, textures), (8, effects), (24, effects)):
@@ -105,3 +105,4 @@ def clear_inputs(t):
         if data:
             _owned[data] = rng.choice((0, 0x100, 1, 0x101))
     t.args(r3=font, r13=sda)
+    return font, sda, thread, allocator
