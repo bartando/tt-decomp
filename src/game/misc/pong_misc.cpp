@@ -1,3 +1,4 @@
+#include "rage/ref_counted_header.hpp"
 #include "xam/thread_sync.h"
 /**
  * pong_misc.cpp — Miscellaneous game classes (fsmMachine, misc helpers)
@@ -1044,7 +1045,6 @@ int CCalMoviePlayer::ComputeFrameSize() {  // 3F00_h
 // ─────────────────────────────────────────────────────────────────────────────
 
 // External helpers used by batch 2+ functions
-extern "C" void pong_EmptyVirtualDestructor(void* obj) __asm__("_util_85C8");            // @ 0x824885C8 - base destructor
 extern "C" void phInst_Release(void* obj);            // @ 0x82460850 - physics instance release
 extern "C" uint32_t xe_GetCurrentThreadId();      // @ 0x82566B78
 extern "C" void _locale_register(void* ptr);     // @ 0x820C02D0 - memory dealloc
@@ -1080,7 +1080,7 @@ extern "C" void grcBuffer_Release(void* obj) __asm__("_grc_BDC0");  // @ 0x8235B
 void CCalMoviePlayer::DtorIntermediate() {
     *(void**)this = (void*)0x820092C0;  // Restore CCalMoviePlayer vtable
     CleanupResources();                  // Clean up threads and resources
-    pong_EmptyVirtualDestructor(this);                     // Destroy base class
+    datBase_ClearField12(this);                     // Destroy base class
 }
 
 /**
@@ -1654,7 +1654,7 @@ int CCalMoviePlayer::ValidateOutputFormat() {
  *
  * Scalar deleting destructor for the base CCalMoviePlayer class.
  * Stamps the base vtable (0x820092C0), runs the event cleanup helper
- * (CCalMoviePlayer_13), destroys the base object (pong_EmptyVirtualDestructor), and
+ * (CCalMoviePlayer_13), destroys the base object (datBase_ClearField12), and
  * optionally frees memory if bit 0 of flags is set.
  */
 void CCalMoviePlayer::ScalarDeletingDtorBase(int flags) {
@@ -1665,7 +1665,7 @@ void CCalMoviePlayer::ScalarDeletingDtorBase(int flags) {
     CleanupResources();
 
     // Destroy base object
-    pong_EmptyVirtualDestructor(this);
+    datBase_ClearField12(this);
 
     // Free if ownership flag set
     if (flags & 1) {

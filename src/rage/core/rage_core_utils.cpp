@@ -24,6 +24,19 @@
 #include "game/template_registry.hpp"
 #include "rage/singleton.h"
 #include "rage/sys_callback.hpp"
+#include "rage/ref_counted_header.hpp"
+
+// @ 0x824885C8 | size: 0x0C (was util_85C8)
+extern "C" void datBase_ClearField12(void* object) {
+    struct Header { uint8_t prefix[0x0C]; uint32_t references; };
+    auto* header = static_cast<Header*>(object);
+    header->references = 0;
+}
+
+// @ 0x82494128 | size: 0x04 (was thunk_fn_824885C8)
+extern "C" void datBase_ClearField12_Thunk(void* object) {
+    datBase_ClearField12(object);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Forward declarations
