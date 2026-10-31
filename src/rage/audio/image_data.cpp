@@ -6,6 +6,9 @@ XAudioLock g_xaudioSourceLock = {};
 TT_DATA_ALIAS("_ZN4rage14g_audMixerLockE", "g_xaudioSourceLock");
 extern const float g_xmaFadeScale = 0x1p-1f; // @ 0x82005A5C
 namespace rage {
+extern const double g_xactFadeHalfPi = 0x1.921fb54442d18p+0; // @ 0x82004AA0
+extern const double g_xactFadeLogBase = 10.0; // @ 0x82079B68
+extern const float g_xactFadeLogScale = 0x1.99999ap-4f; // @ 0x82004A9C
 struct audInstance;
 // Full image spans checked: 64-byte listener and 16/240 null pointer slots.
 alignas(16) uint8_t g_audListener[64] = {}; // @ 0x825EE258
