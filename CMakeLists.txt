@@ -165,6 +165,7 @@ set(SOURCES
     src/game/player/player_animation_reset_helpers.cpp
     src/game/player/player_auxiliary_pose.cpp
     src/game/player/player_auxiliary_animation_helpers.cpp
+    src/game/player/player_animation_clock.cpp
     src/game/player/player_swing_pose_helpers.cpp
     src/game/player/player_apply_movement_target.cpp
     src/game/player/player_pose_easing.cpp
