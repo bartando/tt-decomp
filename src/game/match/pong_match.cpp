@@ -1,3 +1,4 @@
+#include "rage/fi_stream.hpp"
 #include "game/match_ai_array.hpp"
 #include "rage/time_state.hpp"
 /**
@@ -1518,12 +1519,6 @@ extern fiAssetManagerView g_fiAssetManager;  // @ 0x825D0080
 struct fiStream;
 // @ 0x822E2E60 — pushes a folder ("$/..." is taken as is).
 extern void fiAssetManager_PushFolder(fiAssetManagerView* assets, const char* path);
-// @ 0x822E3040 — opens name.ext in the current folder; the loaders pass 0, 1.
-extern fiStream* fiAssetManager_Open(fiAssetManagerView* assets, const char* name, const char* ext,
-                                     int arg3, int arg4);
-// @ 0x822E3B38
-extern void fiStream_Close(fiStream* stream);
-
 // rage::fiTokenizer as the loaders build it on the stack (vtable 0x8205A594).
 struct fiTokenizerView {
     void**      vtable;        // +0x00
@@ -1570,9 +1565,6 @@ extern void gmPracticeTargetFx_Load(gmPracticeTargetFx* fx, fiTokenizerView* tok
 // @ 0x82113F20 (pongNetMessageHolder_3F20_w) — reads "NumTargets" and that many
 // 0x44-byte targets (nine ints, then two groups of four floats).
 extern void gmPracticeTargetSet_Load(gmPracticeTargetSet* set, fiTokenizerView* tokenizer);
-// @ 0x821B2A58 (pg_2A58_g) — allocates `capacity` words; count = capacity.
-extern void gmPracticeTargetWordArray_Init(gmPracticeTargetWordArray* array, int32_t capacity,
-                                           bool flag6, bool flag7);
 
 extern int32_t  g_practiceTargetNumSets;       // @ 0x826063AC (lbl_826063AC)
 extern uint32_t g_practiceTargetDefaultColor;  // @ 0x825CA198, 0xAARRGGBB
@@ -1595,14 +1587,14 @@ static uint32_t ReadColor(fiTokenizerView* tokenizer) {
 
 // Opens name.fx and loads one Fx from it.
 static void LoadFx(gmPracticeTargetFx* fx, const char* name) {
-    fiStream* stream = fiAssetManager_Open(&g_fiAssetManager, name, "fx", 0, 1);
+    fiStream* stream = static_cast<fiStream*>(fiStreamBuf_OpenAll(&g_fiAssetManager, name, "fx", 0, 1));
     if (stream == nullptr) {
         return;
     }
     fiTokenizerView tokenizer;
     fiTokenizer_Init(&tokenizer, name, stream);
     gmPracticeTargetFx_Load(fx, &tokenizer);
-    fiStream_Close(stream);
+    fiStreamBuf_Close(stream);
 }
 
 /**
@@ -1624,7 +1616,7 @@ void gmPracticeTarget::LoadData() {
     LoadFx(&m_fx2, "fx_target2");
 
     int32_t maxTargets = 0;
-    fiStream* stream = fiAssetManager_Open(&g_fiAssetManager, "practice_targets", "fx", 0, 1);
+    fiStream* stream = static_cast<fiStream*>(fiStreamBuf_OpenAll(&g_fiAssetManager, "practice_targets", "fx", 0, 1));
     if (stream != nullptr) {
         fiTokenizerView tokenizer;
         fiTokenizer_Init(&tokenizer, "practice_targets", stream);
@@ -1678,7 +1670,7 @@ void gmPracticeTarget::LoadData() {
                 }
             }
         }
-        fiStream_Close(stream);
+        fiStreamBuf_Close(stream);
     }
 
     gmPracticeTargetWordArray_Init(m_wordArray, maxTargets, false, true);
@@ -1866,16 +1858,16 @@ void gmPracticeTargetWordArray_Shuffle(gmPracticeTargetWordArray* array) {
             uint32_t bits = AdvancePracticeTargetRandom() & 0x7FFFFFFFu;
             j = i + 1 + bits % (array->m_count - i - 1);
         }
-        uint32_t saved = array->m_data[i];
-        array->m_data[i] = array->m_data[j];
-        array->m_data[j] = saved;
+        uint32_t saved = array->m_data.get()[i];
+        array->m_data.get()[i] = array->m_data.get()[j];
+        array->m_data.get()[j] = saved;
     }
     array->field_0C = 0;
 }
 
 // @ 0x821B2C08 | size: 0x90
 uint32_t gmPracticeTargetWordArray_Next(gmPracticeTargetWordArray* array) {
-    uint32_t selected = array->m_data[array->field_0C];
+    uint32_t selected = array->m_data.get()[array->field_0C];
     array->field_0C = (array->field_0C + 1) % array->m_count;
     if (array->field_0C == 0 && (array->m_flags & 0x80)) {
         gmPracticeTargetWordArray_Shuffle(array);
@@ -1925,7 +1917,7 @@ void gmPracticeTarget_SelectSet(void* /*unused*/, int32_t setId, int /*unused*/,
         gmPracticeTargetWordArray* array = target->m_wordArray;
         int32_t count = target->m_sets[setId].m_numTargets;
         array->m_count = count == -1 ? array->m_capacity : count;
-        for (int32_t i = 0; i < array->m_capacity; ++i) array->m_data[i] = i;
+        for (int32_t i = 0; i < array->m_capacity; ++i) array->m_data.get()[i] = i;
         gmPracticeTargetWordArray_Shuffle(array);
     }
     uint32_t index = gmPracticeTargetWordArray_Next(target->m_wordArray);

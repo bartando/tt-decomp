@@ -8,6 +8,7 @@
 
 #include <stdint.h>
 #include "rage/heap.hpp"
+#include "rage/session_state_helpers.hpp"
 
 namespace rage {
 
@@ -353,13 +354,11 @@ void snLeaving_Destructor(hsmStateBase* thisPtr, uint32_t flags) { // @ 0x823E57
 // --------------------------------------------------------------------------
 
 // External helpers for OnEnter handlers
-extern void snLinkedList_InsertNode(snLinkedList* listHead, snNotifier* node); // @ 0x823DD170
 extern bool snLeaveMachine_TryLeave(hsmStateBase* thisPtr);                    // @ 0x823E8558
 extern void snSession_TransitionDestroying(hsmStateBase* thisPtr, hsmEventData* evtState);  // @ 0x823EAA20
 extern void snSession_TransitionChanging(hsmStateBase* thisPtr, hsmEventData* evtState);    // @ 0x823EAB70
 extern void snSession_TransitionStarting(hsmStateBase* thisPtr, hsmEventData* evtState);    // @ 0x823EAC18
 extern void snSession_TransitionEnding(hsmStateBase* thisPtr, hsmEventData* evtState);      // @ 0x823EACC0
-extern void snHsmContext_SetMaxTransitions(hsmStateBase* thisPtr, int32_t limit);            // @ 0x823ED4F8
 extern void SinglesNetworkClient_RegisterNotify(SinglesNetworkClient* networkClient);       // @ 0x823DA940
 extern bool xamSession_StartSession(snLinkedList* sessionNotify);              // @ 0x8236E6C0
 extern bool xamSession_EndSession(snLinkedList* sessionNotify);                // @ 0x8236E920
@@ -440,7 +439,7 @@ void snDestroying_OnEnter(hsmStateBase* thisPtr) { // @ 0x823E2E30
     notifier->m_pOwner = thisPtr;
 
     // Register notifier in session's linked list at session+0xE8
-    snLinkedList_InsertNode(&session->m_notifyList, notifier);
+    snSession_RegisterNotifier(&session->m_notifyList, notifier);
 
     // Attempt to leave the session
     bool leaveResult = snLeaveMachine_TryLeave(thisPtr);
@@ -467,8 +466,8 @@ void snWaitingForReplies_OnEnter(hsmStateBase* thisPtr) { // @ 0x823E3530
     // Clear reply counter at this+48
     *(uint32_t*)((char*)thisPtr + 48) = 0;
 
-    // Set max transition count
-    snHsmContext_SetMaxTransitions(thisPtr, 10000);
+    // Arm the ten-second reply timeout.
+    snSession_SetTimeout(thisPtr, 10000);
 
     // Set up notification callback (thunk -> SinglesNetworkClient_88F8)
     notifier->m_pOwner = thisPtr;
@@ -496,7 +495,7 @@ void snStartingSession_OnEnter(hsmStateBase* thisPtr) { // @ 0x823E41F8
     notifier->m_pCallback = (void*)&thunk_fn_snSession_4110;
 
     // Register notifier in session's linked list at session+0xE8
-    snLinkedList_InsertNode(&session->m_notifyList, notifier);
+    snSession_RegisterNotifier(&session->m_notifyList, notifier);
 
     // Attempt to start session via XAM
     bool result = xamSession_StartSession(&session->m_notifyList);
@@ -529,7 +528,7 @@ void snEnding_OnEnter(hsmStateBase* thisPtr) { // @ 0x823E4698
     notifier->m_pOwner = thisPtr;
 
     // Register notifier in session's linked list at session+0xE8
-    snLinkedList_InsertNode(&session->m_notifyList, notifier);
+    snSession_RegisterNotifier(&session->m_notifyList, notifier);
 
     // Attempt to end session via XAM
     bool result = xamSession_EndSession(&session->m_notifyList);

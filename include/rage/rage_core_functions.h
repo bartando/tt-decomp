@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include "rage/fi_stream.hpp"
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,9 +31,8 @@ extern "C" {
  *   dst    - Destination buffer (modified in place)
  *   src    - Source string to append
  *   maxLen - Maximum total length of dst buffer
- *   fmt    - Format string (unused in current implementation)
  */
-void rage_strcat_bounded(char* dst, const char* src, size_t maxLen, const char* fmt);
+void rage_strcat_bounded(char* dst, const char* src, int32_t maxLen);
 
 /**
  * rage_stricmp @ 0x82186358 | size: 0xC0
@@ -59,49 +59,6 @@ const char* rage_GetExecutableName(void);
 // ============================================================================
 // File Stream Buffer Management
 // ============================================================================
-
-struct fiStreamBuf;
-
-/**
- * fiStreamBuf_Reset @ 0x822E3AC8 | size: 0x6C
- * 
- * Reset file stream buffer to initial state.
- * Flushes any pending data and reinitializes the buffer.
- * 
- * Parameters:
- *   pBuf       - Pointer to fiStreamBuf object
- *   resetParam - Reset parameter (typically 0)
- * 
- * Returns:
- *   0 on success, -1 on failure
- */
-int fiStreamBuf_Reset(struct fiStreamBuf* pBuf, int resetParam);
-
-/**
- * fiStreamBuf_OpenAll @ 0x822E3040 | size: 0x78
- * 
- * Open file stream buffers for all devices in factory.
- * Iterates through device list and opens streams.
- * 
- * Parameters:
- *   pFactory - Device factory/enumerator object
- *   path     - Base file path
- *   aux      - Auxiliary data
- *   unused   - Unused parameter
- *   extra    - Extra parameter forwarded to open
- */
-void fiStreamBuf_OpenAll(void* pFactory, const char* path, void* aux, void* unused, void* extra);
-
-/**
- * fiStreamBuf_Close @ 0x822E3B38 | size: 0x70
- * 
- * Close file stream buffer.
- * Flushes pending data and releases resources.
- * 
- * Returns:
- *   0 on success
- */
-int fiStreamBuf_Close(struct fiStreamBuf* pBuf);
 
 // ============================================================================
 // Graphics Device Management
@@ -247,17 +204,6 @@ void rage_ThreadPool_Cleanup(void* pThreadPool);
 // ============================================================================
 // Object Factory
 // ============================================================================
-
-/**
- * rageObjectFactory_Build @ 0x822E2B50 | size: 0x1E0
- * 
- * Build object from factory.
- * Constructs an object using the factory pattern.
- * 
- * Returns:
- *   Pointer to created object, or NULL on failure
- */
-void* rageObjectFactory_Build(void* pFactory, const char* name);
 
 // ============================================================================
 // Resource Loading

@@ -1,3 +1,4 @@
+#include "grc/resource_release.hpp"
 #include "grc/image_state.hpp"
 #include "../game/pong_render.hpp"
 #include "link/tt_alias.h"
@@ -158,3 +159,13 @@ extern "C" const uint8_t g_shaderConstantData[440] = {
     0x00, 0x1A, 0x23, 0xA6, 0x00, 0x00, 0x80, 0x0E, 0x00, 0x2A, 0x23, 0xB9, 0x00, 0x2C, 0x83, 0xA4,
     0x00, 0x1A, 0x23, 0xA6, 0x00, 0x00, 0x00, 0x0E,
 };
+
+// Shared render allocations: all four pointer slots are zero in the boot image.
+extern "C" {
+// @ 0x825EBA08
+rage::ptr32<void> g_grcSharedSurfacePair[2] = {};
+// @ 0x825EB984
+rage::ptr32<void> g_grcSharedSurface = {};
+// @ 0x825EB9E0
+rage::ptr32<void> g_grcSharedTexture = {};
+}

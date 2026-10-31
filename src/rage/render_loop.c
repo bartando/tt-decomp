@@ -1,3 +1,4 @@
+#include "rage/fi_stream.hpp"
 /**
  * rage/render_loop.c — gameLoop per-frame phase methods
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -829,10 +830,6 @@ extern void* g_pPostEffects;
 extern uint8_t g_postRenderConfig[8]; /* lbl_825CB720 */
 
 /* Object factory creation @ 0x822E3040 / finalise @ 0x822E3B38 */
-extern void* fiStreamBuf_OpenAll(void* pFactory, void* pVtable,
-                                          void* pParam, int bFlag1, int bFlag2);
-extern void fiStreamBuf_Close(void* pObj);
-
 /* Debug log — no-op (blr) in release builds. @ 0x8240E6D0 */
 extern void rage_DebugLog(const char* pFmt, ...);
 
@@ -1032,8 +1029,8 @@ void gameLoop_Init_8F30(gameLoop* pLoop, void* pConfig)
     {
         void* pCreated = fiStreamBuf_OpenAll(
             g_objFactory + 128,    /* factory instance */
-            &k_factoryVtable,      /* vtable param */
-            &k_factoryParam1,      /* creation param */
+            (const char*)&k_factoryVtable,
+            (const char*)&k_factoryParam1,
             1, 1);
         if (pCreated != NULL) {
             fiStreamBuf_Close(pCreated);

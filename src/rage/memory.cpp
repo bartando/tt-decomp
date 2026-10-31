@@ -6,6 +6,7 @@
  */
 
 #include "rage/singleton.h"
+#include "rage/index_wrap.hpp"
 #include "memory.hpp"
 
 // External function declarations
@@ -1418,14 +1419,12 @@ void fragDrawable_LoadDamageShape(uint8_t *drawable, void *shapeDesc) {
 // ─────────────────────────────────────────────────────────────────────────────
 int32_t pgArray_FindActiveEntry(uint8_t *array, int32_t startOffset,
                                 int32_t stride, uint8_t wrapFlag) {
-  extern int32_t pg_C4E8_g(int32_t value, int32_t min, int32_t max);
-
   int32_t index = startOffset + stride;
 
   // Optionally clamp index to valid range
   if (wrapFlag != 0) {
     uint16_t count = *(uint16_t *)(array + 28);
-    index = pg_C4E8_g(index, 0, count - 1);
+    index = math_WrapIndex(index, 0, count - 1);
   }
 
   // Search forward by stride for an active entry
