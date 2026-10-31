@@ -1,8 +1,8 @@
 # Physics link wave G — completed and remaining
 
-This pass addresses 17 of the 85 ABI entries supplied in `/tmp/tt-wave-G/physics.txt`.
+This pass addresses 18 of the 85 ABI entries supplied in `/tmp/tt-wave-G/physics.txt`.
 It adds 29 original PPC routines (15 are dependencies absent from that list).
-The 68 entries below were not addressed by this pass.
+The 67 entries below were not addressed by this pass.
 
 ## Completed
 
@@ -165,7 +165,28 @@ Verification and limits:
 - Cumulative progress: 29 original routines lifted, 17/85 supplied ABI entries
   resolved, 107 deliberate mutations caught, and 68 input entries left.
 
-## Remaining input entries (68)
+## Continuation — constructor iterator and joint block initialization
+
+- Corrected the existing `0x820C0170` vector constructor iterator to take a
+  typed `(dst, stride, count, ctor)` callback contract. Its spec covers negative
+  and zero counts, repeated destinations, reverse strides and callback effects.
+- `phJointChain_Constructor` (`0x8225DD70`) now passes count 20 and the existing
+  element constructor `atSingleton_E3F0_p44` (`0x8225E3F0`), rather than treating
+  the constructor address as template data.
+- `rage::phJoint3Dof_C4F8_w` (`0x821DC4F8`) now uses the named retail no-op
+  `nop_8240E6D0`; the old raw address had the wrong high half.
+- Its missing `phJoint3Dof_ResetAllJoints` spelling was the existing
+  `util_4628` (`0x82154628`). Re-lifted the xyz defaults, flags and shared
+  parameters and removed the declared alias. Three undefined scratch W words
+  per active record are preserved; the specs ignore only those 12 bytes.
+- Specs `lf_vector_ctor_iterator`, `ph_joint_block_reset`,
+  `ph_joint_chain_constructor` and `ph_joint_four_block_constructor` pass seeds
+  1 and 2 (400, 400, 40 and 200 trials respectively).
+- `_joint_initialization_mutations.py` checks callback traversal, record writes,
+  both element/block strides, counts, flags and reset dispatch.
+- Native compilation succeeds; remaining unrelated symbols still prevent linking.
+
+## Remaining input entries (67)
 
 - `_phDemoWorld_67D0_g`
 - `_ph_2E08`
@@ -201,7 +222,6 @@ Verification and limits:
 - `phInst_8F10_p42(void*, unsigned int, void*, void*, void*, void*)`
 - `phInst_AB00(rage::phInst*, void*, char const*)`
 - `phInst_AC00_2hr(rage::phInst*)`
-- `phJoint3Dof_ResetAllJoints(rage::phJoint3Dof*, int)`
 - `phJoint_ApplyDelta(void*, int, float const*, int)`
 - `phObject::CreateViews(phObject*)`
 - `phObject::ReleaseResources()`

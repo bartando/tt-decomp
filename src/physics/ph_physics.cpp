@@ -10,6 +10,7 @@
 #include "ph_physics.hpp"
 #include "bound_lookup.hpp"
 #include "articulated_joint.hpp"
+#include "joint_initialization.hpp"
 #include "rage/math.hpp"
 #include "rage/mat33.hpp"
 
@@ -70,7 +71,6 @@ extern const float g_springScale;    // @ 0x8207A0F4 (.rdata)
 extern const char* g_phResolveProfileTag;
 extern const char* g_phResolveProfileTagEnd;
 extern const uint8_t g_phXYZMask[16];     // @ 0x82629E60 — xyz mask (clear w)
-extern const void* g_phJoint3DofTemplate;  // not data: ph_DD70 passes the element ctor 0x8225E3F0
 extern float g_phTableA[];            // sine/cosine lookup table
 extern float g_phTableB[];            // second lookup table
 extern uint16_t g_phDefaultStatusId;  // @ 0x82005A58
@@ -184,7 +184,6 @@ extern void  msgMsgSink_DispatchNested(void* obj);
 extern void atSingleton_8A48_p42(void* obj);
 extern void fiAsciiTokenizer_Destroy(void* obj);
 extern void strncpy(char*, const char*, int);
-extern void phJoint3Dof_ResetAllJoints(rage::phJoint3Dof*, int);
 extern void phCollider_RecalcBounds(void* thisPtr);
 extern void phCollider_vfn_1(void* collider);
 extern void* g_display_obj_ptr;
@@ -2724,7 +2723,6 @@ void phObject::ReleaseViews() {
 namespace rage {
 
 // Forward declarations for external functions
-extern void phJoint3Dof_0170_g(void*, int, int, void*);
 
 /**
  * rage::phJoint3Dof::SetDampingAndStiffness @ 0x82251268 | size: 0x40
@@ -2755,22 +2753,16 @@ void phJoint3Dof::SetDampingAndStiffness(float arg1, float arg2) {
  * Iterates through 4 sequential sub-blocks embedded in the joint
  * and initializes them via a generic structural callback.
  */
-void phJoint3Dof_C4F8_w(phJoint3Dof* joint) {
-    char* current = reinterpret_cast<char*>(joint);
-    
-    for (int i = 3; i >= 0; i--) {
-        // phJoint3Dof_0170_g iterates over the block calling phJoint3Dof_ResetAllJoints
-        phJoint3Dof_0170_g(current, 64, 8, reinterpret_cast<void*>(0x8207E6D0));
-        
-        phJoint3Dof* blockObj = reinterpret_cast<phJoint3Dof*>(current);
-        *(uint16_t*)(current + 528) = 3;  // offset 0x0210
-        *(uint16_t*)(current + 530) = 3;  // offset 0x0212
-        
-        phJoint3Dof_ResetAllJoints(blockObj, -1);
-        
-        // Advance pointer to the next block (544 bytes stride)
-        current += 544;
+phJoint3Dof* phJoint3Dof_C4F8_w(phJoint3Dof* joint) {
+    uint8_t* current = reinterpret_cast<uint8_t*>(joint);
+    for (unsigned block = 0; block < 4; ++block) {
+        phJoint3Dof_0170_g(current, 64, 8, &nop_8240E6D0);
+        *reinterpret_cast<uint16_t*>(current + 0x210) = 3;
+        *reinterpret_cast<uint16_t*>(current + 0x212) = 3;
+        util_4628(current);
+        current += 0x220;
     }
+    return joint;
 }
 
 /**
@@ -8696,7 +8688,6 @@ void phBoundSphere::SetPositionAndUpdateFlags(const float* position) {
 extern void ph_ctor_FFD8(void* thisPtr, void* param);
 // extern void ph_GetSimulationContext(void* thisPtr);  // removed: conflicts with definition returning void*
 extern void ph_AdvanceSegmentedPtr(void* param, void* dest);
-extern void phJoint3Dof_0170_g(void* dest, int stride, const void* srcTemplate, int count);
 
 // ---------------------------------------------------------------------------
 // phBoundGeometryIntermediate_Constructor @ 0x82291310 | size: 0x6C (108B)
@@ -8729,7 +8720,7 @@ void* phBoundGeometryIntermediate_Constructor(void* thisPtr, void* param) {
 //    initialize each joint slot at a stride of 3016 bytes. After init,
 //    clears the total active joints counter and the enabled flag.
 // ---------------------------------------------------------------------------
-void phJointChain_Constructor(void* thisPtr) {
+void* phJointChain_Constructor(void* thisPtr) {
     uint8_t* obj = (uint8_t*)thisPtr;
 
     // Install joint chain vtable
@@ -8742,7 +8733,7 @@ void phJointChain_Constructor(void* thisPtr) {
     uint8_t* jointSlot = jointBase + 132;  // first joint at +140 from obj
 
     for (int i = 15; i >= 0; i--) {
-        phJoint3Dof_0170_g(jointSlot, 144, &g_phJoint3DofTemplate, 20);
+        phJoint3Dof_0170_g(jointSlot, 144, 20, &atSingleton_E3F0_p44);
         // Clear per-joint active flag at +2880 from joint slot
         *(uint32_t*)(jointSlot + 2880) = 0;
         jointSlot += 3016;  // stride between joint slots
@@ -8753,6 +8744,7 @@ void phJointChain_Constructor(void* thisPtr) {
 
     // Clear enabled flag
     *(uint8_t*)(obj + 4) = 0;
+    return thisPtr;
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
