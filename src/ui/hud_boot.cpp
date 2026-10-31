@@ -4,8 +4,6 @@
 #include "game/pong_network_io.hpp"
 #include "rage/game_loop_types.h"
 
-// snSession_FindProperty @ 0x823F9318
-extern void* snSession_FindProperty(void* client, const char* key);
 
 namespace {
 
@@ -39,7 +37,7 @@ static const char* const k_bootNameKey = reinterpret_cast<const char*>(0x8205E32
 
 static void SetNumericBootSetting(void* networkClient, const char* key, uint32_t value) {
     BootNumericSetting* setting =
-        reinterpret_cast<BootNumericSetting*>(snSession_FindProperty(networkClient, key));
+        reinterpret_cast<BootNumericSetting*>(SinglesNetworkClient_BindEntry(networkClient, key));
     if (setting == nullptr) {
         return;
     }
@@ -50,7 +48,7 @@ static void SetNumericBootSetting(void* networkClient, const char* key, uint32_t
 
 static void SetStringBootSetting(void* networkClient, const char* key, char* value) {
     BootStringSetting* setting =
-        reinterpret_cast<BootStringSetting*>(snSession_FindProperty(networkClient, key));
+        reinterpret_cast<BootStringSetting*>(SinglesNetworkClient_BindEntry(networkClient, key));
     if (setting == nullptr) {
         return;
     }
