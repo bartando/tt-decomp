@@ -4,6 +4,7 @@
 #include "rage/xact_list.hpp"
 #include "audio/xact_fade.hpp"
 #include "audio/xact_volume.hpp"
+#include "audio/xact_buffer.hpp"
 /**
  * msg_msg_sink.cpp — msgMsgSink constructor & destructor
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -2482,8 +2483,6 @@ extern uint32_t msgMsgSink_1D30_g(void*);                             // 0x82451
 extern uint32_t msgMsgSink_1D80_g(void*);                             // 0x82451D80
 // msgMsgSink_1C08_g / _1BE0_g defined earlier in file as uint32_t; reused here.
 extern uint32_t msgMsgSink_1D20_g(void*);                             // 0x82451D20
-extern void* msgMsgSink_BF40_g();                                     // 0x8245BF40
-extern void  atSingleton_BFA0_g(void*);                               // 0x8245BFA0
 extern int32_t msgMsgSink_BFC0_g(void*, uint32_t, uint32_t);          // 0x8245BFC0
 extern int32_t msgMsgSink_7EF8_g(void*, uint32_t);                    // 0x82457EF8
 extern void RtlLeaveCriticalSection_8F18_h(void*);                    // 0x82458F18
@@ -2815,7 +2814,7 @@ void msgMsgSink::vfn_109() {
 void msgMsgSink::vfn_113() {
     uint8_t* self = reinterpret_cast<uint8_t*>(this);
     uint32_t cmd = 0;            // args unavailable at this vtable signature
-    uint32_t vec[16] = {0};
+    rage::ptr32<void> vec[16]{};
     uint32_t count = 1;
     bool wideFlag = false;
     uint32_t scratch[16] = {0};
@@ -2863,8 +2862,8 @@ void msgMsgSink::vfn_113() {
     int32_t status = 0;
     for (int32_t i = 0; i < finalCount && i < 16; ++i) {
         void* entry = rage_01B8(140, 545521664 | 32804);
-        void* obj = entry ? msgMsgSink_BF40_g() : nullptr;
-        vec[i] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(obj));
+        void* obj = entry ? msgMsgSink_BF40_g(entry) : nullptr;
+        vec[i] = obj;
         if (obj == nullptr) {
             status = 0x80070000 | 14;
         }
@@ -2873,12 +2872,10 @@ void msgMsgSink::vfn_113() {
     // On failure, roll back partial allocations
     if (status < 0) {
         for (int32_t i = 0; i < finalCount && i < 16; ++i) {
-            if (vec[i] != 0) {
-                atSingleton_BFA0_g(reinterpret_cast<void*>(
-                    static_cast<uintptr_t>(vec[i])));
-                _locale_register(reinterpret_cast<void*>(
-                    static_cast<uintptr_t>(vec[i])), 545521664 | 32804);
-                vec[i] = 0;
+            if (vec[i]) {
+                atSingleton_BFA0_g(vec[i].get());
+                _locale_register(vec[i].get(), 545521664 | 32804);
+                vec[i] = nullptr;
             }
         }
     }
@@ -2925,7 +2922,7 @@ void msgMsgSink::vfn_114() {
     msgMsgSink_1C08_g(scratch);
 
     void* entry = rage_01B8(140, 545521664 | 32804);
-    void* newObj = entry ? msgMsgSink_BF40_g() : nullptr;
+    void* newObj = entry ? msgMsgSink_BF40_g(entry) : nullptr;
     if (newObj == nullptr) return;
 
     int32_t rc = msgMsgSink_BFC0_g(newObj, 0, 0);
