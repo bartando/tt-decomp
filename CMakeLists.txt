@@ -139,6 +139,7 @@ set(SOURCES
     src/game/creature/pong_creature.cpp
     src/game/drill/pong_drill.cpp
     src/game/input/button_edges.cpp
+    src/game/input/analog_axis.cpp
     src/game/input/input_sequence.cpp
     src/game/misc/cm_operators.cpp
     src/game/misc/pong_misc.cpp
@@ -149,6 +150,9 @@ set(SOURCES
     src/game/network/xonline_strings.cpp
     src/game/player/pong_player.cpp
     src/game/player/pong_player_swing.cpp
+    src/game/player/player_swing_phase.cpp
+    src/game/player/player_shot_interpolation.cpp
+    src/game/player/player_move_mode.cpp
     src/game/player/player_animation_state.cpp
     src/game/player/pong_gameplay_queries.cpp
     src/game/pong_render.cpp

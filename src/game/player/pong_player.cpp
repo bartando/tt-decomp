@@ -95,7 +95,6 @@ extern float     g_kFrameToSecScale;             // frames-to-seconds   @ 0x8202
 
 extern bool CheckButtonPressed(void* record);                              // pg_FFF8_g @ 0x821DFFF8
 extern void PostPageGroupMessage(void* rec, int code, int mask, int a3, int opActive); // pg_E6E0
-extern void pongPlayer_ComputeStepDelta(void* obj, int maxSteps, float* outDelta);   // @ 0x821E0508
 extern bool pongPlayer_CheckServeInput(pongPlayer* p);                            // @ 0x82195B60
 extern void pongPlayer_InitActionState(void* actionState, int released);            // @ 0x821A1460
 
@@ -141,7 +140,7 @@ extern void  nop_8240E6D0(const char* fmt, ...);                                
 extern void  pongPlayer_Deactivate(void* entry);                                         // @ 0x8218BDC0
 extern void  pongPlayer_5C00_g(void* playerPtr, int32_t param);                          // @ 0x82195C00
 extern bool  pongPlayer_99B0_g(float* valuePtr, float startVal, float ratio, float step);// @ 0x820C99B0
-extern float pongPlayer_0508_g(void* obj, int channel, float inputVal);                  // @ 0x821E0508
+extern float pongPlayer_0508_g(void* obj, int channel);                                  // @ 0x821E0508
 
 // ── External globals for batch 10 implementations ────────────────────────
 extern void*       g_pCourtGeomSingleton;     // @ 0x8271A304 — court geometry singleton
@@ -150,7 +149,6 @@ extern const float g_kFloatConst_D168;        // @ 0x8202D168 — grid reset flo
 extern float       g_swingSlotGridDefault;    // @ 0x825CAF7C — writable grid default
 extern const float g_kPositiveSideSign;       // @ 0x825C5938 — positive court side sign
 extern const float g_kTransitionStep;         // @ 0x825CAEC0 — transition blend step size
-extern const float g_kSwingTargetConst;       // @ 0x825C80FC — swing target input constant
 extern void*       g_pPlayerSlotLookup;       // @ 0x8271A32C — player slot lookup global
 
 // Forward declarations for functions implemented at end of file
@@ -768,7 +766,7 @@ bool pongPlayer::IsActionComplete() const
 
 // ===========================================================================
 // SECTION 15 — SetSwingActiveState  @ 0x820C7C78 | size: 0x6C
-// Called from: pongPlayer_StartSwing, pongPlayer_7038_g, pongPlayer_SetPlayMode,
+// Called from: pongPlayer_StartSwing, pongPlayer_7038_g, pongPlayer_5C00_g,
 //              pg_6CF8, pongPlayer_BEE0_g, ref_PostLoadProperties_CCB0
 //
 // Updates the m_bSwingActive flag at +197 (+0xC5) with transition logging.
@@ -866,7 +864,7 @@ bool pongPlayer::CheckOpponentSwingApex() const
 //         is also active. Call PostPageGroupMessage to fire the "button down" event
 //         with code 2125.
 //       - If held (not new): accumulate a float into the record via
-//         pongPlayer_ComputeStepDelta (reads swing data) and fmadds/fadds into the
+//         pongPlayer_0508_g (reads analog input) and fmadds/fadds into the
 //         record's score field. This implements "power charging" while
 //         the button is held.
 //
@@ -920,9 +918,8 @@ void pongPlayer::CheckButtonInput()
                 /*unused*/ 0, /*opponentActive*/ (int)opponentActive);
     } else {
         // Button held: accumulate power into the record's score float.
-        // Compute delta via pongPlayer_ComputeStepDelta then blend via fmadds or fadds.
-        float delta = 0.0f;
-        pongPlayer_ComputeStepDelta(record, /*maxSteps*/ 30, &delta);
+        // Read the analog-axis float return, then blend via fmadds or fadds.
+        const float delta = pongPlayer_0508_g(record, 30);
 
         // Blend constant from global table: g_kPowerBlend @ 0x825C2EA0
         float blend = g_kPowerBlend;
@@ -1834,7 +1831,6 @@ float pongPlayer::GetCurrentSwingStrength() const {
 extern void pongPlayer_EF38_g(void* self, uint8_t r9, uint8_t r10, uint32_t r6,
                                uint32_t r3, float f3, float f2, float f1);
 extern void pongPlayer_F2A0_g(void* self, void* subObj);
-extern void pongPlayer_SetPlayMode(pongPlayer* p, int param);
 extern void pongMover_CalcInitMatrix(void* out, void* inst);
 extern void pongPlayer_SetupShotTarget(void* target, float f1, float f2);
 extern void pg_E6E0(int code, uint8_t mask, int p3, int p4);
@@ -1972,13 +1968,13 @@ void pongPlayer::UpdateCreatureSlotAnims(uint8_t resetFlag) {  // pongPlayer_87B
  *
  * Called from pongPlayer_Process. Initializes movement state and checks
  * for ball contact readiness:
- *   1. Calls pongPlayer_SetPlayMode(0) to reset movement state.
+ *   1. Calls pongPlayer_5C00_g(0) to reset movement state.
  *   2. If slot is null in validation table, or IsInputActiveAndReady
  *      returns true, computes the initial position matrix and sets up
  *      the contact zone parameters.
  */
 void pongPlayer::InitMovementAndContact() {  // pongPlayer_5D50_g @ 0x82195D50
-    pongPlayer_SetPlayMode(this, 0);
+    pongPlayer_5C00_g(this, 0);
 
     uint32_t slotIndex = m_slotIndex;  // +464
     uint32_t* validationTable = g_pPlayerSlotTable;
@@ -2464,7 +2460,7 @@ void pongPlayer::ComputePositionWithOffset() {  // pongPlayer_6308_g @ 0x821D630
 
 
 // 0x821E0270 maps a button id through a pad record's flags.
-extern int pongPad_RemapButton(void* pad, int32_t button);  // @ 0x821E0270
+extern "C" int pongPlayer_0270_g(const void* pad, int32_t button);  // @ 0x821E0270
 
 // ===========================================================================
 // SECTION 33 — pongPlayer_04B0_g  @ 0x821E04B0 | size: 0x54 (84 bytes)
@@ -2478,7 +2474,7 @@ extern int pongPad_RemapButton(void* pad, int32_t button);  // @ 0x821E0270
  * bit 7 differs between bytes 0 and 3 of that entry.
  */
 bool pongPlayer_04B0_g(void* pad, int32_t button) {
-    int index = pongPad_RemapButton(pad, button);
+    int index = pongPlayer_0270_g(pad, button);
     const uint8_t* entries = *reinterpret_cast<uint8_t* const*>(static_cast<uint8_t*>(pad) + 0x31C);
     const uint8_t* entry = entries + index * 4;
     return static_cast<uint8_t>(entry[3] ^ entry[0]) > 127;
@@ -3389,14 +3385,14 @@ void pongPlayer::FindRegisteredListener(void* unused, void* target) {
 extern void  pongPlayer_FD20_g(void* a, int b, void* c, void* d,
                                int e, void* f, void* g, unsigned char h); // @ 0x821EFD20
 // pongPlayer_InterpolateCourtGridPosition — forward declared at top of file with correct 6-param signature
-// Clock/config query — returns timing/state data from match config
-extern void* pongPlayer_7CC0_g(void* matchConfig);                     // @ 0x821E7CC0
+// Camera-side predicate — returns a byte, not a pointer
+extern uint8_t pongPlayer_7CC0_g(void* matchConfig);                   // @ 0x821E7CC0
 // Player record entry setup — configures a slot in the player data table
 extern void  pongPlayer_05A8_g(void* entry, uint8_t metaByte,
-                               void* clockData);                       // @ 0x821E05A8
-// Normalize sub-struct extent vector (float param = threshold via f1)
-extern void  pongPlayer_4EA0_g(void* sub, float normalizeVal);         // @ 0x821D4EA0
-// Compute interpolated position into output buffer
+                               uint8_t cameraSide);                     // @ 0x821E05A8
+// Clamp the vector length between f1 and f2.
+extern void  pongPlayer_4EA0_g(void* sub, float minLength, float maxLength);         // @ 0x821D4EA0
+// Convert the local spin axis into world space
 extern void  pongPlayer_5010_g(void* sub, void* output,
                                void* parent, int flag);                // @ 0x821D5010
 
@@ -3411,7 +3407,7 @@ extern const float g_kPercentScale;      // flt_8202D118 @ 0x8202D118 (100.0f, .
 /**
  * Registers a value into a player record slot.
  *
- * Queries match config for a clock/timing value via pongPlayer_7CC0_g,
+ * Queries the camera-side flag via pongPlayer_7CC0_g,
  * reads a metadata byte from the caller's data region, looks up a slot
  * index from the player records table at [index+1], and — if valid
  * (0–3) — stores the value at entry+20 and calls pongPlayer_05A8_g
@@ -3422,8 +3418,8 @@ extern const float g_kPercentScale;      // flt_8202D118 @ 0x8202D118 (100.0f, .
  * @param value  Value to store at the record entry's offset +20
  */
 extern "C" void pongPlayer_9C60_g(void* base, int index, uint32_t value) {
-    // Get timing state from match config
-    void* clockData = pongPlayer_7CC0_g(g_pCameraSharedState);
+    // Get the camera-side flag
+    uint8_t cameraSide = pongPlayer_7CC0_g(g_pCameraSharedState);
 
     // Read metadata byte from caller's data region
     uint8_t metaByte = *reinterpret_cast<uint8_t*>(
@@ -3437,7 +3433,7 @@ extern "C" void pongPlayer_9C60_g(void* base, int index, uint32_t value) {
         uint8_t* entry = reinterpret_cast<uint8_t*>(g_pPlayerRecords)
                          + slotIdx * 808;
         *reinterpret_cast<uint32_t*>(entry + 20) = value;
-        pongPlayer_05A8_g(entry + 12, metaByte, clockData);
+        pongPlayer_05A8_g(entry + 12, metaByte, cameraSide);
     }
 }
 
@@ -3658,9 +3654,9 @@ extern "C" void pongPlayer_6360_g(void* self, void* bounds) {
     *reinterpret_cast<float*>(sub + 4) = widthDiff;
 
     // Normalize extent vector
-    pongPlayer_4EA0_g(sub, g_swingPhaseThreshold);
+    pongPlayer_4EA0_g(sub, 0.0f, 1.0f);
 
-    // Compute interpolated position → output at sub+16
+    // Convert to world-space spin → output at sub+16
     pongPlayer_5010_g(sub, sub + 16, self, 1);
 }
 
@@ -3728,9 +3724,9 @@ extern "C" void pongPlayer_62C0_g(pongPlayer* self, uint8_t resetFlag) {
  *   sub[0] += depthDiff  (z1 - z0)
  *   sub[4] += widthDiff  (x0 - x1)
  *
- * Then normalizes and recomputes interpolated position.
+ * Then clamps its length and recomputes world-space spin.
  */
-extern "C" void pongPlayer_63E8_g(void* self, void* bounds) {
+extern "C" void pongPlayer_63E8_g(void* self, void* bounds, float /*unused*/, float maxLength) {
     uint8_t* base = reinterpret_cast<uint8_t*>(self);
     float* rect   = reinterpret_cast<float*>(bounds);
 
@@ -3752,9 +3748,9 @@ extern "C" void pongPlayer_63E8_g(void* self, void* bounds) {
     *reinterpret_cast<float*>(sub + 0) = oldDepth + depthDiff;
 
     // Normalize extent vector
-    pongPlayer_4EA0_g(sub, g_swingPhaseThreshold);
+    pongPlayer_4EA0_g(sub, 0.0f, maxLength);
 
-    // Compute interpolated position → output at sub+16
+    // Convert to world-space spin → output at sub+16
     pongPlayer_5010_g(sub, sub + 16, self, 1);
 }
 
@@ -3935,7 +3931,7 @@ void pongPlayer_3628_g(pongPlayer* player, uint8_t flip) {  // SetServeSideFlip 
         uint32_t opponentEntry = dataEntries[slotIdx + 1];
 
         // Get player handedness from slot lookup
-        void* handedness = pongPlayer_7CC0_g(g_pPlayerSlotLookup);
+        uint8_t handedness = pongPlayer_7CC0_g(g_pPlayerSlotLookup);
 
         // Compute opponent record base: table + entry*808 + 12
         void* recordBase = g_pPlayerDataTable + opponentEntry * 808 + 12;
@@ -4232,7 +4228,6 @@ void pongPlayer_D6C8_fw(void* animTransObj) {  // ResetAnimTransitionState @ 0x8
  */
 void pongPlayer_06A0_g(float* outVec,
                        pongPlayer* player) {  // ComputeSwingTargetDelta @ 0x821906A0
-    float inputConst = g_kSwingTargetConst;   // @ 0x825C80FC
     int32_t slotIdx = player->m_inputSlotIdx;
 
     // Look up opponent record from player data table
@@ -4241,22 +4236,22 @@ void pongPlayer_06A0_g(float* outVec,
     void* recordBase = g_pPlayerDataTable + opponentEntry * 808 + 12;
 
     // Get swing deltas for channels 31 and 30
-    float delta1 = pongPlayer_0508_g(recordBase, 31, inputConst);
-    float delta2 = pongPlayer_0508_g(recordBase, 30, inputConst);
+    float delta1 = pongPlayer_0508_g(recordBase, 31);
+    float delta2 = pongPlayer_0508_g(recordBase, 30);
 
     // Store negated deltas
     outVec[1] = -delta1;
     outVec[0] = -delta2;
 
     // Get computed handedness from global slot lookup
-    void* computedHandedness = pongPlayer_7CC0_g(g_pPlayerSlotLookup);
+    uint8_t computedHandedness = pongPlayer_7CC0_g(g_pPlayerSlotLookup);
 
     // Read stored handedness from geometry table
     uint8_t* geomBase = static_cast<uint8_t*>(g_pInputObj) + slotIdx;
     uint8_t storedHandedness = geomBase[64];
 
     // If handedness matches (XOR == 0): negate again → original direction
-    if ((storedHandedness ^ static_cast<uint8_t>(reinterpret_cast<uintptr_t>(computedHandedness) & 0xFF)) == 0) {
+    if ((storedHandedness ^ computedHandedness) == 0) {
         outVec[0] = -outVec[0];
         outVec[1] = -outVec[1];
     }
