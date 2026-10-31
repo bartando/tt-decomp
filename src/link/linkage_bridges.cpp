@@ -57,7 +57,6 @@ void* rage_Alloc(unsigned int size);                                 // rage_cor
 void RegisterSerializedField(void* obj, const void* fieldKey, void* fieldPtr, const void* schemaDesc,
                              uint32_t flags);                        // gd_data.cpp
 void msgMsgSink_03B8_g(void* self, uint32_t index);                  // msg_msg_sink.cpp
-void* msgMsgSink_8D10_g(void* self, uint32_t slotIndex);
 void jumptable_3A48(void* slot, unsigned int kind, unsigned int channel, unsigned int payload);  // hsm.cpp
 void phBoundGeometry_Constructor(void* self);                        // ph_physics.cpp
 void phBoundSphere_Constructor(void* self);
@@ -270,7 +269,6 @@ void RegisterSerializedField(void* obj, const char* name, void* field, void* typ
 // msg_msg_sink.cpp declares the index as u16 in some places, u32 in others
 // (it is a 14-bit index in a 32-bit register).
 void msgMsgSink_03B8_g(void* self, uint16_t index) { msgMsgSink_03B8_g(self, static_cast<uint32_t>(index)); }
-void* msgMsgSink_8D10_g(void* self, uint16_t slotIndex) { return msgMsgSink_8D10_g(self, static_cast<uint32_t>(slotIndex)); }
 
 // msg_msg_sink.cpp passes the channel as u16; hsm.cpp takes unsigned int.
 void jumptable_3A48(void* slot, unsigned int kind, uint16_t channel, unsigned int payload) {

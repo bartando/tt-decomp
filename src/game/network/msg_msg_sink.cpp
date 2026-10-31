@@ -5,6 +5,7 @@
 #include "audio/xact_fade.hpp"
 #include "audio/xact_volume.hpp"
 #include "audio/xact_buffer.hpp"
+#include "audio/xact_wave_acquire.hpp"
 /**
  * msg_msg_sink.cpp — msgMsgSink constructor & destructor
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -1297,7 +1298,6 @@ int32_t msgMsgSink::FindValidMessageSlot(uint32_t searchKey) {
     uint16_t slotIndex = (uint16_t)(slotId & 0xFFFF);
     if (slotIndex != 0xFFFF) {
         // Get the slot data
-        extern void* msgMsgSink_8D10_g(void*, uint32_t);
         void* slotData = msgMsgSink_8D10_g(sessionObj, slotId);
 
         if (slotData != nullptr) {
@@ -1478,7 +1478,6 @@ void msgMsgSink::DispatchEventWithSessionInfo() {
 extern void msgMsgSink_DC40_g(void*, uint32_t);
 extern void game_0388_h(void*, uint16_t);
 extern uint32_t game_8CF8_h(void*, uint16_t);
-extern void* msgMsgSink_8D10_g(void*, uint16_t);
 extern void jumptable_3A48(void*, uint32_t, uint16_t, uint32_t);
 extern void atSingleton_B0E8_sp(void*, uint32_t, uint32_t);
 extern uint32_t RtlEnterCriticalSection_A158_h(void*, void*, uint32_t, uint32_t, uint32_t);
@@ -1812,7 +1811,6 @@ void* msgMsgSink::GetMessageBufferPtr() {
 
 // External callees for group 23
 
-extern void msgMsgSink_EC28_g(void* self, uint32_t param1, uint32_t param2, uint32_t param3);
 extern void msgMsgSink_7970_w(void* self);
 extern void msgMsgSink_7DD8_w(void* self);
 extern void msgMsgSink_8638_w(void* self);
@@ -1994,8 +1992,6 @@ uint32_t msgMsgSink::SetMessageBuffer(void* param) {
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 // Forward declarations for callees
-extern void msgMsgSink_EC28_g(void* sink, uint32_t key, void* outSlot, uint32_t flags);
-extern void msgSlot_SetFloat(void* slot, float value, uint32_t flags);
 extern void game_3F28_h(void* session, void* priorityData);
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2044,40 +2040,6 @@ void msgMsgSink_D1D8_sp(void* self, uint16_t slotIndex) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// msgMsgSink_8D10_g @ 0x82448D10 | 128 bytes
-// Looks up slot data by index. Loads the message handler object from +124.
-// If present, calls handler vtable slot 11 to get the entry count, validates
-// that the index is within range, then calls handler vtable slot 2 to
-// retrieve the slot data pointer. Returns nullptr on failure.
-// ─────────────────────────────────────────────────────────────────────────────
-void* msgMsgSink_8D10_g(void* self, uint32_t slotIndex) {
-    void* handler = *(void**)((uint8_t*)self + 124);
-
-    if (handler != nullptr) {
-        // Call vtable slot 11 to get the slot table descriptor
-        typedef void* (*GetDescFn)(void*);
-        void** vt = *(void***)handler;
-        GetDescFn getDesc = (GetDescFn)vt[11];
-        void* desc = getDesc(handler);
-
-        // Check index against entry count at desc+11 (uint16)
-        uint16_t entryCount = *(uint16_t*)((uint8_t*)desc + 11);
-        uint16_t idx = (uint16_t)(slotIndex & 0xFFFF);
-
-        if (idx >= entryCount) {
-            return nullptr;
-        }
-
-        // Call vtable slot 2 to get slot data by index
-        typedef void* (*GetSlotFn)(void*, uint32_t);
-        void** vt2 = *(void***)handler;
-        GetSlotFn getSlot = (GetSlotFn)vt2[2];
-        return getSlot(handler, slotIndex);
-    }
-
-    return nullptr;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // msgMsgSink_8BA8_2hr @ 0x82448BA8 | 184 bytes
@@ -2224,104 +2186,7 @@ uint32_t msgMsgSink::ApplyPrioritiesLocked(void* priorityData) {
     return 0;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// msgMsgSink::SetPropertyLocked() [vtable slot 31 @ 0x8244F268] | 200 bytes
-// Thread-safe property set: acquires generation lock, locates the message
-// slot via msgMsgSink_EC28_g, validates the slot is active (bit 0) and not
-// disconnecting (bit 1). If the new float value differs from the current
-// one, applies it via msgSlot_SetFloat. Returns error 0x8A65000A if slot invalid.
-// ─────────────────────────────────────────────────────────────────────────────
-uint32_t msgMsgSink::SetPropertyLocked(uint32_t key, float value) {
-    void* sessionObj = *(void**)((uint8_t*)this + 56);
-    void* criticalSection = (uint8_t*)sessionObj + 144;
 
-    extern void RtlEnterCriticalSection(void*);
-    extern void RtlLeaveCriticalSection(void*);
-    RtlEnterCriticalSection(criticalSection);
-
-    void* session = *(void**)((uint8_t*)this + 56);
-    extern int32_t msgMsgSink_84C0_gen(void*);
-    int32_t genResult = msgMsgSink_84C0_gen(session);
-
-    uint32_t result = (uint32_t)genResult;
-    void* slot = nullptr;
-
-    if (genResult >= 0) {
-        msgMsgSink_EC28_g(this, key, &slot, 0);
-        result = (uint32_t)(uintptr_t)slot;
-
-        if ((int32_t)result >= 0 && slot != nullptr) {
-            void* desc = *(void**)((uint8_t*)slot + 16);
-            uint8_t flags = *(uint8_t*)desc;
-
-            if ((flags & 0x1) != 1) {
-                result = 0x8A65000A;
-            } else if (flags & 0x2) {
-                result = 0x8A65000A;
-            } else {
-                float currentVal = *(float*)((uint8_t*)slot + 20);
-                if (value != currentVal) {
-                    msgSlot_SetFloat(slot, value, 0);
-                }
-            }
-        }
-    }
-
-    RtlLeaveCriticalSection(criticalSection);
-    return result;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// msgMsgSink::GetPropertyLocked() [vtable slot 32 @ 0x8244F330] | 200 bytes
-// Thread-safe property get: acquires generation lock, validates the key
-// (rejects keys 1 and 2), locates the message slot, validates it is active
-// (bit 0 set), reads the float at slot+20 into the output pointer.
-// Returns error 0x8A65000A if slot is invalid.
-// ─────────────────────────────────────────────────────────────────────────────
-uint32_t msgMsgSink::GetPropertyLocked(uint32_t key, float* outValue) {
-    void* sessionObj = *(void**)((uint8_t*)this + 56);
-    void* criticalSection = (uint8_t*)sessionObj + 144;
-
-    extern void RtlEnterCriticalSection(void*);
-    extern void RtlLeaveCriticalSection(void*);
-    RtlEnterCriticalSection(criticalSection);
-
-    void* session = *(void**)((uint8_t*)this + 56);
-    extern int32_t msgMsgSink_84C0_gen(void*);
-    int32_t genResult = msgMsgSink_84C0_gen(session);
-
-    uint32_t result = (uint32_t)genResult;
-
-    if (genResult >= 0) {
-        uint16_t keyLower = (uint16_t)(key & 0xFFFF);
-        if (keyLower == 1 || keyLower == 2) {
-            RtlLeaveCriticalSection(criticalSection);
-            return result;
-        }
-
-        void* slot = nullptr;
-        msgMsgSink_EC28_g(this, key, &slot, 0);
-        result = (uint32_t)(uintptr_t)slot;
-
-        if ((int32_t)result >= 0 && slot != nullptr) {
-            void* desc = *(void**)((uint8_t*)slot + 16);
-            uint8_t flags = *(uint8_t*)desc;
-
-            if (flags & 0x1) {
-                float propValue = *(float*)((uint8_t*)slot + 20);
-                *outValue = propValue;
-
-                RtlLeaveCriticalSection(criticalSection);
-                return result;
-            }
-
-            result = 0x8A65000A;
-        }
-    }
-
-    RtlLeaveCriticalSection(criticalSection);
-    return result;
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // msgMsgSink::FlushPendingMessagesLocked() [vtable slot 130 @ 0x8244F9E8] | 188 bytes
@@ -2440,7 +2305,6 @@ extern void* rage_01B8(uint32_t, uint32_t);                           // 0x820C0
 extern void  _locale_register(void*, uint32_t);                       // 0x820C02D0
 extern void* msgMsgSink_B110_g(void*, void*, uint32_t);               // 0x8245B110
 extern void* game_B450_h(void*, void*, uint32_t);                     // 0x8245B450
-extern int32_t RtlEnterCriticalSection_6D70_h(void*);                 // 0x82456D70
 extern void   msgMsgSink_DC40_g(void*, int32_t);                      // 0x8244DC40
 extern void   msgMsgSink_7970_w(void*, bool);                         // 0x82457970
 extern void   sub_8245EE98(void*, bool, int, int, int, int, int, int);// 0x8245EE98
@@ -2640,7 +2504,7 @@ void msgMsgSink::vfn_63() {
         if (subObj == nullptr) { RtlLeaveCriticalSection(cs); return; }
         *reinterpret_cast<void**>(self + 384) = subObj;
 
-        int32_t acq = RtlEnterCriticalSection_6D70_h(this);
+        int32_t acq = xactCue_AcquireWave(this);
         if (acq < 0) { RtlLeaveCriticalSection(cs); return; }
         *reinterpret_cast<uint32_t*>(self + 344) = 4;
         msgMsgSink_DC40_g(this, 1);

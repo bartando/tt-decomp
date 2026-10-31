@@ -103,6 +103,7 @@ set(SOURCES
     src/rage/audio/xact_fade.cpp
     src/rage/audio/xact_volume.cpp
     src/rage/audio/xact_buffer.cpp
+    src/rage/audio/xact_wave_acquire.cpp
     src/rage/audio/xact_sound.cpp
     src/rage/audio/xaudio_effect_buffer.cpp
     src/rage/audio/xaudio_effect.cpp
