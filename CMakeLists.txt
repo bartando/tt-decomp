@@ -163,6 +163,7 @@ set(SOURCES
     src/game/audio/pong_audio.cpp
     src/game/audio/pong_audio_effects.cpp
     src/game/ball/pong_ball.cpp
+    src/game/ball/ball_splash.cpp
     src/game/ball/ball_audio_emitters.cpp
     src/game/ball/ball_audio_envelope.cpp
     src/game/ball/ball_audio_impact.cpp
