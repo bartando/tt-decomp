@@ -1,3 +1,4 @@
+#include "grc/gpu_hang.hpp"
 #include "crt/crt_init.h"
 #include "grc/resource_release.hpp"
 #include "grc/render_context.hpp"
@@ -504,7 +505,6 @@ void grcDevice_setSamplerLodBias(void* device, uint32_t sampler, uint32_t biasBi
 extern "C" void grcTexture_ReleaseResource(void* texture); // @ 0x82352708
 
 extern "C" uint32_t xe_GetCurrentThreadId();     // @ 0x82566B78
-extern "C" void rage_AA78(void* gpuDevice, uint32_t* handle);  // @ 0x8235AA78
 
 // @ 0x8235EAD8 | size: 0x54 (was rage_EAD8 / rmcDrawable_Release)
 extern "C" uint32_t grcDevice_Release(void* device) {
@@ -960,7 +960,6 @@ extern "C" void grcDevice_SetTexture(void* device, uint32_t slot, void* texture)
 }
 
 extern "C" void* g_sda_base;  // @ 0x82600000 — r13 / per-thread kernel state
-extern int D3DDeviceXenon_ReportGPUHang(void* hangState);  // @ 0x823643E0
 
 // Wait until the GPU no longer owns the requested command-ring range. The low
 // two fence bits encode its wrap sequence; the remaining bits are its cursor.
@@ -969,8 +968,7 @@ extern int D3DDeviceXenon_ReportGPUHang(void* hangState);  // @ 0x823643E0
 extern "C" void grcDevice_CommitCommandSpace(void* device, uint32_t end, uint32_t sequence) {
     auto* state = static_cast<uint8_t*>(device);
     const auto queue = [state]() {
-        const uint32_t address = *reinterpret_cast<const volatile uint32_t*>(state + 0x2890);
-        return reinterpret_cast<const volatile uint32_t*>(static_cast<uintptr_t>(address));
+        return rage::load_ptr32<volatile uint32_t>(state, 0x2890);
     };
     const auto pending = [end, sequence](uint32_t fence) {
         const uint32_t lag = (sequence - fence) & 3u;
@@ -980,15 +978,10 @@ extern "C" void grcDevice_CommitCommandSpace(void* device, uint32_t end, uint32_
     if (!pending(initialQueue[1])) {
         return;
     }
-    struct HangState {
-        void* device;
-        uint32_t lastGpuTick;
-        uint32_t lastQueueHead;
-    } hang;
+    grcGpuHangState hang;
     hang.device = device;
     hang.lastQueueHead = initialQueue[0];
-    const auto* thread = *reinterpret_cast<const uint8_t* const*>(
-        static_cast<const uint8_t*>(g_sda_base) + 0x100);
+    const auto* thread = rage::load_ptr32<uint8_t>(g_sda_base, 0x100);
     hang.lastGpuTick = *reinterpret_cast<const uint32_t*>(thread + 0x58);
     do {
         if (D3DDeviceXenon_ReportGPUHang(&hang) == 0) {
@@ -1272,7 +1265,6 @@ extern void grc_3E20(void* device);  // @ 0x82363E20
 extern uint32_t* grc_DBF8(void* device, uint32_t* cursor);  // @ 0x8235DBF8
 extern void grc_CFD8(void* device, uint32_t flags, const int32_t* rect, const float* color,
                      float depth, uint32_t stencil);  // @ 0x8235CFD8
-extern void rage_AD98(void* device);  // @ 0x8235AD98
 extern void grcDevice_FlushDirtyState(void* device);  // @ 0x82363C00
 }
 
