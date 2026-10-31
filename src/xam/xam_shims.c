@@ -24,7 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
+#include "xam/kernel.h"
 
 /*=========================================================================
  * Network DLL Functions
@@ -128,13 +128,6 @@ void XGetVideoMode(void* mode) {
  * XAM Event Creation
  *=========================================================================*/
 
-typedef struct {
-    pthread_mutex_t mutex;
-    pthread_cond_t  cond;
-    int32_t         signaled;
-    int32_t         manual_reset;
-} HostKernelEvent;
-
 /**
  * xam_CreateEvent
  *
@@ -146,21 +139,15 @@ typedef struct {
  * @param b  Manual reset flag (1 = manual, 0 = auto)
  * @param c  Initial state (1 = signaled, 0 = nonsignaled)
  * @param d  Reserved
- * @return   Handle to the event object (cast to uint32_t)
+ * @return   Opaque host handle (four bytes on the Windows x86 target)
  */
-uint32_t xam_CreateEvent(uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
+void* xam_CreateEvent(uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
     (void)a;
     (void)d;
 
-    HostKernelEvent* event = (HostKernelEvent*)calloc(1, sizeof(HostKernelEvent));
-    if (!event) return 0;
-
-    pthread_mutex_init(&event->mutex, NULL);
-    pthread_cond_init(&event->cond, NULL);
-    event->manual_reset = (b != 0) ? 1 : 0;
-    event->signaled = (c != 0) ? 1 : 0;
-
-    return (uint32_t)(uintptr_t)event;
+    HANDLE event = NULL;
+    if (NtCreateEvent(&event, 0, NULL, b ? NotificationEvent : SynchronizationEvent, c) < 0) return 0;
+    return event;
 }
 
 /**

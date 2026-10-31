@@ -20,7 +20,7 @@
 
 /* ── Forward declarations ──────────────────────────────────────────── */
 int   rage_main_stub(void* parms, void* base);
-int   atexit(void (*fn)(void));
+int   xe_atexit(void (*fn)(void));
 void* XePhysicalAlloc_stub(uint32_t sizeBytes, int32_t protectFlags, uint32_t alignment, uint32_t allocFlags);
 void  XeTlsBlock_InitStack(struct XeTlsBlock* pXtf, void* stackBase, uint32_t stackSize);
 void  XeTlsBlock_BindMainThread(struct XeTlsBlock* pXtf);
@@ -85,7 +85,7 @@ void xe_get_thread_ctx_36E8(void)
  *
  * Initializes the main thread's XTF (Xbox Thread Frame) if it hasn't been
  * set up yet. Checks an init flag to guard against double-init. Registers
- * xe_get_thread_ctx_36E8() with atexit() so the context is finalized on exit.
+ * xe_get_thread_ctx_36E8() with xe_atexit() so the context is finalized on exit.
  *
  * The r13 TLS root points to the allocator table; this function installs
  * the default heap address into its active (+4) and saved (+8) slots.
@@ -97,7 +97,7 @@ void sysMemAllocator_InitThreadHeap(void)
         if ((g_allocatorInitFlag & 1u) == 0u) {
             g_allocatorInitFlag |= 1u;
             xe_alloc_thread_ctx_6CA8(&g_mainThreadXtf, 0x02C00000u, 0u);
-            atexit(xe_get_thread_ctx_36E8);
+            xe_atexit(xe_get_thread_ctx_36E8);
         }
 
         allocCtx[1] = &g_mainThreadXtf;

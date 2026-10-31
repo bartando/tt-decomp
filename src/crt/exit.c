@@ -106,7 +106,7 @@ void* _onexit(void (*fn)(void))
  * @param fn  Function to register
  * @return    0 on success, nonzero on failure
  */
-int atexit(void (*fn)(void))
+int xe_atexit(void (*fn)(void))
 {
     void* result = _onexit(fn);
     return result ? 0 : -1;

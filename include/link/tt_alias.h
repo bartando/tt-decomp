@@ -13,7 +13,10 @@
  */
 #pragma once
 
-#if defined(__APPLE__)
+#define TT_ALIAS_STRING_IMPL(value) #value
+#define TT_ALIAS_STRING(value) TT_ALIAS_STRING_IMPL(value)
+
+#if defined(__APPLE__) || (defined(_WIN32) && defined(__i386__))
 #define TT_ASM_SYMBOL(name) "_" name
 #else
 #define TT_ASM_SYMBOL(name) name
@@ -30,9 +33,9 @@
 #define TT_DATA_ALIAS_AT(alias, target, offset)                  \
     __asm__(".globl _" alias "\n"                                \
             ".alt_entry _" alias "\n"                            \
-            ".set _" alias ", _" target "+" #offset)
+            ".set _" alias ", _" target "+" TT_ALIAS_STRING(offset))
 #else
 #define TT_DATA_ALIAS_AT(alias, target, offset)                  \
-    __asm__(".globl " alias "\n"                                 \
-            ".set " alias ", " target "+" #offset)
+    __asm__(".globl " TT_ASM_SYMBOL(alias) "\n"                   \
+            ".set " TT_ASM_SYMBOL(alias) ", " TT_ASM_SYMBOL(target) "+" TT_ALIAS_STRING(offset))
 #endif

@@ -89,13 +89,13 @@ struct ldCamListNode {
     ldCamListNode* prev;
     void* info;
 };
-static_assert(offsetof(ldCamListNode, next) == 8, "alias offsets below");
+static_assert(offsetof(ldCamListNode, next) == sizeof(void*), "alias offsets below");
 extern "C" ldCamListNode g_charViewCS_freeListHead = {
     nullptr, &g_charViewCS_freeListHead, &g_charViewCS_freeListHead, nullptr};
 extern "C" ldCamListNode g_charViewCS_activeListHead = {
     nullptr, &g_charViewCS_activeListHead, &g_charViewCS_activeListHead, nullptr};
-TT_DATA_ALIAS_AT("g_charViewCS_freeTail", "g_charViewCS_freeListHead", 8);      // 0x825CA93C
-TT_DATA_ALIAS_AT("g_charViewCS_activeTail", "g_charViewCS_activeListHead", 8);  // 0x825CA948
+TT_DATA_ALIAS_AT("g_charViewCS_freeTail", "g_charViewCS_freeListHead", __SIZEOF_POINTER__);      // 0x825CA93C
+TT_DATA_ALIAS_AT("g_charViewCS_activeTail", "g_charViewCS_activeListHead", __SIZEOF_POINTER__);  // 0x825CA948
 
 // @ 0x825CAEB8 (.data) — the first 0x60 bytes of the rage::sysTimeManager
 // instance (match_data.cpp's g_sysTimeManager) in the image's 32-bit layout,

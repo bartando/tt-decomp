@@ -26,8 +26,8 @@ extern void     sysMemAllocator_InitThreadHeap(void);  /* @ 0x820C0038 */
 // Xbox thread / synchronisation primitives (XAM layer)
 // xam_CreateEvent — Creates a kernel event object via NtCreateEvent.
 //   r3=type?, r4=initialCount, r5=maxCount, r6=flags → returns handle
-extern uint32_t xam_CreateEvent(uint32_t type, uint32_t initCount,
-                                uint32_t maxCount, uint32_t flags); // @ 0x82566C88
+extern void* xam_CreateEvent(uint32_t type, uint32_t initCount,
+                             uint32_t maxCount, uint32_t flags); // @ 0x82566C88
 
 // RAGE kernel thread registration.
 // r3=func, r4=param, r5=stack_size, r6=base_priority_delta,
@@ -52,9 +52,9 @@ extern struct fiDevice* fiDevice_GetDevice(const char* path,
 
 // g_semRender, g_semUpdate, g_semIO — three XAM kernel semaphore handles
 // Stored at r31+26104/26108/26112 where r31 = lis(-32160) = 0x82600000
-extern uint32_t g_semRender;   /* @ 0x826065F8 */
-extern uint32_t g_semUpdate;   /* @ 0x826065FC */
-extern uint32_t g_semIO;       /* @ 0x82606600 */
+extern void* g_semRender;   /* @ 0x826065F8 — native opaque handle, as defined in globals.c */
+extern void* g_semUpdate;   /* @ 0x826065FC */
+extern void* g_semIO;       /* @ 0x82606600 */
 
 // g_mainThreadHandle — kernel handle for the RAGE main-loop scheduler thread
 extern uint32_t g_mainThreadHandle;  /* @ 0x825D0078 */
