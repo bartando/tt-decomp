@@ -253,6 +253,7 @@ set(SOURCES
     src/anim/animation_timing.cpp
 
     # Physics
+    src/physics/collider_velocity.cpp
     src/physics/ph_float_property.cpp
     src/physics/ph_physics.cpp
     src/physics/bound_lookup.cpp

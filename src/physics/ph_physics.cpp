@@ -15,6 +15,7 @@
 #include "articulated_motion.hpp"
 #include "articulated_response.hpp"
 #include "articulated_constraints.hpp"
+#include "collider_velocity.hpp"
 #include "joint_initialization.hpp"
 #include "rage/math.hpp"
 #include "rage/ptr32.hpp"
@@ -171,7 +172,6 @@ extern void* xe_GetLoadContext(void*);
 
 /* --- Game functions --- */
 extern "C" void pongCreatureInst_E828_v12(void*, uint32_t);
-extern void game_CE58(void* collider);
 extern void pongCreatureInst_RegisterPhysics(void*, void*);
 
 /* --- Audio functions --- */
@@ -185,8 +185,6 @@ extern void  fiAsciiTokenizer_ReadToken(void* tokenizer, int mode);
 extern void  msgMsgSink_DispatchNested(void* obj);
 extern void atSingleton_8A48_p42(void* obj);
 extern "C" void fiAsciiTokenizer_Destroy(void* obj);
-extern void phCollider_RecalcBounds(void* thisPtr);
-extern void phCollider_vfn_1(void* collider);
 extern void* g_display_obj_ptr;
 extern void rage_CopyMatrixAndBind(void*, void*, void*);
 
@@ -2012,30 +2010,7 @@ void rage::phArticulatedCollider::ApplyImpulse(void* param1, void* param2, void*
     func(this, param1, param2, param3, 0, 0);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// phArticulatedCollider::ScalarDestructor (vfn_1) @ 0x8224E6D8 | size: 0x48
-//
-// Scalar deleting destructor override. Calls the base phCollider destructor,
-// then resets joint-related state (joint count and active flag), and cleans
-// up the joint array and constraint data.
-// ─────────────────────────────────────────────────────────────────────────────
 
-void rage::phArticulatedCollider::ScalarDestructor() {
-    // Call base class scalar destructor
-    phCollider_vfn_1((void*)this);
-
-    // Reset joint-related state
-    m_pPhysicsData = 0;          // +472 (0x1D8) — joint count / physics data reset
-    m_bJointsDirty = false;     // +468 (0x1D4)
-
-    // Clean up joint array data
-    void* jointData = (void*)(uintptr_t)m_pJointArray;  // +464 (0x1D0)
-    phArticulatedCollider_ResetJointChain(jointData);
-
-    // Reset constraint data
-    jointData = (void*)(uintptr_t)m_pJointArray;
-    phArticulatedCollider_5D58(jointData);
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // phArticulatedCollider::ResetForces (vfn_2) @ 0x8224E720 | size: 0x80
@@ -5527,9 +5502,6 @@ int32_t phObject_UnbindResource(void* thisPtr) {
 // External subroutines used by the articulated collider
 
 extern void phArticulatedCollider_F0E0(void* collider);        // Update articulated internal state
-extern void phCollider_CDF0_p39(void* collider);               // Update collider position from velocity
-extern void phCollider_vfn_1(void* collider);                  // phCollider::Reset
-extern void phCollider_vfn_42(void* collider);                 // phCollider::SyncAfterBaseUpdate
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -5626,21 +5598,12 @@ void rage::phArticulatedCollider::PostIntegrate(float timestep) {
 // and integration state.
 // ─────────────────────────────────────────────────────────────────────────────
 void rage::phArticulatedCollider::Reset() {
-    // Call base class reset
-    phCollider_vfn_1((void*)this);
-
-    uint32_t* jointArray = (uint32_t*)(uintptr_t)m_pJointArray;  // +464 (0x1D0)
-
-    // Clear status fields
-    m_pPhysicsData = 0;       // +472 (0x1D8) — joint state pointer
-    m_bJointsDirty = 0;      // +468 (0x1D4) — dirty flag (byte)
-
-    // Reset joint chain state
-    phArticulatedCollider_ResetJointChain(jointArray);
-
-    // Reset joint integration accumulators
-    jointArray = (uint32_t*)(uintptr_t)m_pJointArray;  // reload
-    phArticulatedCollider_5D58(jointArray);
+    phCollider_Reset(this);
+    auto* bytes = reinterpret_cast<uint8_t*>(this);
+    *reinterpret_cast<uint32_t*>(bytes + 0x1d8) = 0;
+    bytes[0x1d4] = 0;
+    phArticulatedCollider_ResetJointChain(rage::load_ptr32<void>(this, 0x1d0));
+    phArticulatedCollider_5D58(rage::load_ptr32<void>(this, 0x1d0));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -5742,16 +5705,10 @@ void rage::phArticulatedCollider::ApplyScaledForce(float scaleFactor) {
 //
 // @param velocityVec - Pointer to a 16-byte velocity vector
 void rage::phArticulatedCollider::SetVelocityAndSync(const float* velocityVec) {
-    // Store velocity vector at offset +256
-    memcpy((uint8_t*)this + 256, velocityVec, 16);
-
-    // Update collider position from new velocity (base class)
-    phCollider_CDF0_p39((void*)this);
-
-    // Sync joint velocities from the updated state
-    uint32_t* jointArray = (uint32_t*)(uintptr_t)m_pJointArray;  // +464 (0x1D0)
-    float* forceVec = (float*)((uint8_t*)this + 224);  // +224
-    phArticulatedCollider_8A30(jointArray, forceVec);
+    memcpy((uint8_t*)this + 0x100, velocityVec, 16);
+    phCollider_RefreshLinearVelocity(this);
+    phArticulatedCollider_8A30(rage::load_ptr32<void>(this, 0x1d0),
+                              reinterpret_cast<float*>((uint8_t*)this + 0xe0));
 }
 
 
@@ -5759,17 +5716,12 @@ void rage::phArticulatedCollider::SetVelocityAndSync(const float* velocityVec) {
 // phArticulatedCollider::SyncAfterBaseUpdate (vfn_42) @ 0x8224F910
 // size: 0x38
 //
-// Calls the base phCollider::vfn_42, then syncs joint torques from the
-// collider's torque vector at +240.
+// Stores angular velocity, rebuilds its momentum, and synchronizes joints.
 // ─────────────────────────────────────────────────────────────────────────────
-void rage::phArticulatedCollider::SyncAfterBaseUpdate() {
-    // Call base class vfn_42
-    phCollider_vfn_42((void*)this);
-
-    // Sync joint torques from the collider's angular state
-    uint32_t* jointArray = (uint32_t*)(uintptr_t)m_pJointArray;  // +464 (0x1D0)
-    float* torqueVec = (float*)((uint8_t*)this + 240);  // +240
-    phArticulatedCollider_8B10(jointArray, torqueVec);
+void rage::phArticulatedCollider::SyncAfterBaseUpdate(const float* velocity) {
+    phCollider_SetAngularVelocity(this, velocity);
+    phArticulatedCollider_8B10(rage::load_ptr32<void>(this, 0x1d0),
+                              reinterpret_cast<float*>((uint8_t*)this + 0xf0));
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -7306,28 +7258,8 @@ void phBoundCapsule_DecomposeMatrixToEuler(const float* matrix, float* outEuler)
 // =========================================================================
 
 // External functions used by phArticulatedCollider methods
-extern void phCollider_vfn_1(void* collider);
 
-// ---------------------------------------------------------------------------
-// phArticulatedCollider::Shutdown (vfn_1) @ 0x8224E6D8 | size: 0x48
-//
-// Overrides phCollider::Shutdown (scalar destructor slot). Calls the base
-// class shutdown, then zeros the joint processing state (m_pPhysicsData
-// at +472 and m_bJointsDirty flag at +468), and performs two-phase joint
-// data cleanup via phArticulatedCollider_ResetJointChain and _5D58.
-// ---------------------------------------------------------------------------
-void rage::phArticulatedCollider::Shutdown() {
-    phCollider_vfn_1((void*)this);
 
-    m_pPhysicsData = 0;  // +472
-    m_bJointsDirty = 0;          // +468 (byte)
-
-    void* jointData = (void*)(uintptr_t)m_pJointArray;  // +464
-    phArticulatedCollider_ResetJointChain(jointData);
-
-    jointData = (void*)(uintptr_t)m_pJointArray;  // reload +464
-    phArticulatedCollider_5D58(jointData);
-}
 // ---------------------------------------------------------------------------
 // phArticulatedCollider::ApplyScaledMatrixRowX (vfn_28) @ 0x8224FDA8 | size: 0x94
 //
@@ -7903,84 +7835,51 @@ void rage::phArticulatedCollider::AccumulateForceAtJoint(const float* forceVec, 
 // phArticulatedCollider::SetVelocityScaled (vfn_40) @ 0x8224F870 | size: 0x58
 //
 // Stores the input velocity vector at offset +224, scales it by the
-// restitution coefficient at +100, stores the result at +256, then
+// mass at +100, stores momentum at +256, then
 // propagates velocity to all joints via phArticulatedCollider_8A30.
 //
 // @param velocity - 16-byte aligned velocity vector
 // ─────────────────────────────────────────────────────────────────────────────
 void rage::phArticulatedCollider::SetVelocityScaled(const float* velocity) {
-    uint8_t* self = (uint8_t*)this;
-
-    // Read restitution coefficient from +100
-    float restitution = *(float*)(self + 100);
-
-    // Store velocity at +224
-    float* storedVel = (float*)(self + 224);
-    storedVel[0] = velocity[0];
-    storedVel[1] = velocity[1];
-    storedVel[2] = velocity[2];
-    storedVel[3] = velocity[3];
-
-    // Scale velocity by restitution and store at +256
-    float* scaledVel = (float*)(self + 256);
-    scaledVel[0] = storedVel[0] * restitution;
-    scaledVel[1] = storedVel[1] * restitution;
-    scaledVel[2] = storedVel[2] * restitution;
-    scaledVel[3] = storedVel[3] * restitution;
-
-    // Propagate to all joints
-    void* jointDataPtr = (void*)(uintptr_t)m_pJointArray;  // +464
-    phArticulatedCollider_8A30(jointDataPtr, storedVel);
+    auto* bytes = reinterpret_cast<uint8_t*>(this);
+    const float mass = *reinterpret_cast<float*>(bytes + 0x64);
+    float input[4];
+    memcpy(input, velocity, 16);
+    memcpy(bytes + 0xe0, input, 16);
+    float momentum[4];
+    for (unsigned lane = 0; lane < 4; ++lane)
+        momentum[lane] = phFlushVmx(phFlushVmx(input[lane]) * phFlushVmx(mass));
+    memcpy(bytes + 0x100, momentum, 16);
+    phArticulatedCollider_8A30(rage::load_ptr32<void>(this, 0x1d0),
+                              reinterpret_cast<float*>(bytes + 0xe0));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // phArticulatedCollider::SetAngularVelocity (vfn_43) @ 0x8224F948 | size: 0x44
 //
-// Stores angular velocity at offset +272, calls the base class handler
-// (game_CE58), then propagates angular velocity from +240 to all joints
+// Stores angular momentum at offset +272, derives angular velocity,
+// then propagates angular velocity from +240 to all joints
 // via phArticulatedCollider_8B10.
 //
 // @param angularVelocity - 16-byte aligned angular velocity vector
 // ─────────────────────────────────────────────────────────────────────────────
 void rage::phArticulatedCollider::SetAngularVelocity(const float* angularVelocity) {
-    uint8_t* self = (uint8_t*)this;
-
-    // Store angular velocity at +272
-    float* storedAngVel = (float*)(self + 272);
-    storedAngVel[0] = angularVelocity[0];
-    storedAngVel[1] = angularVelocity[1];
-    storedAngVel[2] = angularVelocity[2];
-    storedAngVel[3] = angularVelocity[3];
-
-    // Call base class handler
-    game_CE58(this);
-
-    // Propagate angular velocity at +240 to all joints
-    float* angVel = (float*)(self + 240);
-    void* jointDataPtr = (void*)(uintptr_t)m_pJointArray;  // +464
-    phArticulatedCollider_8B10(jointDataPtr, angVel);
+    memcpy((uint8_t*)this + 0x110, angularVelocity, 16);
+    phCollider_RefreshAngularVelocity(this);
+    phArticulatedCollider_8B10(rage::load_ptr32<void>(this, 0x1d0),
+                              reinterpret_cast<float*>((uint8_t*)this + 0xf0));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // phArticulatedCollider::UpdatePostIntegrate (vfn_11) @ 0x822CB360 | size: 0x54
 //
-// Calls vtable slot 10 (self-dispatch), then phCollider_RecalcBounds for post-integration
-// cleanup, then dispatches vtable slot 28 on the skeleton object at +16.
+// Integrates accumulated pose corrections, publishes the instance transform,
+// then synchronizes the current instance bounds through its real virtual.
 // ─────────────────────────────────────────────────────────────────────────────
 void rage::phArticulatedCollider::UpdatePostIntegrate() {
-    // Self-dispatch vtable slot 10
-    void** vt = *(void***)this;
-    typedef void (*Slot10Func)(phArticulatedCollider*);
-    ((Slot10Func)vt[10])(this);
-
-    // Post-integration cleanup
-    phCollider_RecalcBounds(this);
-
-    // Dispatch vtable slot 28 on skeleton at +16 (m_pBound)
-    void* skeleton = (void*)(uintptr_t)this->m_pBound;
-    void** skelVt = *(void***)skeleton;
-    typedef void (*Slot28Func)(void*);
-    ((Slot28Func)skelVt[28])(skeleton);
+    reinterpret_cast<phColliderMotionOps*>(this)->IntegrateCorrections();
+    phCollider_PublishTransform(this);
+    rage::load_ptr32<phInstMotionOps>(this, 0x10)->SynchronizeBounds();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
