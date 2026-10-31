@@ -16,7 +16,7 @@ MUTATIONS = [
     ("ignore skeleton flags", "at<uint32_t>(at<void*>(skeleton, 4), 0x14) & 1", "false"),
     ("reload live list count", "i < count", "i < at<uint16_t>(state, 0x4C)"),
     ("cache old entry array", "apply(at<uint32_t*>(state, 0x48)[i]", "apply(cachedEntries[i]"),
-    ("wrong pair ID", "SetupAnimationPair(5, 6,", "SetupAnimationPair(5, 7,"),
+    ("wrong pair ID", "+ 0x40, 5, 6, nullptr,", "+ 0x40, 5, 7, nullptr,"),
     ("leave final mask byte", "slot * 14, 0, 14", "slot * 14, 0, 13"),
 ]
 

@@ -52,7 +52,7 @@ CALLS = {
     "LocomotionStateAnim_2130_g": model(choose_face),
     "LocomotionStateAnim_BlendLocomotionAnims": model(apply_frame, args=("r3", "r5", "f1")),
     "LocomotionStateAnim_TransitionLocomotionState": model(apply_frame, args=("r3", "r5", "f1")),
-    "LocomotionStateAnim::SetupAnimationPair": model(pair, args=("r3", "r4", "r5", "r7"), deref={"r7": 32}),
+    0x8224C418: model(pair, args=("r3", "r4", "r5", "r7"), deref={"r7": 32}),
 }
 
 

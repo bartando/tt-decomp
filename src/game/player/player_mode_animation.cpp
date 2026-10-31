@@ -1,7 +1,13 @@
 // Animation resets used when the inner player state changes movement mode.
 #include <cstdint>
 #include <cstring>
-#include "../creature/pong_creature.hpp"
+#include "link/tt_alias.h"
+
+// Isolated declaration of the member's recovered ABI while the creature
+// thread owns its implementation. Bind directly to that member's native symbol.
+extern bool SetupAnimationPair(void* animations, uint32_t first, uint32_t second,
+                               void* unusedR6, const void* parameters)
+    __asm__(TT_ASM_SYMBOL("_ZN19LocomotionStateAnim18SetupAnimationPairEjjPvPKv")); // @ 0x8224C418
 
 extern "C" uint8_t g_swingInFlightFlag; // @ 0x8260633C
 extern "C" uint32_t g_swingCountFlag; // @ 0x82606340
@@ -105,8 +111,8 @@ extern "C" void LocomotionStateAnim_BBC8_g(void* state) {
     const uint16_t count = at<uint16_t>(state, 0x4C);
     for (uint32_t i = 0; i < count; ++i)
         apply(at<uint32_t*>(state, 0x48)[i], nullptr, skeleton, 0.0f);
-    auto* list = reinterpret_cast<LocomotionStateAnim*>(static_cast<uint8_t*>(state) + 0x40);
-    list->SetupAnimationPair(5, 6, nullptr, g_playerModeAnimationPairParams);
+    SetupAnimationPair(static_cast<uint8_t*>(state) + 0x40, 5, 6, nullptr,
+                       g_playerModeAnimationPairParams);
     at<uint32_t>(state, 0xAC) = 1;
     const uint32_t slot = at<uint32_t>(state, 8);
     std::memset(g_playerModeAnimationBytes + slot * 14, 0, 14);

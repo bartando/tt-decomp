@@ -450,8 +450,7 @@ void* LocomotionStateAnim::FindAnimationByID(uint32_t type, uint32_t id) {
  * @param param Parameter to pass to animation virtual methods
  * @return true if both animations found and configured, false otherwise
  */
-bool LocomotionStateAnim::SetupAnimationPair(uint32_t animID1, uint32_t animID2, void* unusedR6, const void* param) {
-    (void)unusedR6;
+bool LocomotionStateAnim::SetupAnimationPair(uint16_t animID1, uint16_t animID2, void* param) {
     // Find first animation (ID1, 0)
     void* anim1 = FindAnimationByID(animID1, 0);
     
@@ -465,11 +464,11 @@ bool LocomotionStateAnim::SetupAnimationPair(uint32_t animID1, uint32_t animID2,
     
     // Call virtual method on first animation with offset parameter
     // vtable[17] - likely SetupBlendSource or similar
-    VCALL(anim1, 17, void(*)(void*, const void*))(anim1, static_cast<const char*>(param) + 16);
+    VCALL(anim1, 17, void(*)(void*, void*))(anim1, (char*)param + 16);
 
     // Call virtual method on second animation with base parameter
     // vtable[18] - likely SetupBlendTarget or similar
-    VCALL(anim2, 18, void(*)(void*, const void*))(anim2, param);
+    VCALL(anim2, 18, void(*)(void*, void*))(anim2, param);
     
     return true;
 }
