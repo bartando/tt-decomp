@@ -64,9 +64,9 @@ struct pongCreatureSkeleton;
 
 extern "C" uint32_t g_creatureWorkerRelativePose; // @ 0x825C9F54
 extern "C" uint32_t g_renderClearRingIdx; // @ 0x82606348
-extern "C" void pg_5510_g(void* destination, const void* pose, uint32_t boneCount,
+extern "C" void pg_5510_g(void* source, const void* pose, uint32_t unusedR5,
                            void* skinMap, uint32_t unusedR7, int32_t vertexCount,
-                           void* source); // @ 0x82155510
+                           void* output); // @ 0x82155510
 extern "C" uint8_t pg_7578_g(void* buffer); // @ 0x82157578
 extern "C" bool grc_7628(void* buffer); // @ 0x82157628
 

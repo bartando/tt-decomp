@@ -17,11 +17,14 @@ struct PgVertexBuffer {
     uint32_t stagingAddress;            // +0x18: one vertex's data, no stride (pg_6B20_g)
     uint32_t dataAddress;               // +0x1C: CPU mapping, refreshed by pg_7578_g
     uint8_t positionOffset;             // +0x20
-    uint8_t pad21[0x02];
+    uint8_t weightOffset;               // +0x21
+    uint8_t indexOffset;                // +0x22
     uint8_t normalOffset;               // +0x23
     uint8_t pad24[0x0A];
     uint8_t tangentOffset;              // +0x2E
-    uint8_t pad2F[0x2D];
+    uint8_t pad2F[0x0F];
+    uint8_t cpuPositions;               // +0x3E
+    uint8_t pad3F[0x1D];
     uint32_t positionSize;              // +0x5C
     uint8_t pad60[0x08];
     uint32_t normalSize;                // +0x68: bytes for the raw-copy format
@@ -39,7 +42,10 @@ struct PgVertexBuffer {
 static_assert(offsetof(PgVertexBuffer, resourceAddress) == 0x10);
 static_assert(offsetof(PgVertexBuffer, stagingAddress) == 0x18);
 static_assert(offsetof(PgVertexBuffer, positionOffset) == 0x20);
+static_assert(offsetof(PgVertexBuffer, weightOffset) == 0x21);
+static_assert(offsetof(PgVertexBuffer, indexOffset) == 0x22);
 static_assert(offsetof(PgVertexBuffer, normalOffset) == 0x23);
+static_assert(offsetof(PgVertexBuffer, cpuPositions) == 0x3E);
 static_assert(offsetof(PgVertexBuffer, tangentOffset) == 0x2E);
 static_assert(offsetof(PgVertexBuffer, positionSize) == 0x5C);
 static_assert(offsetof(PgVertexBuffer, normalSize) == 0x68);
@@ -330,4 +336,104 @@ extern "C" void grc_69C0(void* vertexBuffer, uint32_t index, const void* positio
     const uint32_t offset = buffer->stride * index + buffer->positionOffset;
     std::memcpy(reinterpret_cast<void*>(static_cast<uintptr_t>(buffer->dataAddress + offset)), position,
                 buffer->positionSize);
+}
+
+namespace {
+uint32_t vertexFormat(const PgVertexBuffer* buffer) {
+    return *reinterpret_cast<const uint32_t*>(uintptr_t(buffer->formatAddress));
+}
+
+void loadStagingVector(float* out, const PgVertexBuffer* buffer, uint32_t offset) {
+    const uintptr_t address = uint32_t(buffer->stagingAddress + offset) & ~uintptr_t(15);
+    std::memcpy(out, reinterpret_cast<const void*>(address), 16);
+}
+
+// The matrix is four row vectors; VMX dot4 accumulates before rounding once.
+void skinTransform(float* out, const float* input, const float* matrix) {
+    float homogeneous[4];
+    for (unsigned lane = 0; lane < 4; ++lane) {
+        uint32_t bits, one;
+        std::memcpy(&bits, input + lane, 4);
+        std::memcpy(&one, lbl_82619BD0 + lane, 4);
+        bits = (bits & lbl_82619BE0[lane]) | one;
+        std::memcpy(homogeneous + lane, &bits, 4);
+    }
+    for (unsigned column = 0; column < 3; ++column) {
+        double sum = 0.0;
+        for (unsigned row = 0; row < 4; ++row)
+            sum += double(vmxFloat(homogeneous[row])) * vmxFloat(matrix[row * 4 + column]);
+        out[column] = vmxFloat(static_cast<float>(sum));
+    }
+    // The last merge retains input x in w; it is not a fourth dot product.
+    out[3] = homogeneous[0];
+}
+}
+
+// Skin the source staging vertices into output (or source when output is null).
+// r5/r7 are unused slots; r8 is the signed vertex count and r9 the output.
+// pg_5510_g @ 0x82155510 | size: 0x4D8
+extern "C" void pg_5510_g(void* sourceBuffer, const void* pose, uint32_t /*unusedR5*/,
+                           void* skinMap, uint32_t /*unusedR7*/, int32_t vertexCount,
+                           void* outputBuffer) {
+    auto* source = static_cast<PgVertexBuffer*>(sourceBuffer);
+    if (!source->mapped) pg_7578_g(source);
+    pg_54B0_g(source, 0);
+    auto* output = outputBuffer ? static_cast<PgVertexBuffer*>(outputBuffer) : source;
+    if (outputBuffer) pg_54B0_g(output, 0);
+    if (vertexCount <= 0) return;
+    const auto* palette = static_cast<const uint16_t*>(skinMap);
+    const auto* matrices = align16(static_cast<const float*>(pose));
+    for (int32_t vertex = 0; vertex < vertexCount; ++vertex) {
+        uint32_t indices = ~0u;
+        if (vertexFormat(source) & 4) {
+            if (!source->mapped) pg_7578_g(source);
+            const uintptr_t address = uint32_t(source->stagingAddress + source->indexOffset);
+            std::memcpy(&indices, reinterpret_cast<const void*>(address), 4);
+        }
+        alignas(16) float weights[4] = {};
+        if (vertexFormat(source) & 2) {
+            if (!source->mapped) pg_7578_g(source);
+            loadStagingVector(weights, source, source->weightOffset);
+        }
+        const uint16_t bones[4] = {palette[(indices >> 16) & 255], palette[(indices >> 8) & 255],
+                                   palette[indices & 255], palette[indices >> 24]};
+        alignas(16) float blended[16];
+        for (unsigned component = 0; component < 16; ++component) {
+            float sum = vmxFloat(vmxFloat(matrices[bones[0] * 16 + component]) * vmxFloat(weights[0]));
+            for (unsigned influence = 1; influence < 4; ++influence) {
+                const float product = vmxFloat(vmxFloat(matrices[bones[influence] * 16 + component]) * vmxFloat(weights[influence]));
+                sum = vmxFloat(sum + product);
+            }
+            blended[component] = sum;
+        }
+        // PPC's absent position/normal/tangent inputs leave scratch unwritten.
+        // Define them as zero; callers must supply an input for each output used.
+        alignas(16) float position[4] = {}, normal[4] = {}, tangent[4] = {};
+        if (source->cpuPositions) {
+            if (!source->mapped) pg_7578_g(source);
+            loadStagingVector(position, source, 0);
+        }
+        pg_5BD8_g(normal, source);
+        if (vertexFormat(source) & 0x4000) {
+            if (!source->mapped) pg_7578_g(source);
+            loadStagingVector(tangent, source, source->tangentOffset);
+        }
+        alignas(16) float skinnedPosition[4], skinnedNormal[4], skinnedTangent[4];
+        skinTransform(skinnedPosition, position, blended);
+        skinTransform(skinnedNormal, normal, blended);
+        skinTransform(skinnedTangent, tangent, blended);
+        if (vertexFormat(output) & 1) {
+            if (!output->mapped) pg_7578_g(output);
+            const uintptr_t address = uint32_t(output->stagingAddress + output->positionOffset);
+            std::memcpy(reinterpret_cast<void*>(address), skinnedPosition, output->positionSize);
+        }
+        if (vertexFormat(output) & 8) {
+            if (!output->mapped) pg_7578_g(output);
+            const uintptr_t address = uint32_t(output->stagingAddress + output->normalOffset) & ~uintptr_t(15);
+            std::memcpy(reinterpret_cast<void*>(address), skinnedNormal, 16);
+        }
+        pg_6B20_g(output, 0, skinnedTangent);
+        source->stagingAddress += source->stride;
+        if (output != source) output->stagingAddress += output->stride;
+    }
 }
