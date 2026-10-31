@@ -11,6 +11,7 @@
  */
 
 #include "rage/rage_system.hpp"
+#include "rage/fi_stream.hpp"
 /* audio_system.hpp removed: C file needs no C++ headers */
 #include <stdint.h>
 #include <string.h>
@@ -43,10 +44,6 @@ extern uint32_t rage_RegisterThread(void* func, void* param,
 
 // Debug log — no-op (blr) in release builds; fires on guard failures.
 extern void rage_DebugLog(const char* msg, ...);  // @ 0x8240E6D0
-
-// File-device layer
-extern struct fiDevice* fiDevice_GetDevice(const char* path,
-                                           uint32_t openForWrite); // @ 0x822E12A0
 
 // Globals
 
