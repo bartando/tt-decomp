@@ -2033,44 +2033,7 @@ void pongNetMessageHolder::CleanupNestedArrays()
     *(uint32_t*)this = VTABLE_rage_crIKBodyBase;  // rage::crIKBodyBase final vtable
 }
 
-// ===========================================================================
-// pongNetMessageHolder::RemoveElementByPointer @ 0x82134350 | size: 0xB8
-//
-// Original symbol: pongNetMessageHolder_4350_wrh
-//
-// Really the triangle stripifier's strip-list erase (TriStripList::Erase in
-// cm_operators.cpp): `this` is the list {items, count}, and `targetPtr` is
-// the address of a slot in it, not a strip. The asm compares slot addresses.
-// The matching slot's strip (if any) has its arrays at +8 and +0x10 freed,
-// then itself; the count drops and the later slots move down one.
-// ===========================================================================
-void pongNetMessageHolder::RemoveElementByPointer(void* targetPtr)
-{
-    uint32_t* count = reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(this) + 4);
-    void***   items = reinterpret_cast<void***>(this);
 
-    uint32_t index = 0;
-    if (*count == 0) {
-        return;
-    }
-    for (void** slot = *items; slot != targetPtr; ++slot) {
-        if (++index >= *count) {
-            return;
-        }
-    }
-
-    void* strip = (*items)[index];
-    if (strip != nullptr) {
-        sysMemAllocator_Free(*reinterpret_cast<void**>(static_cast<uint8_t*>(strip) + 8));
-        sysMemAllocator_Free(*reinterpret_cast<void**>(static_cast<uint8_t*>(strip) + 16));
-        sysMemAllocator_Free(strip);
-    }
-
-    *count -= 1;
-    for (; index < *count; ++index) {
-        (*items)[index] = (*items)[index + 1];
-    }
-}
 
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -176,6 +176,7 @@ set(SOURCES
     
     # Graphics
     src/graphics/fx_crowd.cpp
+    src/graphics/tri_strip_list.cpp
     src/graphics/grc_debug_strings.cpp
     src/graphics/grc_gpu_hang.cpp
     src/graphics/grc_gpu_resources.cpp
