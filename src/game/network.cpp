@@ -1009,48 +1009,6 @@ void SinglesNetworkClient_CleanupGlobalArrays()
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SinglesNetworkClient::GetPlayerID @ 0x8225E408 | size: 0x78
-//
-// Returns the player ID based on flags stored at offset +2.
-// Extracts a 5-bit value and maps it to player indices.
-//
-// Parameters:
-//   client - Pointer to SinglesNetworkClient instance
-//   errorFlag - If true, logs an error for invalid player IDs
-//
-// Returns:
-//   Player ID: 0 for player 1, 1 for player 2, -1 for invalid
-// ─────────────────────────────────────────────────────────────────────────────
-int SinglesNetworkClient_GetPlayerID(void* client, bool errorFlag)
-{
-    uint8_t* clientData = (uint8_t*)client;
-    
-    // Read flags from offset +2 and extract lower 5 bits
-    uint8_t flags = clientData[2];
-    uint8_t playerType = flags & 0x1F;
-    
-    // Map player type to player ID
-    if (playerType == 1) {
-        return 0;  // Player 1
-    }
-    
-    if (playerType == 2) {
-        return 1;  // Player 2
-    }
-    
-    // Invalid player type
-    if (errorFlag) {
-        // Log error message
-        extern void rage_DebugLog(void*, void*);
-        const char* errorMsg = "Invalid player type";
-        rage_DebugLog((void*)errorMsg, nullptr);
-    }
-    
-    return -1;  // Invalid player ID
-}
-
-
-// ─────────────────────────────────────────────────────────────────────────────
 // SinglesNetworkClient::ReadSignedValue @ 0x82260E18 | size: 0x94
 //
 // Reads a signed value from the message buffer and optionally negates it.

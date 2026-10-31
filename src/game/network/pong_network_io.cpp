@@ -14,6 +14,8 @@
 #include "../include/game/pong_network_io.hpp"
 #include <stdint.h>
 
+extern void nop_8240E6D0(const char*, ...); // @ 0x8240E6D0
+
 // Forward declaration for vector write helper
 void WriteVector3ToNetwork(void* client, void* vec3Data);
 
@@ -430,52 +432,16 @@ void ReadBallHitDataFromNetwork(void* ballHitData, void* client)
 }
 
 
-// ══════════════════════════════════════════════════════════════════════════════
-// C LINKAGE ALIASES FOR BACKWARD COMPATIBILITY
-// ══════════════════════════════════════════════════════════════════════════════
-
-/**
- * These extern "C" aliases maintain backward compatibility with existing code
- * that references the original hex-based function names. All new code should
- * use the clean names defined in pong_network_io.hpp.
- */
-
-extern "C" {
-    // Original name: snBitStream_WriteBits
-    uint32_t snBitStream_WriteBits(void* client, uint32_t value, int bitWidth) {
-        return ReadBitsFromStream(client, value, bitWidth);
+// @ 0x8225E408 | size: 0x78
+uint32_t GetPlayerID(void* client, uint32_t reportInvalid) {
+    const uint8_t player = static_cast<const uint8_t*>(client)[2] & 0x1F;
+    if (player == 1) return 0;
+    if (player == 2) return 1;
+    if (static_cast<uint8_t>(reportInvalid)) {
+        nop_8240E6D0("GetPlayerID - msg tgt not player 0 ^ 1!");
     }
-    
-    // Original name: snBitStream_ValidateWrite
-    void snBitStream_ValidateWrite(void* client) {
-        BeginNetworkWrite(client);
-    }
-    
-    // Original name: snBitStream_ReadBits
-    void snBitStream_ReadBits(void* client) {
-        EndNetworkWrite(client);
-    }
-    
-    // SinglesNetworkClient_6838_g — lifted in src/game/network.cpp
-    // SinglesNetworkClient_68A8_g — lifted in src/game/network.cpp
-
-    // Original name: SinglesNetworkClient_51C8_g
-    void SinglesNetworkClient_51C8_g(void* client) {
-        ProcessNetworkPacket(client);
-    }
-    
-    // Original name: rage_atStringCopy
-    void rage_atStringCopy(const char* src, char* dest, int maxSize) {
-        CopyNetworkString(src, dest, maxSize);
-    }
-    
-    // SinglesNetworkClient_A818_g — lifted in src/game/network.cpp
-    // Original name: SinglesNetworkClient_GetPlayerID_E408
-    void SinglesNetworkClient_GetPlayerID_E408(void* client, uint32_t param) {
-        GetPlayerID(client, param);
-    }
+    return UINT32_MAX;
 }
-
 
 // ══════════════════════════════════════════════════════════════════════════════
 // msgMsgSink free functions, net_*, rl/snSession helpers — lifted from tt.xex

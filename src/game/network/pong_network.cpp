@@ -1406,48 +1406,7 @@ void SinglesNetworkClient::ProcessNetworkTimingUpdate(uint32_t timestamp)
  * @return Length of string + 1, or 0 if no space available
  */
 uint32_t SinglesNetworkClient::ReadStringFromStream(const char* stringBuffer) {
-    // Calculate available buffer space
-    // Fields +20 and +32 appear to be buffer pointers/positions
-    uint32_t bufferEnd = *(uint32_t*)((char*)this + 20);
-    uint32_t bufferCurrent = *(uint32_t*)((char*)this + 32);
-    int32_t availableSlots = (bufferEnd - bufferCurrent) >> 3;  // Divide by 8
-    
-    // If no space available, return 0
-    if (availableSlots <= 0) {
-        return 0;
-    }
-    
-    // Clamp to maximum 16 bytes
-    if (availableSlots > 16) {
-        availableSlots = 16;
-    }
-    
-    // Scan string for null terminator
-    uint32_t stringLength = 0;
-    if (stringBuffer[0] != '\0') {
-        // Find string length (max availableSlots-1 bytes)
-        while (stringLength < (uint32_t)(availableSlots - 1)) {
-            stringLength++;
-            if (stringBuffer[stringLength] == '\0') {
-                break;
-            }
-        }
-        
-        // If we found a non-empty string, write it to the stream
-        if (stringLength > 0) {
-            // Call netStream_WriteString to write the string
-            // This is likely WriteStringToStream(this, stringBuffer, stringLength)
-            extern uint32_t netStream_WriteString(void* client, const char* str, uint32_t length);
-            netStream_WriteString(this, stringBuffer, stringLength);
-        }
-    }
-    
-    // Clear/reset 8 bits in the stream
-    // snBitStream_WriteBits is ReadBitsFromStream
-    snBitStream_WriteBits(this, 0, 8);
-    
-    // Return string length + 1
-    return stringLength + 1;
+    return datBitBuffer_WriteShortString(this, stringBuffer);
 }
 
 
@@ -3917,7 +3876,6 @@ void ForceMatchTimeSyncMessage_Process(void* thisPtr) {
 // All are vtable slot 1 (labeled scalar_dtor but actually read from stream).
 // ═══════════════════════════════════════════════════════════════════════════
 
-extern void snBitStream_ReadString(void* client, void* dst, int maxBytes);  // util_0AF0 @ 0x82260AF0
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BallHitMessage_Deserialise  [vtable slot 1 @ 0x823B65F8 | size: 0x68]

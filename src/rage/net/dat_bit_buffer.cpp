@@ -1,4 +1,5 @@
 #include "rage/dat_bit_buffer.hpp"
+#include "rage/ptr32.hpp"
 /**
  * dat_bit_buffer.cpp — datBitBuffer, the network messages' bit stream
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -28,16 +29,16 @@ struct datBitBufferAllocatorView {
 };
 
 struct datBitBufferView {
-    int32_t* m_pShared;                       // +0x00  refcounted block: [0] = refcount, the bits follow
-    uint8_t* m_pReadData;                     // +0x04
-    uint8_t* m_pWriteData;                    // +0x08
+    rage::ptr32<int32_t> m_pShared;                       // +0x00  refcounted block: [0] = refcount, the bits follow
+    rage::ptr32<uint8_t> m_pReadData;                     // +0x04
+    rage::ptr32<uint8_t> m_pWriteData;                    // +0x08
     int32_t  m_capacityBits;                  // +0x0C
     int32_t  m_sizeBits;                      // +0x10  bits written so far (what readers may read)
     int32_t  m_maxBits;                       // +0x14
     int32_t  m_bitOffset;                     // +0x18  bit position of the buffer's first bit
     int32_t  m_readCursor;                    // +0x1C
     int32_t  m_writeCursor;                   // +0x20
-    datBitBufferAllocatorView* m_pAllocator;  // +0x24
+    rage::ptr32<datBitBufferAllocatorView> m_pAllocator;  // +0x24
 };
 
 // PowerPC slw/srw: the shift amount is the low 6 bits, and 32..63 gives 0.
@@ -72,7 +73,7 @@ bool ReadUnsigned(datBitBufferView* bb, T* out, int32_t bits) {
 
     const int32_t bit = bb->m_bitOffset + bb->m_readCursor;
     const uint32_t shift = static_cast<uint32_t>(bit) & 7;
-    const uint8_t* src = bb->m_pReadData + (bit >> 3);
+    const uint8_t* src = bb->m_pReadData.get() + (bit >> 3);
 
     *out = static_cast<T>(static_cast<uint8_t>(ppc_slw(*src++, shift)));
     if (bits > 8) {
@@ -155,6 +156,62 @@ void netTimestamp_Deserialise(void* timestamp, void* bb) {
     __builtin_memcpy(ts + 4, &bits, sizeof bits);
 }
 
+// @ 0x822609F0 | size: 0x7C
+// The wire sends the low word first. Even a failed read publishes zeroed words.
+bool datBitBuffer_ReadU64(void* bb, uint64_t* out) {
+    uint32_t low = 0, high = 0;
+    const bool success = datBitBuffer_ReadU32(bb, &low, 32) &&
+                         datBitBuffer_ReadU32(bb, &high, 32);
+    *out = (static_cast<uint64_t>(high) << 32) | low;
+    return success;
+}
+
+// @ 0x82260AF0 | size: 0x11C
+int snBitStream_ReadString(void* bbp, void* destination, int count) {
+    auto* bb = static_cast<datBitBufferView*>(bbp);
+    const int available = static_cast<int32_t>(static_cast<uint32_t>(bb->m_sizeBits) -
+                                              static_cast<uint32_t>(bb->m_readCursor)) >> 3;
+    if (count > available) count = available > 0 ? available : 0;
+    if (count > 0) {
+        const int32_t bit = bb->m_bitOffset + bb->m_readCursor;
+        const unsigned shift = static_cast<uint32_t>(bit) & 7;
+        const uint8_t* source = bb->m_pReadData.get() + (bit >> 3);
+        auto* dst = static_cast<uint8_t*>(destination);
+        if (shift == 0) {
+            std::memmove(dst, source, static_cast<size_t>(count));
+        } else {
+            for (int i = 0; i < count; ++i) {
+                dst[i] = static_cast<uint8_t>(source[i] << shift);
+                dst[i] = static_cast<uint8_t>(dst[i] | (source[i + 1] >> (8 - shift)));
+            }
+        }
+    }
+    bb->m_readCursor += count * 8;
+    return count;
+}
+
+// @ 0x82260A70 | size: 0x7C
+int datBitBuffer_ReadShortString(void* bbp, char* destination) {
+    auto* bb = static_cast<datBitBufferView*>(bbp);
+    int cursor = bb->m_readCursor;
+    const int count = snBitStream_ReadString(bb, destination, 16);
+    int result;
+    if (count > 0) {
+        destination[count - 1] = 0;
+        cursor += 8;
+        result = 1;
+    } else {
+        destination[0] = 0;
+        result = 0;
+    }
+    for (const char* p = destination; *p; ++p) {
+        cursor += 8;
+        ++result;
+    }
+    bb->m_readCursor = cursor;
+    return result;
+}
+
 // @ 0x82260CE8 — datBitBuffer::Grow (SinglesNetworkClient_0CE8_g)
 // Makes room for `bits` bits: false if that is past m_maxBits. A buffer
 // whose block is shared (refcount > 1) is copied even when it is big enough.
@@ -165,7 +222,7 @@ bool datBitBuffer_Grow(void* bbp, int32_t bits) {
         return false;
     }
     int32_t want;
-    if (bb->m_pShared != nullptr && bb->m_pShared[0] > 1) {
+    if (bb->m_pShared != nullptr && bb->m_pShared.get()[0] > 1) {
         want = bits <= bb->m_sizeBits ? bb->m_sizeBits : bits;
     } else {
         if (bits <= bb->m_capacityBits) {
@@ -184,9 +241,9 @@ bool datBitBuffer_Grow(void* bbp, int32_t bits) {
     }
     block[0] = 1;
     if (bb->m_pShared != nullptr) {
-        std::memcpy(block + 1, bb->m_pShared + 1, static_cast<size_t>((bb->m_sizeBits + 7) >> 3));
-        if (--bb->m_pShared[0] == 0) {
-            bb->m_pAllocator->Free(bb->m_pShared);
+        std::memcpy(block + 1, bb->m_pShared.get() + 1, static_cast<size_t>((bb->m_sizeBits + 7) >> 3));
+        if (--bb->m_pShared.get()[0] == 0) {
+            bb->m_pAllocator->Free(bb->m_pShared.get());
         }
     }
 
@@ -211,7 +268,7 @@ bool datBitBuffer_WriteU32(void* bbp, uint32_t value, int32_t bits) {
     if (bb->m_pWriteData != nullptr && bb->m_writeCursor < bb->m_maxBits) {
         const int32_t bit = bb->m_bitOffset + bb->m_writeCursor;
         const uint32_t shift = static_cast<uint32_t>(bit) & 7;
-        uint8_t* dst = bb->m_pWriteData + (bit >> 3);
+        uint8_t* dst = bb->m_pWriteData.get() + (bit >> 3);
 
         // value and its mask, left-aligned in a word, then shifted so the
         // first byte lines up with the bit position
@@ -240,6 +297,58 @@ bool datBitBuffer_WriteU32(void* bbp, uint32_t value, int32_t bits) {
         bb->m_sizeBits = bb->m_writeCursor;
     }
     return true;
+}
+
+// @ 0x82260738 | size: 0x18C
+uint32_t netStream_WriteString(void* bbp, const char* source, uint32_t byteCount) {
+    auto* bb = static_cast<datBitBufferView*>(bbp);
+    int32_t count = static_cast<int32_t>(byteCount);
+    if (count == 0 || !datBitBuffer_Grow(bb, static_cast<int32_t>(
+            static_cast<uint32_t>(bb->m_writeCursor) + byteCount * 8))) return 0;
+    const int32_t bit = bb->m_bitOffset + bb->m_writeCursor;
+    const unsigned shift = static_cast<uint32_t>(bit) & 7;
+    uint8_t* dst = bb->m_pWriteData.get() + (bit >> 3);
+    const int available = static_cast<int32_t>(static_cast<uint32_t>(bb->m_maxBits) -
+                                              static_cast<uint32_t>(bb->m_writeCursor)) >> 3;
+    if (count > available) {
+        if (available <= 0) return 0;
+        count = available;
+    }
+    if (count != 0) {
+        if (shift == 0) {
+            std::memmove(dst, source, static_cast<size_t>(count));
+        } else {
+            const uint8_t firstMask = static_cast<uint8_t>(0xFFu << (8 - shift));
+            const uint8_t secondMask = static_cast<uint8_t>(0xFFu >> shift);
+            for (int i = 0; i < count; ++i) {
+                dst[i] = static_cast<uint8_t>((dst[i] & firstMask) |
+                                             (static_cast<uint8_t>(source[i]) >> shift));
+                dst[i + 1] = static_cast<uint8_t>((dst[i + 1] & secondMask) |
+                                                 (static_cast<uint8_t>(source[i]) << (8 - shift)));
+            }
+        }
+        bb->m_writeCursor += count * 8;
+        if (bb->m_writeCursor > bb->m_sizeBits) bb->m_sizeBits = bb->m_writeCursor;
+    }
+    return static_cast<uint32_t>(count);
+}
+
+// @ 0x82260688 | size: 0xB0
+uint32_t datBitBuffer_WriteShortString(void* bbp, const char* source) {
+    auto* bb = static_cast<datBitBufferView*>(bbp);
+    int available = static_cast<int32_t>(static_cast<uint32_t>(bb->m_maxBits) -
+                                        static_cast<uint32_t>(bb->m_writeCursor)) >> 3;
+    if (available <= 0) return 0;
+    if (available >= 16) available = 16;
+    uint32_t count = 0;
+    if (source[0]) {
+        while (count < static_cast<uint32_t>(available - 1)) {
+            if (source[++count] == 0) break;
+        }
+        if (count) netStream_WriteString(bb, source, count);
+    }
+    datBitBuffer_WriteU32(bb, 0, 8);
+    return count + 1;
 }
 
 // @ 0x822605F0 — datBitBuffer::WriteSigned<s32> (atSingleton_05F0_g)
