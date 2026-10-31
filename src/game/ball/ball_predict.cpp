@@ -9,14 +9,6 @@ extern void        rage_debugLog(const char* fmt, ...);                        /
 extern const char* pongPlayer_1510_g(void* obj, int arg);                      // @ 0x82391510
 extern "C" void    sysCallback_Invoke(bpFunctor* fn, void* arg);               // @ 0x8225FFF8
 
-// What the replay keeps of the ball per frame (0x30 bytes; +0x08 is never written).
-struct bpReplayBall {
-    float    time;
-    float    time2;
-    uint32_t _pad08[2];
-    bpVec4   pos;
-    bpVec4   angVel;
-};
 extern void gdReplayMgr_RecordBallSample(void* replay, bpReplayBall* s);        // @ 0x821CD0F8
 
 extern "C" const uint32_t g_vectorComparisonMask[4];   // @ 0x82619BE0
