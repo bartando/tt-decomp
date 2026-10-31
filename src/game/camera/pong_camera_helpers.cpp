@@ -25,6 +25,7 @@ extern float g_cameraThreshold;
 
 extern uint8_t pg_ApplyTransition(void* gameState, TransitionParams* params,
                                   int mode, TransitionFlags* flags, int enable);
+bool pongCameraMgr_3500_fw(pongCameraMgr* self, void* evaluator, int mode); // @ 0x821F3500
 
 // A transition is an eight-byte key, mode, and a slice of the condition ring.
 struct CameraTransitionEntry {
@@ -224,6 +225,30 @@ bool pg_3B28_fw(TransitionParams* key, void* evaluator) {
 }
 
 extern "C" uint32_t g_cameraLerpState; // @ 0x826064C4
+extern "C" float g_cameraShotChangeGate; // @ 0x825C5EBC
+extern "C" const float g_cameraTransitionOffset; // @ 0x8202D168
+
+// The original's two unused argument positions precede the requested count.
+// Compare the snapshotted count after querying both ends of the shot interval.
+// @ 0x821F7CD8 | size: 0x120
+bool pg_7CD8_2h(pongCameraMgr* source, void* evaluator, int, int, int count) {
+    const uint32_t snapshot = g_cameraLerpState;
+    const float gate = g_cameraShotChangeGate;
+    // Unordered gate comparisons reject; unordered distances use the far case.
+    if (!(gate > 0.0f)) return gate <= 0.0f && snapshot == static_cast<uint32_t>(count);
+    TransitionParams key;
+    __builtin_memcpy(&key, source, sizeof key);
+    float duration;
+    __builtin_memcpy(&duration, &key.vtableOrState, sizeof duration);
+    key.value += duration;
+    if (!pg_6F68(evaluator, source, 5, nullptr, -1)) return false;
+    const float current = *reinterpret_cast<const float*>(source);
+    if (!pongCameraMgr_3500_fw(reinterpret_cast<pongCameraMgr*>(&key), evaluator, 5)) return false;
+    const float difference = current - key.value;
+    const float distance = __builtin_fabsf(difference);
+    const uint32_t requested = static_cast<uint32_t>(count);
+    return snapshot == (!(distance < g_cameraTransitionOffset) ? requested - 2u : requested - 1u);
+}
 
 // Both the forward event and interval query must stay within the original
 // clamp bound. Commit the local result only after both calls succeed.
@@ -433,22 +458,6 @@ bool pongCameraMgr_QueryB(void* stateCopy, int index) {
 bool pongCameraMgr_QueryC(void* stateCopy, int index) {
     return pongCameraMgr_3650_fw(static_cast<pongCameraMgr*>(stateCopy),
                                  nullptr, index);
-}
-
-/**
- * pongCameraMgr_SetCameraByIndex @ 0x821F7CD8 (tail-call target for the
- * SelectCameraN thunks).
- *
- * Writes the index into the manager's m_resetCounter field (+0x38) and
- * clears the camera-object pointers (+0x28 / +0x2C). This matches the
- * observed behaviour: SelectCameraN is always followed by a state reset.
- */
-void pongCameraMgr_SetCameraByIndex(void* mgr, int index) {
-    if (!mgr) return;
-    uint8_t* self = static_cast<uint8_t*>(mgr);
-    *reinterpret_cast<uint32_t*>(self + 0x28) = 0;
-    *reinterpret_cast<uint32_t*>(self + 0x2C) = 0;
-    *reinterpret_cast<uint32_t*>(self + 0x38) = static_cast<uint32_t>(index);
 }
 
 }  // extern "C"
