@@ -136,6 +136,7 @@ set(SOURCES
     src/game/ball/ball_flight.cpp
     src/game/ball/ball_shot.cpp
     src/game/ball/ball_shot_solve.cpp
+    src/game/ball/ball_shot_trajectory.cpp
     src/game/ball/ball_process_hit.cpp
     src/game/ball/ball_playback.cpp
     src/game/ball/ball_prediction_stream.cpp

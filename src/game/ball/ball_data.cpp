@@ -71,6 +71,9 @@ TT_DATA_ALIAS("g_ballInstancePtr", "g_pPhysicsSim");
 extern "C" void* lbl_826063C8 = nullptr;
 TT_DATA_ALIAS("g_phShadowState", "lbl_826063C8");
 
+// @ 0x826064B8 (.data) — trajectory solver's table-height adjustment
+extern "C" float g_ballTableSurfaceOffset = 0.0f;
+
 // @ 0x82606564 (.data) — active scene used by prediction collision queries
 extern "C" void* lbl_82606564 = nullptr;
 
