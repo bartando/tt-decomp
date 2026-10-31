@@ -26,8 +26,6 @@ extern void rage_free(void* ptr);
 extern void rage_DebugLog(const char* msg, ...);
 extern void rage_DebugLogNop(const char* msg, ...);  // @ 0x8240E6D0 — debug logger (no-op in retail)
 extern "C" int _stricmp(const char* s1, const char* s2);
-extern void* pongGame_GetCreatureInfo(void* player, int index);  // @ 0x82019C00 — returns creature info ptr
-extern void pongPlayer_GetCreatureMatrices(void* player, int index, void* outMatrix1, void* outMatrix2);
 
 // Forward declarations
 bool IsMatrixIdentity(const float* matrix);  // @ 0x820C3C70 - Matrix identity check
@@ -140,57 +138,32 @@ pongMover::~pongMover() {
  * pongMover::Reset @ 0x820C9F40 | size: 0x13C
  * 
  * Resets mover state to initial position and orientation.
- * Calculates initial matrix from creature data and applies it.
+ * Calculates the rest matrix, optionally teleports the creature, then clears motion.
  */
-void pongMover::Reset(void* creatureData) {
-    float initMatrix[16];
-    
-    // Calculate initial transformation matrix
-    CalcInitMatrix(initMatrix, this, creatureData);
-    
-    // Get creature index and look up in global table
-    uint32_t creatureIndex = m_creatureIndex;
-    uint32_t* globalTable = *(uint32_t**)0x82606430;  // g_creatureTable
-    uint32_t tableEntry = globalTable[(creatureIndex + 33) * 4];
-    uint32_t subEntry = globalTable[(tableEntry + 29) * 4];
-    
-    // Apply matrix to creature if valid
-    if (m_pCreature && subEntry != 0) {
+extern "C" void* g_sceneRenderObj; // @ 0x82606430
+
+void pongMover::Reset(bool alternate) {
+    alignas(16) float initMatrix[16];
+    CalcInitMatrix(initMatrix, this, alternate);
+    const auto* table = static_cast<const uint32_t*>(g_sceneRenderObj);
+    const uint32_t index = table[m_creatureIndex + 0x21];
+    if (!m_pCreature) {
+        rage_DebugLogNop("WTF");
+    } else if (table[index + 0x1D] != 0) {
         static_cast<pongCreature*>(m_pCreature)->RequestTeleport(
             "pongMover::Reset", reinterpret_cast<const pongCreatureMatrix*>(initMatrix),
-            false, true, false);  // @ 0x820C7CE8, immediately
-    } else {
-        rage_DebugLog("pongMover::Reset() - no creature to reset");  /* UNVERIFIED — string not found in binary */
+            false, true, false);
     }
-    
-    // Extract position from matrix column 3 (translation vector)
-    m_posX  = initMatrix[12];   // +0x10
-    m_posY  = initMatrix[13];   // +0x14
-    m_posZ  = 0.0f;             // +0x18
-
-    // Zero remaining motion floats
-    m_unk1C = m_unk20 = m_unk24 = 0.0f;
-    m_unk28 = m_unk2C = m_unk30 = 0.0f;
-    m_unk34 = m_unk38 = m_unk3C = 0.0f;
-
-    // Clear physics bits 1 and 2 from flags (+0x40), preserve all others
-    m_flags = (m_flags & 0xF9);
-
-    // Zero physics state floats (+0x48..+0x54)
+    m_posX = initMatrix[12];
+    m_posY = initMatrix[14];
+    m_posZ = m_unk1C = m_unk20 = m_unk24 = 0.0f;
+    m_unk28 = m_unk2C = m_unk30 = m_unk34 = m_unk38 = m_unk3C = 0.0f;
+    m_flags &= 0xF9;
     m_unk48 = m_unk4C = m_unk50 = m_unk54 = 0.0f;
-
-    // Zero 16-byte AltiVec-aligned movement buffer (+0x60)
     memset(m_unk60, 0, sizeof(m_unk60));
-
-    // Reset movement state (+0x74..+0x86)
-    m_bIsMoving    = 1;
-    m_moveTimer    = 0.0f;    // +0x78
-    m_targetTimer  = 0.0f;    // +0x7C
-    m_bHasTarget   = 0;       // +0x84
-    m_bTargetReached = 0;     // +0x85
-    m_bPathBlocked = 0;       // +0x86
-
-    // Zero path data (+0xD0, 16 bytes)
+    m_bIsMoving = 1;
+    m_moveTimer = m_targetTimer = 0.0f;
+    m_bHasTarget = m_bTargetReached = m_bPathBlocked = 0;
     memset(m_pathData, 0, sizeof(m_pathData));
 }
 
@@ -410,107 +383,68 @@ void pongMover::UpdateVelocity() {
  * Calculates initial transformation matrix for the mover.
  * Uses creature position, orientation, and player data.
  */
-void pongMover::CalcInitMatrix(float* outMatrix, pongMover* mover, void* creatureData) {
-    // Start with identity matrix
+extern "C" void* g_input_obj_ptr; // @ 0x825EAB28
+extern "C" uint8_t g_playerModeTransitionFlag; // @ 0x82606327
+extern "C" uint8_t g_playerModeTransform[64]; // @ 0x82606910
+extern "C" const float lbl_82606750[4]; // @ 0x82606750
+extern "C" float g_phCapsuleShapeK; // @ 0x825C8080
+extern "C" void pongMatchSettings_GetCourtBounds(void*, int, void*, void*); // @ 0x821C9CD0
+extern void* pongMatch_GetCharacterForSlot(void*, uint32_t); // @ 0x821C9C00
+
+namespace {
+template<class T> T& moverAt(void* object, unsigned offset) {
+    return *reinterpret_cast<T*>(static_cast<uint8_t*>(object) + offset);
+}
+float flushMoverVmx(float value) {
+    uint32_t bits;
+    __builtin_memcpy(&bits, &value, sizeof bits);
+    if ((bits & 0x7F800000u) == 0) {
+        bits &= 0x80000000u;
+        __builtin_memcpy(&value, &bits, sizeof value);
+    }
+    return value;
+}
+void mirrorMoverMatrix(float* outMatrix) {
+    for (unsigned row = 0; row < 16; row += 8)
+        for (unsigned lane = 0; lane < 4; ++lane)
+            outMatrix[row + lane] = flushMoverVmx(
+                flushMoverVmx(lbl_82606750[lane]) - flushMoverVmx(outMatrix[row + lane]));
+}
+}
+
+float* pongMover::CalcInitMatrix(float* outMatrix, pongMover* mover, uint32_t alternate) {
     memcpy(outMatrix, g_identityMatrixRef, 64);
-    
-    // Check if we should use remote rest matrix
-    uint8_t flags = mover->m_flags;
-    bool useRemoteMatrix = (flags & 0x10) != 0;
-
-    if (useRemoteMatrix) {
-        // Check if remote matrix is valid (identity check)
-        float* remoteMatrixObj = mover->m_remoteRestMatrix;
-        bool isIdentity = IsMatrixIdentity(remoteMatrixObj);
-
-        // If not identity, copy remote rest matrix
-        if (!isIdentity) {
-            float* remoteMatrix = &mover->m_remoteRestMatrix[12];
-
-            rage_DebugLog(g_str_pongMover_calcInitMatrix,
-                        remoteMatrix[0], remoteMatrix[1], remoteMatrix[2]);
-
-            // Copy 4x4 matrix (64 bytes)
-            memcpy(outMatrix, mover->m_remoteRestMatrix, 64);
-
-            // Get player and creature data
-            void* player = *(void**)0x825F1238;  // g_currentPlayer
-            uint32_t creatureIndex = mover->m_creatureIndex;
-            
-            void* playerCreature = (void*)((char*)player + creatureIndex);
-            void* creatureInfo = pongGame_GetCreatureInfo(player, creatureIndex);
-            void* creatureStats = *(void**)((char*)creatureInfo + 44);
-
-            // Check if mirrored
-            uint8_t playerMirror = *(uint8_t*)((char*)creatureStats + 260);
-            uint8_t creatureMirror = *(uint8_t*)((char*)playerCreature + 64);
-            
-            if (playerMirror != creatureMirror) {
-                // Apply mirror transformation
-                // Negate X-axis components (flip horizontally)
-                float* row0 = &outMatrix[0];
-                float* row2 = &outMatrix[8];
-                
-                float* mirrorVec = (float*)0x82606750;  // g_mirrorVector
-                
-                row0[0] = mirrorVec[0] - row0[0];
-                row0[1] = mirrorVec[1] - row0[1];
-                row0[2] = mirrorVec[2] - row0[2];
-                row0[3] = mirrorVec[3] - row0[3];
-                
-                row2[0] = mirrorVec[0] - row2[0];
-                row2[1] = mirrorVec[1] - row2[1];
-                row2[2] = mirrorVec[2] - row2[2];
-                row2[3] = mirrorVec[3] - row2[3];
-            }
-            
-            return;
-        }
+    if ((mover->m_flags & 0x10) && !IsMatrixIdentity(mover->m_remoteRestMatrix)) {
+        rage_DebugLogNop("pongMover::CalcInitMatrix() - setting rest mtx to remote rest mtx [%f,%f,%f]",
+                         double(mover->m_remoteRestMatrix[12]),
+                         double(mover->m_remoteRestMatrix[13]),
+                         double(mover->m_remoteRestMatrix[14]));
+        memcpy(outMatrix, mover->m_remoteRestMatrix, 64);
+        void* settings = g_input_obj_ptr;
+        const uint32_t slot = mover->m_creatureIndex;
+        void* character = pongMatch_GetCharacterForSlot(settings, slot);
+        const uint8_t mirror = moverAt<uint8_t>(moverAt<void*>(character, 0x2C), 0x104);
+        if (moverAt<uint8_t>(settings, slot + 0x40) != mirror)
+            mirrorMoverMatrix(outMatrix);
+        return outMatrix;
     }
-    
-    // Check if using alternate matrix source
-    bool useAlternate = *(uint8_t*)((char*)creatureData + 64) != 0;
-    
-    if (useAlternate) {
-        // Check global flag
-        bool globalFlag = *(uint8_t*)0x82606327 != 0;
-        
-        if (globalFlag) {
-            // Use global alternate matrix @ 0x82606990
-            memcpy(outMatrix, (void*)0x82606990, 64);
-            return;
-        }
+    if (static_cast<uint8_t>(alternate) && g_playerModeTransitionFlag) {
+        memcpy(outMatrix, g_playerModeTransform, 64);
+        return outMatrix;
     }
-    
-    // Default: calculate from player position
-    void* player = *(void**)0x825F1238;
-    uint32_t creatureIndex = mover->m_creatureIndex;
-
-    float tempMatrix1[16];
-    float tempMatrix2[16];
-
-    pongPlayer_GetCreatureMatrices(player, creatureIndex, tempMatrix1, tempMatrix2);
-
-    void* creatureInfo = pongGame_GetCreatureInfo(player, creatureIndex);
-    void* creatureStats = *(void**)((char*)creatureInfo + 44);
-
-    // Get height offset
-    float heightOffset = *(float*)((char*)creatureStats + 252);
-    outMatrix[13] = heightOffset;  // Y position
-
-    // Check if creature is active
-    uint32_t creaturePtr = mover->m_creatureIndex;
-    void* activeCreature = (void*)((char*)player + creaturePtr);
-    bool isActive = *(uint8_t*)((char*)activeCreature + 64) != 0;
-    
-    if (isActive) {
-        // Use calculated position from temp matrix
-        float calcHeight = tempMatrix2[2];  // Z component
-        outMatrix[14] = calcHeight;
-        
-        // Additional positioning logic based on creature type...
-        // (Simplified - full logic involves more complex calculations)
-    }
+    void* settings = g_input_obj_ptr;
+    alignas(16) float lower[4], upper[4];
+    pongMatchSettings_GetCourtBounds(settings, mover->m_creatureIndex, lower, upper);
+    void* character = pongMatch_GetCharacterForSlot(settings, mover->m_creatureIndex);
+    outMatrix[13] = moverAt<float>(moverAt<void*>(character, 0x2C), 0xFC);
+    const uint8_t side = moverAt<uint8_t>(settings, mover->m_creatureIndex + 0x40);
+    outMatrix[14] = side ? lower[2] : upper[2];
+    if (static_cast<uint8_t>(alternate))
+        outMatrix[12] = side ? -0.25f : g_phCapsuleShapeK;
+    character = pongMatch_GetCharacterForSlot(settings, mover->m_creatureIndex);
+    if (side != moverAt<uint8_t>(moverAt<void*>(character, 0x2C), 0x104))
+        mirrorMoverMatrix(outMatrix);
+    return outMatrix;
 }
 
 
@@ -3794,7 +3728,6 @@ extern "C" void pongCreature_D938_wrh(void* charCtx, void* physicsPtr,
                                       void* animPtr);                              // @ 0x820FD938
 extern "C" void util_C880(void* charCtx);                                          // @ 0x8214C880
 extern "C" void LocomotionStateAnim_BBC8_g(void* animBlock);                       // @ 0x820CBBC8
-extern void pongMover_Reset(void* mover, bool needsFlip);                          // @ 0x820C9F40
 
 void pongCreature::Reset(void* world, void* scene) {
     // --- Step 1: tear down locomotion host, if present.
@@ -3854,7 +3787,7 @@ void pongCreature::Reset(void* world, void* scene) {
     int32_t boundPlayer = *(int32_t*)((char*)renderObj + 296);
     bool    needsFlip   = (thisPlayer == boundPlayer);
 
-    pongMover_Reset(*(void**)((char*)this + 152), needsFlip);
+    static_cast<pongMover*>(*(void**)((char*)this + 152))->Reset(needsFlip);
 
     // --- Step 6: patch per-player input-slot transform entry, clear stale bits.
     extern void* g_input_obj_ptr;  // @ 0x825EAB28

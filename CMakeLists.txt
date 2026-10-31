@@ -138,8 +138,10 @@ set(SOURCES
     src/game/camera/pong_camera.cpp
     src/game/camera/pong_camera_helpers.cpp
     src/game/creature/pong_creature.cpp
+    src/game/creature/mover_input_speed.cpp
     src/game/drill/pong_drill.cpp
     src/game/input/button_edges.cpp
+    src/game/input/analog_axis.cpp
     src/game/input/input_sequence.cpp
     src/game/misc/cm_operators.cpp
     src/game/misc/pong_misc.cpp
@@ -150,6 +152,26 @@ set(SOURCES
     src/game/network/xonline_strings.cpp
     src/game/player/pong_player.cpp
     src/game/player/pong_player_swing.cpp
+    src/game/player/player_swing_phase.cpp
+    src/game/player/player_shot_interpolation.cpp
+    src/game/player/player_move_mode.cpp
+    src/game/player/creature_move_mode.cpp
+    src/game/player/player_action_groups.cpp
+    src/game/player/player_control_queries.cpp
+    src/game/player/player_control_queries_data.cpp
+    src/game/player/player_mode_data.cpp
+    src/game/player/player_mode_animation.cpp
+    src/game/player/player_swing_pose_helpers.cpp
+    src/game/player/player_apply_movement_target.cpp
+    src/game/player/player_pose_easing.cpp
+    src/game/player/player_serve_callbacks.cpp
+    src/game/player/player_serve_hit_point.cpp
+    src/game/player/player_serve_hit_point_data.cpp
+    src/game/player/player_shot_target_setup.cpp
+    src/game/player/player_spin_helpers.cpp
+    src/game/player/camera_node_cast.cpp
+    src/game/player/player_camera_side.cpp
+    src/game/player/player_camera_side_data.cpp
     src/game/player/player_animation_state.cpp
     src/game/player/pong_gameplay_queries.cpp
     src/game/pong_render.cpp
@@ -161,6 +183,11 @@ set(SOURCES
     src/rage/rtti_class_strings.cpp
     
     # Animation
+    src/anim/anim_blender_state.cpp
+    src/anim/root_motion_blend.cpp
+    src/anim/bone_matrix_lookup.cpp
+    src/anim/bone_transform_lookup.cpp
+    src/anim/motion_lookup_data.cpp
     src/anim/pcr_anim_blenders.cpp
     src/anim/locomotion.cpp
 

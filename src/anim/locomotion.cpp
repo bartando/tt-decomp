@@ -524,17 +524,6 @@ int32_t pcrPostPointBlender_GetActiveClipIndex(pcrPostPointBlender* self)
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * crAnimBlenderState_Init  @ 0x8224C810 | size 0x120
- *
- * Resets a crAnimBlenderState sub-structure to defaults.  See
- * src/anim/anim_blender_init.cpp for the full lifted body.
- */
-void crAnimBlenderState_Init(void* state)
-{
-    (void)state;
-}
-
-/**
  * pcrAnimBlender_ApplyClipWeights  @ 0x820CF420 | size 0x178
  *
  * Looks up a clip by hashed name and pushes blend weights to every

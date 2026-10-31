@@ -72,6 +72,26 @@ void mat33RotateX(float* matrix, double angle) {
     }
 }
 
+// Formerly phBoundCapsule_1EA0_g. Rotate both complete X/Z rows in place.
+// The vnmsubfp negates the rounded difference, including its zero sign.
+// @ 0x82111EA0 | size: 0xB0
+void mat33RotateY(float* matrix, double angle) {
+    float cosine, sine;
+    cosSin(&cosine, &sine, angle);
+    cosine = flushRotationVmx(cosine);
+    sine = flushRotationVmx(sine);
+    for (unsigned lane = 0; lane < 4; ++lane) {
+        const float x = flushRotationVmx(matrix[lane]);
+        const float z = flushRotationVmx(matrix[8 + lane]);
+        const float xCosine = flushRotationVmx(x * cosine);
+        const float zCosine = flushRotationVmx(z * cosine);
+        const float xSine = flushRotationVmx(x * sine);
+        const float zSine = flushRotationVmx(z * sine);
+        matrix[8 + lane] = flushRotationVmx(xSine + zCosine);
+        matrix[lane] = -flushRotationVmx(zSine - xCosine);
+    }
+}
+
 // Formerly phBoundCapsule_3DA0_g. Build a row-vector axis-angle rotation;
 // zero angle writes identity without touching the axis or any row's w padding.
 // @ 0x820C3DA0 | size: 0x170

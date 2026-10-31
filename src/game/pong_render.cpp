@@ -20,6 +20,7 @@
 #include "camera/pong_camera.hpp"
 #include <cstring>
 #include "rage/shader_parameters.hpp"
+#include "rage/sys_callback.hpp"
 
 // pongLightState_CopyLights @ 0x8213E110 | size: 0x30C (was game_E110)
 // Copies all eight slots, regardless of count. game_E0A8 (0x8213E0A8)
@@ -415,7 +416,6 @@ void pongShadowMap::applyShaderParameters(int32_t pass) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Layer rendering
 // ─────────────────────────────────────────────────────────────────────────────
-extern void util_FFF8(void* callback, int32_t argument);  // @ 0x8225FFF8
 extern void pongLightState_Reset(pongLightState* state, int32_t mask);  // @ 0x82154628
 extern void cmOperatorCtor_0B50_w(void* overrideState);  // @ 0x820F0B50
 extern "C" void* rage_A980(void* device);  // @ 0x8235A980
@@ -429,7 +429,7 @@ extern void rage_C660(void* device);  // @ 0x8235C660
 void pongDrawBucketLayer::Render(int32_t pass) {
     auto* callbacks = reinterpret_cast<void**>(0x825C58ECu);
     if (void* callback = callbacks[beforeCallback * 2])
-        util_FFF8(callback, 0);
+        sysCallback_Invoke(callback, nullptr);
 
     if (enabled != 0) {
         const uint32_t frame = *reinterpret_cast<const uint32_t*>(0x825C4898u);
@@ -507,7 +507,7 @@ void pongDrawBucketLayer::Render(int32_t pass) {
     }
 
     if (void* callback = callbacks[afterCallback * 2])
-        util_FFF8(callback, 0);
+        sysCallback_Invoke(callback, nullptr);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -843,7 +843,6 @@ struct SwipePattern {
 extern SwipePattern g_swipePatterns[17];  // @ 0x825D09A0
 
 // External function references
-extern "C" void sysCallback_Invoke(void* obj, int param);  // @ 0x8225FFF8
 extern void util_PackColorRGBA(uint32_t* outColor, const float* inVector);  // @ 0x8223F840
 extern void hudFlashBase_DrawFlashOverlay(void* hudObj, void* corner1, void* corner2, 
                                  float alpha, int reverseFlag);  // @ 0x82140420
@@ -1166,7 +1165,6 @@ void pongScrnTransFreezeAndCrossFade::Begin() {
     uint32_t* fieldAt28 = (uint32_t*)((char*)this + 28);
     if (*fieldAt28 != 0) {
         void* fieldAt16 = (void*)((char*)this + 16);
-        extern void sysCallback_Invoke(void* target, int param);
         sysCallback_Invoke(fieldAt16, 0);
     }
 

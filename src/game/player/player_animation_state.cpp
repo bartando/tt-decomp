@@ -21,7 +21,7 @@ extern void game_ADC0(void*, void*); // @ 0x820DADC0
 extern void LocomotionStateAnim_1E68_g(void*, void*); // @ 0x820C1E68
 // r4 is unused, r5 receives the position; r6 is not an argument.
 extern uint32_t LocomotionStateAnim_B800_g(void*, void*, float*); // @ 0x820CB800
-extern float phBoundCapsule_B6A0_g(float); // @ 0x820CB6A0
+extern float ph_ClampAndSin(float); // @ 0x820CB6A0
 extern float util_B6F0(float); // @ 0x820CB6F0
 extern float cmSmoothRemap_B768(float); // @ 0x820CB768
 
@@ -269,7 +269,7 @@ extern "C" void pongPlayer_C678_g(pongPlayer* player) {
                 weight = 1.0f - ratio;
                 switch (g_playerPoseEaseMode) {
                 case 1: weight = util_B6F0(weight); break;
-                case 2: weight = phBoundCapsule_B6A0_g(weight); break;
+                case 2: weight = ph_ClampAndSin(weight); break;
                 case 3: weight = cmSmoothRemap_B768(weight); break;
                 }
                 state->blendWeight = weight;

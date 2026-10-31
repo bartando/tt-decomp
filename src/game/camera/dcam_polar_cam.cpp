@@ -39,9 +39,8 @@
 
 extern "C" {
 
-// phBoundCapsule_DD20_fw @ 0x8227DD20 — angle normalization (wraps to [-PI, PI])
-// Takes f1 = angle, returns f1 = normalized angle
-extern float phBoundCapsule_DD20_fw(float angle);
+// phBoundCapsule_DD20_fw @ 0x8227DD20 — acos with finite inputs clamped to [-1, 1].
+extern float phBoundCapsule_DD20_fw(float value);
 
 // rage_0000 @ 0x82150000 — converts float opacity to ARGB alpha byte
 extern uint32_t rage_0000(float opacity);

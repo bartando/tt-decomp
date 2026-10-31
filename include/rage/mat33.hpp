@@ -15,6 +15,9 @@ void mat33RotationNormalizedAxis(float* out, const float* axis, double angle);
 // Row 0 and any translation row remain untouched; VMX flushes denormals.
 void mat33RotateX(float* matrix, double angle);
 
+// Rotate rows 0 and 2 about local Y, including w; retain row 1 and translation.
+void mat33RotateY(float* matrix, double angle);
+
 // XYZ Euler angles in radians; input may overlap output. Preserve row padding.
 void mat33FromEuler(float* out, const float* angles); // @ 0x82118278
 

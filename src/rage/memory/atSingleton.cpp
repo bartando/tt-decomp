@@ -16,7 +16,7 @@
  *   InitializeNetSystem  — network singleton init (stub)
  *   NotifyObservers      — broadcast singleton events
  *   ClearPendingFlag     — clear bit 0 of state flags
- *   CallVirtualDestructor — vtable slot 0 dispatch
+ *   sysCallback_Destroy — direct callback cleanup (anim_blender_state.cpp)
  *   GetFactory           — factory registry lookup (stub)
  *   atSingleton_ScrambleData — data transform using magic-constant division
  */
@@ -275,25 +275,6 @@ void ClearPendingFlag(atSingleton* singleton)
         return;
 
     singleton->m_flags &= ~0x1;
-}
-
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  CallVirtualDestructor
-//
-//  @ 0x821E7BC0 | size: 0x0C
-//
-//  Dispatches vtable slot 0 (virtual destructor) on the given object.
-// ═══════════════════════════════════════════════════════════════════════════════
-void CallVirtualDestructor(void* obj)
-{
-    if (!obj)
-        return;
-
-    void** vtable = *reinterpret_cast<void***>(obj);
-    typedef void (*VirtualFn)(void*);
-    VirtualFn fn = reinterpret_cast<VirtualFn>(vtable[0]);
-    fn(obj);
 }
 
 

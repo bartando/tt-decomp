@@ -814,23 +814,13 @@ float ph_Atan2fSafe(float f1, float f2) {
 // If the value is outside the valid range [minThreshold, maxThreshold],
 // it's clamped. Otherwise, it's scaled and passed through a trig function.
 // ─────────────────────────────────────────────────────────────────────────────
-float ph_ClampAndSin(float inputValue) {
-    // Load threshold constants from global data
-    const float minThreshold = g_phNegThreshold;  // @ 0x8202D010
-    const float maxThreshold = g_phClampMax;  // @ 0x8202D008
-    const float scaleFactor = *(float*)0x8202CFF0;   // offset +0 from base
-    
-    if (inputValue <= minThreshold) {
-        return minThreshold;
-    }
-    
-    if (inputValue >= maxThreshold) {
-        return maxThreshold;
-    }
-    
-    // Apply scaling and trigonometric transformation
-    float scaledValue = inputValue * scaleFactor;
-    return ph_Sinf(scaledValue);
+extern double crt_sin(double); // @ 0x824301D8
+// @ 0x820CB6A0 | size: 0x50
+float ph_ClampAndSin(float value) {
+    if (!(value > 0.0f)) return 0.0f;
+    if (!(value < 1.0f)) return 1.0f;
+    const float angle = value * 1.5707963705062866f;
+    return static_cast<float>(crt_sin(angle));
 }
 
 extern double crt_cos(double angle); // @ 0x824302B0
@@ -1039,33 +1029,6 @@ void phBoundCapsule_FindFirstValid(void* container, int* outIndex, float* outX, 
 // External float constants
 extern const float g_floatOne;   // @ 0x8202D108 = 1.0f
 extern const float g_floatZero;  // @ 0x8202D110 = 0.0f
-
-// ─────────────────────────────────────────────────────────────────────────────
-// rage::phBoundCapsule::ScaleRadius @ 0x820CB6A0 | size: 0x50
-//
-// Conditionally scales the capsule radius based on the input scale factor.
-// If scale is outside the range (floatZero, floatOne), applies scaling.
-//
-// Parameters:
-//   scale - Scale factor to apply to radius
-// ─────────────────────────────────────────────────────────────────────────────
-void rage::phBoundCapsule::ScaleRadius(float scale) {
-    const float* constants = &g_floatOne;  // constant table base
-    const float one = constants[0];    // +0 = 1.0f
-    const float zero = constants[72];  // +288 = 0.0f (offset in bytes / 4)
-    
-    // Only scale if outside valid range
-    if (scale > zero && scale < one) {
-        return;  // No scaling needed
-    }
-    
-    // Apply scaling: multiply by constant at offset +0
-    float scaleFactor = constants[0];  // 1.0f
-    float scaledValue = scale * scaleFactor;
-    
-    // Call helper function to apply the scaled value
-    ph_Sinf(scaledValue);
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // rage::phBoundCapsule::ComputeExtent @ 0x820D0550 | size: 0x50
@@ -5956,7 +5919,7 @@ extern void  phBoundCapsule_ComputeAngleXZ(void* obj, float y, float z);  // ang
 extern void  phBoundCapsule_UpdateCapsuleState(void* obj);               // capsule update
 extern void  rage_debugLog(const char* name, int param);      // debug log (no-op in release)
 extern int   phBoundCapsule_ResolvePlayerIndex(void* obj);               // resolve player index
-extern int   game_1700(void* obj);                           // get player from object
+extern void* game_1700(void* obj);                           // checked camera-node cast @ 0x82101700
 
 // Global pointers used by capsule operations
 extern uint32_t* g_phBoundCapsule_GlobalState;  // @ various global singletons
@@ -7258,17 +7221,15 @@ void rage::phBoundCapsule::InitializeCapsule(float halfHeight, float radius) {
 //    new[+4] = old[+4]*cos - old[+8]*sin
 // ---------------------------------------------------------------------------
 void phBoundCapsule_RotateAxisXZ(float* vec, float angle) {
-    float sinVal = (float)ph_Sinf(angle);
-    float cosVal = (float)ph_Cosf(angle);
-
-    float oldX = vec[1];  // +4
-    float oldZ = vec[2];  // +8
-
-    float newZ = oldZ * sinVal + oldX * cosVal;
-    vec[2] = newZ;
-
-    float newX = oldX * cosVal - oldZ * sinVal;
-    vec[1] = newX;
+    const float sine = static_cast<float>(crt_sin(angle));
+    const float cosine = static_cast<float>(crt_cos(angle));
+    const float oldY = vec[1];
+    const float oldZ = vec[2];
+    // The fmuls products round before the fused multiply-add/subtract.
+    const float ySine = oldY * sine;
+    const float zSine = oldZ * sine;
+    vec[2] = __builtin_fmaf(oldZ, cosine, ySine);
+    vec[1] = __builtin_fmaf(oldY, cosine, -zSine);
 }
 
 // ---------------------------------------------------------------------------
