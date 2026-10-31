@@ -1,3 +1,4 @@
+#include "../../anim/look_at_controller.hpp"
 #include "rage/mat33.hpp"
 
 
@@ -4079,8 +4080,6 @@ extern void pongPlayer_B208_g(void* swingState, const float* target, uint8_t fla
 
 // pongLookAtController (vtable 0x82027AEC, whose slot 1 is 0x820D28E0) calls.
 extern void game_2950(pongLookAtController* lookAt);                                 // @ 0x820D2950
-extern void game_28F0(pongLookAtController* lookAt, const float* target, int which);  // @ 0x820D28F0
-extern void game_2A40(pongLookAtController* lookAt);                                 // @ 0x820D2A40
 
 static pongCreatureLayout* CreatureLayout(pongCreature* creature) {
     return reinterpret_cast<pongCreatureLayout*>(creature);
