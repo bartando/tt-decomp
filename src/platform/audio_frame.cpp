@@ -47,4 +47,15 @@ int32_t XAudioFrame_Resize(void* frameInterface, const AudioFrame* frame, uint32
     return PcmFrame_Resize(owner, frame, flags);
 }
 
-double XAudio_UInt64ToDouble(unsigned long long value) { return static_cast<double>(value); }
+// The retail conversion truncates discarded significand bits, rather than
+// rounding as an ordinary C++ unsigned-integer conversion would.
+// @ 0x825693C0 | size: 0x28
+double XAudio_UInt64ToDouble(unsigned long long value) {
+    if (value == 0) return 0.0;
+    const unsigned leading = __builtin_clzll(value);
+    const uint64_t fraction = ((value << leading) >> 11) & 0x000fffffffffffffULL;
+    const uint64_t bits = (uint64_t(1086 - leading) << 52) | fraction;
+    double result;
+    std::memcpy(&result, &bits, sizeof(result));
+    return result;
+}
