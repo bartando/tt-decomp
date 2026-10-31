@@ -133,6 +133,7 @@ set(SOURCES
     src/rage/swf_page_group.cpp
     src/rage/swf_vm.cpp
     src/rage/swf_value_helpers.cpp
+    src/rage/swf_text.cpp
     src/rage/swf_clip_events.cpp
     src/rage/core/timer.cpp
     src/rage/core/rage_core_utils.cpp

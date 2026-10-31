@@ -2,14 +2,11 @@
 #include <cstdint>
 #include <cstring>
 #include <cmath>
+#include "rage/swf_value.hpp"
+#include "rage/swf_text.hpp"
 
 // These tags are the interpreter's actual layout; swfValueType's historical
 // public enum does not describe this ABI. Pointers in payloads are guest words.
-struct SwfVmValue {
-    uint32_t payload;
-    uint32_t tag;
-};
-static_assert(sizeof(SwfVmValue) == 8);
 
 extern "C" {
     extern const float g_swfZero; // @ 0x8202D110
@@ -19,8 +16,6 @@ extern "C" {
     float swfValueToFloat(const void* value);  // @ 0x823FA688
     const char* util_A768_1(const void* value, void* buffer, int maxLen);  // @ 0x823FA768
     uint8_t swfValuesEqual(const SwfVmValue* a, const SwfVmValue* b);  // @ 0x823FA928
-    void* swfCopyString(const char* text);  // @ 0x823FABC0
-    const char* swfInternText(const char* text);  // @ 0x823F9FB0
     void swfCopyActionFunction(void* destination, const void* source);  // @ 0x82402FC0
     void swfCallFunction(void* context, const char* name, int count, const SwfVmValue* args,
                          SwfVmValue* result, void* target);  // @ 0x82403090

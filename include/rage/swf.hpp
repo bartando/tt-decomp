@@ -181,7 +181,7 @@ public:
     int VisitMembers() override;  // @ 0x823FBF98 | size: 0x28
     uint32_t GetMember(const char* name, void* result) override;  // @ 0x823FB970 | size: 0x624
     uint32_t SetMember(const char* name, void* value) override;  // @ 0x823FC1A8 | size: 0x5F0
-    void DeleteMember(const char* name) override;  // @ 0x823FABC0 | size: 0xE8
+    void DeleteMember(const char* name) override;  // shared base implementation @ 0x823FC848
     void Invoke(const char* methodName, void* args, int argCount, void* outResult) override;  // @ 0x823FE500 | size: 0x3D0
 };
 

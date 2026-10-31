@@ -1,4 +1,6 @@
 #include "rage/swf_state.hpp"
+#include "rage/swf_text.hpp"
+#include "rage/ptr32.hpp"
 #include "grc/image_state.hpp"
 #include "crt/host_format.h"
 #include "grc/device_state.h"
@@ -1880,8 +1882,6 @@ uint32_t swfINSTANCE::SetMember(const char* name, void* value) {
     extern void* g_swfStringBuffer;        // @ 0x82604850
     extern void* g_swfScriptObjectPool;    // @ 0x82604C60
     extern void* g_vtable_swfSCRIPTOBJECT; // @ 0x82074D14
-    extern void swfReleaseText(void* text, int freeStorage); // @ 0x823F8A38
-    extern void* swfCopyText(const char* text); // @ 0x823FABC0
     extern void* swfFindTexture(void* dictionary, const char* name); // @ 0x82151990
 
     const char* property = util_A768_1(name, &g_swfStringBuffer, SWF_INTERN_BUFFER_SIZE);
@@ -1910,9 +1910,9 @@ uint32_t swfINSTANCE::SetMember(const char* name, void* value) {
     if (strcmp(property, "text") == 0) {
         char buffer[256];
         const char* text = util_A768_1(value, buffer, sizeof(buffer));
-        void*& oldText = *reinterpret_cast<void**>(instance + 0x48);
-        if (oldText) swfReleaseText(oldText, 1);
-        oldText = swfCopyText(text);
+        auto& oldText = *reinterpret_cast<rage::ptr32<void>*>(instance + 0x48);
+        if (oldText) swfReleaseText(oldText.get(), 1);
+        oldText = swfCopyString(text);
         return 1;
     }
     if (strcmp(property, "_alpha") == 0) {
