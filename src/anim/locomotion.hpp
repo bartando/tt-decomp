@@ -28,3 +28,12 @@ float LocomotionStateAnim_2858(void* entry, void* frame, uint32_t unusedR5);
 // Advance and wrap one animation entry's normalized phase.
 // @ 0x820C28B0
 void LocomotionStateAnim_28B0_w(void* entry);
+
+// Apply an evaluated channel to a skeleton; r4 and f1 are unused.
+void LocomotionStateAnim_C128_g(void* entry, void* unusedR4, void* skeleton, float weight); // @ 0x8224C128
+void LocomotionStateAnim_C288_g(void* entry, void* unusedR4, void* skeleton, float weight); // @ 0x8224C288
+void LocomotionStateAnim_C8F8_g(void* skeleton); // @ 0x8214C8F8
+
+// Fetch the ID-zero pair's quaternion and translation into a 32-byte output.
+bool LocomotionStateAnim_C358_g(void* list, uint32_t firstType, uint32_t secondType,
+                                uint32_t unusedR6, float* out); // @ 0x8224C358
