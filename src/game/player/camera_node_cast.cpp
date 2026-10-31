@@ -27,7 +27,7 @@ struct CameraTypeNode {
     virtual void Reserved17();
     virtual void Reserved18();
     virtual void Reserved19();
-    virtual uint32_t IsType(uintptr_t type);
+    virtual uint32_t IsType(uintptr_t type) = 0;
 };
 }
 
