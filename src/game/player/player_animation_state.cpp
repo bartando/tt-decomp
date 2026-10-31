@@ -3,14 +3,11 @@
 #include <cstdint>
 #include <cstring>
 #include <cstddef>
-
-struct pongPlayer;
+#include "pong_player.hpp"
 
 extern "C" bool pongPlayer_D550_g(void*); // @ 0x820CD550
 extern "C" bool pongPlayer_D598_g(void*); // @ 0x820CD598
 extern "C" bool pongPlayer_D5F0_g(void*); // @ 0x820CD5F0
-extern "C" bool pongPlayer_D660_g(void*); // @ 0x820CD660
-extern "C" bool pongPlayer_D6B8_g(void*); // @ 0x820CD6B8
 extern float pongPlayer_D238_g(void*); // @ 0x820DD238
 extern float game_C8E0_h(void*); // @ 0x820DC8E0
 extern void LocomotionStateAnim_CDB8_g(void*, bool, bool); // @ 0x820DCDB8
@@ -36,7 +33,6 @@ extern uint32_t playerPose_FilterDof(void*, uint32_t, uint32_t, void*, float*); 
 extern "C" void** g_pInputArrayTable; // @ 0x825EAB28
 extern "C" const float g_identityMatrixRef[16]; // @ 0x825CB800
 extern "C" uint8_t g_playerSlotPoseData[160]; // @ 0x82619990
-extern "C" uint8_t g_swingInFlightFlag; // @ 0x8260633C
 extern "C" uint8_t g_playerPoseChannelBlend; // @ 0x82606334
 extern "C" int32_t g_playerPoseEaseMode; // @ 0x82606330
 
@@ -138,7 +134,7 @@ extern "C" void pongPlayer_C678_g(pongPlayer* player) {
     bool secondaryOverlay = false;
     state->blendWeight = 0.0f;
 
-    if (pongPlayer_D660_g(state)) {
+    if (player->IsCreatureStateReady()) {
         if (state->locomotion) state->locomotion[340] = 0;
         exportPose(state->special, state->pose);
     } else if (pongPlayer_D598_g(state)) {
@@ -217,9 +213,9 @@ extern "C" void pongPlayer_C678_g(pongPlayer* player) {
             end = markerTime(record, 308);
             limit = at<float>(swing, 48);
         }
-        secondaryOverlay = pongPlayer_D6B8_g(state) && progress > end;
+        secondaryOverlay = player->IsCreatureState2Active() && progress > end;
         if (at<float>(swing, 28) >= at<float>(swing, 48)) state->activeSlot = nullptr;
-    } else if (pongPlayer_D6B8_g(state)) {
+    } else if (player->IsCreatureState2Active()) {
         if (state->locomotion) state->locomotion[340] = 0;
         exportPose(state->secondary, state->pose);
         if (!pongPlayer_D550_g(state)) {
@@ -282,7 +278,7 @@ extern "C" void pongPlayer_C678_g(pongPlayer* player) {
             nullptr, filter, filterData, weight, nullptr, playerPose_BlendDof);
     }
 overlays:
-    if (secondaryOverlay && pongPlayer_D6B8_g(state)) {
+    if (secondaryOverlay && player->IsCreatureState2Active()) {
         exportPose(state->secondary, state->secondaryPose);
         LocomotionStateAnim_B800_g_B800_1(state->pose, state->secondaryPose,
             nullptr, nullptr, nullptr, clampPoseWeight(state->blendWeight), nullptr, playerPose_BlendDof);

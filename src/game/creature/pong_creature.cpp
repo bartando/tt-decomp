@@ -8,6 +8,7 @@
  */
 
 #include "pong_creature.hpp"
+#include "../player/pong_player.hpp"
 #include "../../anim/locomotion.hpp"
 #include "globals.h"
 #include "game/pong_strings.hpp"
@@ -3928,7 +3929,6 @@ extern "C" void pongPlayer_D228_g(pongPlayerStateView* state);  // @ 0x820CD228
 extern "C" bool pongPlayer_D550_g(pongPlayerStateView* state);  // @ 0x820CD550
 extern "C" bool pongPlayer_D598_g(pongPlayerStateView* state);  // @ 0x820CD598
 extern "C" bool pongPlayer_D5F0_g(pongPlayerStateView* state);  // @ 0x820CD5F0
-extern "C" bool pongPlayer_D660_g(pongPlayerStateView* state);  // @ 0x820CD660
 // @ 0x820CD7B0 — writes the swing's target position to outTarget and returns it
 extern float* pongPlayer_D7B0_g(float* outTarget, pongPlayerStateView* state);
 // @ 0x820CB208
@@ -4166,7 +4166,8 @@ void pongCreature::UpdateAnimation() {
     if (state != nullptr) {
         pongPlayer_D228_g(state);
 
-        if (self->swingState != nullptr && self->playerIndex >= 0 && !pongPlayer_D660_g(self->state)) {
+        if (self->swingState != nullptr && self->playerIndex >= 0 &&
+            !reinterpret_cast<const pongPlayerState*>(self->state)->IsCreatureStateReady()) {
             pongPlayerStateView* current = self->state;
             if (pongPlayer_D550_g(current) || pongPlayer_D598_g(current) || pongPlayer_D5F0_g(current)) {
                 const bool flag = pongPlayer_D5F0_g(current);

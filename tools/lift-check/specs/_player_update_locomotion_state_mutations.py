@@ -17,7 +17,7 @@ from liftcheck.runner import Checker, Options
 MUTATIONS = [
     ("empty stub", "    auto* state = reinterpret_cast<PlayerPoseState*>(player);",
      "    return;\n    auto* state = reinterpret_cast<PlayerPoseState*>(player);"),
-    ("wrong highest priority", "if (pongPlayer_D660_g(state))", "if (pongPlayer_D6B8_g(state))"),
+    ("wrong highest priority", "if (player->IsCreatureStateReady())", "if (player->IsCreatureState2Active())"),
     ("retain stale blend weight", "    state->blendWeight = 0.0f;", "    state->blendWeight = 0.5f;"),
     ("special exports secondary", "exportPose(state->special, state->pose);", "exportPose(state->secondary, state->pose);"),
     ("wrong export vtable slot", "animation, 8)(animation, frame)", "animation, 4)(animation, frame)"),
@@ -40,7 +40,7 @@ MUTATIONS = [
     ("wrong timed transform stride", "state->slotIndex * 80", "state->slotIndex * 64"),
     ("drop timed activation flags", "transform, record[314]", "transform, 0"),
     ("keep finished active slot", "if (at<float>(swing, 28) >= at<float>(swing, 48))", "if (false)"),
-    ("omit secondary overlay", "if (secondaryOverlay && pongPlayer_D6B8_g(state))", "if (false)"),
+    ("omit secondary overlay", "if (secondaryOverlay && player->IsCreatureState2Active())", "if (false)"),
     ("omit secondary blend", "blend = progress < start;", "blend = false;"),
     ("NaN previous triggers recovery transition", "at<float>(recovery, 168) < time",
      "!(at<float>(recovery, 168) >= time)"),

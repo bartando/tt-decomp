@@ -243,23 +243,24 @@ bool pongPlayer::IsCreatureStateReady() const {
     if (!m_bActive) {
         return false;
     }
-    return m_pCreatureState->IsReady();   // vtable slot 7
+    return m_pCreatureState->IsReady() != 0;
 }
 
 /**
  * pongPlayerState::IsCreatureState2Active()  @ 0x820CD6B8 | size: 0x80
  *
  * Checks the secondary creature-state object (m_pCreatureState2) via two
- * virtual queries: IsActive (slot 6) then IsReady (slot 7).  Both must pass.
+ * virtual queries: IsActive (slot 6) must be false, then IsReady (slot 7)
+ * must be true. The second query reloads the state pointer after the first.
  */
 bool pongPlayer::IsCreatureState2Active() const {
     if (!m_pCreatureState2) {
         return false;
     }
-    if (!m_pCreatureState2->IsActive()) {  // vtable slot 6
+    if (m_pCreatureState2->IsActive() != 0) {
         return false;
     }
-    return m_pCreatureState2->IsReady();   // vtable slot 7
+    return m_pCreatureState2->IsReady() != 0;
 }
 
 
@@ -1750,49 +1751,6 @@ float pongPlayer::GetSwingPhaseValue() const {
         return 0.0f;
     }
     return m_pTimingState->m_currentTime;
-}
-
-/**
- * pongPlayer::IsSwingInputBlocked()  @ 0x820CD660 | size: 0x54
- *
- * Returns true when swing input should be blocked due to creature state.
- * Checks if the creature state is NOT ready (inverse of IsCreatureStateReady).
- *
- * Note: This is a wrapper that inverts the logic for clarity at call sites.
- */
-bool pongPlayer::IsSwingInputBlocked() const {
-    if (!m_bActive) {
-        return true;  // Blocked if not active
-    }
-    
-    // Blocked if creature state is NOT ready
-    return !m_pCreatureState->IsReady();
-}
-
-/**
- * pongPlayer::GetAnimationBlendWeight()  @ 0x820CD6B8 | size: 0x80
- *
- * Returns the animation blend weight from the secondary creature state.
- * Used for blending between animation states during transitions.
- *
- * Returns 0.0f if the creature state doesn't exist or isn't active.
- */
-float pongPlayer::GetAnimationBlendWeight() const {
-    if (!m_pCreatureState2) {
-        return 0.0f;
-    }
-    
-    if (!m_pCreatureState2->IsActive()) {
-        return 0.0f;
-    }
-    
-    if (!m_pCreatureState2->IsReady()) {
-        return 0.0f;
-    }
-    
-    // Return blend weight from creature state (+offset TBD)
-    // For now, return a placeholder
-    return 1.0f;
 }
 
 /**

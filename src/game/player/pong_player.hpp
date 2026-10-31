@@ -226,11 +226,16 @@ struct pongAnimState {
 
 // ── Sub-struct: pongCreatureState ────────────────────────────────────────
 struct pongCreatureState {
-    void**      vtable;              // +0x00
+    virtual void Reserved0() = 0;
+    virtual void Reserved1() = 0;
+    virtual void Reserved2() = 0;
+    virtual void Reserved3() = 0;
+    virtual void Reserved4() = 0;
+    virtual void Reserved5() = 0;
+    virtual uint8_t IsActive() const = 0; // slot 6; nonzero suppresses the secondary gate
+    virtual uint8_t IsReady() const = 0;  // slot 7
     uint8_t     _pad04[420];         // +0x04..+0x1A7
     uint8_t     m_postPointFlag;     // +0x1A8 (424)  post-point face animation trigger
-    bool IsActive() const { return ((bool(*)(const pongCreatureState*))vtable[6])(this); }
-    bool IsReady()  const { return ((bool(*)(const pongCreatureState*))vtable[7])(this); }
 };
 
 
@@ -356,8 +361,6 @@ struct pongPlayer {
     bool IsRecoveryTimerBelowThreshold() const;
     void* GetStateObjectByIndex(uint32_t index) const;
     float GetSwingPhaseValue() const;
-    bool IsSwingInputBlocked() const;
-    float GetAnimationBlendWeight() const;
     float GetCurrentSwingStrength() const;
     bool IsMatchSlotValid() const;
     void UpdateSwingTrajectory();
@@ -438,7 +441,7 @@ extern const float g_kZero;                  // @ 0x8202D110
 extern const float g_kSwingScaleFactor;      // @ 0x8204A3B8
 extern const vec3  g_hitVectorFlip;
 extern void*       g_geomSingleton;
-extern uint8_t     g_swingInFlightFlag;      // @ 0x8260633C
+extern "C" uint8_t g_swingInFlightFlag;      // @ 0x8260633C
 extern uint32_t    g_swingCountFlag;         // @ lis(-32160)+25408
 
 // ── Batch: NetSyncFloat record helpers (0x82199Cxx family) ─────────────
