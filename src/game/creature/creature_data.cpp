@@ -38,3 +38,9 @@ extern "C" alignas(16) float lbl_82606750[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 TT_DATA_ALIAS("g_kVecConst_606750", "lbl_82606750");
 TT_DATA_ALIAS("g_playerMirrorPlane", "lbl_82606750");
 TT_DATA_ALIAS("g_zeroVec4", "lbl_82606750");
+
+// @ 0x825C9D60 (.data) — duration before clearing the movement latch
+extern "C" float g_moverStartDelay = 1.75f;
+
+// @ 0x820290F0 (.rdata) — zero-input delay before restoring the latch
+extern "C" const float g_moverStopDelay = 0.05000000074505806f;
