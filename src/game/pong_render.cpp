@@ -63,7 +63,14 @@ extern const float lbl_8202D108;               // @ 0x8202D108  1.0f
 extern "C" uint32_t g_grmShaderFx_variantTable[23];  // @ 0x825EBBD8  pending render state
 extern "C" uint32_t g_grmShaderFx_boundContext;      // @ 0x825EBC54  shader-global write counter
 
-extern void game_E0A8(pongLightState* dst, const pongLightState* src);  // @ 0x8213E0A8
+// @ 0x8213E0A8 | size: 0x64
+pongLightState* game_E0A8(pongLightState* dst, const pongLightState* src) {
+    pongLightState_CopyLights(dst, src);
+    dst->ambient = src->ambient;
+    dst->count = src->count;
+    dst->field_212 = src->field_212;
+    return dst;
+}
 extern uint32_t game_A2F8(const char* name, int create);              // @ 0x8215A2F8
 extern void game_A670(uint32_t handle, const ShaderVector* values, int count);  // @ 0x8215A670
 
