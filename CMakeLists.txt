@@ -157,6 +157,7 @@ set(SOURCES
     src/game/ball/ball_shot_trajectory.cpp
     src/game/ball/ball_shot_simulation.cpp
     src/game/ball/ball_process_hit.cpp
+    src/game/ball/ball_prediction_copy_locked.cpp
     src/game/ball/ball_playback.cpp
     src/game/ball/ball_visual_spin.cpp
     src/game/ball/ball_prediction_stream.cpp
@@ -181,6 +182,7 @@ set(SOURCES
     src/game/input/analog_axis.cpp
     src/game/input/input_sequence.cpp
     src/game/misc/cm_operators.cpp
+    src/game/misc/movie_worker_helpers.cpp
     src/game/misc/pong_misc.cpp
     src/game/network/pong_network.cpp
     src/game/network/pong_network_classes.cpp
@@ -238,6 +240,7 @@ set(SOURCES
     src/anim/animation_timing.cpp
 
     # Physics
+    src/physics/ph_float_property.cpp
     src/physics/ph_physics.cpp
     src/physics/bound_lookup.cpp
     src/physics/articulated_constraints.cpp
@@ -299,6 +302,7 @@ set(SOURCES
     src/rage/data/dat_resource_fixup.cpp
     src/rage/network/sn_event.cpp
     src/xam/kernel_import_thunks.c
+    src/rage/math/float_approach.cpp
     src/rage/math/ph_math.cpp
     src/rage/math/polygon_clip.cpp
     src/rage/math/swf_matrix.cpp

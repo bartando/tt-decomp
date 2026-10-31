@@ -1013,17 +1013,41 @@ bool bkGroup_DispatchInputWithUiFlag(void* pPageGroup, float* pInputValue);  // 
 // Contains 8 KEVENT objects at offsets +84 through +196 (stride 16).
 class CCalMoviePlayer {
 public:
-    // ── virtual methods (vtable slots) ──
+    // Preserve the original virtual slot order, including unlifted methods.
+    virtual void UnliftedSlot0();
+    virtual void UnliftedSlot1();
+    virtual void UnliftedSlot2();
     virtual void Lock();                              // [3]  acquire internal lock
+    virtual void UnliftedSlot4();
     virtual void Unlock();                            // [5]  release internal lock
+    virtual void UnliftedSlot6();
+    virtual void UnliftedSlot7();
     virtual int32_t GetError();                       // [8]  return error code
     virtual void ProcessCommand(void* params);        // [9]  dispatch command block
+    virtual void UnliftedSlot10();
+    virtual void UnliftedSlot11();
+    virtual void UnliftedSlot12();
     virtual int32_t CleanupInternal();                // [13] internal cleanup
+    virtual void UnliftedSlot14();
+    virtual void UnliftedSlot15();
     virtual int32_t SetBufferPairA(int32_t param);    // [16] set buffer pair A
     virtual int32_t SetBufferPairB(int32_t param);    // [17] set buffer pair B
+    virtual void UnliftedSlot18();
+    virtual void UnliftedSlot19();
+    virtual void UnliftedSlot20();
+    virtual void UnliftedSlot21();
+    virtual void UnliftedSlot22();
+    virtual void UnliftedSlot23();
     virtual void WaitForAllThreads();                 // [24] join worker threads
+    virtual void UnliftedSlot25();
+    virtual void UnliftedSlot26();
+    virtual void UnliftedSlot27();
+    virtual void UnliftedSlot28();
+    virtual void UnliftedSlot29();
+    virtual void UnliftedSlot30();
     virtual void RenderFrame(int32_t param);          // [31] render a frame
     virtual void MediaControl_Run();                  // [32] IMediaControl::Run
+    virtual void UnliftedSlot33();
     virtual void MediaControl_Pause();                // [34] IMediaControl::Pause
     virtual void MediaControl_Stop();                 // [35] IMediaControl::Stop
     virtual void MediaControl_GetState();             // [36] IMediaControl::GetState
@@ -1104,8 +1128,7 @@ public:
     int GetField220();  int GetField224();  int GetField228();
 
     // Vtable dispatch thunks (delegate to virtual methods)
-    int DispatchSlot32();  int DispatchSlot34();
-    int DispatchSlot35();  int DispatchSlot36();  int DispatchSlot37();
+    int DispatchSlot32();
 
     // Ring buffer / frame management
     int GetRemainingFrames();
@@ -1125,11 +1148,8 @@ public:
 
     // Batch 2 — intermediate-level functions (72-176B)
     void DtorIntermediate();                           // @ 0x824915C8
-    void SaveAndReplaceFiberContext();                 // @ 0x8235EB30
     int  QueryPhysicsInstance(void* outResult);        // @ 0x82483AD8
     void DeletingDestructor(int flags);                // @ 0x82487240
-    void AdvanceReadIndexAtomic();                     // @ 0x8248DCC8
-    void AdvanceWriteIndexAtomic();                    // @ 0x8248DD30
     void DispatchVSlot9ZeroArgs();                     // @ 0x8248E1E0
     void DispatchVSlot9OneArg(uint32_t arg0);          // @ 0x8248E228
     void DispatchVSlot9TwoArgs(uint32_t a0, uint32_t a1); // @ 0x8248E278
