@@ -6,9 +6,9 @@ Includes non-float-representable angles, signed zero and quadrant boundaries.
 import math
 from liftcheck.spec import *
 
-FUNCTION = "ph_BuildRotationMatrixX"
+FUNCTION = "rage::mat33RotationX"
 ADDRESS = 0x820C3F10
-SOURCE = "src/physics/ph_physics.cpp"
+SOURCE = "src/rage/math/mat33.cpp"
 TRIALS = 1200
 CALLS = {0x824302B0: run(args=("f1",)), 0x824301D8: run(args=("f1",))}
 

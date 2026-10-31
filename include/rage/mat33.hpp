@@ -2,6 +2,12 @@
 
 namespace rage {
 
+// Padded row-vector principal rotations. r3 = output, f1 = double angle;
+// write xyz only, preserving row padding and any translation row.
+void mat33RotationX(float* out, double angle); // @ 0x820C3F10
+void mat33RotationY(float* out, double angle); // @ 0x820C3F98
+void mat33RotationZ(float* out, double angle); // @ 0x820C4020
+
 // Write the xyz entries of three 16-byte rows, preserving padding. Axis is an
 // aligned vec4 and need not be normalized; it may be null when angle is zero.
 // Output and axis must be disjoint. The original accepts a double angle in f1.
