@@ -5446,7 +5446,6 @@ extern void pongNetMessageHolder_0838_w(void* dst, void* src);                //
 extern void PongNetRoundRobinCoordinator_FC20_w(void* obj);                    // @ 0x8220FC20
 extern void* ke_8F70(void* obj);                                               // @ 0x822C8F70 — ctor returning this
 extern void pongCreatureInst_9030_g(void* creatureInst, void* srcPayload);    // @ 0x822C9030
-extern void* atSingleton_7CE0_w(void* singleton, int zero, int slotMinusOne); // @ 0x82447CE0 — returns slot key
 
 // The max-float init value is at 0x82079AD4 (.rdata, 4 bytes).  Bodies read
 // it by symbol reference via a small accessor so the raw address stays out
@@ -5762,71 +5761,6 @@ void pongNetMessageHolder_D040_w(pongNetMessageHolder* holder, void* extraArg, c
             fn(&lbl_826065E4);
         }
     }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// pongNetMessageHolder_AAC8_w @ 0x8245AAC8 | size: 0x150
-//
-// Scans a packed 16-byte-stride "candidate list" embedded inside the inner
-// pool at holder->m_pInternalArray + 8 for entries whose float at +4
-// exceeds an input threshold (r1 / f1).  The matching slot indices are
-// compacted into a scratch u16 array of size `slotCount * 2 bytes`, then
-// atSingleton_7CE0_w picks one of them, and the winner's 32-bit payload
-// at +0 and its 16-bit slot-id are written back to caller-provided out
-// pointers (r5 = uint16*, r6 = uint32*).  Returns 0 on success, or the
-// fixed error code 0x80070000 | 14 on OOM.
-// ─────────────────────────────────────────────────────────────────────────────
-uint32_t pongNetMessageHolder_AAC8_w(pongNetMessageHolder* holder,
-                                     uint32_t /*unusedArg*/,
-                                     uint16_t* outSlotId,
-                                     uint32_t* outPayload,
-                                     float threshold) {
-    // Default "no match" outputs (written up-front so early-returns leave
-    // sentinel values behind).
-    *outPayload = 0xFFFFFFFFu;
-    *outSlotId  = 0xFFFFu;
-
-    // Inner pool lives at holder->m_pInternalArray; slotCount is its u16 at
-    // +0.  The candidate array starts at +8 with a 16-byte stride.
-    auto* inner = reinterpret_cast<uint8_t*>(holder->m_pInternalArray);
-    const uint32_t slotCount = *reinterpret_cast<uint16_t*>(inner + 0);
-    const uint32_t scratchBytes = slotCount * 2u;
-
-    auto* scratch = static_cast<uint16_t*>(rage_Alloc(scratchBytes));
-    if (scratch == nullptr) {
-        // Fixed error code observed in the original: (-32761 << 16) | 14.
-        return 0x80070000u | 14u;
-    }
-
-    uint8_t* entries = inner + 8;  // 16-byte-stride entries
-    uint16_t matchCount = 0;
-    for (uint32_t i = 0; i < slotCount; ++i) {
-        const float candidate = *reinterpret_cast<float*>(entries + i * 16 + 4);
-        if (candidate > threshold) {
-            scratch[matchCount] = static_cast<uint16_t>(i);
-            ++matchCount;
-        }
-    }
-
-    if (matchCount != 0) {
-        // atSingleton_7CE0_w returns a chosen index into the scratch list
-        // (takes the raw handle + match-count-minus-one).
-        int chosenRaw = reinterpret_cast<intptr_t>(
-            atSingleton_7CE0_w(reinterpret_cast<uint8_t*>(holder) + 4,
-                               0, matchCount - 1));
-        const uint32_t chosen = static_cast<uint32_t>(chosenRaw);
-
-        // Fetch the winning slot's u16 index and its 32-bit payload.
-        const uint16_t winnerSlot = scratch[chosen];
-        const uint32_t winnerPayload =
-            *reinterpret_cast<uint32_t*>(entries + winnerSlot * 16);
-
-        *outPayload = winnerPayload;
-        *outSlotId  = winnerSlot;
-    }
-
-    rage_free(scratch);
-    return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

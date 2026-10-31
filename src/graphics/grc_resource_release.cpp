@@ -1,9 +1,54 @@
 #include "grc/resource_release.hpp"
 #include "crt/crt_init.h"
+#include "rage/grc_command_stream.hpp"
 #include <cstring>
 
 extern "C" void DbgBreakPoint(); // @ 0x8258662C
 extern "C" void grcTexture_ReleaseResource(void* resource); // @ 0x82352708
+
+namespace {
+uint32_t grcCacheBase(uint32_t address) {
+    return (address & 0x1FFFFFFFu) + (((address >> 20) + 0x200u) & 0x1000u)
+           - 0x40000000u;
+}
+
+// The resource packs cache addresses as Xbox virtual-address words. Decode
+// those words through the same arena translation as stored game pointers.
+void* grcCachePointer(uint32_t address) {
+    rage::ptr32<void> pointer;
+    std::memcpy(&pointer, &address, sizeof(pointer));
+    return pointer.get();
+}
+}
+
+// Drop one page reference (bits 12..15). On the last reference, invalidate
+// each packed 128-byte range before passing its decoded endpoints to the cache
+// helper. That callback may change the second range or the address-mode flag.
+// @ 0x82352CC8 | size: 0xF0
+void grc_2CC8(void* resource, uint32_t data, uint32_t auxiliary) {
+    auto* words = static_cast<uint32_t*>(resource);
+    const uint32_t flags = words[0] - 0x1000u;
+    words[0] = flags;
+    if ((flags & 0xF000u) == 0) {
+        const uint32_t first = words[2];
+        if (first != 0xFFFF0000u) {
+            words[2] = 0xFFFF0000u;
+            const uint32_t base = flags & 0x40000000u ? data : grcCacheBase(data);
+            rage_EEC0(grcCachePointer(base + ((first >> 16) << 7)),
+                      grcCachePointer(base + ((first & 0xFFFFu) << 7)));
+        }
+        if (auxiliary != 0) {
+            const uint32_t second = words[3];
+            if (second != 0xFFFF0000u) {
+                words[3] = 0xFFFF0000u;
+                const uint32_t base = words[0] & 0x40000000u ? auxiliary : grcCacheBase(auxiliary);
+                rage_EEC0(grcCachePointer(base + ((second >> 16) << 7)),
+                          grcCachePointer(base + ((second & 0xFFFFu) << 7)));
+            }
+        }
+    }
+    __atomic_thread_fence(__ATOMIC_SEQ_CST);
+}
 
 // Low eight flag bits hold the reference count. A type-4 resource can retain
 // another resource at +0x2C; release it before reloading the parent's flags.

@@ -1,6 +1,8 @@
+#include "game/player_manager_state.hpp"
 #include "game/network_timestamp.hpp"
 #include "rage/ptr32.hpp"
 #include "rage/float_approach.hpp"
+#include "game/ai_swing_direction.hpp"
 /**
  * pongPlayer — Player state query functions
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -2655,7 +2657,6 @@ void pongPlayer::ResetSwingTrackingState() {  // pongPlayer_FA40_g @ 0x8219FA40
  *   5. Clears byte at +5512 and sets +5504 to 1 (default shot type).
  *   6. Calls ref_fi_FCD8 to finalise the serve FSM transition.
  */
-extern void pongPlayer_5F70_g(void* charSlotEntry);  // copy shot data to char table
 extern void ref_fi_FCD8(void* self);                  // finalise serve FSM
 
 void pongPlayer::FinalizeServeSetup() {  // pongPlayer_F9C0_g @ 0x8219F9C0
@@ -2982,7 +2983,6 @@ void pongPlayer::Update() {  // pongPlayer_Update @ 0x8218CF08
  * pongPlayer_4C08_g on self to synchronise replay state.
  */
 extern void pongCreature_59C0_g(void* creature);    // @ 0x820C59C0
-extern void pongPlayer_4C08_g(pongPlayer* player);  // @ 0x82194C08
 
 void pongPlayer::UpdateReplay() {  // pongPlayer_UpdateReplay @ 0x8218E178
     if (!m_pLocomotionState) {
@@ -4091,23 +4091,23 @@ void pongPlayer_06A0_g(float* outVec,
 // External forward declarations for batch 10
 // ---------------------------------------------------------------------------
 extern uint32_t pongMatch_GetCharacterIndex(uint32_t playerSlot); // @ 0x821C9B70
-extern uint32_t g_plrPlayerMgr_state;  // @ 0x82606430 — manager pointer
 extern void* g_gameDataMgr;           // @ 0x8271A2E4
+extern "C" const char g_pongMatchMissingPlayerMgr[]; // @ 0x8203CD80
 
 // @ 0x821C9C00 | size: 0x5C
 // Read the selected character for a match slot. With no player manager, log
 // and use character zero; the game-data manager and its array are still used.
 void* pongMatch_GetCharacterForSlot(void* /*match*/, uint32_t playerSlot) {
     uint32_t characterIndex = 0;
-    if (g_plrPlayerMgr_state == 0) {
-        nop_8240E6D0(
-            reinterpret_cast<const char*>(uintptr_t{0x8203CD80u}));
+    if (!g_plrPlayerMgr_state) {
+        nop_8240E6D0(g_pongMatchMissingPlayerMgr);
     } else {
         characterIndex = pongMatch_GetCharacterIndex(playerSlot);
     }
     auto* manager = static_cast<uint8_t*>(g_gameDataMgr);
-    void** characters = *reinterpret_cast<void***>(manager + 0x18);
-    return characters[characterIndex];
+    auto* characters = rage::load_ptr32<rage::ptr32<void>>(manager, 0x18);
+    const uint32_t byteOffset = characterIndex * 4u;
+    return rage::load_ptr32<void>(characters, byteOffset);
 }
 
 extern void phBoundCapsule_0880_g(void* capsule, void* outMatrix, void* samplingState);
@@ -4126,45 +4126,6 @@ extern const float g_kFloatConst_5C5938;    // height ratio threshold @ 0x825C59
 extern const float g_kFloatConst_79BB8;     // frame-to-duration scale @ 0x82079BB8
 extern const double g_kDoubleConst_79D10;   // floor constant @ 0x82079D10
 extern const double g_kDoubleConst_79B08;   // ceiling constant @ 0x82079B08
-
-
-// ===========================================================================
-// 1. UpdateOpponentBoundTransform
-// ===========================================================================
-/**
- * pongPlayer::UpdateOpponentBoundTransform()
- * @ 0x82194C08 | size: 0xA8
- *
- * Gets the opponent's physics bound capsule via the creature lookup chain,
- * computes a transform matrix, and copies the 4x16-byte result into
- * m_pLocoState2 at offset +32.
- */
-void pongPlayer::UpdateOpponentBoundTransform() {  // pongPlayer_4C08_g @ 0x82194C08
-    if (!m_pOpponent) return;
-
-    // Get opponent's character sub-object at +188
-    uint8_t* opponentBytes = reinterpret_cast<uint8_t*>(m_pOpponent);
-    uint8_t* characterSub = *reinterpret_cast<uint8_t**>(opponentBytes + 188);
-
-    // +8 is the match player slot, used to resolve its character data.
-    uint32_t playerSlot = *reinterpret_cast<uint32_t*>(characterSub + 8);
-    void* lookupResult = pongMatch_GetCharacterForSlot(
-        reinterpret_cast<void*>(g_pInputArrayTable), playerSlot);
-
-    // Navigate chain: result->+44->+324 to get bound capsule
-    uint8_t* chainEntry = *reinterpret_cast<uint8_t**>(
-        static_cast<uint8_t*>(lookupResult) + 44);
-    void* boundCapsule = *reinterpret_cast<void**>(chainEntry + 324);
-
-    // Compute transform matrix from bound capsule
-    alignas(16) vec3 transformMatrix[4];  // 4x16 = 64 bytes
-    void* meshParam = *reinterpret_cast<void**>(characterSub + 28);
-    phBoundCapsule_0880_g(boundCapsule, transformMatrix, meshParam);
-
-    // Copy matrix to locomotion state data at +32
-    uint8_t* dest = reinterpret_cast<uint8_t*>(m_pLocoState2) + 32;
-    memcpy(dest, transformMatrix, sizeof(vec3) * 4);
-}
 
 
 // ===========================================================================
@@ -5949,15 +5910,6 @@ struct shotTargetLayout {
 // rtti aiPlayer (vtable 0x8203A83C, stored by 0x821A5FC8); pongPlayer+0x1F0.
 // What 0x821A66A8 fills in: four direction weights the AI wants for its swing.
 // The names follow the pad's order (see pongPlayer_ReadSwingDirectionInput).
-struct aiSwingDirectionView {
-    uint8_t _pad00[0x04];
-    float   up;        // +0x04
-    float   down;      // +0x08
-    float   right;     // +0x0C
-    float   left;      // +0x10
-    uint8_t _pad14[0x44];
-    uint8_t resolved;  // +0x58  set by 0x821A66A8, which returns at once while it is set
-};
 
 struct aiPlayerServeView {
     struct Sub34 {
@@ -6160,8 +6112,6 @@ extern void* g_networkTimingObject;  // @ 0x8271A328
 // @ 0x82391480 — cached timestamp text for log lines.
 // @ 0x821D3860 — records a named transition on the game state object.
 extern void game_3860(void* gameState, int kind, const char* name);
-// @ 0x82198A48 — StartServe's query callback: *answer = io_Input_poll_9D68 && +0x17EC != 0.
-extern void io_8A48(pongPlayer* player, int32_t* answer);
 // Flags argument of PostGameMessage: one bit per player.
 static uint32_t PlayerMessageBit(int32_t playerIndex) {
     return playerIndex != 0 ? 2u : 1u;
@@ -6198,8 +6148,6 @@ extern bool pongPlayer_04B0_g(void* pad, int32_t button);
 // @ 0x821921D0 — 0, or the stick's direction as 1..8; going by how
 // ReadSwingDirectionInput maps it, 1 is up and they run clockwise.
 extern int32_t phBoundCapsule_21D0_g(pongPlayer* player);
-// @ 0x821A66A8 — works out the AI's direction weights once (sets `resolved`).
-extern void pongPlayer_66A8_g(aiSwingDirectionView* dir);
 // @ 0x82193A68 — applies the four weights (left, right, up, down) to the swing.
 extern void pongPlayer_3A68_g(pongPlayer* player, float left, float right, float up, float down);
 // @ 0x8219EE88 — the shotTarget's side: hands the weights to its +0xAF0 object.

@@ -1,4 +1,5 @@
 #include "audio/xact_sink_io.hpp"
+#include "game/message_sink_children.hpp"
 #include "rage/dat_bit_buffer.hpp"
 #include "rage/ptr32.hpp"
 #include "rage/hud_page_group.hpp"
@@ -459,10 +460,7 @@ uint32_t GetPlayerID(void* client, uint32_t reportInvalid) {
 
 // ── Forward declarations for sibling-owned helpers ──────────────────────────
 extern uint32_t atSingleton_6F98_g(); // @ 0x82566F98
-extern int32_t game_9D70_h(void* node, uint32_t flags);               // @ 0x82459d70
 extern int32_t atSingleton_9B98_p39(void* node, void* key);           // @ 0x82459b98
-extern int32_t game_3F68_h(void* sink);                               // @ 0x82453f68
-extern void  game_A650_h(void* node);                                 // @ 0x8245a650
 extern int32_t game_3FD0_h(void* sink);                               // @ 0x82453fd0
 extern int32_t game_9A48_h(void* node);                               // @ 0x82459a48
 extern void  msgMsgSink_8B78_g(void* sessionRef, uint16_t hdr);       // @ 0x82448b78
@@ -474,8 +472,6 @@ extern void  msgMsgSink_EA00(void);                                   // @ 0x824
 extern void  _locale_register(void* sink, uint32_t tag);              // @ 0x820c02d0
 extern int32_t snNotifyGamerAdded_E790(void* self, void* param,
                                        void** outHandle);             // @ 0x8244e790
-extern uint32_t atSingleton_7CE0_w(void* bucket, int inBounds,
-                                   int boundExcl);                    // @ 0x82447ce0
 extern int32_t net_1CC8(uint32_t* outSlot, int one, int zero,
                         int zero2, int zero3, uint32_t flags,
                         int eight, int zero4, int zero5);              // @ 0x82481cc8
@@ -491,7 +487,7 @@ extern "C" void snSession_AddNode_C068(void* nodeList, void* node);
  * msgMsgSink_3C88_g @ 0x82453C88 | size: 0xe8
  *
  * Iteratively updates a bit-field on the sink and, when it transitions, walks
- * the sink's child linked-list at +36 forwarding into game_9D70_h(child, flag).
+ * the sink's child linked-list at +36 forwarding into msgChild_SetPaused.
  * Bit 0x20 at +52 pauses pending deadlines. Pausing stores the current
  * millisecond tick at +108; resuming shifts the pending deadlines by the
  * elapsed pause duration. Checked against the retail assembly.
@@ -519,7 +515,7 @@ uint32_t msgMsgSink_3C88_g(void* self, uint32_t flag)
     auto* child = rage::load_ptr32<uint8_t>(bytes, 0x28);
     int32_t result = 0;
     while (child != head) {
-        result = game_9D70_h(child, flag);
+        result = msgChild_SetPaused(child, flag);
         child = rage::load_ptr32<uint8_t>(child, 4);
         if (result < 0) break;
     }
@@ -547,35 +543,6 @@ uint32_t msgMsgSink_3D70_p39(void* self)
         node = *reinterpret_cast<uint32_t*>(node + 4);
     }
     return 0;
-}
-
-
-/**
- * msgMsgSink_4550_g @ 0x82454550 | size: 0x88
- *
- * If stateWord (+80) == 6: calls game_3F68_h(sink); if that returns 0 issues a
- * virtual-call on vtable slot 1 with flag=1 (scalar-deleting dtor convention).
- * Otherwise walks child list at +36 calling game_A650_h(child) for each.
- */
-void msgMsgSink_4550_g(void* self)
-{
-    uint8_t* s = static_cast<uint8_t*>(self);
-    int32_t state = *reinterpret_cast<int32_t*>(s + 80);
-    if (state == 6) {
-        if (game_3F68_h(self) == 0) {
-            // Virtual dispatch slot 1 with flag=1 (scalar-deleting dtor)
-            void** vt = *reinterpret_cast<void***>(s + 0);
-            using Fn = void(*)(void*, int);
-            reinterpret_cast<Fn>(vt[1])(self, 1);
-        }
-    } else {
-        uint8_t* head = s + 36;
-        uint32_t node = *reinterpret_cast<uint32_t*>(s + 40);
-        while (node != static_cast<uint32_t>(reinterpret_cast<uintptr_t>(head))) {
-            game_A650_h(reinterpret_cast<void*>(node));
-            node = *reinterpret_cast<uint32_t*>(node + 4);
-        }
-    }
 }
 
 

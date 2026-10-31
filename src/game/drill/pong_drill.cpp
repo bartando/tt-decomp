@@ -11,6 +11,8 @@
 #include "globals.h"
 #include "game/pong_strings.hpp"
 #include "rage/hud_page_group.hpp"
+#include "rage/ptr32.hpp"
+#include "../player/pong_gameplay_queries.hpp"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -80,9 +82,10 @@ struct DrillTransform {
 // play area of one side of it; the matrix at +0x44 is the one whose position
 // the drill tests against the target and places targets around.
 struct DrillMatchView {
-    uint8_t               _pad00[0x44];
-    const DrillTransform* m_pPlayerTransform;  // +0x44
+    uint8_t _pad00[0x44];
+    rage::ptr32<const DrillTransform> m_pPlayerTransform; // +0x44
 };
+static_assert(offsetof(DrillMatchView, m_pPlayerTransform) == 0x44, "drill transform pointer");
 extern void* g_input_obj_ptr;  // @ 0x825EAB28
 
 // The game state at 0x82606430: each player's aiming reticle.
@@ -170,9 +173,6 @@ void hudTrainingHUD_PushArrowDirection(DrillTrainingHud* hud) {
     }
     if (acquired != 0) hudFlashBase_PublishPageGroup(hud);
 }
-// Corners of side `side`'s play area: (min.x, 0, min.z) and (max.x, 0, max.z).
-extern void DrillMatch_GetSideBounds(  // @ 0x821C9CD0
-    DrillMatchView* match, int side, DrillVector4* pMin, DrillVector4* pMax);
 // Moves the target to `position` (w = radius); clamps it to the table while
 // m_clampToTable is set.
 struct DrillTableDimensions {
@@ -877,7 +877,7 @@ void pongDrillMovement::NextAttempt(int count) {
 
     DrillMatchView* match = static_cast<DrillMatchView*>(g_input_obj_ptr);
     DrillVector4 areaMin, areaMax;
-    DrillMatch_GetSideBounds(match, 0, &areaMin, &areaMax);
+    pongMatchSettings_GetCourtBounds(match, 0, &areaMin, &areaMax);
 
     // Chance of a target beside the player (x) rather than along an end (z).
     float besideChance = 0.5f;

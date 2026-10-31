@@ -27,7 +27,7 @@ def _side_bounds(ctx):
 
 CALLS = {
     "pongTrainingDrill::NextAttempt": stub(ret="void"),
-    "DrillMatch_GetSideBounds": model(_side_bounds),
+    "pongMatchSettings_GetCourtBounds": model(_side_bounds),
     "gmPracticeTarget_SetPosition": run(args=("r3", "r4"), deref={"r4": 16}),
 }
 

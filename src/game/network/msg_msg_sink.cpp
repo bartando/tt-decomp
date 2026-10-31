@@ -1,6 +1,9 @@
 #include "audio/xact_sink_io.hpp"
+#include "grc/resource_release.hpp"
+#include "game/message_sink_time.hpp"
 #include "rage/xact_list.hpp"
 #include "audio/xact_fade.hpp"
+#include "audio/xact_volume.hpp"
 /**
  * msg_msg_sink.cpp — msgMsgSink constructor & destructor
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -627,7 +630,6 @@ extern void* RtlEnterCriticalSection_D6F0_fw(void*);
 extern void msgMsgSink_D168_sp(void*);
 extern void msgMsgSink_D1D8_sp(void*);
 extern void msgMsgSink_6138_2hr(void*);
-extern void grc_2CC8(void*, uint32_t, uint32_t);
 extern void atSingleton_8E88_p42(void*, void*, uint32_t, uint32_t, uint32_t);
 extern void ph_EF40(void*, void*);
 extern void game_9CF8_h(void*, const void*);
@@ -664,10 +666,10 @@ void* msgMsgSink_vfn_42_EFE8_1(void* self, void* value) {
 }
 
 // msgMsgSink_3258_wrh @ 0x82353258 | size: 0xC
-// Loads field at +12, passes it with zero to grc_2CC8
+// Releases pages on this resource, using its data word at +12.
 void msgMsgSink_3258_wrh(void* self) {
-    uint32_t val = *(uint32_t*)((uint8_t*)self + 12);
-    grc_2CC8((void*)(uintptr_t)val, 0, 0);
+    const uint32_t data = *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(self) + 12);
+    grc_2CC8(self, data, 0);
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -790,34 +792,6 @@ void msgMsgSink_8E40_sp(void* self) {
     typedef void (*Fn)(void*);
     void** vt = *(void***)nested;
     ((Fn)vt[20])(nested);
-}
-
-/* ───────────────────────────────────────────────────────────────────────────
- * GROUP 8: Virtual dispatch thunks through +36, return 0 if null
- * ─────────────────────────────────────────────────────────────────────────── */
-
-// msgMsgSink_8E60_sp @ 0x82458E60 | size: 0x24
-// Forwards to nested->vtable[11] (offset 44), returns 0 if nested is null
-uint32_t msgMsgSink_8E60_sp(void* self) {
-    void* nested = *(void**)((uint8_t*)self + 36);
-    if (nested != nullptr) {
-        typedef uint32_t (*Fn)(void*);
-        void** vt = *(void***)nested;
-        return ((Fn)vt[11])(nested);
-    }
-    return 0;
-}
-
-// msgMsgSink_8E88_sp @ 0x82458E88 | size: 0x24
-// Forwards to nested->vtable[21] (offset 84), returns 0 if nested is null
-uint32_t msgMsgSink_8E88_sp(void* self) {
-    void* nested = *(void**)((uint8_t*)self + 36);
-    if (nested != nullptr) {
-        typedef uint32_t (*Fn)(void*);
-        void** vt = *(void***)nested;
-        return ((Fn)vt[21])(nested);
-    }
-    return 0;
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -1175,7 +1149,6 @@ void msgMsgSink::ProcessPendingMessages() {
         if (hasData != 0) {
             // Process pending messages from the message object
             void* msgObj = *(void**)((uint8_t*)this + 52);
-            extern void msgMsgSink_3DC8_g(void*);
             msgMsgSink_3DC8_g(msgObj);
         }
     }
@@ -2494,7 +2467,6 @@ extern void msgMsgSink_vfn_36_5FD0_1(void*);                          // 0x82455
 extern uint32_t atSingleton_6F98_g(); // @ 0x82566F98
 extern void  jumptable_3A48(void*, uint32_t, uint32_t, uint32_t);
 extern uint32_t msgMsgSink_4EB8_g(void*);                             // 0x82454EB8
-extern int32_t  msgMsgSink_66B0_h(void*);                             // 0x824566B0
 extern void* rage_01B8(uint32_t, uint32_t);                           // 0x820C01B8
 extern void  _locale_register(void*, uint32_t);                       // 0x820C02D0
 extern void* msgMsgSink_B110_g(void*, void*, uint32_t);               // 0x8245B110
@@ -2576,8 +2548,8 @@ void msgMsgSink::vfn_61() {
     int32_t state = *reinterpret_cast<int32_t*>(self + 412);
 
     if (state == 1) {
-        // State 1: negotiate → transition based on msgMsgSink_66B0_h result
-        if (msgMsgSink_66B0_h(this) != 0) {
+        // State 1: negotiate once the peer and its pending operations are ready.
+        if (msgSink_IsPeerReady(this) != 0) {
             // Populate connection flags at +412/+416/+420 from peer type
             void* peerInfo = *reinterpret_cast<void**>(self + 408);
             uint16_t raw = *reinterpret_cast<uint16_t*>(
