@@ -1,7 +1,7 @@
 // Wrapped angular limits used by creature rotation constraints.
 #include "../game/creature/pong_creature.hpp"
 
-extern "C" double fmod(double value, double period); // @ 0x82431D78
+#include "rage/math.hpp"
 
 namespace {
 constexpr float kPi = 0x1.921fb6p+1f;
@@ -14,7 +14,7 @@ constexpr float kFullTurnThreshold = 0x1.921fb2p+2f;
 float LocomotionStateAnim_WrapAngle(float value) {
     const float offset = value < 0.0f ? -kPi : kPi;
     const float shifted = offset + value;
-    const float remainder = static_cast<float>(fmod(shifted, double(kTwoPi)));
+    const float remainder = static_cast<float>(crt_fmod(shifted, double(kTwoPi)));
     const float result = remainder - offset;
     return result == -kPi ? kPi : result;
 }

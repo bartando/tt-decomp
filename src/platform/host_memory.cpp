@@ -4,8 +4,18 @@
 #include <cstring>
 #include <mutex>
 #include <unordered_map>
+#ifdef _WIN32
+#include <malloc.h>
+#endif
 
 namespace {
+void freeAligned(void* address) {
+#ifdef _WIN32
+    _aligned_free(address);
+#else
+    std::free(address);
+#endif
+}
 struct Allocation { uint32_t size, protect; };
 std::mutex allocationMutex;
 std::unordered_map<void*, Allocation> allocations;
@@ -22,12 +32,17 @@ extern "C" void* MmAllocatePhysicalMemoryEx(uint32_t flags, uint32_t size, uint3
     uint64_t rounded = (uint64_t(size) + page - 1) & ~(page - 1);
     if (rounded > UINT32_MAX) return nullptr;
     void* result = nullptr;
+#ifdef _WIN32
+    result = _aligned_malloc(static_cast<size_t>(rounded), static_cast<size_t>(std::max<uint64_t>(alignment, page)));
+    if (!result) return nullptr;
+#else
     if (posix_memalign(&result, std::max<uint64_t>(alignment, page), rounded)) return nullptr;
+#endif
     std::memset(result, 0, rounded);
     try {
         std::lock_guard<std::mutex> guard(allocationMutex);
         allocations.emplace(result, Allocation{static_cast<uint32_t>(rounded), protect});
-    } catch (...) { std::free(result); return nullptr; }
+    } catch (...) { freeAligned(result); return nullptr; }
     return result;
 }
 extern "C" void MmFreePhysicalMemory(uint32_t, void* address) {
@@ -35,7 +50,7 @@ extern "C" void MmFreePhysicalMemory(uint32_t, void* address) {
     auto it = allocations.find(address);
     if (it == allocations.end()) return;
     allocations.erase(it);
-    std::free(address);
+    freeAligned(address);
 }
 extern "C" uint32_t MmQueryAllocationSize(void* address) {
     std::lock_guard<std::mutex> guard(allocationMutex);

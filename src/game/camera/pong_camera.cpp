@@ -2939,26 +2939,8 @@ extern void* charViewCS_vtable[];           // @ 0x82036454 (camBaseCS vtable)
  * the base vtable back in, chains to rage's base destructor, and — if the
  * caller passed the "delete" flag in the low bit of r4 — frees the object.
  */
-charViewCS::~charViewCS() {
-    // Clean up subsystem state owned at +292 (m_ownsHeap block).
-    util_1568(&m_ownsHeap);
+// Defined in its owning module; do not duplicate the export here.
 
-    // Re-stamp the vtable pointer at *this* before chaining: this lets any
-    // overridden slots in the base destructor dispatch correctly.
-    vtable = charViewCS_vtable;
-
-    // Chain into the rage base class destructor.
-    rage_7630(this);
-
-    // The synthetic `deleteFlag` in the low bit of r4 (passed via the ABI's
-    // hidden 2nd arg for deleting-destructors) asks the runtime whether to
-    // release this object's heap storage. Preserved via a compiler-intrinsic
-    // `__dtor_delete_flag` stand-in wired up in the recomp harness.
-    // KNOWN LIMITATION: the delete-flag ABI shim lives in the harness, not
-    // in lifted source; until that plumbs through, the deallocating branch
-    //     if (__dtor_delete_flag & 1) rage_free_00C0(this);
-    // stays commented out. The cleanup side above is already correct.
-}
 
 /**
  * charViewCS::RegisterAxisHooks — vtable slot 3
