@@ -108,8 +108,8 @@ pongMover::pongMover(void* creaturePool) {
     m_flags = 1;
 
     // Zero tail fields
-    m_unkE0 = 0;
-    m_unkE4 = 0;
+    m_velocityContext = nullptr;
+    m_velocityOverride = nullptr;
 
     // If creature pointer is already set (placement-new on pre-allocated memory),
     // adjust it relative to the pool base: m_pCreature += pool[idx+2]
@@ -331,6 +331,147 @@ void pongMover_AdjustVelocity(pongMover* mover, float* x, float* z) {
     };
     adjust(x, position[0], lower[0], upper[0]);
     adjust(z, position[2], lower[2], upper[2]);
+}
+
+namespace {
+float moverFlushVmx(float value) {
+    uint32_t bits;
+    memcpy(&bits, &value, sizeof(bits));
+    if ((bits & 0x7F800000u) == 0) {
+        bits &= 0x80000000u;
+        memcpy(&value, &bits, sizeof(value));
+    }
+    return value;
+}
+
+// The VMX normalization used by both target-velocity paths. Dot xyz, refine
+// the reciprocal square root once, and scale all four lanes (including w).
+void moverNormalize(float* vector) {
+    double dot = 0.0;
+    for (unsigned lane = 0; lane < 3; ++lane) {
+        const float value = moverFlushVmx(vector[lane]);
+        dot += static_cast<double>(value) * value;
+    }
+    const float length2 = moverFlushVmx(static_cast<float>(dot));
+    float reciprocal = moverFlushVmx(static_cast<float>(
+        1.0 / __builtin_sqrt(static_cast<double>(length2))));
+    if (reciprocal == __builtin_inff()) reciprocal = 0.0f;
+    const float squared = moverFlushVmx(reciprocal * reciprocal);
+    const float product = moverFlushVmx(length2 * squared);
+    for (unsigned lane = 0; lane < 4; ++lane) {
+        const float half = lane < 3 ? 0.5f : 0.0f;
+        const float one = lane < 3 ? 1.0f : 0.0f;
+        const float halfReciprocal = moverFlushVmx(half * reciprocal);
+        const float error = -moverFlushVmx(product - one);
+        const float correction = moverFlushVmx(error * halfReciprocal);
+        const float scale = moverFlushVmx(correction + reciprocal);
+        vector[lane] = moverFlushVmx(moverFlushVmx(vector[lane]) * scale);
+    }
+}
+}
+
+// Select a target speed from travel time and separation, then apply the
+// normalized direction. This helper was labelled as a capsule operation.
+// pongMover_ComputeTargetVelocity (was phBoundCapsule_A9A0_g) @ 0x820CA9A0 | size: 0x1A4
+float* pongMover_ComputeTargetVelocity(float* out, pongMover* mover,
+                                     const float* origin, const float* target) {
+    alignas(16) float direction[4];
+    for (unsigned lane = 0; lane < 4; ++lane)
+        direction[lane] = moverFlushVmx(moverFlushVmx(target[lane]) - moverFlushVmx(origin[lane]));
+    const float separationX = __builtin_fabsf(target[0] - origin[0]);
+    out[0] = out[1] = out[2] = 0.0f;
+    const float x2 = direction[0] * direction[0];
+    const float distance = static_cast<float>(crt_sqrt(__builtin_fmaf(direction[2], direction[2], x2)));
+    const float requiredSpeed = distance / mover->m_posZ;
+    moverNormalize(direction);
+    float weight = 0.0f;
+    if (requiredSpeed > pongMover_GetInputSpeed(mover)) {
+        weight = 1.0f;
+    } else {
+        const float amount = separationX > 0.0f ? separationX * 1.4492753744125366f
+                                                : distance * 0.7246376872062683f;
+        const double raised = amount >= 0.0f ? amount : 0.0;
+        const float clamped = static_cast<float>(raised - 1.0 >= 0.0 ? 1.0 : raised);
+        weight = clamped * clamped;
+    }
+    const float speed = __builtin_fabsf(pongMover_GetInputSpeed(mover)) * weight;
+    for (unsigned lane = 0; lane < 4; ++lane)
+        out[lane] = moverFlushVmx(moverFlushVmx(direction[lane]) * moverFlushVmx(speed));
+    return out;
+}
+
+// pongMover_ComputeLocalVelocity (was phBoundCapsule_A640_g) @ 0x820CA640 | size: 0x14C
+float* pongMover_ComputeLocalVelocity(float* out, pongMover* mover) {
+    const auto* creature = static_cast<const uint8_t*>(mover->m_pCreature);
+    out[0] = mover->m_unk30;
+    out[1] = 0.0f;
+    out[2] = mover->m_unk34;
+    const auto* instance = *reinterpret_cast<const uint8_t* const*>(creature + 0xA4);
+    alignas(16) float position[4];
+    memcpy(position, instance + 0x40, sizeof(position));
+    if (!(pongMover_GetBlendWeight(mover) <= 0.0f)) {
+        const float x = mover->m_posX - position[0];
+        const float z = mover->m_posY - position[2];
+        const float x2 = x * x;
+        const float distance = static_cast<float>(crt_sqrt(__builtin_fmaf(z, z, x2)));
+        if (distance <= mover->m_unk50) {
+            memset(out, 0, 16);
+            mover->m_flags |= 8;
+            return out;
+        }
+        alignas(16) float target[4] = {mover->m_posX, position[1], mover->m_posY, 0.0f};
+        alignas(16) float velocity[4];
+        pongMover_ComputeTargetVelocity(velocity, mover, position, target);
+        const float limit = mover->m_unk48;
+        const auto clamp = [limit](float value) {
+            const float delta = value - -limit;
+            const float raised = delta >= 0.0f ? value : -limit;
+            return double(raised) - limit >= 0.0 ? limit : raised;
+        };
+        out[0] = clamp(velocity[0]);
+        out[2] = clamp(velocity[2]);
+    }
+    return out;
+}
+
+extern const uint8_t g_hudShell_UpdateBlock[0x60]; // @ 0x825CAEB8
+
+// pongMover_ComputeRemoteVelocity (was phBoundCapsule_A790_g) @ 0x820CA790 | size: 0x20C
+float* pongMover_ComputeRemoteVelocity(float* out, pongMover* mover) {
+    out[0] = out[1] = out[2] = 0.0f;
+    if (!(pongMover_GetBlendWeight(mover) > 0.0f)) return out;
+    const auto* creature = static_cast<const uint8_t*>(mover->m_pCreature);
+    const auto* instance = *reinterpret_cast<const uint8_t* const*>(creature + 0xA4);
+    const int32_t type = *reinterpret_cast<const int32_t*>(creature + 0xC8);
+    alignas(16) float position[4];
+    memcpy(position, instance + 0x40, sizeof(position));
+    // The original never initializes scratch w. Give that padding lane a
+    // defined value; only xyz participates in distance/arrival decisions.
+    alignas(16) float direction[4] = {mover->m_posX, position[1], mover->m_posY, 0.0f};
+    for (unsigned lane = 0; lane < 4; ++lane)
+        direction[lane] = moverFlushVmx(moverFlushVmx(direction[lane]) - moverFlushVmx(position[lane]));
+    const float x2 = direction[0] * direction[0];
+    const float distance2 = __builtin_fmaf(direction[2], direction[2], x2);
+    const float threshold = type == 2 && !(mover->m_flags & 0x20) ? mover->m_unk54 : 1e-6f;
+    if (!(distance2 > threshold)) {
+        mover->m_flags |= 8;
+        return out;
+    }
+    if (mover->m_velocityOverride) {
+        alignas(16) float scratch[4];
+        const float* result = mover->m_velocityOverride(scratch, mover->m_velocityContext, mover->m_unk48);
+        memcpy(out, result, 16);
+        return out;
+    }
+    const float distance = static_cast<float>(crt_sqrt(distance2));
+    float frameRate;
+    memcpy(&frameRate, g_hudShell_UpdateBlock + 0x0C, sizeof(frameRate));
+    float speed = distance * frameRate;
+    if (speed > mover->m_unk48) speed = mover->m_unk48;
+    moverNormalize(direction);
+    for (unsigned lane = 0; lane < 4; ++lane)
+        out[lane] = moverFlushVmx(moverFlushVmx(direction[lane]) * moverFlushVmx(speed));
+    return out;
 }
 
 // Blend input and local/remote movement, mirror it for the court side, and
