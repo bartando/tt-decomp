@@ -1,11 +1,10 @@
 from liftcheck.spec import *
 
-FUNCTION = "CCalMoviePlayer::SaveAndReplaceFiberContext"
+FUNCTION = "_CCalMoviePlayer_EB30"
 ADDRESS = 0x8235EB30
-SOURCE = "src/game/misc/pong_misc.cpp"
+SOURCE = "src/game/misc/movie_worker_helpers.cpp"
 TRIALS = 1000
-RET = None
-CALLS = {"xe_GetCurrentThreadId": stub(ret=lambda c: c.rng.getrandbits(32))}
+CALLS = {"xe_GetCurrentThreadId": stub(ret=lambda c: c.rng.getrandbits(32), args=())}
 
 
 def inputs(t):

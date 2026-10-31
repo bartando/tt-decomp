@@ -28,8 +28,8 @@ CASES = [
     ('ph_articulated_build_point_response', 'void phArticulatedCollider_BuildPointResponse(', [
         ('skip last column', 'axis < 3', 'axis < 2'),
         ('always use first column', '= axis;', '= 0;'),
-        ('leave selectors dirty', '*reinterpret_cast<uint32_t*>(uintptr_t(data[10 + i])) = 0;',
-         '*reinterpret_cast<uint32_t*>(uintptr_t(data[10 + i])) = 2;'),
+        ('leave selectors dirty', '*rage::load_ptr32<uint32_t>(data, (10 + i) * 4) = 0;',
+         '*rage::load_ptr32<uint32_t>(data, (10 + i) * 4) = 2;'),
     ]),
     ('ph_articulated_build_angular_response', 'void phArticulatedCollider_BuildAngularResponse(', [
         ('wrong unit torque', 'g_phResponseBasis[axis]', 'g_phResponseBasis[(axis + 1) % 3]'),

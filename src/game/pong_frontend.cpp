@@ -1449,16 +1449,6 @@ void* CCalMoviePlayer::GetFrameBuffer() {
 // Manage the thread ID at offset +10376 (0x2888)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Stores the current thread ID.
-/// CCalMoviePlayer::ReplaceFiberContext @ 0x8235EB30 | size: 0x40
-void CCalMoviePlayer::ReplaceFiberContext() {
-    uint32_t* threadId = (uint32_t*)((uint8_t*)this + 10376);
-    if (*threadId) {
-        xe_GetCurrentThreadId();
-    }
-    *threadId = xe_GetCurrentThreadId();
-}
-
 /// Clears the thread ID (with memory barrier).
 /// CCalMoviePlayer::ClearFiberContext @ 0x8235EB70 | size: 0x10
 void CCalMoviePlayer::ClearFiberContext() {
