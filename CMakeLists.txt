@@ -153,6 +153,7 @@ set(SOURCES
     src/game/player/player_swing_phase.cpp
     src/game/player/player_shot_interpolation.cpp
     src/game/player/player_move_mode.cpp
+    src/game/player/camera_node_cast.cpp
     src/game/player/player_camera_side.cpp
     src/game/player/player_camera_side_data.cpp
     src/game/player/player_animation_state.cpp

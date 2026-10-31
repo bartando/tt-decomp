@@ -6008,7 +6008,7 @@ extern void  phBoundCapsule_ComputeAngleXZ(void* obj, float y, float z);  // ang
 extern void  phBoundCapsule_UpdateCapsuleState(void* obj);               // capsule update
 extern void  rage_debugLog(const char* name, int param);      // debug log (no-op in release)
 extern int   phBoundCapsule_ResolvePlayerIndex(void* obj);               // resolve player index
-extern int   game_1700(void* obj);                           // get player from object
+extern void* game_1700(void* obj);                           // checked camera-node cast @ 0x82101700
 
 // Global pointers used by capsule operations
 extern uint32_t* g_phBoundCapsule_GlobalState;  // @ various global singletons
