@@ -137,6 +137,7 @@ set(SOURCES
     src/rage/network/session_events.cpp
     src/rage/network/snSessionStates.cpp
     src/rage/network/session_state_helpers.cpp
+    src/rage/network/hsm_transition.cpp
     src/rage/core/subsystem_init.c
     src/rage/swf.cpp
     src/rage/swf_image_data.cpp
