@@ -92,13 +92,6 @@ uint32_t g_nScreenWidth = 1280;
 void* g_nonWsConfig = NULL;
 
 
-/* Shader constant data table @ 0x8202C328 (.rdata, 440 bytes)
- * Used by grc_CB48 for GPU shader constant initialization */
-const uint8_t g_shaderConstantData[440] = {
-    /* This is a placeholder - actual data would need to be extracted from binary */
-    0
-};
-
 // ============================================================================
 // Render Loop Globals
 // ============================================================================

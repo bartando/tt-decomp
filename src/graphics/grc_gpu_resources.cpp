@@ -659,11 +659,6 @@ void grcDevice_ApplyShaderState(void* device) {
     }
 }
 
-// Writes a contiguous register run, flushing the command buffer if needed.
-extern uint32_t* grcDevice_WriteRegisterRunOverflow(void* device, uint32_t* cursor,
-                                                    uint32_t firstRegister, const uint32_t* valuesBeforeRun,
-                                                    uint32_t count, uint32_t stride); // @ 0x823625A0
-
 // Callers supply a nonzero mask; bit 63 corresponds to values[0].
 // @ 0x82362658
 void grcDevice_FlushDirtyRegisterGroup(void* device, uint64_t dirty, uint32_t firstRegister,

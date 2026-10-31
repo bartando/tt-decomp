@@ -138,6 +138,10 @@ set(SOURCES
     src/rage/hud_page_group.cpp
     src/rage/swf_page_group.cpp
     src/rage/swf_vm.cpp
+    src/rage/swf_value_helpers.cpp
+    src/rage/swf_text.cpp
+    src/rage/swf_bounds.cpp
+    src/rage/swf_action_copy.cpp
     src/rage/swf_clip_events.cpp
     src/rage/core/timer.cpp
     src/rage/core/rage_core_utils.cpp
@@ -167,6 +171,7 @@ set(SOURCES
     src/game/audio/pong_audio.cpp
     src/game/audio/pong_audio_effects.cpp
     src/game/ball/pong_ball.cpp
+    src/game/ball/ball_splash.cpp
     src/game/ball/ball_audio_emitters.cpp
     src/game/ball/ball_audio_envelope.cpp
     src/game/ball/ball_audio_impact.cpp
@@ -245,6 +250,7 @@ set(SOURCES
     src/game/pong_render.cpp
     src/game/match/hsm_log_strings.cpp
     src/game/match/pong_match.cpp
+    src/game/match/match_ai_array.cpp
     src/game/match/replay_state_publish.cpp
     src/game/match/lvl_table.cpp
     src/game/match/pong_states.cpp
@@ -260,11 +266,13 @@ set(SOURCES
     src/anim/bone_transform_lookup.cpp
     src/anim/motion_lookup_data.cpp
     src/anim/pcr_anim_blenders.cpp
+    src/anim/look_at_controller.cpp
     src/anim/locomotion.cpp
     src/anim/angle_helpers.cpp
     src/anim/animation_timing.cpp
 
     # Physics
+    src/physics/collider_velocity.cpp
     src/physics/ph_float_property.cpp
     src/physics/ph_physics.cpp
     src/physics/bound_lookup.cpp
@@ -277,6 +285,7 @@ set(SOURCES
     src/graphics/grc_debug_strings.cpp
     src/graphics/grc_gpu_hang.cpp
     src/graphics/grc_cache.cpp
+    src/graphics/grc_state_helpers.cpp
     src/graphics/grc_command_stream.cpp
     src/graphics/grc_device.cpp
     src/graphics/grc_gpu_resources.cpp
