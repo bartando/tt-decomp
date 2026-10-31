@@ -505,7 +505,6 @@ void ph_vt5D38_15_0160(void* self, int flags, void* arg);
 } // extern "C"
 
 extern void util_F8E8(void* self);
-extern int _stricmp(const char* a, const char* b);
 
 // ── ph_9E50 — swap material/archetype owner on a phInst slot ───────────────
 // If newArch != null and g_physicsInstrument is enabled, bump refcount at
@@ -907,15 +906,7 @@ void ph_vt5A84_63_6B90(void* self) {
     float value = *reinterpret_cast<float*>(s + 120);
     *reinterpret_cast<float*>(s + 112) = value;
 }
-extern "C" int32_t ph_vt57D8_12_62F8(void* self);
-void ph_vt5A8C_63_6A50(void* self) {
-    auto* s = static_cast<uint8_t*>(self);
-    int32_t r = ph_vt57D8_12_62F8(s + 16);
-    if (r >= 0) {
-        *reinterpret_cast<uint16_t*>(s + 104) = 1;
-        *reinterpret_cast<uint16_t*>(s + 106) = 1;
-    }
-}
+
 
 // ph_vt5B98_40_8D50 / _41_8E50: classification-bit dispatchers used by
 // world cleanup. Extern is single-arg — flagArg comes from the inner

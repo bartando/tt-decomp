@@ -144,3 +144,9 @@ extern "C" const float g_phInertiaPivotRatio = 9.999999747378752e-6f;
 extern "C" const float g_phContactVolumeScale = 300.0f;
 // @ 0x82033020 (.rdata)
 extern "C" const char g_phNegativeVolumeWarning[] = "Bound part has volume %f!";
+
+// @ 0x82003DA8 (.rdata) — initial stream interval
+extern "C" const float g_phStreamInitialInterval = 0.0f;
+
+// @ 0x82005C78 (.rdata) — bytes per packed format element
+extern "C" const uint32_t g_phStreamFormatWidths[3] = {4, 2, 1};

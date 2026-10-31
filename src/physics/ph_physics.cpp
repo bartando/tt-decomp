@@ -16,6 +16,7 @@
 #include "articulated_response.hpp"
 #include "articulated_constraints.hpp"
 #include "collider_velocity.hpp"
+#include "stream_configuration.hpp"
 #include "joint_initialization.hpp"
 #include "rage/math.hpp"
 #include "rage/ptr32.hpp"
@@ -152,7 +153,6 @@ extern void ph_vt5A60_61_7A38(void* obj);
 extern void ph_vt5A60_62_8F80(void* obj);
 extern void ph_vt5A7C_63_6A98(void* obj);
 extern void ph_vt5A84_63_6B90(void* obj);
-extern void ph_vt5A8C_63_6A50(void* obj);
 extern void ph_vt5B98_40_8D50(void* obj);
 extern void ph_vt5B98_41_8E50(void* obj);
 extern void* phArchetype_Load(const char*, void*);
@@ -4113,9 +4113,9 @@ void ph_vt5A60_23_Thunk(void* thisPtr) {
 }
 
 // ph_vt5A60_32_7238 @ 0x82467238 | size: 0x8
-// Adjusts this by -16, tail-calls ph_vt5A8C_63_6A50
-void ph_vt5A60_32_Thunk(void* thisPtr) {
-    ph_vt5A8C_63_6A50((char*)thisPtr - 16);
+// Adjusts this by -16, tail-calls phStream_ConfigurePrimary
+int32_t ph_vt5A60_32_Thunk(void* thisPtr, const uint32_t* configuration, uint32_t mode) {
+    return phStream_ConfigurePrimary((char*)thisPtr - 16, configuration, mode);
 }
 
 // ph_vt5A60_34_7240 @ 0x82467240 | size: 0x8
@@ -4180,9 +4180,9 @@ void ph_vt5A60_49_Thunk(void* thisPtr) {
 }
 
 // ph_vt5A60_24_8D00 @ 0x82468D00 | size: 0x8
-// Adjusts this by -16, tail-calls ph_vt5A8C_63_6A50
-void ph_vt5A60_24_Thunk(void* thisPtr) {
-    ph_vt5A8C_63_6A50((char*)thisPtr - 16);
+// Adjusts this by -16, tail-calls phStream_GetRecordField
+int32_t ph_vt5A60_24_Thunk(void* thisPtr, uint32_t* output) {
+    return phStream_GetRecordField((char*)thisPtr - 16, output);
 }
 
 // ph_vt5A60_25_8D08 @ 0x82468D08 | size: 0x8
@@ -4209,10 +4209,12 @@ void ph_vt5A60_31_Thunk(void* thisPtr) {
     ph_vt5A60_57_6858((char*)thisPtr - 16);
 }
 
+int ph_vt5A78_63_GetFloat108(void* thisPtr, float* out); // @ 0x824689B0
+
 // ph_vt5A60_33_8D30 @ 0x82468D30 | size: 0x8
-// Adjusts this by -16, tail-calls ph_vt5A8C_63_6A50
-void ph_vt5A60_33_Thunk(void* thisPtr) {
-    ph_vt5A8C_63_6A50((char*)thisPtr - 16);
+// Adjusts this by -16, tail-calls ph_vt5A78_63_GetFloat108
+int32_t ph_vt5A60_33_Thunk(void* thisPtr, float* output) {
+    return ph_vt5A78_63_GetFloat108((char*)thisPtr - 16, output);
 }
 
 // ph_vt5A60_35_8D40 @ 0x82468D40 | size: 0x8
@@ -4282,9 +4284,9 @@ void ph_vt5B98_38_Thunk(void* thisPtr) {
 }
 
 // ph_vt5B98_12_8D28 @ 0x82468D28 | size: 0x8
-// Adjusts this by -16, tail-calls ph_vt5A8C_63_6A50
-void ph_vt5B98_12_Thunk(void* thisPtr) {
-    ph_vt5A8C_63_6A50((char*)thisPtr - 16);
+// Adjusts this by -16, tail-calls phStream_ConfigurePacked
+int32_t ph_vt5B98_12_Thunk(void* thisPtr, const uint32_t* configuration, uint32_t mode) {
+    return phStream_ConfigurePacked((char*)thisPtr - 16, configuration, mode);
 }
 
 // ph_vt5B98_14_8D38 @ 0x82468D38 | size: 0x8
