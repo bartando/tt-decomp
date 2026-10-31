@@ -8,6 +8,7 @@
  */
 
 #include "ph_physics.hpp"
+#include "bound_lookup.hpp"
 #include "rage/math.hpp"
 
 extern "C" void* rage_alloc(uint32_t size);  // RAGE heap alloc (defined in heap.c)
@@ -96,7 +97,6 @@ extern uint32_t g_identityVec[];  // @ 0x82606740 — 16-byte identity/zero vect
 
 /* --- Physics functions --- */
 extern float phJoint1Dof_AE38(void*);
-extern int phArticulatedCollider_E668(rage::phArticulatedCollider* collider, int boneIndex);
 extern void  phBoundCapsule_CopyEntries(void* a, void* b, int count);
 extern void  phBoundCapsule_9DA0_2h(void* a, void* b, int count);
 extern void  phBoundCapsule_F5F8_p39(void* data);
@@ -5745,7 +5745,6 @@ extern void phArticulatedCollider_F0E0(void* collider);        // Update articul
 extern void phCollider_CDF0_p39(void* collider);               // Update collider position from velocity
 extern void phCollider_vfn_1(void* collider);                  // phCollider::Reset
 extern void phCollider_vfn_42(void* collider);                 // phCollider::SyncAfterBaseUpdate
-extern int32_t phArticulatedCollider_E668_GetJointIndex(void* thisPtr, int jointParam);  // Joint index lookup
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -5801,7 +5800,7 @@ void rage::phArticulatedCollider::DispatchConstraintSolver(void* param1, void* p
 // ─────────────────────────────────────────────────────────────────────────────
 void rage::phArticulatedCollider::AccumulateJointForce(int jointParam, const float* forceVec) {
     // Look up the joint index via E668 helper
-    int32_t jointIndex = phArticulatedCollider_E668_GetJointIndex((void*)this, jointParam);
+    int32_t jointIndex = phArticulatedCollider_E668(this, jointParam);
 
     // Load joint pointer from jointArray[(jointIndex + 10)]
     uint32_t* jointArray = (uint32_t*)(uintptr_t)m_pJointArray;   // +464 (0x1D0)
@@ -10104,7 +10103,6 @@ phInst* phSimulator::FindWeakestInst(uint32_t* breakableArray,
             void** boundVt = *(void***)(uintptr_t)boundPtr;
             uint8_t boundType = *(uint8_t*)((uint8_t*)boundVt + 4);
             if (boundType == 9) {
-                extern uint32_t phBoundComposite_E750(void* bound);
                 numComponents = (int32_t)phBoundComposite_E750(
                     (void*)(uintptr_t)boundPtr);
                 if (numComponents > 128) {

@@ -16,6 +16,7 @@
  */
 
 #include <cstdint>
+#include "crt/rtti.h"
 #include "link/tt_alias.h"
 
 // @ 0x8202D108 (.rdata) — ph_ClampAndSin's upper clamp
@@ -110,3 +111,8 @@ extern "C" float g_phTableA[6] = {};
 
 // @ 0x82079C54 (.rdata) — minimum segment/triangle determinant
 extern "C" const float g_segmentTriangleMinArea = 0.00000762939453125f;
+
+// @ 0x825D2C94 (.data) — RTTI descriptor used by articulated bound lookup.
+RTTITypeDescriptor g_typeDescriptor_phBoundComposite = {
+    nullptr, nullptr, ".?AVphBoundComposite@rage@@"
+};
