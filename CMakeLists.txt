@@ -138,6 +138,7 @@ set(SOURCES
     src/game/camera/pong_camera.cpp
     src/game/camera/pong_camera_helpers.cpp
     src/game/creature/pong_creature.cpp
+    src/game/creature/creature_pose.cpp
     src/game/drill/pong_drill.cpp
     src/game/input/button_edges.cpp
     src/game/input/input_sequence.cpp
