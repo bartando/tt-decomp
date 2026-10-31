@@ -11,7 +11,7 @@ CASES = {
         ('wrong GPU base', '- 0x40000000u;', '+ 0x40000000u;'),
         ('wrong allocation size', 'list->device, 0x1080, 0x80', 'list->device, 0x107C, 0x80'),
         ('wrong fallback process', 'KeGetCurrentProcessType() == 2', 'KeGetCurrentProcessType() == 1'),
-        ('retain failed count', '        list->count = 0;', '        /* count retained */'),
+        ('retain failed head', '        list->head = nullptr;', '        /* head retained */'),
         ('lose first link', 'block[0] = gpuChainAddress(block + 1);', 'block[0] = gpuChainAddress(block);'),
         ('lose previous cursor link', 'if (list->cursor != nullptr)', 'if (false)'),
         ('wrong end sentinel', 'list->end = block + 0x41F;', 'list->end = block + 0x420;'),
@@ -20,8 +20,8 @@ CASES = {
     'grc_command_stream_refill': [
         ('ignore active guard', 'field<uint32_t>(device, 0x34E0) == 0', 'true'),
         ('wrong disabled bit', '(field<uint8_t>(device, 0x28C0) & 0x80) == 0 &&\n        g_grcThreadCommandTracking', '(field<uint8_t>(device, 0x28C0) & 0x40) == 0 &&\n        g_grcThreadCommandTracking'),
-        ('reload source after allocate', 'commands, count, capturedSource, 0,', 'commands, count, source, 0,'),
-        ('wrong append flags', 'commands, count, capturedSource, 0,', 'commands, count, capturedSource, 1,'),
+        ('reload word count after allocate', 'commands, gpuAddress, capturedWordCount, 0,', 'commands, gpuAddress, wordCount, 0,'),
+        ('wrong append flags', 'commands, gpuAddress, capturedWordCount, 0,', 'commands, gpuAddress, capturedWordCount, 1,'),
         ('omit finalize', '    rage_A780(device);', '    /* finalize lost */'),
         ('ignore tracking global', 'g_grcThreadCommandTracking != 0', 'true'),
         ('wrong handle adjustment', 'field<uint32_t>(device, 0x289C) - 2', 'field<uint32_t>(device, 0x289C) - 1'),
@@ -30,7 +30,7 @@ CASES = {
     ],
     'grc_command_stream_submit': [
         ('clear wrong flag', 'field<uint8_t>(device, 0x28C0) &= 0xFD;', 'field<uint8_t>(device, 0x28C0) &= 0xFE;'),
-        ('grow on exact fit', 'reinterpret_cast<uintptr_t>(list->end))', 'reinterpret_cast<uintptr_t>(list->end) - 1)'),
+        ('grow on exact fit', 'reinterpret_cast<uintptr_t>(cursor) + 4 > reinterpret_cast<uintptr_t>(list->end))', 'reinterpret_cast<uintptr_t>(cursor) + 4 >= reinterpret_cast<uintptr_t>(list->end))'),
         ('wrong command opcode', '*cursor = 0x85000000u;', '*cursor = 0x84000000u;'),
         ('lose cursor advance', 'list->cursor = cursor + 1;', 'list->cursor = cursor;'),
         ('wrong skip-submit bit', '(field<uint8_t>(device, 0x28C0) & 0x10) == 0', '(field<uint8_t>(device, 0x28C0) & 0x20) == 0'),
