@@ -343,6 +343,7 @@ set(SOURCES
     src/rage/math/polygon_clip.cpp
     src/rage/math/swf_matrix.cpp
     src/rage/math/mat44.cpp
+    src/rage/math/mat33_extract_euler.cpp
     src/rage/math/mat33.cpp
     src/rage/math/mat33_orthonormalize.cpp
     src/rage/math/mat34_transform.cpp

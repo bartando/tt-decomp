@@ -6901,7 +6901,6 @@ void phBound_RelocatePointers(void* thisPtr, void* relocDesc) {
 extern int32_t phBoundCapsule_ResolvePlayerIndex(void* capsuleData);
 extern void phBoundCapsule_ComputeAngleXZ(void* camera, float fovHoriz, float fovVert);
 extern void phBoundCapsule_UpdateCapsuleState(void* camera);
-extern void phBoundCapsule_DecomposeRotation(float* inMatrix, float* row0, float* row1, float* row2, float* row3);
 
 // ---------------------------------------------------------------------------
 // 1. phBoundCapsule::TestPointContainment @ 0x822A4288 | size: 0xAC
@@ -7161,57 +7160,7 @@ float phBoundCapsule_TransformPointToLocal(void* capsule, const float* worldPoin
     return capsuleDistance;
 }
 
-// ---------------------------------------------------------------------------
-// 10. phBoundCapsule::DecomposeMatrixToEuler @ 0x820D0658 | size: 0xE8
-//     Decomposes a 4x4 rotation matrix into Euler angles (stored as a
-//     3-component vector). Extracts pitch from the matrix, computes yaw
-//     and roll via atan2 on the remaining matrix rows.
-//     Output: [0]=roll, [1]=yaw, [2]=pitch (in capsule convention)
-// ---------------------------------------------------------------------------
-void phBoundCapsule_DecomposeMatrixToEuler(const float* matrix, float* outEuler) {
 
-    // Copy the 4x4 matrix to local storage for decomposition
-    float localMatrix[16];
-    memcpy(localMatrix + 0,  matrix + 0,  16);  // row 0
-    memcpy(localMatrix + 4,  matrix + 4,  16);  // row 1
-    memcpy(localMatrix + 8,  matrix + 8,  16);  // row 2
-    memcpy(localMatrix + 12, matrix + 12, 16);  // row 3
-
-    // Decompose: extract axis angles from the 3x3 rotation sub-matrix
-    phBoundCapsule_DecomposeRotation(localMatrix, localMatrix, localMatrix + 4,
-                          localMatrix + 8, localMatrix + 12);
-
-    // Compute pitch angle from rows 1 and 2 (atan2)
-    float pitchY = localMatrix[6];   // row1[2] = element (1,2)
-    float pitchX = localMatrix[5];   // row1[1] = element (1,1)
-
-    float pitch;
-    if (pitchY == g_floatZero && pitchX == g_floatZero) {
-        pitch = g_floatZero;
-    } else {
-        pitch = (float)ph_Atan2f(pitchX, pitchY);
-    }
-
-    // Compute yaw from rows 2 and 3
-    float yawY = localMatrix[10];   // row2[2]
-    float yawX = localMatrix[8];    // row2[0]
-
-    float yaw;
-    if (yawY == g_floatZero && yawX == g_floatZero) {
-        yaw = g_floatZero;
-    } else {
-        yaw = (float)ph_Atan2f(yawX, yawY);
-    }
-
-    // Compute roll from the Z-axis component
-    float rollInput = -localMatrix[9];  // -row2[1]
-    float roll = (float)crt_asin(rollInput);
-
-    // Store Euler angles
-    outEuler[1] = (float)yaw;
-    outEuler[2] = (float)pitch;
-    outEuler[0] = (float)roll;
-}
 
 // =========================================================================
 // rage::phArticulatedCollider -- Additional Virtual Methods
