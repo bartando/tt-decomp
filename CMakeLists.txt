@@ -144,6 +144,7 @@ set(SOURCES
     src/game/ball/ball_prediction_step.cpp
     src/game/ball/ball_prediction_queries.cpp
     src/game/ball/ball_prediction_hit_ids.cpp
+    src/game/ball/ball_prediction_hit_queries.cpp
     src/game/ball/ball_prediction_postprocess.cpp
     src/game/ball/ball_prediction_quaternion.cpp
     src/game/camera/pong_camera.cpp
