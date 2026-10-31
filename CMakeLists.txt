@@ -139,6 +139,7 @@ set(SOURCES
     src/game/ball/ball_shot_trajectory.cpp
     src/game/ball/ball_process_hit.cpp
     src/game/ball/ball_playback.cpp
+    src/game/ball/ball_visual_spin.cpp
     src/game/ball/ball_prediction_stream.cpp
     src/game/ball/ball_prediction_step.cpp
     src/game/ball/ball_prediction_queries.cpp
@@ -227,6 +228,7 @@ set(SOURCES
     src/rage/math/swf_matrix.cpp
     src/rage/math/mat44.cpp
     src/rage/math/mat33.cpp
+    src/rage/math/mat33_orthonormalize.cpp
     src/game/input/button_edges.cpp
     src/game/player/player_state_queries.cpp
     src/game/misc/ccal_ring_buffer.cpp
