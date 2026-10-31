@@ -210,7 +210,6 @@ void* g_pPlayerSlotTable = NULL;
 void* g_pPlayerDataTable = NULL;
 void* g_pPlayerDataTable_slot = NULL;
 void* g_pPlayerLerpTable = NULL;
-void* g_plrPlayerMgr_state = NULL;
 
 // ============================================================================
 // Network System Globals

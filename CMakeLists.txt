@@ -164,6 +164,7 @@ set(SOURCES
     src/game/cutscene/gd_cutscene_strings.cpp
     src/game/cutscene/pong_cutscene.cpp
     src/game/data/gd_data.cpp
+    src/game/data/player_manager_state.cpp
     src/game/template_registry.cpp
     src/game/game_message.cpp
     src/game/game_message_data.cpp

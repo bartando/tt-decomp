@@ -1,3 +1,4 @@
+#include "game/player_manager_state.hpp"
 /**
  * gd_data.cpp — Game data management classes
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -35,7 +36,6 @@ struct rageAllocator {
 };
 
 // Global state
-extern uint32_t g_plrPlayerMgr_state;  // @ 0x82606430 (lis 0x8260 + 0x6430)
 extern uint32_t* g_sda_base;            // @ SDA:0x82600000 - Small Data Area base
 
 // Serialization / XML support
@@ -143,7 +143,7 @@ void plrPlayerMgr_ReleaseResourcePairs(void* subObjectArrayBase) {
 plrPlayerMgr::~plrPlayerMgr() {
     vtable    = (void**)0x82039A24;
     m_vtable2 = (void**)0x82039AB0;
-    g_plrPlayerMgr_state = 0;
+    g_plrPlayerMgr_state = nullptr;
 
     for (int i = 1; i >= 0; i--) {
         plrPlayerMgr_ReleaseResourcePairs(m_subObjects[i]);
