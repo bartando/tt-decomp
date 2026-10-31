@@ -34,7 +34,6 @@ extern "C" {
     void swfFile_DestroyResources(void* ptr);   // @ 0x824035B0 — releases child resource array entries
     void swfInstance_Cleanup(void* ptr);        // @ 0x823FB670 — unlinks instance from display list
     void swfSymtab_Enumerate(void* symtab);     // @ 0x823FED10 — enumerate symtab members
-    const char* swfInternString(const char* name, void* buffer, int maxLen);  // string interning
     void* swfInstanceConstruct(void* storage);  // @ 0x823FB570
     void rage_DebugLog(const char* msg, ...);    // debug log stub (no-op)
     void swfSymtab_Delete(void* symtab, const char* key);   // symtab key delete
@@ -2155,42 +2154,21 @@ void swfACTIONFUNC::Invoke(const char* methodName, void* args, int argCount, voi
 // Local entries store 8-byte {value, type} pairs in m_pLocalValues (+7328).
 // ─────────────────────────────────────────────────────────────────────────────
 uint32_t swfACTIONFUNC::GetMember(const char* name, void* result) {
-    // Intern the name string
-    char internBuffer[SWF_INTERN_BUFFER_SIZE];
-    extern const char* swfInternString(const char* name, void* buffer, int maxLen);
-    const char* interned = swfInternString(name, internBuffer, SWF_INTERN_BUFFER_SIZE);
-
-    // Search local variable table
-    int localCount = m_localCount;  // +132
-    if (localCount > 0) {
-        const char* localNames = (const char*)this + 136;  // local name table
-        for (int i = 0; i < localCount; i++) {
-            // Compare interned name against local name entry (byte-by-byte)
-            const char* entryName = localNames + i * 128;
-            const char* src = interned;
-            const char* dst = entryName;
-            int diff = 0;
-            while (*src != '\0') {
-                diff = (int)(uint8_t)*src - (int)(uint8_t)*dst;
-                if (diff != 0) break;
-                src++;
-                dst++;
-            }
-            if (diff == 0) {
-                // Found — copy 8-byte value pair from m_pLocalValues
-                uint32_t* localValues = (uint32_t*)m_pLocalValues;  // +7328
-                uint32_t* out = (uint32_t*)result;
-                out[0] = localValues[i * 2];
-                out[1] = localValues[i * 2 + 1];
-                return true;
-            }
+    char nameBuffer[SWF_INTERN_BUFFER_SIZE];
+    // r4 is a tagged SWF value, as in the other script GetMember methods.
+    const char* text = util_A768_1(name, nameBuffer, sizeof(nameBuffer));
+    const int localCount = m_localCount;
+    for (int i = 0; i < localCount; ++i) {
+        const char* entry = reinterpret_cast<const char*>(_padLocalTable) + i * 128;
+        if (std::strcmp(text, entry) == 0) {
+            auto* values = static_cast<uint32_t*>(m_pLocalValues);
+            auto* out = static_cast<uint32_t*>(result);
+            out[0] = values[i * 2];
+            out[1] = values[i * 2 + 1];
+            return 1;
         }
     }
-
-    // Not found locally — delegate to inner MovieClip's GetMember (slot 10).
-    swfINSTANCE* innerObj = m_pInnerObject;  // +7332
-    if (!innerObj) return false;
-    return innerObj->GetMember(name, result);
+    return m_pInnerObject->GetMember(name, result);
 }
 
 int swfACTIONFUNC::VisitMembers() {
@@ -2756,9 +2734,6 @@ void swfFile_DestroyResources(void* file) { (void)file; }
 void swfInstance_Cleanup(void* instance) { (void)instance; }
 float swfComputeFramePosition(void* a, void* b, float* c, float* d) {
     (void)a; (void)b; if (c) *c = 0.0f; if (d) *d = 0.0f; return 0.0f;
-}
-const char* swfInternString(const char* a, void* b, int c) {
-    (void)b; (void)c; return a;
 }
 // @ 0x82403270
 void* swfPopResult(void* dst) {

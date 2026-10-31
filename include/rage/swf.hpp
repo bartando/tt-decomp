@@ -213,7 +213,7 @@ public:
     void Invoke(const char* methodName, void* args, int argCount, void* outResult) override;  // @ 0x823FF4D0
 
     // ── member fields ──
-    uint8_t     _padAction04[120];   // padding after swfSCRIPTOBJECT fields
+    uint8_t     _padAction04[112];   // 20-byte script base -> local count at +0x84
     int         m_localCount;        // +132 (0x84)
     uint8_t     _padLocalTable[7192]; // local name table (+136 .. +7327)
     void*       m_pLocalValues;      // +7328 (0x1CA0)
@@ -221,6 +221,11 @@ public:
     // Declared as swfINSTANCE* so forwarding thunks can use virtual dispatch.
     swfINSTANCE* m_pInnerObject;     // +7332 (0x1CA4)
 };
+
+static_assert(sizeof(void*) != 4 || __builtin_offsetof(swfACTIONFUNC, m_localCount) == 0x84,
+              "swfACTIONFUNC local count layout");
+static_assert(sizeof(void*) != 4 || __builtin_offsetof(swfACTIONFUNC, m_pInnerObject) == 0x1CA4,
+              "swfACTIONFUNC inner object layout");
 
 /**
  * swfSCRIPTARRAY @ vtable 0x82074E4C
