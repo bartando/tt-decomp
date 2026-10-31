@@ -299,6 +299,31 @@ def _signed_unpack() -> list[str]:
     return errors
 
 
+def _float_comparison() -> list[str]:
+    """Tolerance must never make an infinity equal a finite value or its opposite."""
+    checker = object.__new__(Checker)
+    errors = []
+    nan, inf = float("nan"), float("inf")
+    equal = [(0.0, -0.0), (1.0, 1.0), (inf, inf), (-inf, -inf), (nan, nan)]
+    unequal = [(inf, -inf), (inf, 0.0), (-inf, 0.0), (inf, 1e300),
+               (-inf, -1e300), (nan, 1.0), (nan, inf)]
+    for tolerance in (0.0, 1e-99, 1e-5, 1e100):
+        checker.ftol = tolerance
+        for a, b in equal:
+            if not checker.feq(a, b):
+                errors.append(f"tolerance {tolerance}: {a} and {b} must compare equal")
+        for a, b in unequal:
+            if checker.feq(a, b) or checker.feq(b, a):
+                errors.append(f"tolerance {tolerance}: {a} and {b} must differ in either order")
+    checker.ftol = 1e-99
+    if checker.feq(1.0, 1.0 + 2**-23) or checker.feq(0.0, 2**-149):
+        errors.append("tiny tolerance accepted unequal float32 values")
+    checker.ftol = 1e-5
+    if not checker.feq(1.0, 1.0 + 1e-6) or checker.feq(1.0, 1.01):
+        errors.append("finite relative tolerance comparison is incorrect")
+    return errors
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="lift-check selftest")
     ap.add_argument("--isa", action="store_true", help="only the instruction tests")
@@ -307,6 +332,12 @@ def main(argv=None) -> int:
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args(argv or [])
     bad = 0
+
+    float_errors = _float_comparison()
+    print(f"{'ok  ' if not float_errors else 'FAIL'} finite/nonfinite float comparison regressions")
+    for line in float_errors:
+        print(f"     {line}")
+    bad += bool(float_errors)
 
     from .calltests import regressions
     call_errors = regressions()

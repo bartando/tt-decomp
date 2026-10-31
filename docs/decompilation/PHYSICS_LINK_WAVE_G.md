@@ -47,6 +47,11 @@ CMake includes the new lookup source.
   new lookup helper or descriptor appears in the final native linker errors.
 - The local `tools/lift-check/.venv/` is a real Python 3.13 venv with Unicorn,
   created with the requested `uv` commands. The lift-check README is unchanged.
+- Fixed a shared checker bug where nonzero tolerance accepted infinity against
+  a finite value or opposite infinity. A selftest covers finite/nonfinite pairs,
+  signed zero, NaNs and finite tolerance; restoring the old comparator produces
+  15 regression failures. The velocity specs and their mutations pass with the
+  stricter comparator.
 - This is emulator and native-build verification, not console or gameplay testing.
 
 Mutation runners live in `tools/lift-check/specs/`:
