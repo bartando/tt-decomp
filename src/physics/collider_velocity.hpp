@@ -113,3 +113,5 @@ struct phInstMotionOps {
     virtual void ReservedSlot27() = 0;
     virtual void SynchronizeBounds() = 0;
 };
+
+void phVector_AccumulateProjected(float* current, const float* delta); // @ 0x8223ACB0

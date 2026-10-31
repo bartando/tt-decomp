@@ -31,6 +31,7 @@ double crt_floor(double value); // @ 0x82431910
 double crt_sqrt(double value);  // @ 0x824301D0 — fsqrt, rounded by its callers
 
 static float phFlushVmx(float value);
+void phSphere_RebuildBounds(void* bound); // @ 0x82295598
 
 // ─────────────────────────────────────────────────────────────────────────────
 // File-local helpers
@@ -125,7 +126,6 @@ extern void phArticulatedCollider_8450(void* jointData); // @ 0x82258450
 extern void ph_Sqrtf_joint(rage::phJoint3Dof*, float);
 extern void phArticulatedCollider_8A30(void* jointData, const float* velocity); // @ 0x82258A30
 extern void phArticulatedCollider_8B10(void* jointData, const float* angularVelocity); // @ 0x82258B10
-extern void phBoundCapsule_ACB0_p45(void* capsule);
 extern "C" void phCollider_vfn_4(rage::phArticulatedCollider* collider);
 extern void phInst_5910_p39(void* obj);
 extern void phJoint1Dof_AFF8_p42(rage::phJoint3Dof*, int, float*);
@@ -1595,44 +1595,22 @@ float phVec3MagSquared(const float* vector) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ph_AdvanceSegmentedPtr @ 0x820C3870 | size: 0x38
-//
-// Advances a pointer within a segmented array structure. This function:
-// 1. Checks if the input pointer is valid (non-null)
-// 2. Calculates which segment the pointer is in
-// 3. Advances the pointer by the segment stride
-//
-// Used for iterating through physics data structures with non-contiguous memory.
-//
-// Parameters:
-//   arrayBase - Base pointer to the segmented array structure
-//   ptrToAdvance - Pointer to advance (modified in-place)
+// Relocate a non-null four-byte pointer using the resource descriptor's base,
+// unsigned segment size and signed per-segment adjustment. Null skips the
+// descriptor entirely; a zero divisor traps like the original.
 // ─────────────────────────────────────────────────────────────────────────────
-void ph_AdvanceSegmentedPtr(void* arrayBase, void** ptrToAdvance) {
-    uint8_t* base = (uint8_t*)arrayBase;
-    uint32_t currentPtr = *(uint32_t*)ptrToAdvance;
-    
-    // Early exit if pointer is null
-    if (currentPtr == 0) {
-        return;
-    }
-    
-    // Load array metadata
-    uint32_t arrayStart = *(uint32_t*)(base + 4);
-    uint32_t elementStride = *(uint32_t*)(base + 76);
-    
-    // Calculate element index
-    uint32_t offset = currentPtr - arrayStart;
-    uint32_t elementIndex = offset / elementStride;
-    
-    // Calculate segment table index (index + 2)
-    uint32_t segmentIndex = (elementIndex + 2) * 4;
-    
-    // Load segment base offset
-    uint32_t segmentOffset = *(uint32_t*)(base + segmentIndex);
-    
-    // Advance pointer by segment offset
-    uint32_t newPtr = segmentOffset + currentPtr;
-    *(uint32_t*)ptrToAdvance = newPtr;
+void ph_AdvanceSegmentedPtr(void* arrayBase, void* ptrToAdvance) {
+    auto* slot = static_cast<rage::ptr32<uint8_t>*>(ptrToAdvance);
+    auto* current = slot->get();
+    if (!current) return;
+    auto* start = rage::load_ptr32<uint8_t>(arrayBase, 4);
+    const auto* words = static_cast<const uint32_t*>(arrayBase);
+    const uint32_t stride = words[0x4c / 4];
+    if (!stride) __builtin_trap();
+    const uint32_t offset = static_cast<uint32_t>(current - start);
+    const uint32_t index = offset / stride;
+    const int32_t adjustment = static_cast<int32_t>(words[index + 2]);
+    *slot = current + adjustment;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -6171,7 +6149,6 @@ void phCollisionPairArrayInit(void* contactPair) {
 
 // Forward declarations for init helpers
 extern void snListNode_Init(void* listNode);           // Intrusive list node init
-extern void phBoundSphere_vfn_37(void* bound); // Sphere-specific init
 extern void ph_9BC0(void* listHead);           // Collision list init
 
 // Global identity-like AABB template vector
@@ -6375,7 +6352,7 @@ void phBoundSphere_Constructor(void* thisPtr) {
 
     *(uint32_t*)(obj + 128) = 0;
 
-    phBoundSphere_vfn_37(thisPtr);
+    phSphere_RebuildBounds(thisPtr);
 
     *(uint32_t*)(obj + 132) = 0;
     *(uint32_t*)(obj + 136) = 0;
@@ -7446,7 +7423,6 @@ void rage::phArticulatedCollider::DispatchJointSolve(int index) {
 extern void snListNode_Init(void* listHead);                     // Intrusive list head init
 extern void ph_9BC0(void* thisPtr);                      // Collision manager base init
 extern void ph_1310(void* thisPtr);                      // phBoundGeometry base init
-extern void phBoundSphere_vfn_37(void* thisPtr);         // phBoundSphere finalize init
 
 extern uint8_t g_phBoundInitialized;                     // @ 0x826064E0
 extern float g_identityVector[4];                        // @ 0x82606740
@@ -7748,11 +7724,10 @@ void rage::phArticulatedCollider::DispatchJointSlot7(int jointIndex) {
 // ─────────────────────────────────────────────────────────────────────────────
 // phArticulatedCollider::DelegateToBoundCapsule (vfn_24) @ 0x822CC700 | size: 0x8
 //
-// Adjusts 'this' by +352 to reach the embedded phBoundCapsule sub-object,
-// then tail-calls phBoundCapsule_ACB0_p45.
+// Adds a projected correction into the accumulated displacement at +352.
 // ─────────────────────────────────────────────────────────────────────────────
-void rage::phArticulatedCollider::DelegateToBoundCapsule() {
-    phBoundCapsule_ACB0_p45((char*)this + 352);
+void rage::phArticulatedCollider::DelegateToBoundCapsule(const float* delta) {
+    phVector_AccumulateProjected(reinterpret_cast<float*>((uint8_t*)this + 0x160), delta);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -8349,7 +8324,6 @@ void phBoundSphere::SetPositionAndUpdateFlags(const float* position) {
 // External declarations
 extern void ph_ctor_FFD8(void* thisPtr, void* param);
 // extern void ph_GetSimulationContext(void* thisPtr);  // removed: conflicts with definition returning void*
-extern void ph_AdvanceSegmentedPtr(void* param, void* dest);
 
 // ---------------------------------------------------------------------------
 // phBoundGeometryIntermediate_Constructor @ 0x82291310 | size: 0x6C (108B)
@@ -12131,4 +12105,38 @@ void phBound_TransformWorldCentroid(void* self, const float* matrix) {
         rage::phBound_TransformCentroid(static_cast<const float*>(self), matrix,
                                       reinterpret_cast<float*>(static_cast<char*>(self) + 0x40));
     }
+}
+
+extern "C" float lbl_82619BF0[4]; // @ 0x82619BF0 — mutable rsqrt sentinel
+extern "C" const float lbl_825CB7D0[4]; // @ 0x825CB7D0 — half vector
+
+// @ 0x82295598
+void phSphere_RebuildBounds(void* bound) {
+    auto* bytes = static_cast<uint8_t*>(bound);
+    auto* values = reinterpret_cast<float*>(bound);
+    const float radius = values[2];
+    const float negativeRadius = -radius;
+    values[3] = radius;
+    for (unsigned lane = 0; lane < 4; ++lane) {
+        values[4 + lane] = radius;
+        values[8 + lane] = negativeRadius;
+    }
+    if (!bytes[5]) return;
+    float center[4];
+    memcpy(center, bytes + 0x30, 16);
+    for (unsigned lane = 0; lane < 4; ++lane)
+        values[4 + lane] = phFlushVmx(phFlushVmx(radius) + phFlushVmx(center[lane]));
+    for (unsigned lane = 0; lane < 4; ++lane)
+        values[8 + lane] = phFlushVmx(phFlushVmx(negativeRadius) + phFlushVmx(center[lane]));
+    const float squaredLength = phDotVmx(center, center, 3);
+    const float estimate = phFlushVmx(static_cast<float>(1.0 / sqrt(double(squaredLength))));
+    const float y = estimate == phFlushVmx(lbl_82619BF0[0]) ? lbl_82606750[0] : estimate;
+    const float ySquared = phFlushVmx(phFlushVmx(y) * phFlushVmx(y));
+    const float halfY = phFlushVmx(phFlushVmx(lbl_825CB7D0[0]) * phFlushVmx(y));
+    const float product = phFlushVmx(phFlushVmx(squaredLength) * phFlushVmx(ySquared));
+    const float error = phFlushVmx(-(product - phFlushVmx(lbl_825CB7C0[0])));
+    const float correction = phFlushVmx(phFlushVmx(error) * phFlushVmx(halfY));
+    const float refined = phFlushVmx(correction + phFlushVmx(y));
+    const float length = phFlushVmx(phFlushVmx(squaredLength) * refined);
+    values[3] = radius + length;
 }

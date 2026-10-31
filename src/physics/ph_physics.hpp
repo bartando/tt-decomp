@@ -450,7 +450,7 @@ struct phArticulatedCollider {
     void BuildJointAngularResponse(int boneIndex);
     void DispatchJointSlot12(int jointIndex, float* outVec);
     void DispatchJointSlot7(int jointIndex);
-    void DelegateToBoundCapsule();
+    void DelegateToBoundCapsule(const float* delta);
     void DispatchJointSlot5(int jointIndex);
     float GetJointStiffness(int jointIndex);
     void AccumulateForceAtJoint(const float* forceVec, int boneIndex);

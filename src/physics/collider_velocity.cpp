@@ -172,3 +172,25 @@ void phCollider_PublishTransform(void* collider) {
     }
     std::memcpy(instance + 0x10, matrix, 64);
 }
+
+// @ 0x8223ACB0
+void phVector_AccumulateProjected(float* current, const float* delta) {
+    float old[4], increment[4], result[4];
+    std::memcpy(old, current, 16);
+    std::memcpy(increment, delta, 16);
+    const float projection = dot3(old, increment);
+    if (projection <= g_floatZero) {
+        for (unsigned i = 0; i < 4; ++i)
+            result[i] = flush(flush(old[i]) + flush(increment[i]));
+    } else {
+        const float magnitudeSquared = dot3(increment, increment);
+        if (!(magnitudeSquared > projection)) return;
+        const float fraction = projection / magnitudeSquared;
+        const float scale = g_floatOne - fraction;
+        for (unsigned i = 0; i < 4; ++i) {
+            const float product = flush(flush(increment[i]) * flush(scale));
+            result[i] = flush(product + flush(old[i]));
+        }
+    }
+    std::memcpy(current, result, 16);
+}
