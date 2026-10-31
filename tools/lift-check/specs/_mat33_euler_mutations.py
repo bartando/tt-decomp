@@ -1,4 +1,4 @@
-"""Mutation proof for both recovered Euler extraction conventions."""
+"""Mutation proof for the recovered Euler extraction conventions and heading cache."""
 import contextlib
 import io
 from pathlib import Path
@@ -20,6 +20,20 @@ CASES = [
         ('wrong asin sign', 'crt_asin(-basis[9])', 'crt_asin(basis[9])'),
         ('swap X output', 'angles[0] = x;', 'angles[0] = z;'),
     ]),
+    ('mat33_extract_euler_xzy', SOURCE, 'void mat33ToEulerXZY(', [
+        ('skip orthonormalization', 'mat33Orthonormalize(basis);', '(void)basis;'),
+        ('wrong asin element', 'crt_asin(-basis[4])', 'crt_asin(-basis[2])'),
+        ('reverse Y atan', 'basis[8], basis[0]', 'basis[0], basis[8]'),
+        ('wrong X atan', 'basis[6], basis[5]', 'basis[6], basis[10]'),
+    ]),
+    ('locomotion_cache_matrix_heading', 'src/game/creature/pong_creature.cpp', 'void* LocomotionStateAnim_47E8_g(', [
+        ('wrong translation row', 'static_cast<uint8_t*>(matrix) + 0x30', 'static_cast<uint8_t*>(matrix) + 0x20'),
+        ('drop cached W', 'std::memcpy(output + 0x10, translation, 16);', 'std::memcpy(output + 0x10, translation, 12);'),
+        ('wrong Euler heading', 'float heading = angles[1];', 'float heading = angles[0];'),
+        ('skip negative canonicalization', 'if (heading < 0.0f) heading += g_twoPi;', '(void)heading;'),
+        ('return matrix', 'return self;', 'return matrix;'),
+    ]),
+
 ]
 
 

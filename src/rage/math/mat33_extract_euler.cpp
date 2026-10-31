@@ -42,4 +42,18 @@ void mat33ToEulerZXY(const float* matrix, float* angles) {
     angles[0] = x;
 }
 
+// @ 0x82234360
+void mat33ToEulerXZY(const float* matrix, float* angles) {
+    alignas(16) float basis[16];
+    std::memcpy(basis, matrix, 64);
+    mat33Orthonormalize(basis);
+    const float z = static_cast<float>(crt_asin(-basis[4]));
+    const float zero = lbl_8202D110;
+    const float y = angleOrZero(basis[8], basis[0], zero);
+    const float x = angleOrZero(basis[6], basis[5], zero);
+    angles[0] = x;
+    angles[1] = y;
+    angles[2] = z;
+}
+
 } // namespace rage
