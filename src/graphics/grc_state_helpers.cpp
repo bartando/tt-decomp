@@ -8,6 +8,8 @@ extern "C" void grcDevice_SetViewport(void* device, const void* viewport); // @ 
 void grcDevice_FlushDirtyRegisterGroup(void* device, uint64_t dirty, uint32_t firstRegister,
                                       const uint32_t* values); // @ 0x82362658
 
+extern "C" const uint8_t g_shaderConstantData[440]; // @ 0x8202C328
+
 namespace {
 template<class T> T read(const void* base, uint32_t offset) {
     T value;
@@ -166,4 +168,42 @@ uint32_t* grcDevice_WriteRegisterRunOverflow(void* device, uint32_t* cursor,
         // The refill's stored cursor, not its return register, is authoritative.
         cursor = rage::load_ptr32<uint32_t>(device, 0);
     }
+}
+
+// Upload the two retail constant programs, reset resolve state, and establish
+// the 16x16 scissor. Keep each publication/refill at the original packet boundary.
+// @ 0x8235CB48 | size: 0x23C
+void grcCommandBuffer_initShaderConstants(void* device) {
+    grc_3E20(device);
+    uint32_t* cursor = reserve(device);
+    *++cursor = 0xC01C2B00; *++cursor = 0; *++cursor = 27;
+    std::memcpy(cursor + 1, g_shaderConstantData + 40, 108);
+    cursor += 27;
+    publish(device, cursor);
+
+    cursor = reserve(device);
+    *++cursor = 0xC00A2B00; *++cursor = 1; *++cursor = 9;
+    std::memcpy(cursor + 1, g_shaderConstantData, 36);
+    cursor += 9;
+    *++cursor = 0x12180; *++cursor = 0x10010001; *++cursor = 0;
+    publish(device, cursor);
+
+    cursor = reserve(device);
+    cursor = grc_DBF8(device, cursor);
+    *++cursor = 0x2200; *++cursor = 0;
+    *++cursor = 0x2203; *++cursor = 0;
+    write(device, 0x28, read<uint64_t>(device, 0x28) | UINT64_C(0x20000000));
+    write(device, 0x30, read<uint64_t>(device, 0x30) | UINT64_C(0x180));
+    write(device, 0x20, read<uint64_t>(device, 0x20) | (UINT64_C(1) << 63));
+    write(device, 0x28, read<uint64_t>(device, 0x28) | (UINT64_C(1) << 37) | (UINT64_C(1) << 34));
+    *++cursor = 0x2208; *++cursor = 4;
+    *++cursor = 0x2104; *++cursor = 0;
+    *++cursor = 0x2202; *++cursor = 0;
+    *++cursor = 0x2201; *++cursor = 0x10001;
+    write(device, 0x28, read<uint64_t>(device, 0x28) | (UINT64_C(1) << 59) | (UINT64_C(1) << 35) | (UINT64_C(1) << 36));
+    write(device, 0x20, read<uint64_t>(device, 0x20) | UINT64_C(0x10000000));
+    publish(device, cursor);
+    grcDevice_SetScissorRect(device, 0, 0, 16, 16);
+    write(device, 0x28C1, uint8_t(read<uint8_t>(device, 0x28C1) | 8));
+    write(device, 0x30, read<uint64_t>(device, 0x30) | UINT64_C(0x20));
 }

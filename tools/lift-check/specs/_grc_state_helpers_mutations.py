@@ -53,7 +53,12 @@ CASES = [
          "        rage_A980(device);\n        // The refill's stored cursor, not its return register, is authoritative.\n        cursor = rage::load_ptr32<uint32_t>(device, 0);",
          '        cursor = static_cast<uint32_t*>(rage_A980(device));'),
     ]),
-
+    ('grc_state_shader_constants', 'void grcCommandBuffer_initShaderConstants(', [
+        ('short upload', 'g_shaderConstantData + 40, 108', 'g_shaderConstantData + 40, 104'),
+        ('wrong first publication', 'cursor += 27;', 'cursor += 26;'),
+        ('wrong scissor', 'device, 0, 0, 16, 16', 'device, 0, 0, 15, 16'),
+        ('omit pending flag', 'uint8_t(read<uint8_t>(device, 0x28C1) | 8)', 'read<uint8_t>(device, 0x28C1)'),
+    ]),
 ]
 
 def main():

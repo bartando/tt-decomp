@@ -16,3 +16,7 @@ void grc_3E20(void* device); // @ 0x82363E20
 #ifdef __cplusplus
 }
 #endif
+
+#ifdef __cplusplus
+void grcCommandBuffer_initShaderConstants(void* device); // @ 0x8235CB48
+#endif
