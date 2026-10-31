@@ -10,7 +10,7 @@ FUNCTION = "pongMatch_GetCharacterForSlot"
 ADDRESS = 0x821C9C00
 SOURCE = "src/game/player/pong_player.cpp"
 TRIALS = 1200
-# Other TUs disagree about these names; the instructions load these addresses.
+# Canonical manager slot and game-data manager loaded by the instructions.
 EXTERNS = {"g_plrPlayerMgr_state": 0x82606430, "g_gameDataMgr": 0x8271A2E4}
 
 

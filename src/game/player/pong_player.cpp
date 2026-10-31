@@ -1,3 +1,4 @@
+#include "game/player_manager_state.hpp"
 #include "game/network_timestamp.hpp"
 #include "rage/ptr32.hpp"
 #include "rage/float_approach.hpp"
@@ -4152,7 +4153,6 @@ void pongPlayer_06A0_g(float* outVec,
 // External forward declarations for batch 10
 // ---------------------------------------------------------------------------
 extern uint32_t pongMatch_GetCharacterIndex(uint32_t playerSlot); // @ 0x821C9B70
-extern void* g_plrPlayerMgr_state;  // @ 0x82606430 — native global boundary
 extern void* g_gameDataMgr;           // @ 0x8271A2E4
 extern "C" const char g_pongMatchMissingPlayerMgr[]; // @ 0x8203CD80
 
@@ -4161,13 +4161,13 @@ extern "C" const char g_pongMatchMissingPlayerMgr[]; // @ 0x8203CD80
 // and use character zero; the game-data manager and its array are still used.
 void* pongMatch_GetCharacterForSlot(void* /*match*/, uint32_t playerSlot) {
     uint32_t characterIndex = 0;
-    if (g_plrPlayerMgr_state == 0) {
+    if (!g_plrPlayerMgr_state) {
         nop_8240E6D0(g_pongMatchMissingPlayerMgr);
     } else {
         characterIndex = pongMatch_GetCharacterIndex(playerSlot);
     }
     auto* manager = static_cast<uint8_t*>(g_gameDataMgr);
-    auto* characters = rage::load_ptr32<uint8_t>(manager, 0x18);
+    auto* characters = rage::load_ptr32<rage::ptr32<void>>(manager, 0x18);
     const uint32_t byteOffset = characterIndex * 4u;
     return rage::load_ptr32<void>(characters, byteOffset);
 }

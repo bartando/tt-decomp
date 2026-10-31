@@ -1,3 +1,4 @@
+#include "grc/resource_release.hpp"
 #include "rage/mat33.hpp"
 #include "rage/ref_counted_header.hpp"
 /**
@@ -9585,7 +9586,6 @@ void phBoundCapsule_8C08_2h()
 extern void util_C788(void* obj);
 extern void _locale_register(void* thisPtr, uint32_t key);
 extern void ph_FC68_h(void* subObj);
-extern void grc_2CC8(rage::phInst* inst, uint32_t r4_masked, uint32_t r5_masked);
 extern void phInst_AC00_2hr(rage::phInst* inst);
 extern void phInst_AB00(rage::phInst* inst, void* arg, const char* tag);
 extern void phInst_8F10_p42(void* r3, uint32_t r4_zero, void* r5, void* r6,

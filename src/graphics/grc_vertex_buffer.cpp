@@ -1,3 +1,4 @@
+#include "grc/resource_release.hpp"
 // Vertex attribute writes to the Xbox 360's 32-bit vertex-buffer layout.
 #include <cstddef>
 #include <cstdint>
@@ -128,7 +129,6 @@ extern "C" uint32_t grcResource_Lock(void* resource, uint32_t fence, uint32_t un
                                     uint32_t auxiliary, uint32_t base, uint32_t auxiliaryBase,
                                     uint32_t data, uint32_t size, uint32_t flags,
                                     uint32_t cacheFlags); // @ 0x823529E0
-extern "C" void grc_2CC8(void* resource, uint32_t data, uint32_t auxiliary); // @ 0x82352CC8
 
 // @ 0x82157578 | size: 0xB0
 extern "C" uint8_t pg_7578_g(void* vertexBuffer) {
