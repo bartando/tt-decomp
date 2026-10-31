@@ -947,9 +947,11 @@ TT_DATA_ALIAS("g_assetVersions_verC", "g_aiTypeId_3");  /* @ 0x825C8038 */
 TT_DATA_ALIAS("g_eventType_FootAudio", "g_aiTypeId_2"); /* @ 0x825C803C */
 TT_DATA_ALIAS("g_eventType_Message", "g_aiTypeId_3");   /* @ 0x825C8038 */
 
-/* Shared CRT startup objects: the lifted startup TU only declares them. */
+/* Shared CRT objects: the lifted TUs only declare them. */
 void (*g_single_init_fn)(void) = NULL;  /* @ 0x825B1298 */
 int g_cinit_retval = -1;                /* @ 0x825B0A74 */
+double g_crtExpOverflow = __builtin_inf(); /* @ 0x825B12A8 */
+
 uint8_t g_crt_init_critical_section[8]; /* @ 0x825B0A30 */
 CrtListEntry g_crt_init_callback_list = {  /* @ 0x825B0A4C */
     &g_crt_init_callback_list, &g_crt_init_callback_list

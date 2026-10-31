@@ -55,6 +55,7 @@ set(SOURCES
     # CRT layer
     src/crt/crt_init.c
     src/crt/ctrlfp.cpp
+    src/crt/exp.cpp
     src/crt/fp_helpers.cpp
     src/crt/entry.c
     src/crt/exit.c
@@ -356,6 +357,7 @@ set(SOURCES
     src/rage/math/polygon_clip.cpp
     src/rage/math/swf_matrix.cpp
     src/rage/math/mat44.cpp
+    src/rage/math/normal_density.cpp
     src/rage/math/quat_ops.cpp
     src/rage/math/mat33_extract_euler.cpp
     src/rage/math/mat33.cpp

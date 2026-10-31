@@ -178,7 +178,6 @@ extern void pongCreatureInst_RegisterPhysics(void*, void*);
 /* --- Audio functions --- */
 extern void aud_1498(void* obj);
 extern void aud_6A20_wrap_6A20(void* obj);
-extern double aud_2478(double x);  // exp() approximation @ 0x82432478
 
 /* --- Utility / tokenizer / singleton functions --- */
 extern uint8_t fiAsciiTokenizer_ReadBool(void*, void*, void*);
@@ -9479,40 +9478,7 @@ void CPeakMeterEffect_Create(void* config, void* allocator, void** outResult) {
 
 // (F420 and 5D88 are lifted as GetJointLimitsForAxis and phMatrix_RotateZ)
 
-/**
- * phBoundCapsule_26B8 @ 0x821426B8 | size: 0x84 (132 bytes)
- *
- * Computes an exponential decay factor from a capsule radius and height.
- * Uses the formula: (1/height) * exp(-height^2 / (radius^2 * 3.0))
- *
- * This produces a Gaussian-like falloff used for capsule soft-shadow
- * or contact response weighting.
- *
- * @param height - Capsule height (f1)
- * @param radius - Capsule radius (f3)
- * @return Weighted decay factor
- */
-float phBoundCapsule_26B8(float height, float radius) {
-    float radiusSq = radius * radius;
-
-    // Multiply by constant (3.0 or similar scale) from .rdata
-    float scaledRadiusSq = radiusSq * 3.0f;  // constant from lbl_8202D108+124
-
-    // Call sqrtf on scaled radius squared
-    float expResult = (float)ph_Sqrtf(scaledRadiusSq);
-
-    float heightSq = height * height;
-    float denom = radiusSq * 3.0f;  // reloaded from lbl_8202D108+124
-    float ratio = heightSq / denom;
-
-    // Compute exp(-ratio) via aud_2478
-    float expNegRatio = (float)aud_2478(-ratio);
-
-    float invHeight = 1.0f / expResult;  // 1.0f from lbl_8202D110+0
-    float result = invHeight * expNegRatio;
-
-    return result;
-}
+// (26B8 is rage::normalDensity in rage/math/normal_density.cpp)
 
 // (3F08 lifted as rage::expandAabbByOffsetBox in rage/math/polygon_clip.cpp)
 
