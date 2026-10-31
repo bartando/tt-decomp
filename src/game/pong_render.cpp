@@ -60,6 +60,7 @@ extern uint32_t lbl_825EBAB0;                   // @ 0x825EBAB0  LightType handl
 extern uint32_t lbl_825EBC34;                   // @ 0x825EBC34  Ambient handle
 extern ShaderTable* lbl_825EBC40;          // @ 0x825EBC40
 extern "C" const uint8_t g_shaderParameterDirtyMasks[8];           // @ 0x825D4C80  MSB-first dirty-bit masks
+extern "C" const uint32_t g_shaderMatrixTransposeMasks[3][4]; // @ 0x8202F0A0
 extern const float lbl_825C5938;               // @ 0x825C5938  -1.0f
 extern const float lbl_8202D108;               // @ 0x8202D108  1.0f
 extern "C" uint32_t g_grmShaderFx_variantTable[23];  // @ 0x825EBBD8  pending render state
@@ -334,8 +335,38 @@ extern const ShaderVector lbl_825CA4A8[4];       // @ 0x825CA4A8  paired samplin
 extern const float lbl_825C4890;                // @ 0x825C4890  shadow blend (0.3)
 extern void* game_53C8(pongShadowMap* map, int32_t player, int32_t layer); // @ 0x821453C8
 extern void pongShadowMap_A5C8_g(uint32_t handle, void* texture);         // @ 0x8215A5C8
-extern void game_9AA0(ShaderTable* table, uint32_t handle, const ShaderVector* matrices,
-                      int32_t count);                                  // @ 0x82159AA0
+// @ 0x82159AA0 | size: 0x124
+void game_9AA0(ShaderTable* table, uint32_t handle, const ShaderVector* matrices,
+               int32_t count) {
+    uint32_t* descriptor = table->entries + (handle >> 18) * 2;
+    uint32_t bit = (handle >> 1) & 0x1FFFFu;
+    uint32_t length = count != 0 ? static_cast<uint32_t>(count)
+                                 : ((descriptor[0] >> 2) & 0x3FFFu);
+    const uint32_t end = bit + length;
+    while (bit < end) {
+        // lvx snapshots all four rows before any write; stvx rounds down too.
+        uint32_t matrix[4][4];
+        memcpy(matrix, reinterpret_cast<const void*>(
+            reinterpret_cast<uintptr_t>(matrices) & ~uintptr_t(15)), sizeof(matrix));
+        descriptor += 2;
+        const uint32_t format = (descriptor[0] >> 4) & 7;
+        const uint32_t slot = descriptor[1] & 0xFFFFu;
+        ShaderVector* bank = table->values;
+        const uint32_t* mask = g_shaderMatrixTransposeMasks[(format + 1) / 4];
+        uint32_t output[4][4];
+        for (uint32_t row = 0; row < 4; ++row) {
+            for (uint32_t lane = 0; lane < 4; ++lane) {
+                output[row][lane] = (matrix[row][lane] & ~mask[lane])
+                                  | (matrix[lane][row] & mask[lane]);
+            }
+        }
+        table->dirtyBits[bit >> 3] |= g_shaderParameterDirtyMasks[bit & 7];
+        memcpy(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(bank + slot)
+                                      & ~uintptr_t(15)), output, sizeof(output));
+        ++bit;
+        matrices += 4;
+    }
+}
 
 namespace {
 int32_t shadowTextureDimension(void* texture, int slot) {

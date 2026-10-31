@@ -40,3 +40,10 @@ uint32_t g_ambientCurSlot = 0;        // @ 0x825EBBDC
 // Shared normalized color clamp bounds from the image.
 extern const float g_colorClampMin = 0.0f; // @ 0x8202D110
 extern const float g_colorClampMax = 1.0f; // @ 0x8202D108
+
+// @ 0x8202F0A0 (.rdata) — lvx selects one aligned mask per matrix format.
+extern "C" alignas(16) const uint32_t g_shaderMatrixTransposeMasks[3][4] = {
+    {0, 0, 0, 0},
+    {0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu},
+    {1, 2, 1, 2},
+};
