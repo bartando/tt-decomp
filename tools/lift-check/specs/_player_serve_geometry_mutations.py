@@ -16,8 +16,9 @@ CASES = [
     ]),
     ("player_serve_bone_matrix", [
         ("wrong player slot", "const uint32_t playerSlot = at<uint32_t>(blender, 8);", "const uint32_t playerSlot = 0;"),
-        ("wrong bone id", "at<uint32_t>(blender, 0x1C)", "0"),
-        ("omit bone matrix", "phBoundCapsule_0880_g(skeleton, output, at<uint32_t>(blender, 0x1C));", "(void)skeleton;"),
+        ("wrong sample state", "at<void*>(blender, 0x1C)", "nullptr"),
+        ("underallocate sampled matrix", "alignas(16) pongMatrix34 sampledBone = {};", "struct ShortBone { vec3 a; }; alignas(16) ShortBone sampledBone = {};"),
+        ("omit bone matrix", "phBoundCapsule_0880_g(skeleton, output, at<void*>(blender, 0x1C));", "(void)skeleton;"),
         ("omit time fraction", "const float time = remaining * ballTime;", "const float time = ballTime;"),
         ("omit translation x", "addVmx(origin.x, multiplyVmx(motion.x, time))", "origin.x"),
         ("omit translation w", "addVmx(origin._pad, multiplyVmx(motion._pad, time))", "origin._pad"),
