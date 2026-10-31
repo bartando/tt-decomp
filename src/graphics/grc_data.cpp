@@ -32,7 +32,7 @@ extern "C" void* g_grcRefCountedObjs[4] = {};
 extern "C" void* g_pGrcTextureFactoryString = nullptr;
 
 // @ 0x82617E60 (.data)
-extern "C" void* g_grcRenderObjects[2] = {};
+// g_grcRenderObjects is the complete shared context in network/image_data.cpp.
 
 uint32_t g_ambientStreamSlotCap = 0;  // @ 0x825C8F54
 uint32_t g_ambientMappedSlot = 0;     // @ 0x825EBB84
@@ -42,6 +42,30 @@ uint32_t g_ambientCurSlot = 0;        // @ 0x825EBBDC
 extern const float g_colorClampMin = 0.0f; // @ 0x8202D110
 extern const float g_colorClampMax = 1.0f; // @ 0x8202D108
 
+// GPU shadow-state counters and dimensions from the image.
+extern "C" int32_t lbl_825C9014 = 1; // @ 0x825C9014
+extern "C" int32_t lbl_825C9018 = 1; // @ 0x825C9018
+extern "C" int32_t lbl_825EB97C = 0; // @ 0x825EB97C
+extern "C" uint32_t g_grcShaderPatchSerial = 0; // @ 0x8271A83C
+
+float g_fxBillboardRight[4] = {}; // @ 0x82715FC0
+float g_fxBillboardUp[4] = {}; // @ 0x82715FB0
+float g_fxBillboardRotatedAxes[4096] = {}; // @ 0x82715FD0
+const float g_fxBillboardDefaultUVs[4] = {0, 1, 1, 0}; // @ 0x825C2ADC
+const float* g_fxBillboardUVs = g_fxBillboardDefaultUVs; // @ 0x825C2B10
+
+// @ 0x8202C318
+extern "C" const uint16_t g_grcFetchSwizzleMasks[8] = {
+    0xe000, 0x1c00, 0x380, 0x70, 0x8, 0xa, 0x8, 0xe
+};
+
+// @ 0x82065F68
+extern "C" const uint8_t g_grcFetchFormatSizes[64] = {
+    0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+    0x1, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1, 0x2, 0x0, 0x0, 0x0, 0x0, 0x1,
+    0x2, 0x1, 0x2, 0x4, 0x1, 0x2, 0x4, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
+    0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x3, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0
+};
 // @ 0x8202F0A0 (.rdata) — lvx selects one aligned mask per matrix format.
 extern "C" alignas(16) const uint32_t g_shaderMatrixTransposeMasks[3][4] = {
     {0, 0, 0, 0},
@@ -50,7 +74,7 @@ extern "C" alignas(16) const uint32_t g_shaderMatrixTransposeMasks[3][4] = {
 };
 
 // @ 0x825EBA20 (.data) — fallback texture used by render and texture references.
-void* g_grcDefaultTexture = nullptr;
+// g_grcDefaultTexture is the canonical slot in graphics/image_data.cpp.
 
 // @ 0x8260663C (.data) — enable per-thread command handle tracking.
 uint32_t g_grcThreadCommandTracking = 0;

@@ -1,3 +1,7 @@
+#include "game/network_static_node.hpp"
+#include "game/network_context.hpp"
+#include "rage/dat_bit_buffer.hpp"
+#include "rage/memory.h"
 #include "rage/hud_page_group.hpp"
 #include "crt/rtti.h"
 // pong_network.cpp — Network message implementations | Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -82,7 +86,6 @@ extern void Player_ApplyServeStarted(void* matchObj, void* slotA, void* slotB, f
 
 // pongNetMessageHolder helpers used by static init/dtor wrappers.
 extern void pongNetMessageHolder_vfn_2_0868_1(pongNetMessageHolder* holder);
-extern void pongNetMessageHolder_vfn_2_3878_1(pongNetMessageHolder* holder);
 extern void pongNetMessageHolder_vfn_2_18D0_1(pongNetMessageHolder* holder);
 extern void pongNetMessageHolder_vfn_2_FD70_1(pongNetMessageHolder* holder);
 extern void pongNetMessageHolder_vfn_2_1628_1(pongNetMessageHolder* holder);
@@ -159,7 +162,6 @@ extern pongNetMessageHolder g_holderInstance_129C;          // @ 0x825D129C
 extern pongNetMessageHolder g_holderInstance_AudioRefCount; // @ 0x825D12B4
 extern uint8_t              g_holderInstance_InputDataMgr;  // @ 0x825D1960
 extern uint8_t              g_holderInstance_13A4;          // @ 0x825D13A4
-extern uint8_t              g_holderInstance_1948;          // @ 0x825D1948
 extern void*                g_holderInstance_MotionRangeMgr_ptr; // @ 0x825D164C
 extern void*                g_holderInstance_MotionRangeMgr;     // @ 0x825D1638
 extern void*                g_holderInstance_DataMgr;       // @ 0x825D1900
@@ -179,13 +181,7 @@ extern float g_fDefaultTimer;         // @ 0x825C5938 (-1.0f)
 extern const char g_szScoreMessageFmt[];  // @ 0x8206EE0C
 
 namespace {
-struct PongNetMessageHolderStaticNode {
-    uint32_t m_vtable;
-    uint32_t m_field4;
-    uint32_t m_field8;
-};
 
-static_assert(sizeof(PongNetMessageHolderStaticNode) == 0x0C);
 
 inline uint32_t& NetMessageHolderInitHead() {
     return g_netMessageHolderInitHead_raw;
@@ -575,7 +571,7 @@ void pongNetMessageHolder_4718_w() {
 void pongNetMessageHolder_4AD8_w() {
     auto* holder = reinterpret_cast<pongNetMessageHolder*>(&g_holderInstance_String);
     holder->vtable = reinterpret_cast<void**>(VTABLE_pongNetMessageHolder_0248);
-    pongNetMessageHolder_vfn_2_3878_1(holder);
+    holder->CleanupInternalArray();
     holder->vtable = reinterpret_cast<void**>(VTABLE_pongNetMessageHolderBase);
     --NetMessageHolderLiveCount();
 }
@@ -623,7 +619,7 @@ void pongNetMessageHolder_4BF8_w() {
 static void PushStaticHolderNode(void* nodeAddr) {
     pongNetMessageHolder* holder = pongNetMessageHolder_FAE0_isl();
     auto* node = reinterpret_cast<PongNetMessageHolderStaticNode*>(nodeAddr);
-    node->m_field8 = (uint32_t)(uintptr_t)holder->m_pInternalArray;
+    node->next = holder->m_pInternalArray;
     holder->m_pInternalArray = nodeAddr;
     holder->m_refCount++;
 }
@@ -659,11 +655,12 @@ void pongNetMessageHolder_EAD8_sp() {
 // Registers the static holder dtor callback and tracks init ordering.
 // ===========================================================================
 void pongNetMessageHolder_08B0_p() {
-    auto* node = reinterpret_cast<PongNetMessageHolderStaticNode*>(&g_holderInstance_13A4);
+    struct InitLink { uint32_t vtable; uint32_t previous; };
+    auto* node = reinterpret_cast<InitLink*>(&g_holderInstance_13A4);
     const uint32_t previousHead = NetMessageHolderInitHead();
 
     NetMessageHolderInitHead() = (uintptr_t)&g_holderInstance_13A4;
-    node->m_field4 = previousHead;
+    node->previous = previousHead;
 
     ++NetMessageHolderLiveCount();
     std::atexit(pongNetMessageHolder_5038_w);
@@ -858,11 +855,11 @@ const char* RequestDataMessage::vfn_7() {
 // Each player slot has button state fields that are checked via CheckButtonPressed.
 //
 // Network setup involves:
-//  - Getting network status via snSession_AcquireLock
+//  - Acquiring the loop guard via hudFlashBase_IsNetworkDirty
 //  - Checking a global singleton flag
 //  - Finding a network message slot via snSession_FindProperty
 //  - Initializing the message slot with values 1 and 3
-//  - Calling snSession_ReleaseLock if network status is non-zero
+//  - Releasing the acquired guard via hudFlashBase_PublishPageGroup
 //  - Setting the ready flag at this+24 to 1
 // ===========================================================================
 void SinglesNetworkClient::CheckAllPlayersReady()
@@ -2030,44 +2027,7 @@ void pongNetMessageHolder::CleanupNestedArrays()
     *(uint32_t*)this = VTABLE_rage_crIKBodyBase;  // rage::crIKBodyBase final vtable
 }
 
-// ===========================================================================
-// pongNetMessageHolder::RemoveElementByPointer @ 0x82134350 | size: 0xB8
-//
-// Original symbol: pongNetMessageHolder_4350_wrh
-//
-// Really the triangle stripifier's strip-list erase (TriStripList::Erase in
-// cm_operators.cpp): `this` is the list {items, count}, and `targetPtr` is
-// the address of a slot in it, not a strip. The asm compares slot addresses.
-// The matching slot's strip (if any) has its arrays at +8 and +0x10 freed,
-// then itself; the count drops and the later slots move down one.
-// ===========================================================================
-void pongNetMessageHolder::RemoveElementByPointer(void* targetPtr)
-{
-    uint32_t* count = reinterpret_cast<uint32_t*>(reinterpret_cast<uint8_t*>(this) + 4);
-    void***   items = reinterpret_cast<void***>(this);
 
-    uint32_t index = 0;
-    if (*count == 0) {
-        return;
-    }
-    for (void** slot = *items; slot != targetPtr; ++slot) {
-        if (++index >= *count) {
-            return;
-        }
-    }
-
-    void* strip = (*items)[index];
-    if (strip != nullptr) {
-        sysMemAllocator_Free(*reinterpret_cast<void**>(static_cast<uint8_t*>(strip) + 8));
-        sysMemAllocator_Free(*reinterpret_cast<void**>(static_cast<uint8_t*>(strip) + 16));
-        sysMemAllocator_Free(strip);
-    }
-
-    *count -= 1;
-    for (; index < *count; ++index) {
-        (*items)[index] = (*items)[index + 1];
-    }
-}
 
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -3960,7 +3920,6 @@ void ForceMatchTimeSyncMessage_Process(void* thisPtr) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 extern void snBitStream_ReadString(void* client, void* dst, int maxBytes);  // util_0AF0 @ 0x82260AF0
-extern void DeserializeGamerHandle(void* client, void* dst);                // netStream_ReadU32GamerHandleVariant @ 0x82260E18
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BallHitMessage_Deserialise  [vtable slot 1 @ 0x823B65F8 | size: 0x68]
@@ -4186,7 +4145,7 @@ void SpectatorQuitMessage_Deserialise(void* thisPtr, void* client) {
     *(float*)(obj + 0x04) = timingRef;
 
     // Gamer handle block at +0x08 (XBL identity)
-    DeserializeGamerHandle(client, obj + 0x08);
+    datBitBuffer_ReadS32(client, reinterpret_cast<int32_t*>(obj + 0x08), 32);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -5613,13 +5572,11 @@ extern void pongNetMessageHolder_vfn_2_0B58_1(pongNetMessageHolder* holder);  //
 extern void pongNetMessageHolder_vfn_2_1628_1(pongNetMessageHolder* holder);  // @ 0x823C1628
 extern void pongNetMessageHolder_vfn_2_18D0_1(pongNetMessageHolder* holder);  // @ 0x823C18D0 (declared earlier)
 extern void pongNetMessageHolder_vfn_2_1770_1(pongNetMessageHolder* holder);  // @ 0x823C1770 (declared earlier)
-extern void pongNetMessageHolder_vfn_2_3878_1(pongNetMessageHolder* holder);  // @ 0x823C3878 (declared earlier)
 extern void pongNetMessageHolder_0838_w(void* dst, void* src);                // @ 0x82220838 — evtSet-like copy
 extern void PongNetRoundRobinCoordinator_FC20_w(void* obj);                    // @ 0x8220FC20
 extern void* ke_8F70(void* obj);                                               // @ 0x822C8F70 — ctor returning this
 extern void pongCreatureInst_9030_g(void* creatureInst, void* srcPayload);    // @ 0x822C9030
 extern void* atSingleton_7CE0_w(void* singleton, int zero, int slotMinusOne); // @ 0x82447CE0 — returns slot key
-extern "C" void thunk_rage_free(void* p);                                      // @ 0x820C0120
 
 // The max-float init value is at 0x82079AD4 (.rdata, 4 bytes).  Bodies read
 // it by symbol reference via a small accessor so the raw address stays out
@@ -5706,7 +5663,7 @@ pongNetMessageHolder* pongNetMessageHolder_vfn_0_5490_1(pongNetMessageHolder* se
 // ─────────────────────────────────────────────────────────────────────────────
 pongNetMessageHolder* pongNetMessageHolder_vfn_0_59E0_1(pongNetMessageHolder* self, int flags) {
     self->vtable = reinterpret_cast<void**>(VTABLE_pongNetMessageHolder_03C4);
-    pongNetMessageHolder_vfn_2_3878_1(self);
+    self->CleanupInternalArray();
     self->vtable = reinterpret_cast<void**>(VTABLE_pongNetMessageHolderBase);
     --NetMessageHolderLiveCount();
 
@@ -5998,7 +5955,7 @@ uint32_t pongNetMessageHolder_AAC8_w(pongNetMessageHolder* holder,
         *outSlotId  = winnerSlot;
     }
 
-    thunk_rage_free(scratch);
+    rage_free(scratch);
     return 0;
 }
 
@@ -6671,7 +6628,7 @@ void pongNetMessageHolder_vfn_0_4D10_1(pongNetMessageHolder* self, uint32_t delF
 // ─────────────────────────────────────────────────────────────────────────────
 void pongNetMessageHolder_vfn_0_5788_1(pongNetMessageHolder* self, uint32_t delFlag) {
     self->vtable = reinterpret_cast<void**>(VTABLE_pongNetMessageHolder_0360);
-    pongNetMessageHolder_vfn_2_3878_1(self);
+    self->CleanupInternalArray();
     self->vtable = reinterpret_cast<void**>(VTABLE_pongNetMessageHolderBase);
     g_netMessageHolderLiveCount--;
     if (delFlag & 1u) {
@@ -6685,7 +6642,7 @@ void pongNetMessageHolder_vfn_0_5788_1(pongNetMessageHolder* self, uint32_t delF
 // ─────────────────────────────────────────────────────────────────────────────
 void pongNetMessageHolder_vfn_0_5AD0_1(pongNetMessageHolder* self, uint32_t delFlag) {
     self->vtable = reinterpret_cast<void**>(VTABLE_pongNetMessageHolder_03EC);
-    pongNetMessageHolder_vfn_2_3878_1(self);
+    self->CleanupInternalArray();
     self->vtable = reinterpret_cast<void**>(VTABLE_pongNetMessageHolderBase);
     g_netMessageHolderLiveCount--;
     if (delFlag & 1u) {

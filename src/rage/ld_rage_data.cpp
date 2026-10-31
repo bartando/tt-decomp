@@ -141,3 +141,5 @@ extern "C" alignas(16) uint32_t g_swfAppliedRenderState[22] = {};
 // @ 0x825EBC40 (.data) — runtime-initialised
 extern "C" void* g_pGrcTextureCache = nullptr;
 TT_DATA_ALIAS("lbl_825EBC40", "g_pGrcTextureCache");
+
+TT_DATA_ALIAS("lbl_825C9030", "g_grcFormatId"); // @ 0x825C9030

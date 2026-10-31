@@ -21,6 +21,9 @@ extern "C" {
 #define STATUS_SUCCESS               0
 #define STATUS_TIMEOUT               0x00000102
 #define STATUS_PENDING               0x00000103
+#define STATUS_NOT_SUPPORTED         ((int32_t)0xC00000BB)
+#define STATUS_INVALID_HANDLE        ((int32_t)0xC0000008)
+#define STATUS_SEMAPHORE_LIMIT_EXCEEDED ((int32_t)0xC0000047)
 #define STATUS_NO_MEMORY             0xC0000017
 #define STATUS_INVALID_PARAMETER     0xC000000D
 
@@ -33,6 +36,7 @@ extern "C" {
 #define INFINITE                     0xFFFFFFFF
 
 // Forward declarations
+struct _RTL_CRITICAL_SECTION;
 typedef void* HANDLE;
 typedef void* PVOID;
 typedef uint32_t DWORD;
@@ -129,9 +133,14 @@ int32_t KeResetEvent(void* Event);
  */
 NTSTATUS KeWaitForSingleObject(void* Object, uint32_t WaitReason, uint32_t WaitMode,
                                 uint32_t Alertable, LARGE_INTEGER* Timeout);
-NTSTATUS NtWaitForSingleObjectEx(void* Object, uint32_t WaitMode, uint32_t Alertable,
-                                const int64_t* Timeout);
-NTSTATUS NtClose(HANDLE Handle);
+
+// Xbox extended wait adds WaitMode to the NT handle wait contract.
+NTSTATUS NtWaitForSingleObjectEx(HANDLE handle, uint32_t waitMode, uint32_t alertable, const LARGE_INTEGER* timeout); // @ 0x82585EFC
+NTSTATUS NtClose(HANDLE handle);
+void KeInitializeEvent(void* event, EVENT_TYPE type, int32_t initialState);
+NTSTATUS RtlInitializeCriticalSection(struct _RTL_CRITICAL_SECTION* section);
+NTSTATUS RtlDeleteCriticalSection(struct _RTL_CRITICAL_SECTION* section);
+void KfLowerIrql(uint32_t irql);
 
 //=============================================================================
 // Semaphore Functions
@@ -162,7 +171,7 @@ NTSTATUS NtCreateSemaphore(HANDLE* SemaphoreHandle, uint32_t DesiredAccess,
  * @param PreviousCount   Pointer to receive previous count (can be NULL)
  * @return STATUS_SUCCESS or error code
  */
-NTSTATUS NtReleaseSemaphore(HANDLE SemaphoreHandle, int32_t ReleaseCount, int32_t* PreviousCount);
+NTSTATUS NtReleaseSemaphore(HANDLE SemaphoreHandle, int32_t ReleaseCount, int32_t* PreviousCount); // @ 0x8258666C
 
 //=============================================================================
 // Critical Region Functions
@@ -261,15 +270,15 @@ typedef struct _MM_STATISTICS {
  * Used for audio buffers, video memory, and other hardware-accessible memory.
  * 
  * @param dwFlags         Allocation flags
+ * @param size            Allocation size in bytes
  * @param dwMinAddress    Minimum physical address
  * @param dwMaxAddress    Maximum physical address
  * @param dwAlignment     Alignment requirement (must be power of 2)
  * @param dwProtect       Memory protection flags
  * @return Physical address of allocated memory, or 0 if failed
  */
-void* MmAllocatePhysicalMemoryEx(uint32_t dwFlags, uint32_t dwMinAddress,
-                                  uint32_t dwMaxAddress, uint32_t dwAlignment,
-                                  uint32_t dwProtect);
+void* MmAllocatePhysicalMemoryEx(uint32_t flags, uint32_t size, uint32_t protect,
+                                 uint32_t minimumAddress, uint32_t maximumAddress, uint32_t alignment);
 
 /**
  * MmFreePhysicalMemory @ 0x8258635C | ordinal: varies
@@ -364,7 +373,7 @@ void RtlInitAnsiString(ANSI_STRING* DestinationString, const char* SourceString)
  * @param Status NTSTATUS code to convert
  * @return Corresponding Win32 error code
  */
-uint32_t RtlNtStatusToDosError(NTSTATUS Status);
+uint32_t RtlNtStatusToDosError(NTSTATUS Status); // @ 0x82585E5C
 
 //=============================================================================
 // XEX Header Functions
@@ -449,8 +458,6 @@ typedef struct _RTL_CRITICAL_SECTION {
  * @param CriticalSection Pointer to critical section
  */
 void RtlEnterCriticalSection(RTL_CRITICAL_SECTION* CriticalSection);
-void RtlInitializeCriticalSection(RTL_CRITICAL_SECTION* CriticalSection);
-void RtlDeleteCriticalSection(RTL_CRITICAL_SECTION* CriticalSection);
 
 /**
  * RtlLeaveCriticalSection @ 0x82585DFC | ordinal: varies

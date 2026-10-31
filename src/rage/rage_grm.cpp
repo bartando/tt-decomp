@@ -1,8 +1,11 @@
+#include "grc/render_context.hpp"
+#include "grc/image_state.hpp"
 /**
  * rage_grm.cpp — Graphics / rendering class implementations
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
  */
 #include "rage/singleton.h"
+#include "grc/viewport.hpp"
 #include "rage_grm.hpp"
 #include "animation/rage_anim.hpp"   // rage::datResource
 #include <cstring>
@@ -38,14 +41,7 @@ extern "C" void   sysMemAllocator_InitThreadHeap();                // @ 0x820C00
 extern "C" void* g_rageDescriptorHead __asm__("_g_tls_base");  // r13+0: the thread's TLS block (globals.c g_tls_base)
 extern "C" rage::grmShaderFactory* g_grmShaderFactory_instance; // @ 0x82606374
 
-extern "C" void* g_pCurrentViewport;                // @ 0x825EBAA0
 extern "C" const float g_identityMatrixRef[16];     // @ 0x825CB800
-extern uint8_t lbl_8260633D;                        // @ 0x8260633D
-extern float lbl_82619D20[16];                      // @ 0x82619D20
-extern float lbl_82619D60[16];                      // @ 0x82619D60
-// Despite its auto-name, this sets the current viewport's model matrices.
-extern "C" void pongShadowMap_38C0_g(void* viewport, const float* world,
-                                     const float* composite); // @ 0x821538C0
 extern "C" void fragDrawable_D798_wrh(const float* transform, const float* view,
                                        const float* projection); // @ 0x8225D798
 extern "C" void fragDrawable_19C8_h(void* model, void* shaderGroup,
@@ -127,7 +123,9 @@ void rmcDrawable_DrawLodModels(void* lodGroup, void* shaderGroup, const float* t
         }
         if (model[0x15] != 0) {
             if (currentTransform != -1) {
-                pongShadowMap_38C0_g(g_pCurrentViewport, g_identityMatrixRef, g_identityMatrixRef);
+                static_cast<grcViewport*>(g_pCurrentViewport)->SetTransformMatrices(
+                    *reinterpret_cast<const CamMatrix44*>(g_identityMatrixRef),
+                    *reinterpret_cast<const CamMatrix44*>(g_identityMatrixRef));
                 currentTransform = -1;
             }
             // Xenon stores r9 with stb, so only its low byte selects the path.
@@ -142,7 +140,9 @@ void rmcDrawable_DrawLodModels(void* lodGroup, void* shaderGroup, const float* t
             const int wantedTransform = model[0x18] != 0 ? -1 : static_cast<int>(transformIndex);
             if (currentTransform != wantedTransform) {
                 const float* matrix = wantedTransform == -1 ? g_identityMatrixRef : transforms + transformIndex * 16;
-                pongShadowMap_38C0_g(g_pCurrentViewport, matrix, matrix);
+                static_cast<grcViewport*>(g_pCurrentViewport)->SetTransformMatrices(
+                    *reinterpret_cast<const CamMatrix44*>(matrix),
+                    *reinterpret_cast<const CamMatrix44*>(matrix));
                 currentTransform = wantedTransform;
             }
             // This update occurs for every rigid draw, including cache hits and
@@ -454,8 +454,6 @@ extern "C" {
     void rage_6C50_h(void* device, uint32_t reg, const uint32_t* values, uint32_t count); // @ 0x82356C50
     void rage_6CA0_h(void* device, uint32_t reg, const uint32_t* values, uint32_t count); // @ 0x82356CA0
     void grcDevice_SetTexture(void* device, uint32_t slot, void* texture); // @ 0x82359940
-    extern uint32_t g_grmUploadOverrideEnabled; // @ 0x825B1F70
-    extern uint32_t g_grmUploadOverrideLayout;  // @ 0x825E784C
 }
 
 // @ 0x82446370
@@ -656,11 +654,8 @@ extern "C" {
     uint32_t grmShaderInstance_Bind(uint32_t effectSlot,
                                     uint32_t entryId,
                                     uint32_t flags);        // @ 0x8215AF90
-    extern uint32_t g_grmShaderInstance_previous;          // @ 0x825EBC44
-    extern uint32_t g_grmShaderInstance_activeEntry;       // @ 0x825EBC48
     // Same object as grc_data.cpp's g_grcRenderObjects, which is declared too
     // small: Select reads word 4.
-    extern uint32_t g_grmShaderInstance_context[5];        // @ 0x82617E60
 
     // SDA-resident globals used by the grmShaderFx runtime.
     extern uint32_t g_grmShaderFx_activeState;      // @ 0x825EBA68
@@ -807,14 +802,14 @@ void grmShaderParameter_SetVector(uint32_t context, uint32_t handle, const void*
 
 // @ 0x8215AE90
 void grmShaderInstance_Select(uint32_t /* context */, uint32_t entryId) {
-    uint32_t* context = g_grmShaderInstance_context;
+    void** context = g_grmShaderInstance_context;
     uint32_t& activeEntry = g_grmShaderInstance_activeEntry;
     const uint32_t previous = g_grmShaderInstance_previous;
     if (previous != 0) {
-        if (previous == context[0] && entryId == activeEntry) {
-            const bool changed = context[4] != g_grmShaderFx_boundContext;
+        if (previous == reinterpret_cast<uintptr_t>(context[0]) && entryId == activeEntry) {
+            const bool changed = reinterpret_cast<uintptr_t>(context[4]) != g_grmShaderFx_boundContext;
             if (changed)
-                context[4] = g_grmShaderFx_boundContext;
+                context[4] = reinterpret_cast<void*>(static_cast<uintptr_t>(g_grmShaderFx_boundContext));
             if (changed || g_grmShaderFx_boundParam != previous) {
                 g_grmShaderFx_boundParam = previous;
                 grmShaderInstance_FilterAndUploadParameters(previous);
@@ -830,7 +825,7 @@ void grmShaderInstance_Select(uint32_t /* context */, uint32_t entryId) {
         g_grmShaderInstance_previous = 0;
         return;
     }
-    const uint32_t selected = context[0];
+    const uint32_t selected = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(context[0]));
     activeEntry = entryId;
     g_grmShaderInstance_previous = selected;
     auto* instance = reinterpret_cast<uint8_t*>(static_cast<uintptr_t>(selected));

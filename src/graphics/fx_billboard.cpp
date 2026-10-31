@@ -1,3 +1,4 @@
+#include "grc/image_state.hpp"
 #include "fx_effects.hpp"
 #include <cstddef>
 
@@ -5,9 +6,6 @@ extern const float* g_fxBillboardUVs;              // @ 0x825C2B10
 extern float g_fxBillboardRight[4];               // @ 0x82715FC0
 extern float g_fxBillboardUp[4];                  // @ 0x82715FB0
 extern float g_fxBillboardRotatedAxes[4096];       // @ 0x82715FD0 (512 pairs, eight floats each)
-extern uint32_t g_fxVertexCursor;                 // @ 0x825EBA74
-extern uint32_t g_fxCountOnly;                    // @ 0x825EBA84
-extern uint32_t g_fxVertexCount;                  // @ 0x825EBA88
 
 namespace {
 struct FxBillboardVertex {
@@ -76,13 +74,6 @@ void fxDrawBillboardQuad(uint32_t uvIndex, float angle, float x, float y, float 
     }
     g_fxVertexCount += 4;
 }
-
-extern uint32_t g_fxCurrentColor; // @ 0x825CA604
-extern float g_fxVertexNormalX;   // @ 0x825EBA6C
-extern float g_fxVertexNormalY;   // @ 0x825EBA80
-extern float g_fxVertexNormalZ;   // @ 0x825EBA8C
-extern float g_fxVertexU;         // @ 0x825EBA78
-extern float g_fxVertexV;         // @ 0x825EBA70
 extern const float g_fxVertexDepth; // @ 0x8202D110
 
 // Append a 2D vertex using the current normal, colour and UV state.

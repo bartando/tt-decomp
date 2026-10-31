@@ -1,3 +1,4 @@
+#include "rage/dat_bit_buffer.hpp"
 /**
  * dat_bit_buffer.cpp — datBitBuffer, the network messages' bit stream
  * Rockstar Presents Table Tennis (Xbox 360, 2006)

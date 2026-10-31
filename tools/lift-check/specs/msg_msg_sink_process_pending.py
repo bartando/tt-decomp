@@ -8,7 +8,7 @@ RET = None
 
 CALLS = {
     "sink.vfn_16": model(lambda c: c.ret(r3=c.rng.choice([0, 8, 16, 24, 0xffffffff, 0x100])), args=("r3",)),
-    "msgMsgSink_3B48_g": model(lambda c: c.ret(r3=c.rng.choice([0, 1, -1, 256])), args=("r3",)),
+    "rage::xactFade_Update": model(lambda c: c.ret(r3=c.rng.choice([0, 1, -1, 256])), args=("r3",)),
     "msgMsgSink_3DC8_g": stub(ret="void", args=("r3",)),
     "xactSound_Update": stub(ret="void", args=("r3",)),
 }

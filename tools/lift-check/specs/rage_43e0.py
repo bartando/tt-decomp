@@ -20,7 +20,7 @@ SOURCE = "src/graphics/grc_gpu_hang.cpp"
 EXTERNS = {
     "xe_GetCurrentThreadId": 0x82566B78,
     "rage_DebugPrintf": 0x82363FE0,
-    "g_gpuHangSentinel": 0x82606654,
+    "g_grcProgressState": 0x82606654,
     "g_sda_base": 0x82600000,
     "rage::k_str_d3d_hang_try_instrumented": 0x82066510,
     "rage::k_str_d3d_hang_breaking_into_debugger": 0x820665E8,

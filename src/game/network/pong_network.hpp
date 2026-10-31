@@ -1549,7 +1549,6 @@ struct pongNetMessageHolder {
     // ── non-virtual methods ──
     void InitializeTimedGameUpdateArray();  // @ 0x823C6E30
     void CleanupNestedArrays();  // @ 0x82135C70
-    void RemoveElementByPointer(void* targetPtr);  // @ 0x82134350
     void InitializeInternalArray();
     void RemoveFromThreadPoolList();
     void InitializeMessageArray();

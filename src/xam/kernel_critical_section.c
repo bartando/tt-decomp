@@ -19,25 +19,28 @@ static tt_mutex* mutex_for(const void* address) {
     while (entry && entry->address != address) entry = entry->next;
     if (!entry) {
         entry = calloc(1, sizeof(*entry));
-        if (!entry) abort();
+        if (!entry) { tt_mutex_unlock(&registry_mutex); return NULL; }
         entry->address = address; entry->next = entries; entries = entry;
     }
     tt_mutex_unlock(&registry_mutex);
     return &entry->mutex;
 }
-void RtlInitializeCriticalSection(RTL_CRITICAL_SECTION* cs) {
-    if (cs) (void)mutex_for(cs);
+NTSTATUS RtlInitializeCriticalSection(RTL_CRITICAL_SECTION* cs) {
+    if (!cs) return STATUS_INVALID_PARAMETER;
+    return mutex_for(cs) ? STATUS_SUCCESS : STATUS_NO_MEMORY;
 }
 void RtlEnterCriticalSection(RTL_CRITICAL_SECTION* cs) {
-    if (cs) tt_mutex_lock(mutex_for(cs));
+    if (cs) { tt_mutex* mutex = mutex_for(cs); if (!mutex) abort(); tt_mutex_lock(mutex); }
 }
 uint32_t RtlTryEnterCriticalSection(RTL_CRITICAL_SECTION* cs) {
-    return cs && tt_mutex_trylock(mutex_for(cs));
+    tt_mutex* mutex = cs ? mutex_for(cs) : NULL;
+    return mutex && tt_mutex_trylock(mutex);
 }
 void RtlLeaveCriticalSection(RTL_CRITICAL_SECTION* cs) {
-    if (cs) tt_mutex_unlock(mutex_for(cs));
+    if (cs) { tt_mutex* mutex = mutex_for(cs); if (!mutex) abort(); tt_mutex_unlock(mutex); }
 }
-void RtlDeleteCriticalSection(RTL_CRITICAL_SECTION* cs) {
+NTSTATUS RtlDeleteCriticalSection(RTL_CRITICAL_SECTION* cs) {
+    if (!cs) return STATUS_INVALID_PARAMETER;
     /* As on Win32, callers must ensure no thread owns or waits on the lock. */
     tt_mutex_lock(&registry_mutex);
     CriticalSectionEntry** link = &entries;
@@ -48,4 +51,5 @@ void RtlDeleteCriticalSection(RTL_CRITICAL_SECTION* cs) {
         tt_mutex_destroy(&entry->mutex); free(entry);
     }
     tt_mutex_unlock(&registry_mutex);
+    return STATUS_SUCCESS;
 }

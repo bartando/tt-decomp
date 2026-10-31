@@ -6,7 +6,7 @@ from liftcheck.spec import *  # noqa: F401,F403
 FUNCTION = "msgMsgSink::vfn_56"
 ADDRESS = 0x82456E38
 SOURCE = "src/game/network/msg_msg_sink.cpp"
-INNER = "msgMsgSink_vfn_34"
+INNER = "msgMsgSink::SetMessageBuffer"
 NOTIFY = "msgMsgSink_3E68_g"
 
 CALLS = {

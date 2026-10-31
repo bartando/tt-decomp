@@ -1,3 +1,8 @@
+#include "rage/swf_state.hpp"
+#include "grc/image_state.hpp"
+#include "crt/host_format.h"
+#include "grc/device_state.h"
+#include "rage/math.hpp"
 #include "rage/sys_callback.hpp"
 /**
  * rage::swf* — Scaleform Flash UI System Implementation
@@ -32,7 +37,6 @@ extern "C" {
     void swfFile_DestroyResources(void* ptr);   // @ 0x824035B0 — releases child resource array entries
     void swfInstance_Cleanup(void* ptr);        // @ 0x823FB670 — unlinks instance from display list
     void swfSymtab_Enumerate(void* symtab);     // @ 0x823FED10 — enumerate symtab members
-    const char* swfInternString(const char* name, void* buffer, int maxLen);  // string interning
     void* swfInstanceConstruct(void* storage);  // @ 0x823FB570
     void rage_DebugLog(const char* msg, ...);    // debug log stub (no-op)
     void swfSymtab_Delete(void* symtab, const char* key);   // symtab key delete
@@ -50,10 +54,8 @@ extern "C" {
     float swfINSTANCE_F0D8_w(void* instance, float* outMin);  // @ 0x823FF0D8 — display height, optional minimum
     void* util_B188(void* slots, int index);  // @ 0x823FB188
     uint8_t util_0068(void* record);  // @ 0x821E0068 — button released this frame
-    int _snprintf(char* buffer, size_t count, const char* format, ...);  // @ 0x820C0B40
     extern void* g_sda_6404;  // @ 0x82606404 — shared texture lookup owner
     void hudFlashBase_76F8_g(int stage, int slot, void* texture);  // @ 0x820F76F8
-    void hudFlashBase_B138_g();  // @ 0x8215B138
     void grcDevice_Present(uint32_t flags, int color, int clearDepth, float depth,
                            bool clearStencil, int stencil);  // @ 0x8214F088
     extern uint32_t g_grmShaderFx_flushRequired;  // @ 0x825EBB1C
@@ -66,20 +68,7 @@ extern bool CheckButtonPressed(void* record);  // @ 0x821DFFF8
 
 extern int rage_2A78(int primitiveType, int vertexCount);  // @ 0x82152A78
 extern void fxEmitVertex2D(float x, float y); // @ 0x82406010
-extern uint32_t g_fxVertexCursor;  // @ 0x825EBA74
-extern uint32_t g_fxCountOnly;     // @ 0x825EBA84
-extern uint32_t g_fxVertexCount;   // @ 0x825EBA88
-extern uint32_t g_fxCurrentColor; // @ 0x825CA604
-extern float g_fxVertexNormalX;   // @ 0x825EBA6C
-extern float g_fxVertexNormalY;   // @ 0x825EBA80
-extern float g_fxVertexNormalZ;   // @ 0x825EBA8C
-extern float g_fxVertexU;         // @ 0x825EBA78
-extern float g_fxVertexV;         // @ 0x825EBA70
 extern const float g_fxVertexDepth; // @ 0x8202D110
-extern const float g_swfAtlasUVScale; // @ 0x820290EC
-extern float g_swfPixelScaleX;    // @ 0x82602824
-extern float g_swfPixelScaleY;    // @ 0x8260283C
-extern void (*g_swfBindFontTexture)(void* texture); // @ 0x82602820
 extern void* g_binkVideoPlayer;   // @ 0x825EB988 — graphics device (legacy global name)
 extern void fxEmitVertex2D(float x, float y); // @ 0x82406010
 
@@ -237,19 +226,6 @@ struct swfFontAtlas {
     const uint8_t* textureIndices; // Optional per-glyph texture page; otherwise page 0.
 };
 
-struct swfGlyphRenderState {
-    float matrix[6]; // a, b, c, d, tx, ty
-    void* texture;
-};
-extern swfGlyphRenderState g_swfGlyphRenderState; // @ 0x82606120
-
-struct swfLineRenderState {
-    float uvMatrix[6]; // a, b, c, d, tx, ty
-    float matrix[6];
-};
-extern swfLineRenderState g_swfLineRenderState; // @ 0x8260613C
-extern const float g_swfTwipsToPixels; // @ 0x820290F0
-
 namespace {
 struct swfGlyphVertex {
     float position[3];
@@ -338,7 +314,6 @@ struct swfShapeFillState {
 };
 
 extern uint32_t swfSampleGradient(const void* gradient, float x, float y); // @ 0x824060B8
-extern const float g_swfTwipScale; // @ 0x820290F0
 
 #if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC push_options
@@ -706,7 +681,6 @@ void swfSetTransformMatrix(void* transform, const float* matrix) {
 #if defined(__clang__)
 #pragma clang fp contract(off)
 #endif
-    extern double swfAsin(double value);  // @ 0x82430E88
     extern void swfMakeRotationMatrix(float* out, float degrees);  // @ 0x823FA2A0
     extern void swfConcatMatrix(float* out, const float* child, const float* parent);  // @ 0x823FA1E0
     extern float g_swfMinShear;  // @ 0x825C90C8 — shared -0.01 tolerance
@@ -741,7 +715,7 @@ void swfSetTransformMatrix(void* transform, const float* matrix) {
         normalizedD = inverseLength * normalizedD;
         const float normalizedC = inverseLength * negativeC;
         const float sine = -std::fma(normalizedD, 0.0f, -normalizedC);
-        const float radians = static_cast<float>(swfAsin(sine));
+        const float radians = static_cast<float>(::crt_asin(sine));
         const float degrees = radians * 57.2957763671875f;  // 0x82079B44
         rotation = rotation + degrees;
         // PPC bge tests !LT, so an unordered (NaN) angle also exits the loop.
@@ -1314,7 +1288,6 @@ void swfCMD_PlaceObject2_ScalarDestructor(swfCMD_PlaceObject2* obj, int flags) {
 
 // @ 0x824081B0
 void swfCMD_PlaceObject2::Execute(swfINSTANCE* parent) {
-    extern void* g_swfCurrentFile;  // @ 0x82602838
     auto* command = reinterpret_cast<uint8_t*>(this);
     auto* container = reinterpret_cast<uint8_t*>(parent);
     const uint16_t resourceIndex = *reinterpret_cast<uint16_t*>(command + 0x14);
@@ -1760,10 +1733,7 @@ int swfINSTANCE::VisitMembers() {
  * The inner object is stored at offset +7332.
  */
 uint32_t swfACTIONFUNC::SetMember(const char* name, void* value) {
-    swfINSTANCE* innerObj = *reinterpret_cast<swfINSTANCE**>(reinterpret_cast<char*>(this) + 0x1CA4);
-    using Setter = uint32_t (*)(swfINSTANCE*, const char*, void*);
-    void** vtable = *reinterpret_cast<void***>(innerObj);
-    return reinterpret_cast<Setter>(vtable[11])(innerObj, name, value);
+    return m_pInnerObject->SetMember(name, value);
 }
 
 /**
@@ -1913,7 +1883,6 @@ uint32_t swfINSTANCE::SetMember(const char* name, void* value) {
     extern void swfReleaseText(void* text, int freeStorage); // @ 0x823F8A38
     extern void* swfCopyText(const char* text); // @ 0x823FABC0
     extern void* swfFindTexture(void* dictionary, const char* name); // @ 0x82151990
-    extern double swfRotationRemainder(double angle, double period); // @ 0x82431D78
 
     const char* property = util_A768_1(name, &g_swfStringBuffer, SWF_INTERN_BUFFER_SIZE);
     char* instance = reinterpret_cast<char*>(this);
@@ -1964,7 +1933,7 @@ uint32_t swfINSTANCE::SetMember(const char* name, void* value) {
     if (strcmp(property, "_rotation") == 0) {
         float angle = swfValueToFloat(value);
         *reinterpret_cast<float*>(instance + 0x54) =
-            static_cast<float>(swfRotationRemainder(angle, 360.0));
+            static_cast<float>(crt_fmod(angle, 360.0));
         instance[0x95] = 1;
         return 1;
     }
@@ -2155,42 +2124,21 @@ void swfACTIONFUNC::Invoke(const char* methodName, void* args, int argCount, voi
 // Local entries store 8-byte {value, type} pairs in m_pLocalValues (+7328).
 // ─────────────────────────────────────────────────────────────────────────────
 uint32_t swfACTIONFUNC::GetMember(const char* name, void* result) {
-    // Intern the name string
-    char internBuffer[SWF_INTERN_BUFFER_SIZE];
-    extern const char* swfInternString(const char* name, void* buffer, int maxLen);
-    const char* interned = swfInternString(name, internBuffer, SWF_INTERN_BUFFER_SIZE);
-
-    // Search local variable table
-    int localCount = m_localCount;  // +132
-    if (localCount > 0) {
-        const char* localNames = (const char*)this + 136;  // local name table
-        for (int i = 0; i < localCount; i++) {
-            // Compare interned name against local name entry (byte-by-byte)
-            const char* entryName = localNames + i * 128;
-            const char* src = interned;
-            const char* dst = entryName;
-            int diff = 0;
-            while (*src != '\0') {
-                diff = (int)(uint8_t)*src - (int)(uint8_t)*dst;
-                if (diff != 0) break;
-                src++;
-                dst++;
-            }
-            if (diff == 0) {
-                // Found — copy 8-byte value pair from m_pLocalValues
-                uint32_t* localValues = (uint32_t*)m_pLocalValues;  // +7328
-                uint32_t* out = (uint32_t*)result;
-                out[0] = localValues[i * 2];
-                out[1] = localValues[i * 2 + 1];
-                return true;
-            }
+    char nameBuffer[SWF_INTERN_BUFFER_SIZE];
+    // r4 is a tagged SWF value, as in the other script GetMember methods.
+    const char* text = util_A768_1(name, nameBuffer, sizeof(nameBuffer));
+    const int localCount = m_localCount;
+    for (int i = 0; i < localCount; ++i) {
+        const char* entry = reinterpret_cast<const char*>(_padLocalTable) + i * 128;
+        if (std::strcmp(text, entry) == 0) {
+            auto* values = static_cast<uint32_t*>(m_pLocalValues);
+            auto* out = static_cast<uint32_t*>(result);
+            out[0] = values[i * 2];
+            out[1] = values[i * 2 + 1];
+            return 1;
         }
     }
-
-    // Not found locally — delegate to inner MovieClip's GetMember (slot 10).
-    swfINSTANCE* innerObj = m_pInnerObject;  // +7332
-    if (!innerObj) return false;
-    return innerObj->GetMember(name, result);
+    return m_pInnerObject->GetMember(name, result);
 }
 
 int swfACTIONFUNC::VisitMembers() {
@@ -2291,11 +2239,10 @@ swfSPRITE::~swfSPRITE() {}
  */
 bool swfContext_IsGlobalSlot13AltMode() {
     // External declarations
-    extern void* swfGlobalObject_GetSlotValuePtr(void* obj, int slotIndex);  // @ 0x823FB188
     extern void* g_swfSlotObject;  // @ 0x82604848 (SDA offset 18504)
     
     // Get slot 13 value from the global SWF object
-    uint8_t* result = (uint8_t*)swfGlobalObject_GetSlotValuePtr(g_swfSlotObject, 13);
+    uint8_t* result = (uint8_t*)::util_B188(g_swfSlotObject, 13);
     
     // Load bytes at offsets +0 and +3
     uint8_t byte0 = result[0];
@@ -2354,7 +2301,7 @@ void swfRenderInstanceTree(void* instance, const void* parentTransform) {
     if (texture) {
         hudFlashBase_76F8_g(0, 0, texture);
         if (g_grmShaderFx_flushRequired != 0 || g_grmShaderFx_forceResetFlag != 0) {
-            hudFlashBase_B138_g();
+            grcDevice_FlushRenderState();
         }
         node[0x94] = 1;
     }
@@ -2757,9 +2704,6 @@ void swfFile_DestroyResources(void* file) { (void)file; }
 void swfInstance_Cleanup(void* instance) { (void)instance; }
 float swfComputeFramePosition(void* a, void* b, float* c, float* d) {
     (void)a; (void)b; if (c) *c = 0.0f; if (d) *d = 0.0f; return 0.0f;
-}
-const char* swfInternString(const char* a, void* b, int c) {
-    (void)b; (void)c; return a;
 }
 // @ 0x82403270
 void* swfPopResult(void* dst) {

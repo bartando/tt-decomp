@@ -1,4 +1,6 @@
 #include "xam/kernel.h"
+#include "xam/thread_sync.h"
+#include "platform/host_error.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,7 +32,8 @@ int main(void) {
     uint32_t storage[4] = {0x11223344, 0x55667788, 0x99aabbcc, 0xddeeff00};
     uint32_t original[4]; memcpy(original, storage, sizeof(storage));
     RTL_CRITICAL_SECTION* lock = (RTL_CRITICAL_SECTION*)&storage[1];
-    RtlInitializeCriticalSection(lock);
+    CHECK(RtlInitializeCriticalSection(lock) == STATUS_SUCCESS);
+    CHECK(RtlInitializeCriticalSection(NULL) < 0);
     RtlEnterCriticalSection(lock);
     CHECK(RtlTryEnterCriticalSection(lock));
     RtlLeaveCriticalSection(lock);
@@ -75,6 +78,24 @@ int main(void) {
     CHECK(KeWaitForSingleObject(semaphore, 0, 0, 0, &poll) == STATUS_TIMEOUT);
     CHECK(NtClose(semaphore) == STATUS_SUCCESS);
     CHECK(NtWaitForSingleObjectEx(NULL, 0, 0, &poll) < 0);
+    CHECK(sysThread_WaitTimeout(NULL, 0) == UINT32_MAX && hostGetLastError() == 6);
+
+    uint32_t embedded[2] = {0x12345678, 0xabcdef01};
+    KeInitializeEvent(embedded, SynchronizationEvent, 1);
+    CHECK(NtWaitForSingleObjectEx(embedded, 1, 0, &poll) == STATUS_SUCCESS);
+    CHECK(NtWaitForSingleObjectEx(embedded, 1, 0, &poll) == STATUS_TIMEOUT);
+    CHECK(NtWaitForSingleObjectEx(embedded, 2, 0, &poll) == (NTSTATUS)STATUS_INVALID_PARAMETER);
+    CHECK(NtWaitForSingleObjectEx(embedded, 1, 1, &poll) == STATUS_TIMEOUT); /* native alertable poll */
+    CHECK(NtClose(embedded) == STATUS_SUCCESS);
+    CHECK(embedded[0] == 0x12345678 && embedded[1] == 0xabcdef01);
+
+    void* memory = MmAllocatePhysicalMemoryEx(0, 5000, 4, 0, UINT32_MAX, 8192);
+    CHECK(memory && (uintptr_t)memory % 8192 == 0 && MmQueryAllocationSize(memory) == 8192);
+    for (unsigned i = 0; i < 8192; ++i) CHECK(((unsigned char*)memory)[i] == 0);
+    MmFreePhysicalMemory(0, memory);
+    CHECK(MmQueryAllocationSize(memory) == 0);
+    CHECK(!MmAllocatePhysicalMemoryEx(0, 5000, 4, 0, UINT32_MAX, 3));
+    CHECK(RtlNtStatusToDosError(STATUS_SEMAPHORE_LIMIT_EXCEEDED) == 298);
 
     LARGE_INTEGER now; KeQuerySystemTime(&now);
     CHECK(now > 116444736000000000LL && KeQueryPerformanceFrequency() > 0);
@@ -82,12 +103,15 @@ int main(void) {
     LARGE_INTEGER delay = -10000;
     CHECK(KeDelayExecutionThread(0, 0, &delay) == STATUS_SUCCESS);
     KSPIN_LOCK spin = 0;
+    KfLowerIrql(0);
+    CHECK(KeRaiseIrqlToDpcLevel() == 0 && KeRaiseIrqlToDpcLevel() == 2);
+    KfLowerIrql(0);
     CHECK(KeTryToAcquireSpinLockAtRaisedIrql(&spin));
     CHECK(!KeTryToAcquireSpinLockAtRaisedIrql(&spin));
     KeReleaseSpinLockFromRaisedIrql(&spin);
     for (unsigned i = 0; i < 64; ++i) CHECK(KeTlsFree(slots[i]));
     CHECK(!KeTlsFree(slots[0]));
-    RtlDeleteCriticalSection(lock);
+    CHECK(RtlDeleteCriticalSection(lock) == STATUS_SUCCESS);
     CHECK(memcmp(storage, original, sizeof(storage)) == 0);
     puts("Win32 kernel synchronization tests passed (32-bit).");
     return 0;

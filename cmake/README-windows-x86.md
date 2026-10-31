@@ -39,6 +39,17 @@ cmake --build build/macos --target tt_platform_test
 ctest --test-dir build/macos --output-on-failure
 ```
 
+The macOS checks also run the platform layer's existing SDK synchronization,
+TLS, IRQL, allocation and wait/error contract tests. Both checks passed after
+merging `5faf20b`. All 256 game translation units compiled as COFF i386 with
+the pointer-size guard. The full Windows link reported 706 distinct undefined
+game symbols, compared with 707 on macOS. There were no Windows-only missing
+symbols. The one macOS-only diagnostic was `typeinfo for pongTrainingDrill`:
+`llvm-nm` confirms that the Windows drill object defines this RTTI record,
+while the macOS drill object references it without defining it. This is a
+compiler/RTTI emission difference, rather than a missing Windows platform API.
+The inventories are snapshots; rerun the helper after merging further lifts.
+
 ## Offline/native Windows setup
 
 Transfer `build/win32-deps/` along with the sources. A native Windows LLVM
@@ -63,6 +74,9 @@ Windows. libstdc++, libgcc and their winpthread dependency are linked
 statically; application synchronization itself uses Win32, with no pthread
 backend on Windows. SDL2.dll remains a runtime dependency and is copied
 beside the game automatically once its link succeeds.
+The tested Homebrew sysroot uses the Windows Universal CRT; that runtime must
+be present on the destination Windows installation. The test EXE imports only
+Windows system/UCRT DLLs, with no libgcc, libstdc++ or winpthread DLL imports.
 
 The Windows backend keeps SDK/stdcall imports in `src/platform/win32.c` and
 guest/cdecl exports in `src/xam/kernel_win32.c`. NT event/wait/semaphore

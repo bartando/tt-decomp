@@ -1,16 +1,7 @@
-#include <cstdint>
+#include "audio/xact_fade.hpp"
 
 namespace rage {
 
-struct XactFade {
-    void** vtable;
-    float value;
-    uint16_t duration;
-    uint16_t reserved;
-    uint32_t curve;
-    uint32_t state;
-    float progress;
-};
 
 extern const float g_xactFadeZero; // @ 0x82003DA8
 extern const float g_xactFadeOne;  // @ 0x82003DAC

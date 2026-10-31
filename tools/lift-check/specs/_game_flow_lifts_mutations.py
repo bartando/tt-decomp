@@ -34,7 +34,7 @@ CASES = {
     "pong_match_get_character_for_slot": (
         "src/game/player/pong_player.cpp", [
             ("ignore manager absence", "if (g_plrPlayerMgr_state == 0)", "if (false)"),
-            ("omit missing-manager log", "pongMatch_LogMissingPlayerMgr(\n            reinterpret_cast<const char*>(uintptr_t{0x8203CD80u}));",
+            ("omit missing-manager log", "nop_8240E6D0(\n            reinterpret_cast<const char*>(uintptr_t{0x8203CD80u}));",
              "/* missing diagnostic */"),
             ("wrong player slot", "pongMatch_GetCharacterIndex(playerSlot);",
              "pongMatch_GetCharacterIndex(playerSlot ^ 1u);"),

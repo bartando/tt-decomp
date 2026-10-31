@@ -1,3 +1,4 @@
+#include "rage/mat33.hpp"
 
 
 /**
@@ -4058,8 +4059,6 @@ struct pongCreatureLayout {
 // unless keepInstanceMatrix it moves the instance there (0x820C8FA8).
 extern void pongCreature_Teleport(pongCreature* creature, const pongCreatureMatrix* matrix,
                                   bool resetWorkers, bool updatePoseFirst, bool keepInstanceMatrix);
-// @ 0x820C3F98 — rotation by angle about y into rows a, b, c (cos at [0] and [10])
-extern void ph_BuildRotationMatrixY(float* outRotation, double angle);
 // @ 0x820CC5A8 — the player state's list for the replay list it is given
 extern pongAnimEntryList* game_C5A8(pongPlayerStateView* state, pongAnimEntryList* replayList);
 // @ 0x8214C8F8 (defined in locomotion.cpp)
@@ -4172,7 +4171,7 @@ void pongCreature::ReplayStarting(bool keepInstanceMatrix) {
     memcpy(&matrix, g_identityMatrixRef, sizeof(matrix));
     if (frame.position[2] < 0.0f) {
         pongCreatureMatrix turn;
-        ph_BuildRotationMatrixY(turn.a, 3.14159274f);  // 0x82079B30
+        rage::mat33RotationY(turn.a, 3.14159274f);  // 0x82079B30
         rage::mat33ComposeInPlace(reinterpret_cast<float*>(&matrix), reinterpret_cast<const float*>(&turn));
     }
     memcpy(matrix.d, frame.position, sizeof(matrix.d));
