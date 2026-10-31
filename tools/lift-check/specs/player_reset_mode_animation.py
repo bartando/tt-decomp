@@ -50,8 +50,8 @@ CALLS = {
     "special.vfn_3": stub(ret="void", args=("r3",)),
     "locomotion.vfn_3": stub(ret="void", args=("r3", "r4", "r5", "r6"), deref={"r5": 64}),
     "LocomotionStateAnim_2130_g": model(choose_face),
-    "LocomotionStateAnim_BlendLocomotionAnims": model(apply_frame, args=("r3", "r5", "f1")),
-    "LocomotionStateAnim_TransitionLocomotionState": model(apply_frame, args=("r3", "r5", "f1")),
+    "LocomotionStateAnim_C128_g": model(apply_frame, args=("r3", "r5", "f1")),
+    "LocomotionStateAnim_C288_g": model(apply_frame, args=("r3", "r5", "f1")),
     0x8224C418: model(pair, args=("r3", "r4", "r5", "r7"), deref={"r7": 32}),
 }
 

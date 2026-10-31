@@ -13,6 +13,7 @@
 #include "game/game_message.hpp"
 #include "pong_player.hpp"
 #include "../creature/pong_creature.hpp"
+#include "../../anim/locomotion.hpp"
 #include <cstring>   // memset
 #include <cmath>     // fabsf
 #include <cfloat>    // FLT_MAX
@@ -35,10 +36,6 @@ extern void pongPlayer_UpdateLocomotionState(pongPlayer* state);  // @ 0x820CC67
 
 // LocomotionStateAnim helpers — update animation list entries.
 // C128 = standard transition, C288 = alternate (flag-gated) transition.
-extern void LocomotionStateAnim_BlendLocomotionAnims(uint32_t entry, void* unusedR4,
-                                                   void* skeleton, float weight);
-extern void LocomotionStateAnim_TransitionLocomotionState(uint32_t entry, void* unusedR4,
-                                                        void* skeleton, float weight);
 
 
 // ── External game helpers referenced by pong_player.cpp ───────────────────
@@ -329,15 +326,15 @@ void pongPlayer::UpdateAnimationState() {
     void* listObj = inRange ? *reinterpret_cast<void**>(reinterpret_cast<uint8_t*>(this) + 0x50)
                             : m_pLocoState2;
     uint32_t* listWords = static_cast<uint32_t*>(listObj);
-    uint32_t* entries   = reinterpret_cast<uint32_t*>(listWords[2]);  // +8
+    void** entries = *reinterpret_cast<void***>(static_cast<uint8_t*>(listObj) + 8);
     uint16_t  count     = static_cast<uint16_t>(listWords[3]);        // +12
 
     for (int i = 0; i < (int)count; ++i) {
         if (useBlend) {
-            LocomotionStateAnim_BlendLocomotionAnims(entries[i], nullptr, m_pParent,
+            LocomotionStateAnim_C128_g(entries[i], nullptr, m_pParent,
                                                    g_recoveryTimerThreshold);
         } else {
-            LocomotionStateAnim_TransitionLocomotionState(entries[i], nullptr, m_pParent,
+            LocomotionStateAnim_C288_g(entries[i], nullptr, m_pParent,
                                                         g_recoveryTimerThreshold);
         }
     }
