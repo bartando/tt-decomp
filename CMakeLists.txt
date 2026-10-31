@@ -55,6 +55,7 @@ set(SOURCES
     # CRT layer
     src/crt/crt_init.c
     src/crt/ctrlfp.cpp
+    src/crt/fp_helpers.cpp
     src/crt/entry.c
     src/crt/exit.c
     src/crt/fmod.cpp
@@ -186,6 +187,7 @@ set(SOURCES
     src/game/ball/ball_prediction_quaternion.cpp
     src/game/camera/pong_camera.cpp
     src/game/camera/pong_camera_helpers.cpp
+    src/game/camera/camera_transition_queries.cpp
     src/game/camera/cm_cam_actions.cpp
     src/game/camera/dcam_polar_cam.cpp
     src/game/creature/pong_creature.cpp
@@ -236,6 +238,7 @@ set(SOURCES
     src/game/pong_render.cpp
     src/game/match/hsm_log_strings.cpp
     src/game/match/pong_match.cpp
+    src/game/match/replay_state_publish.cpp
     src/game/match/lvl_table.cpp
     src/game/match/pong_states.cpp
     src/game/match/match_rtti_strings.cpp

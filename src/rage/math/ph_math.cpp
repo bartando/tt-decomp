@@ -14,15 +14,12 @@
  */
 
 #include <cstdint>
+#include "crt/fp_helpers.hpp"
 #include "rage/math.hpp"
 
 // The mixed FP/integer Xenon interfaces leave GPR slots for FP arguments.
 // Explicit unused slots keep these declarations callable under ppc32 SysV too.
 uint32_t _ctrlfp(uint32_t desired, uint32_t mask);  // @ 0x82436530
-int crt_fp_classify(double value);  // @ 0x824357A8
-double crt_fp_adjust_exponent(uint32_t unused, int delta, double value);  // @ 0x82435770
-double crt_fp_round(double value);  // @ 0x82436B30
-double crt_fp_sqrt(double value);  // @ 0x82436528
 double crt_fp_quiet_nan(int operation, uint32_t unused, uint32_t control, double value);  // @ 0x82436260
 // flags in r3, operation in r4, saved control in r7; value/result in f1/f2.
 double crt_fp_exception(uint32_t flags, int operation, uint32_t unused5, uint32_t unused6,
