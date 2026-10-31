@@ -437,3 +437,22 @@ extern "C" void pg_5510_g(void* sourceBuffer, const void* pose, uint32_t /*unuse
         if (output != source) output->stagingAddress += output->stride;
     }
 }
+
+// Indexed normal read. Mapping may replace the data pointer, stride or format.
+// util_5B08 @ 0x82155B08 | size: 0xCC
+extern "C" float* util_5B08(float* out, void* vertexBuffer, uint32_t index) {
+    auto* buffer = static_cast<PgVertexBuffer*>(vertexBuffer);
+    if ((vertexFormat(buffer) & 8) == 0) return out;
+    if (!buffer->mapped) pg_7578_g(buffer);
+    const uint32_t source = buffer->dataAddress + buffer->stride * index + buffer->normalOffset;
+    alignas(16) float normal[4];
+    if (buffer->packedNormal) {
+        uint32_t packed;
+        std::memcpy(&packed, reinterpret_cast<const void*>(uintptr_t(source)), 4);
+        unpackNormPacked32(packed, normal);
+    } else {
+        std::memcpy(normal, align16(reinterpret_cast<const float*>(uintptr_t(source))), 16);
+    }
+    std::memcpy(const_cast<float*>(align16(out)), normal, 16);
+    return out;
+}
