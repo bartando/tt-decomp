@@ -212,3 +212,83 @@ void BallPredict_InterpolateSamples(void* ringPtr, void* unusedR4, gdBallPredict
         BallPredict_BlendSamples(out, nullptr, &ring->At(first), &ring->At(second), factor);
     }
 }
+
+namespace {
+struct CachedPredictionRing {
+    PredictionRing ring;
+    gdBallPredictSample cached;  // +0x2590 within the ring object
+};
+static_assert(__builtin_offsetof(CachedPredictionRing, cached) == 0x2590, "prediction cache offset");
+
+struct TransitionState {
+    uint8_t _pad00[4];
+    float previousWindow;
+    float blendRate;
+    float hitTime;
+    gdBallPredictData* banks[2];
+};
+}
+
+extern uint32_t BallPredict_ShouldUsePrevious(void* state); // @ 0x821D3390
+extern "C" const double g_kDoubleConst_79B00;               // @ 0x82079B00
+extern "C" const double g_kDoubleConst_79B08;               // @ 0x82079B08
+
+// @ 0x821D94B8
+// An empty ring returns its existing cache without overwriting it.
+gdBallPredictSample* BallPredict_GetInterpolatedSample(void* ringPtr, void* unusedR4, float time) {
+    auto* ring = static_cast<CachedPredictionRing*>(ringPtr);
+    int first = -1;
+    int second = -1;
+    float factor = g_kFloatConst_D110;
+    if (BallPredict_FindNeighborIndices(ringPtr, unusedR4, &first, &second, &factor, time)) {
+        BallPredict_BlendSamples(&ring->cached, nullptr, &ring->ring.At(first),
+                                 &ring->ring.At(second), factor);
+    }
+    return &ring->cached;
+}
+
+// @ 0x821D7460
+// Crossfade from the current trajectory toward the previous one, retaining the
+// current ball height. Unlike within-trajectory interpolation, W is not written.
+void BallPredict_BlendTransitionSamples(gdBallPredictSample* out, void* /*unusedR4*/,
+                                       const gdBallPredictSample* first,
+                                       const gdBallPredictSample* second, float factor) {
+    out->time = __builtin_fmaf(second->time - first->time, factor, first->time);
+    out->time2 = __builtin_fmaf(second->time2 - first->time2, factor, first->time2);
+    out->pos.x = __builtin_fmaf(second->pos.x - first->pos.x, factor, first->pos.x);
+    out->pos.y = first->pos.y;
+    out->pos.z = __builtin_fmaf(second->pos.z - first->pos.z, factor, first->pos.z);
+    out->vel = first->vel;
+    out->angVel = first->angVel;
+    out->bounced = first->bounced;
+    out->flag9 = first->flag9;
+    out->hittable = first->hittable != 0 && first->bounced == 0;
+    bpVec4 orientation = first->orient;
+    float dot = second->orient.y * orientation.y;
+    dot = __builtin_fmaf(second->orient.z, orientation.z, dot);
+    dot = __builtin_fmaf(second->orient.w, orientation.w, dot);
+    dot = __builtin_fmaf(second->orient.x, orientation.x, dot);
+    if (dot < g_kFloatConst_D110) {
+        orientation = bpVec4{-orientation.x, -orientation.y, -orientation.z, -orientation.w};
+    }
+    BallPredict_QuaternionSlerp(&out->orient, nullptr, &orientation, &second->orient, factor);
+}
+
+// @ 0x821D3C60
+void BallPredict_InterpolateState(void* statePtr, void* /*unusedR4*/, gdBallPredictSample* out, float time) {
+    auto* state = static_cast<TransitionState*>(statePtr);
+    if (static_cast<uint8_t>(BallPredict_ShouldUsePrevious(statePtr)) != 0) {
+        gdBallPredictSample current;
+        CopySample(current, *BallPredict_GetInterpolatedSample(state->banks[1]->m_samples, nullptr, time));
+        gdBallPredictSample previous;
+        CopySample(previous, *BallPredict_GetInterpolatedSample(state->banks[0]->m_samples, nullptr, time));
+        const float raw = (time - state->hitTime) * state->blendRate;
+        // PPC fsel chooses the lower bound for NaN and negative values.
+        const double lower = raw >= 0.0f ? static_cast<double>(raw) : g_kDoubleConst_79B00;
+        const float factor = static_cast<float>(lower - g_kDoubleConst_79B08 >= 0.0
+                                                ? g_kDoubleConst_79B08 : lower);
+        BallPredict_BlendTransitionSamples(out, nullptr, &current, &previous, factor);
+    } else {
+        BallPredict_InterpolateSamples(state->banks[1]->m_samples, nullptr, out, time);
+    }
+}
