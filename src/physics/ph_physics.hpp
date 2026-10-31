@@ -508,7 +508,7 @@ struct phArticulatedCollider {
     void ClearJointForces();
     void DispatchConstraintSolver(void* param1, void* param2);
     void AccumulateJointForce(int jointParam, const float* forceVec);
-    void PostIntegrate();
+    void PostIntegrate(float timestep);
     void Reset();
     void ClearForces();
     void UpdateChildJoints();

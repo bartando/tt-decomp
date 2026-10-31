@@ -8,7 +8,10 @@
  */
 
 #include "ph_physics.hpp"
+#include "bound_lookup.hpp"
+#include "articulated_joint.hpp"
 #include "rage/math.hpp"
+#include "rage/mat33.hpp"
 
 extern "C" void* rage_alloc(uint32_t size);  // RAGE heap alloc (defined in heap.c)
 
@@ -96,7 +99,6 @@ extern uint32_t g_identityVec[];  // @ 0x82606740 — 16-byte identity/zero vect
 
 /* --- Physics functions --- */
 extern float phJoint1Dof_AE38(void*);
-extern int phArticulatedCollider_E668(rage::phArticulatedCollider* collider, int boneIndex);
 extern void  phBoundCapsule_CopyEntries(void* a, void* b, int count);
 extern void  phBoundCapsule_9DA0_2h(void* a, void* b, int count);
 extern void  phBoundCapsule_F5F8_p39(void* data);
@@ -104,19 +106,21 @@ extern void  phBoundCapsule_ForwardToSink_9C78_1(void* a, void* b, int count);
 extern void  ph_1B78(void* thisPtr, float f2, float f3, void* r6);
 extern void phArticulatedCollider_UpdateJointTransforms(void* activeJoints);
 extern void phArticulatedCollider_ProcessJoints(void* collider);
-extern void phArticulatedCollider_60F8(void* jointData, float recipTimestep, float dampingFactor, float springFactor);
-extern void phArticulatedCollider_RebuildJointWeights(void* jointData);
+extern void phArticulatedCollider_60F8(void* jointData, float linearLimit, float angularLimit, float timestep); // @ 0x822560F8
+extern void phArticulatedCollider_RestoreVelocities(void* jointData); // @ 0x82256B40
 extern void phArticulatedCollider_ProcessColliderState(void* collider);
 extern void phArticulatedCollider_ApplyJointDelta(void* jointData, int linkIndex, const float* delta);
 extern void phArticulatedCollider_ResetJointLink(void* jointData, int linkIndex);
-extern void phArticulatedCollider_ResetJointChain(void* jointArray);
+extern void phArticulatedCollider_ResetJointChain(void* jointArray); // @ 0x822557F0
 extern void phArticulatedCollider_5D58(void* jointArray);
-extern void phArticulatedCollider_ResetForceAccumulators(void* jointArray);
-extern void phArticulatedCollider_5FE0(void* jointData);
-extern void phArticulatedCollider_F0E0(void* collider);
-extern void phArticulatedCollider_8450(void* jointData);
+extern void phArticulatedCollider_ResetForceAccumulators(void* jointArray); // @ 0x82255A40
+extern void phArticulatedCollider_5FE0(void* jointData); // @ 0x82255FE0
+extern void phArticulatedCollider_F0E0(void* collider); // @ 0x8224F0E0
+extern void phArticulatedCollider_8450(void* jointData); // @ 0x82258450
 extern void ph_Sqrtf_joint(rage::phJoint3Dof*, float);
 extern void ph_ApplyAngularVelocity(void* capsule);
+extern void phArticulatedCollider_8A30(void* jointData, const float* velocity); // @ 0x82258A30
+extern void phArticulatedCollider_8B10(void* jointData, const float* angularVelocity); // @ 0x82258B10
 extern void phBoundCapsule_ACB0_p45(void* capsule);
 extern "C" void phCollider_vfn_4(rage::phArticulatedCollider* collider);
 extern void phInst_5910_p39(void* obj);
@@ -2452,45 +2456,31 @@ void rage::phArticulatedCollider::NormalizeVector(const float* src, float* dst) 
 // ─────────────────────────────────────────────────────────────────────────────
 // phArticulatedCollider::SetTimestep (F040_g) @ 0x8224F040 | size: 0xA0
 //
-// Configures the simulation timestep for the articulated collider.
-// Computes reciprocal timestep and derived damping/spring constants,
-// then reconfigures capsule geometry, joint hierarchy, transforms,
-// and constraint data for the new timestep.
+// Advances articulated body state using timestep-dependent speed limits.
+// Prepares the solver response, clamps/damps velocities, integrates body
+// poses, restores saved velocities, propagates child motion and rebases
+// the collider before rebuilding joint solver state.
 //
 // @param timestep - The physics simulation timestep in seconds
 // ─────────────────────────────────────────────────────────────────────────────
-extern void ph_IntegrateJointPositions(void* jointData);
+extern void ph_IntegrateJointPositions(void* jointData, float timestep); // @ 0x82256968
 
 void rage::phArticulatedCollider::SetTimestep(float timestep) {
-    void* jointData = (void*)(uintptr_t)m_pJointArray;  // +464 (0x1D0)
-
-    // Prepare joint force state
+    // Serialized layout: the joint-data pointer is at +0x1D0. Retain the first
+    // pointer across preparation, limiting and integration, then reload it for
+    // each later stage exactly as the original caller does.
+    uint32_t* self = reinterpret_cast<uint32_t*>(this);
+    void* jointData = reinterpret_cast<void*>(uintptr_t(self[0x1D0 / 4]));
     phArticulatedCollider_5FE0(jointData);
-
-    // Compute reciprocal timestep
-    float recipTimestep = 1.0f / timestep;
-
-    // Derive damping and spring constants from reciprocal timestep
-    float dampingFactor = recipTimestep * g_dampingScale;
-    float springFactor  = recipTimestep * g_springScale;
-
-    // Reconfigure joint solver with new timing constants
-    phArticulatedCollider_60F8(jointData, timestep, dampingFactor, springFactor);
-
-    // Reconfigure capsule geometry for new timestep
-    ph_IntegrateJointPositions(jointData);
-
-    // Rebuild joint weight/response data
-    phArticulatedCollider_RebuildJointWeights(jointData);
-
-    // Recompute joint hierarchy transforms
-    phArticulatedCollider_8450(jointData);
-
-    // Recompute joint transform matrices
-    phArticulatedCollider_F0E0((void*)this);
-
-    // Reinitialize joint constraints
-    phArticulatedCollider_5D58(jointData);
+    const float inverseTimestep = g_phClampMax / timestep;
+    const float angularLimit = inverseTimestep * g_dampingScale;
+    const float linearLimit = inverseTimestep * g_springScale;
+    phArticulatedCollider_60F8(jointData, linearLimit, angularLimit, timestep);
+    ph_IntegrateJointPositions(jointData, timestep);
+    phArticulatedCollider_RestoreVelocities(reinterpret_cast<void*>(uintptr_t(self[0x1D0 / 4])));
+    phArticulatedCollider_8450(reinterpret_cast<void*>(uintptr_t(self[0x1D0 / 4])));
+    phArticulatedCollider_F0E0(this);
+    phArticulatedCollider_5D58(reinterpret_cast<void*>(uintptr_t(self[0x1D0 / 4])));
 }
 
 } // namespace rage
@@ -5644,19 +5634,12 @@ int32_t phObject_UnbindResource(void* thisPtr) {
 // ═════════════════════════════════════════════════════════════════════════════
 
 // External subroutines used by the articulated collider
-extern void ph_IntegrateJointPositions(void* jointArray);           // Update capsule bounds from joints
-extern void phArticulatedCollider_8450(void* jointArray);      // Post-integrate joint transforms
 extern void phArticulatedCollider_5D58(void* jointArray);      // Reset joint integration state
-extern void phArticulatedCollider_ResetJointChain(void* jointArray);   // Reset joint chain state
-extern void phArticulatedCollider_8A30(void* jointArray, float* forceVec);  // Sync joint velocities
-extern void phArticulatedCollider_8B10(void* jointArray, float* torqueVec); // Sync joint torques
 
-extern void phArticulatedCollider_ResetForceAccumulators(void* jointArray);  // Reset joint force accumulators
 extern void phArticulatedCollider_F0E0(void* collider);        // Update articulated internal state
 extern void phCollider_CDF0_p39(void* collider);               // Update collider position from velocity
 extern void phCollider_vfn_1(void* collider);                  // phCollider::Reset
 extern void phCollider_vfn_42(void* collider);                 // phCollider::SyncAfterBaseUpdate
-extern int32_t phArticulatedCollider_E668_GetJointIndex(void* thisPtr, int jointParam);  // Joint index lookup
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -5712,7 +5695,7 @@ void rage::phArticulatedCollider::DispatchConstraintSolver(void* param1, void* p
 // ─────────────────────────────────────────────────────────────────────────────
 void rage::phArticulatedCollider::AccumulateJointForce(int jointParam, const float* forceVec) {
     // Look up the joint index via E668 helper
-    int32_t jointIndex = phArticulatedCollider_E668_GetJointIndex((void*)this, jointParam);
+    int32_t jointIndex = phArticulatedCollider_E668(this, jointParam);
 
     // Load joint pointer from jointArray[(jointIndex + 10)]
     uint32_t* jointArray = (uint32_t*)(uintptr_t)m_pJointArray;   // +464 (0x1D0)
@@ -5737,21 +5720,12 @@ void rage::phArticulatedCollider::AccumulateJointForce(int jointParam, const flo
 //   3. Update articulated collider internal state (F0E0)
 //   4. Reset joint integration state
 // ─────────────────────────────────────────────────────────────────────────────
-void rage::phArticulatedCollider::PostIntegrate() {
-    uint32_t* jointArray = (uint32_t*)(uintptr_t)m_pJointArray;  // +464 (0x1D0)
-
-    // Step 1: Update capsule bounds from current joint positions
-    ph_IntegrateJointPositions(jointArray);
-
-    // Step 2: Post-integrate joint transforms
-    phArticulatedCollider_8450(jointArray);
-
-    // Step 3: Update internal articulated state
-    phArticulatedCollider_F0E0((void*)this);
-
-    // Step 4: Reset joint integration accumulators
-    jointArray = (uint32_t*)(uintptr_t)m_pJointArray;  // reload after potential modification
-    phArticulatedCollider_5D58(jointArray);
+void rage::phArticulatedCollider::PostIntegrate(float timestep) {
+    uint32_t* self = reinterpret_cast<uint32_t*>(this);
+    ph_IntegrateJointPositions(reinterpret_cast<void*>(uintptr_t(self[0x1D0 / 4])), timestep);
+    phArticulatedCollider_8450(reinterpret_cast<void*>(uintptr_t(self[0x1D0 / 4])));
+    phArticulatedCollider_F0E0(this);
+    phArticulatedCollider_5D58(reinterpret_cast<void*>(uintptr_t(self[0x1D0 / 4])));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -7443,10 +7417,7 @@ void phBoundCapsule_DecomposeMatrixToEuler(const float* matrix, float* outEuler)
 
 // External functions used by phArticulatedCollider methods
 extern void phCollider_vfn_1(void* collider);
-extern void phArticulatedCollider_ResetJointChain(void* jointData);
 extern void phArticulatedCollider_5D58(void* jointData);
-extern void phArticulatedCollider_ResetForceAccumulators(void* jointData);
-extern void phArticulatedCollider_5FE0(void* jointData);
 extern void* phArticulatedCollider_CreateJointConstraints(void* jointData, uint32_t boneMap,
     uint32_t constraintMap, uint32_t jointParamA, uint32_t jointParamB, uint32_t jointParamC);
 
@@ -7983,8 +7954,6 @@ void rage::phArticulatedCollider::DispatchJointSlot7(int jointIndex) {
 // rage::phArticulatedCollider — Dispatch, Force, and Matrix Functions (10 fns)
 // ═════════════════════════════════════════════════════════════════════════════
 
-extern void phArticulatedCollider_8A30(void* jointData, const float* velocity);
-extern void phArticulatedCollider_8B10(void* jointData, const float* angularVelocity);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // phArticulatedCollider::DelegateToBoundCapsule (vfn_24) @ 0x822CC700 | size: 0x8
@@ -8843,6 +8812,370 @@ static float phDotVmx(const float* a, const float* b, unsigned count) {
     for (unsigned lane = 0; lane < count; ++lane)
         sum += static_cast<double>(phFlushVmx(a[lane])) * phFlushVmx(b[lane]);
     return phFlushVmx(static_cast<float>(sum));
+}
+
+// Body vectors are position (+0xC0), linear/angular velocity (+0x110/+0x120),
+// then their cached angular and point velocities (+0x130/+0x140). The scalar
+// cross product deliberately rounds its second product before fused subtraction.
+static void phRefreshJointVelocity(float* body) {
+    const float* position = body + 0xC0 / 4;
+    const float* angular = body + 0x120 / 4;
+    float* pointVelocity = body + 0x140 / 4;
+    memcpy(body + 0x130 / 4, angular, 16);
+    memcpy(pointVelocity, body + 0x110 / 4, 16);
+    for (unsigned axis = 0; axis < 3; ++axis) {
+        const unsigned y = (axis + 1) % 3, z = (axis + 2) % 3;
+        const float product = angular[y] * position[z];
+        const float cross = __builtin_fmaf(angular[z], position[y], -product);
+        pointVelocity[axis] += cross;
+    }
+}
+
+// Clear dynamic state on one articulated body. Saved velocity and force
+// ranges are distinct; the force block at +0x3F0 is intentionally untouched.
+// phArticulatedBody_ClearState @ 0x82126BD0 | size: 0xAC
+void phArticulatedBody_ClearState(void* object) {
+    uint8_t* body = static_cast<uint8_t*>(object);
+    memset(body + 0x110, 0, 64);
+    memset(body + 0x3D0, 0, 32);
+    memset(body + 0x410, 0, 64);
+}
+
+// Restore each body's saved pose, reset its dynamic state, and clear per-body
+// and per-child flags. The body pointer and count are reloaded after the helper.
+// phArticulatedCollider_ResetJointChain @ 0x822557F0 | size: 0x14C
+void phArticulatedCollider_ResetJointChain(void* jointData) {
+    uint32_t* data = static_cast<uint32_t*>(jointData);
+    for (int i = 0; i < static_cast<int32_t>(data[1]); ++i) {
+        phArticulatedBody_ClearState(reinterpret_cast<void*>(uintptr_t(data[10 + i])));
+        float* body = reinterpret_cast<float*>(uintptr_t(data[10 + i]));
+        memcpy(body + 0xC0 / 4, body + 0x100 / 4, 16);
+        phRefreshJointVelocity(body);
+        memcpy(body + 0x90 / 4, body + 0xD0 / 4, 48);
+        data[105 + i] = 0;
+    }
+    const int count = static_cast<int32_t>(data[1]);
+    if (count > 1)
+        memset(reinterpret_cast<uint8_t*>(data) + 8, 0, static_cast<unsigned>(count - 1));
+}
+
+// Clear current/saved body velocities, then clear each child joint's solver
+// accumulators through its real virtual interface (slot +0x44).
+// phArticulatedCollider_ResetForceAccumulators @ 0x82255A40 | size: 0x110
+void phArticulatedCollider_ResetForceAccumulators(void* jointData) {
+    uint32_t* data = static_cast<uint32_t*>(jointData);
+    for (int i = 0; i < static_cast<int32_t>(data[1]); ++i) {
+        uint8_t* body = reinterpret_cast<uint8_t*>(uintptr_t(data[10 + i]));
+        memset(body + 0x110, 0, 64);
+        memset(body + 0x3F0, 0, 64);
+    }
+    const int childCount = static_cast<int32_t>(data[1]) - 1;
+    for (int i = 0; i < childCount; ++i) {
+        auto* joint = reinterpret_cast<rage::phArticulatedJointOps*>(uintptr_t(data[42 + i]));
+        joint->ClearVelocityConstraints();
+    }
+}
+
+// Propagate each child joint's motion into its body, then cache body velocities.
+// The body pointer is captured before dispatch; virtual propagation can update
+// the joint-data array itself.
+// phArticulatedCollider_8450 @ 0x82258450 | size: 0xE8
+void phArticulatedCollider_8450(void* jointData) {
+    uint32_t* data = static_cast<uint32_t*>(jointData);
+    const int childCount = static_cast<int32_t>(data[1]) - 1;
+    for (int i = 0; i < childCount; ++i) {
+        float* body = reinterpret_cast<float*>(uintptr_t(data[11 + i]));
+        auto* joint = reinterpret_cast<rage::phArticulatedJointOps*>(uintptr_t(data[42 + i]));
+        joint->PropagateMotion();
+        phRefreshJointVelocity(body);
+    }
+}
+
+extern "C" const float lbl_82606750[4]; // @ 0x82606750 — shared zero vector
+
+// Extract the root's transposed basis/position into the collider, then rebase
+// every body about the new origin while preserving its cached point velocity.
+// phArticulatedCollider_F0E0 @ 0x8224F0E0 | size: 0x138
+void phArticulatedCollider_F0E0(void* collider) {
+    uint32_t* self = static_cast<uint32_t*>(collider);
+    uint32_t* data = reinterpret_cast<uint32_t*>(uintptr_t(self[0x1D0 / 4]));
+    const float* root = reinterpret_cast<const float*>(uintptr_t(data[10]));
+    float rootTransform[16];
+    memcpy(rootTransform, root + 0x90 / 4, sizeof(rootTransform));
+    float* output = reinterpret_cast<float*>(self);
+    for (unsigned row = 0; row < 3; ++row)
+        for (unsigned lane = 0; lane < 4; ++lane)
+            memcpy(output + 0xA0 / 4 + row * 4 + lane, rootTransform + lane * 4 + row, 4);
+    float delta[4];
+    for (unsigned lane = 0; lane < 4; ++lane) {
+        output[0xD0 / 4 + lane] = phFlushVmx(phFlushVmx(output[0xD0 / 4 + lane]) + phFlushVmx(rootTransform[12 + lane]));
+        delta[lane] = phFlushVmx(phFlushVmx(lbl_82606750[lane]) - phFlushVmx(rootTransform[12 + lane]));
+    }
+    data = reinterpret_cast<uint32_t*>(uintptr_t(self[0x1D0 / 4]));
+    for (int i = 0; i < static_cast<int32_t>(data[1]); ++i) {
+        float* body = reinterpret_cast<float*>(uintptr_t(data[10 + i]));
+        for (unsigned lane = 0; lane < 4; ++lane)
+            body[0xC0 / 4 + lane] = phFlushVmx(phFlushVmx(body[0xC0 / 4 + lane]) + delta[lane]);
+        const float* angular = body + 0x130 / 4;
+        for (unsigned axis = 0; axis < 3; ++axis) {
+            const unsigned y = (axis + 1) % 3, z = (axis + 2) % 3;
+            const float product = angular[y] * delta[z];
+            const float cross = __builtin_fmaf(angular[z], delta[y], -product);
+            body[0x140 / 4 + axis] += cross;
+        }
+    }
+}
+
+extern "C" const float lbl_8202CFE8[2]; // @ 0x8202CFE8 — damping rate, 0.1
+
+static void phClampBodyVelocity(float* velocity, float limit, float limitSquared) {
+    const float lengthSquared = phDotVmx(velocity, velocity, 3);
+    if (lengthSquared > limitSquared) {
+        const float inverseLength = lengthSquared == g_phZeroFloat ? g_phZeroFloat
+            : g_phClampMax / __builtin_sqrtf(lengthSquared);
+        const float scale = inverseLength * limit;
+        for (unsigned lane = 0; lane < 4; ++lane)
+            velocity[lane] = phFlushVmx(phFlushVmx(velocity[lane]) * phFlushVmx(scale));
+    }
+}
+
+// Clamp xyz speed (scaling all four lanes), damp, then refresh velocity caches.
+// phArticulatedCollider_60F8 @ 0x822560F8 | size: 0x208
+void phArticulatedCollider_60F8(void* jointData, float linearLimit,
+                               float angularLimit, float timestep) {
+    uint32_t* data = static_cast<uint32_t*>(jointData);
+    const float damping = -__builtin_fmaf(timestep, lbl_8202CFE8[0], -g_phClampMax);
+    const float angularLimitSquared = angularLimit * angularLimit;
+    const float linearLimitSquared = linearLimit * linearLimit;
+    for (int i = 0; i < static_cast<int32_t>(data[1]); ++i) {
+        float* body = reinterpret_cast<float*>(uintptr_t(data[10 + i]));
+        float* angular = body + 0x120 / 4;
+        float* linear = body + 0x110 / 4;
+        phClampBodyVelocity(angular, angularLimit, angularLimitSquared);
+        for (unsigned lane = 0; lane < 4; ++lane)
+            angular[lane] = phFlushVmx(phFlushVmx(angular[lane]) * phFlushVmx(damping));
+        phClampBodyVelocity(linear, linearLimit, linearLimitSquared);
+        for (unsigned lane = 0; lane < 4; ++lane)
+            linear[lane] = phFlushVmx(phFlushVmx(linear[lane]) * phFlushVmx(damping));
+        phRefreshJointVelocity(body);
+    }
+}
+
+static void phRecoverOriginVelocity(float* body) {
+    const float* position = body + 0xC0 / 4;
+    const float* angular = body + 0x120 / 4;
+    for (unsigned axis = 0; axis < 3; ++axis) {
+        const unsigned y = (axis + 1) % 3, z = (axis + 2) % 3;
+        const float product = position[y] * angular[z];
+        const float cross = __builtin_fmaf(position[z], angular[y], -product);
+        body[0x110 / 4 + axis] += cross;
+    }
+}
+
+// Restore saved angular/point velocities and recover linear velocity at the
+// body's origin. This is the routine formerly called RebuildJointWeights.
+// phArticulatedCollider_RestoreVelocities @ 0x82256B40 | size: 0xE4
+void phArticulatedCollider_RestoreVelocities(void* jointData) {
+    uint32_t* data = static_cast<uint32_t*>(jointData);
+    for (int i = 0; i < static_cast<int32_t>(data[1]); ++i) {
+        float* body = reinterpret_cast<float*>(uintptr_t(data[10 + i]));
+        memcpy(body + 0x130 / 4, body + 0x410 / 4, 16);
+        memcpy(body + 0x140 / 4, body + 0x420 / 4, 16);
+        memcpy(body + 0x120 / 4, body + 0x130 / 4, 16);
+        memcpy(body + 0x110 / 4, body + 0x140 / 4, 16);
+        phRecoverOriginVelocity(body);
+    }
+}
+
+// Rodrigues rotation with the solver's scalar product/FMA ordering. All axis
+// components are captured before stores; row padding and final W stay untouched.
+// phArticulatedCollider_BuildRotation @ 0x82256D98 | size: 0xF8
+void phArticulatedCollider_BuildRotation(void*, float* out, const float* axis, double angle) {
+    const float cosine = static_cast<float>(crt_cos(angle));
+    const float sine = static_cast<float>(crt_sin(angle));
+    const float x = axis[0], y = axis[1], z = axis[2];
+    const float yy = y * y, yz = z * y, zz = z * z, xx = x * x;
+    const float scale = g_phClampMax - cosine;
+    const float xs = x * scale;
+    const float yzScale = yz * scale;
+    const float xyScale = y * xs, xzScale = z * xs;
+    const float sinX = x * sine, sinY = y * sine, sinZ = z * sine;
+    out[0] = __builtin_fmaf(xx, scale, cosine);
+    out[1] = xyScale - sinZ;
+    out[2] = sinY + xzScale;
+    out[5] = __builtin_fmaf(yy, scale, cosine);
+    out[4] = sinZ + xyScale;
+    out[6] = yzScale - sinX;
+    out[8] = xzScale - sinY;
+    out[9] = sinX + yzScale;
+    out[10] = __builtin_fmaf(zz, scale, cosine);
+    out[12] = out[13] = out[14] = g_phZeroFloat;
+}
+
+extern "C" const float lbl_825CB7C0[4]; // @ 0x825CB7C0 — (1, 1, 1, 0)
+extern "C" const float g_phBoundSphere_DirEps; // @ 0x82079B10 — angular speed squared threshold
+
+namespace rage {
+// Integrate positions and (above the angular threshold) rotate each body's
+// basis about its normalized angular velocity. VMX multiplies/adds round and
+// flush separately; the reciprocal's Newton step retains its masked W lane.
+// ph_IntegrateJointPositions @ 0x82256968 | size: 0x1D8
+void ph_IntegrateJointPositions(void* jointData, float timestep) {
+    uint32_t* data = static_cast<uint32_t*>(jointData);
+    for (int i = 0; i < static_cast<int32_t>(data[1]); ++i) {
+        float* body = reinterpret_cast<float*>(uintptr_t(data[10 + i]));
+        float angular[4];
+        memcpy(angular, body + 0x120 / 4, sizeof(angular));
+        const float lengthSquared = phDotVmx(angular, angular, 3);
+        for (unsigned lane = 0; lane < 4; ++lane) {
+            const float step = phFlushVmx(phFlushVmx(body[0x110 / 4 + lane]) * phFlushVmx(timestep));
+            body[0xC0 / 4 + lane] = phFlushVmx(step + phFlushVmx(body[0xC0 / 4 + lane]));
+        }
+        if (!(lengthSquared > g_phBoundSphere_DirEps))
+            continue;
+        const float speed = static_cast<float>(crt_sqrt(lengthSquared));
+        const float inverse = phFlushVmx(static_cast<float>(1.0 / static_cast<double>(speed)));
+        const float product = phFlushVmx(inverse * phFlushVmx(speed));
+        float axis[4];
+        for (unsigned lane = 0; lane < 4; ++lane) {
+            const float residual = phFlushVmx(-(product - phFlushVmx(lbl_825CB7C0[lane])));
+            const float refined = phFlushVmx(phFlushVmx(inverse * residual) + inverse);
+            axis[lane] = phFlushVmx(phFlushVmx(angular[lane]) * refined);
+        }
+        alignas(16) float rotation[16];
+        phArticulatedCollider_BuildRotation(jointData, rotation, axis, speed * timestep);
+        alignas(16) float transform[16], previous[16];
+        memcpy(previous, body + 0x90 / 4, sizeof(previous));
+        memcpy(transform, rotation, sizeof(transform));
+        mat33ComposeInPlace(transform, previous);
+        memcpy(body + 0x90 / 4, transform, 48);
+    }
+}
+} // namespace rage
+
+// Multiply the symmetric spatial tensor (three 3x4 blocks A, B, C) by a
+// vector pair: first = B^T * first + A * second, second = B * second + C * first.
+// Preserve the original four stages of loads/stores, including aliased inputs.
+// phSpatialTensor_Multiply @ 0x822556E0 | size: 0x10C
+void phSpatialTensor_Multiply(const float* matrix, const float* input, float* output) {
+    for (unsigned stage = 0; stage < 4; ++stage) {
+        float value[4], rows[16], result[4];
+        const unsigned inputVector = stage == 0 || stage == 3 ? 0 : 4;
+        const unsigned block = stage == 0 || stage == 1 ? 16 : stage == 2 ? 0 : 32;
+        memcpy(value, input + inputVector, sizeof(value));
+        memcpy(rows, matrix + block, sizeof(rows));
+        for (unsigned axis = 0; axis < 3; ++axis) {
+            if (stage == 0) {
+                const float column[3] = {rows[axis], rows[4 + axis], rows[8 + axis]};
+                result[axis] = phDotVmx(value, column, 3);
+            } else {
+                result[axis] = phDotVmx(value, rows + axis * 4, 3);
+            }
+        }
+        result[3] = result[0];
+        float* target = output + (stage == 1 || stage == 3 ? 4 : 0);
+        if (stage < 2)
+            memcpy(target, result, sizeof(result));
+        else
+            for (unsigned lane = 0; lane < 4; ++lane)
+                target[lane] = phFlushVmx(phFlushVmx(target[lane]) + phFlushVmx(result[lane]));
+    }
+}
+
+// Apply local force responses, reduce them child-to-parent, then propagate
+// the resolved parent response back through each joint to its child body.
+// phArticulatedCollider_PrepareForceResponse @ 0x82256300 | size: 0x218
+void phArticulatedCollider_PrepareForceResponse(void* jointData) {
+    uint32_t* data = static_cast<uint32_t*>(jointData);
+    for (int i = 0; i < static_cast<int32_t>(data[1]); ++i) {
+        float* body = reinterpret_cast<float*>(uintptr_t(data[10 + i]));
+        alignas(16) float response[8];
+        phSpatialTensor_Multiply(body + 0x310 / 4, body + 0x170 / 4, response);
+        memcpy(body + 0x3F0 / 4, response, sizeof(response));
+        memset(body + 0x170 / 4, 0, 32);
+    }
+    const int backwardCount = static_cast<int32_t>(data[1]);
+    for (int child = backwardCount - 1; child > 0; --child) {
+        auto* joint = reinterpret_cast<rage::phArticulatedJointOps*>(uintptr_t(data[41 + child]));
+        const float* body = reinterpret_cast<const float*>(uintptr_t(data[10 + child]));
+        float* parent = reinterpret_cast<float*>(uintptr_t(data[10 + data[72 + child]]));
+        float* reduced = reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(joint) + 0x1B0);
+        joint->ResolveParentResponse(body + 0x3F0 / 4, reduced);
+        for (unsigned lane = 0; lane < 8; ++lane)
+            parent[0x3F0 / 4 + lane] = phFlushVmx(phFlushVmx(parent[0x3F0 / 4 + lane]) + phFlushVmx(reduced[lane]));
+    }
+    const int forwardCount = static_cast<int32_t>(data[1]);
+    for (int child = 1; child < forwardCount; ++child) {
+        auto* joint = reinterpret_cast<rage::phArticulatedJointOps*>(uintptr_t(data[41 + child]));
+        const float* parent = reinterpret_cast<const float*>(uintptr_t(data[10 + data[72 + child]]));
+        float* body = reinterpret_cast<float*>(uintptr_t(data[10 + child]));
+        const float* reduced = reinterpret_cast<const float*>(reinterpret_cast<uint8_t*>(joint) + 0x1B0);
+        float* propagated = reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(joint) + 0x1D0);
+        alignas(16) float difference[8];
+        for (unsigned lane = 0; lane < 8; ++lane)
+            difference[lane] = phFlushVmx(phFlushVmx(parent[0x3F0 / 4 + lane]) - phFlushVmx(reduced[lane]));
+        joint->ResolveChildResponse(difference, propagated);
+        for (unsigned lane = 0; lane < 8; ++lane)
+            body[0x3F0 / 4 + lane] = phFlushVmx(phFlushVmx(body[0x3F0 / 4 + lane]) + phFlushVmx(propagated[lane]));
+    }
+}
+
+// Add the resolved force response to cached velocities, then recover current
+// angular and origin linear velocities from those caches.
+// phArticulatedCollider_5FE0 @ 0x82255FE0 | size: 0x114
+void phArticulatedCollider_5FE0(void* jointData) {
+    phArticulatedCollider_PrepareForceResponse(jointData);
+    uint32_t* data = static_cast<uint32_t*>(jointData);
+    for (int i = 0; i < static_cast<int32_t>(data[1]); ++i) {
+        float* body = reinterpret_cast<float*>(uintptr_t(data[10 + i]));
+        for (unsigned lane = 0; lane < 8; ++lane)
+            body[0x130 / 4 + lane] = phFlushVmx(phFlushVmx(body[0x130 / 4 + lane]) + phFlushVmx(body[0x3F0 / 4 + lane]));
+        memcpy(body + 0x120 / 4, body + 0x130 / 4, 16);
+        memcpy(body + 0x110 / 4, body + 0x140 / 4, 16);
+        phRecoverOriginVelocity(body);
+    }
+}
+
+// Shift all body velocities by the root's change, preserving relative motion.
+// phArticulatedCollider_8A30 @ 0x82258A30 | size: 0xE0
+void phArticulatedCollider_8A30(void* jointData, const float* velocity) {
+    uint32_t* data = static_cast<uint32_t*>(jointData);
+    const float* root = reinterpret_cast<const float*>(uintptr_t(data[10]));
+    float delta[4];
+    for (unsigned lane = 0; lane < 4; ++lane)
+        delta[lane] = phFlushVmx(phFlushVmx(velocity[lane]) - phFlushVmx(root[0x110 / 4 + lane]));
+    for (int i = 0; i < static_cast<int32_t>(data[1]); ++i) {
+        float* body = reinterpret_cast<float*>(uintptr_t(data[10 + i]));
+        for (unsigned lane = 0; lane < 4; ++lane)
+            body[0x110 / 4 + lane] = phFlushVmx(delta[lane] + phFlushVmx(body[0x110 / 4 + lane]));
+        phRefreshJointVelocity(body);
+    }
+}
+
+// Changing angular velocity also shifts each body's linear velocity by
+// deltaAngular x position. VMX rounds/flushed products separately; the cached
+// point velocity uses the scalar fused cross product above. Input may alias a body.
+// phArticulatedCollider_8B10 @ 0x82258B10 | size: 0x188
+void phArticulatedCollider_8B10(void* jointData, const float* angularVelocity) {
+    uint32_t* data = static_cast<uint32_t*>(jointData);
+    const float* root = reinterpret_cast<const float*>(uintptr_t(data[10]));
+    float delta[4];
+    for (unsigned lane = 0; lane < 4; ++lane)
+        delta[lane] = phFlushVmx(phFlushVmx(angularVelocity[lane]) - phFlushVmx(root[0x120 / 4 + lane]));
+    for (int i = 0; i < static_cast<int32_t>(data[1]); ++i) {
+        float* body = reinterpret_cast<float*>(uintptr_t(data[10 + i]));
+        for (unsigned lane = 0; lane < 4; ++lane) {
+            const unsigned y = lane < 3 ? (lane + 1) % 3 : 3;
+            const unsigned z = lane < 3 ? (lane + 2) % 3 : 3;
+            const float product1 = phFlushVmx(phFlushVmx(body[0xC0 / 4 + z]) * delta[y]);
+            const float product2 = phFlushVmx(phFlushVmx(body[0xC0 / 4 + y]) * delta[z]);
+            const float cross = phFlushVmx(-(product2 - product1));
+            body[0x110 / 4 + lane] = phFlushVmx(cross + phFlushVmx(body[0x110 / 4 + lane]));
+        }
+        for (unsigned lane = 0; lane < 4; ++lane)
+            body[0x120 / 4 + lane] = phFlushVmx(delta[lane] + phFlushVmx(body[0x120 / 4 + lane]));
+        phRefreshJointVelocity(body);
+    }
 }
 
 // Rotate the first two complete vec4 rows; the Z and translation rows are untouched.
@@ -9956,7 +10289,6 @@ phInst* phSimulator::FindWeakestInst(uint32_t* breakableArray,
             void** boundVt = *(void***)(uintptr_t)boundPtr;
             uint8_t boundType = *(uint8_t*)((uint8_t*)boundVt + 4);
             if (boundType == 9) {
-                extern uint32_t phBoundComposite_E750(void* bound);
                 numComponents = (int32_t)phBoundComposite_E750(
                     (void*)(uintptr_t)boundPtr);
                 if (numComponents > 128) {
@@ -11592,3 +11924,13 @@ void ReverbAllpass<kLength>::Process(float* in, float* out) {
 }
 
 template void ReverbAllpass<512>::Process(float*, float*);  // @ 0x82462A28
+
+// Cache the transformed local centroid at +0x40 only when enabled at byte 7.
+// Shares the transform (including its shuffled W lane) with the output variant.
+// phBound_TransformWorldCentroid @ 0x8228D0E8 | size: 0x90
+void phBound_TransformWorldCentroid(void* self, const float* matrix) {
+    if (static_cast<const uint8_t*>(self)[7] != 0) {
+        rage::phBound_TransformCentroid(static_cast<const float*>(self), matrix,
+                                      reinterpret_cast<float*>(static_cast<char*>(self) + 0x40));
+    }
+}

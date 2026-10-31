@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import math
 import os
 import random
 import struct
@@ -463,7 +464,7 @@ class Checker:
     def feq(self, a: float, b: float) -> bool:
         if a == b or (a != a and b != b):
             return True
-        if self.ftol <= 0:
+        if self.ftol <= 0 or not math.isfinite(a) or not math.isfinite(b):
             return False
         return abs(a - b) <= self.ftol * max(1.0, abs(a), abs(b))
 
