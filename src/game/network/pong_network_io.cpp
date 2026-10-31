@@ -1,3 +1,4 @@
+#include "audio/xact_sink_io.hpp"
 // pong_network_io.cpp — Network I/O helper functions | Rockstar Presents Table Tennis (Xbox 360, 2006)
 
 /**
@@ -859,7 +860,7 @@ void msgMsgSink_6138_2hr(void* self)
  * Invokes msgMsgSink_6138_2hr(self); if the low bit of the `flag` argument
  * is set, additionally calls _locale_register(self, 0x20408861).
  */
-void msgMsgSink_6220_w(void* self, uint32_t flag = 0)
+void msgMsgSink_6220_w(void* self, uint32_t flag)
 {
     msgMsgSink_6138_2hr(self);
     if ((flag & 1) != 0) {

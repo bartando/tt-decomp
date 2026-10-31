@@ -27,7 +27,7 @@ MUTATIONS = (
     ("detach through wrong vtable slot", "(table[31])(instance, retained)", "(table[30])(instance, retained)"),
     ("destroy wrong retained object", "(table[2])(retained, 0, 0)", "(table[2])(retained, 1, 0)"),
     ("retain instance after detach", "self->instance = nullptr;", "/* lost instance clear */"),
-    ("skip finalizer after detach", "            msgMsgSink_A670_2hr(self);\n        } else if",
+    ("skip finalizer after detach", "            xactWave_Finalize(self);\n        } else if",
      "            /* lost finalizer */\n        } else if"),
     ("retire the voice instead of instance", "atSingleton_2378_g(instance);", "atSingleton_2378_g(self->voice);"),
     ("consume wrong update request value", "&self->updateRequested, 1u, 0u", "&self->updateRequested, 2u, 0u"),

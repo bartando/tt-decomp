@@ -1,3 +1,5 @@
+#include "rage/dat_bit_buffer.hpp"
+#include "rage/memory.h"
 #include "crt/rtti.h"
 // pong_network.cpp — Network message implementations | Rockstar Presents Table Tennis (Xbox 360, 2006)
 
@@ -3962,7 +3964,6 @@ void ForceMatchTimeSyncMessage_Process(void* thisPtr) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 extern void snBitStream_ReadString(void* client, void* dst, int maxBytes);  // util_0AF0 @ 0x82260AF0
-extern void DeserializeGamerHandle(void* client, void* dst);                // netStream_ReadU32GamerHandleVariant @ 0x82260E18
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BallHitMessage_Deserialise  [vtable slot 1 @ 0x823B65F8 | size: 0x68]
@@ -4188,7 +4189,7 @@ void SpectatorQuitMessage_Deserialise(void* thisPtr, void* client) {
     *(float*)(obj + 0x04) = timingRef;
 
     // Gamer handle block at +0x08 (XBL identity)
-    DeserializeGamerHandle(client, obj + 0x08);
+    datBitBuffer_ReadS32(client, reinterpret_cast<int32_t*>(obj + 0x08), 32);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -5621,7 +5622,6 @@ extern void PongNetRoundRobinCoordinator_FC20_w(void* obj);                    /
 extern void* ke_8F70(void* obj);                                               // @ 0x822C8F70 — ctor returning this
 extern void pongCreatureInst_9030_g(void* creatureInst, void* srcPayload);    // @ 0x822C9030
 extern void* atSingleton_7CE0_w(void* singleton, int zero, int slotMinusOne); // @ 0x82447CE0 — returns slot key
-extern "C" void thunk_rage_free(void* p);                                      // @ 0x820C0120
 
 // The max-float init value is at 0x82079AD4 (.rdata, 4 bytes).  Bodies read
 // it by symbol reference via a small accessor so the raw address stays out
@@ -6000,7 +6000,7 @@ uint32_t pongNetMessageHolder_AAC8_w(pongNetMessageHolder* holder,
         *outSlotId  = winnerSlot;
     }
 
-    thunk_rage_free(scratch);
+    rage_free(scratch);
     return 0;
 }
 

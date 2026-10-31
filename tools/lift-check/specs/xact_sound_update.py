@@ -88,7 +88,7 @@ CALLS = {
     "cue.vfn_31": stub(ret=owns_transitions, args=("r3",)),
     "cue.vfn_27": stub(ret="void", args=("r3",)),
     "event.vfn_1": model(retire, args=("r3",)),
-    "msgMsgSink_3B48_g": stub(ret=control_result),
+    "rage::xactFade_Update": stub(ret=control_result),
     "msgMsgSink_3DC8_g": model(process_control),
     "msgMsgSink_DC40_g": stub(ret="void"),
     "msgMsgSink_4EB8_g": stub(ret=start_result),

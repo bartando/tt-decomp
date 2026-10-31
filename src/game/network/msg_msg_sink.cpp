@@ -1,3 +1,6 @@
+#include "audio/xact_sink_io.hpp"
+#include "rage/xact_list.hpp"
+#include "audio/xact_fade.hpp"
 /**
  * msg_msg_sink.cpp — msgMsgSink constructor & destructor
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -23,7 +26,6 @@
  *       - 0x8244F8B0 (vslot 89): ForwardDispatchMessage / ForwardToBaseUpdate
  *       - 0x824505C8 (vslot 147): ForwardCleanupMessage / ForwardToBaseNotify
  *       - 0x824508A8 (vslot 148): ForwardFinalizeMessage / ForwardToBaseProcess
- *       - 0x824514E8 (vslot 78): ForwardToRageHandler / ForwardToEmbeddedObject
  *       - 0x8244F7B8 (vslot 115): GetNameLength / GetMessageBufferPtr
  *       - 0x8244F768 (vslot 119): SendPulseToConnection / GetSessionLock
  *       - 0x824564A0 (vslot 120): DispatchEventWithSessionInfo / NotifyStateChange
@@ -51,7 +53,7 @@ extern void RtlLeaveCriticalSection(void*);
 extern void rage_free(void* ptr);
 extern void* msgMsgSink_A970_2h(void* self, void* rttiArg, void* bucket, uint16_t hdr16, void* callback);
 extern void* msgMsgSink_F518_wrh(uint32_t);
-extern void msgMsgSink_E860_g(void*, uint32_t, uint32_t, uint32_t);
+
 
 // Vtable pointers (from .rdata)
 static void* const kMsgMsgSink_Vtable      = (void*)0x8205B0D0;  // dialogManager vtable (derived)
@@ -189,13 +191,14 @@ msgMsgSink* msgMsgSink::InitializeExtended(void* rttiArg, void* bucket, uint16_t
  *
  * Parameters:
  *   r3 (this) - msgMsgSink instance
- *   r4 - message parameter 1
+ *   r4 - source pointer
  *   r6 - message index (uint16_t)
- *   r9 - message parameter 2
+ *   r9 - output handle pointer
  *
- * Returns: void (calls msgMsgSink_E860_g for actual processing)
+ * Returns the HRESULT from msgMsgSink_E860_g
  */
-void msgMsgSink::ProcessMessageWithIndex(uint32_t param1, uint16_t msgIndex, uint32_t param2) {
+int32_t msgMsgSink::ProcessMessageWithIndex(void* source, uint32_t /*unusedR5*/, uint16_t msgIndex,
+    uint32_t /*unusedR7*/, uint32_t /*unusedR8*/, uint32_t* outHandle) {
     // Get message object from internal storage at offset +284 (0x11C)
     void* msgObj = msgMsgSink_F518_wrh(this->m_connectionHandle);
     
@@ -210,7 +213,7 @@ void msgMsgSink::ProcessMessageWithIndex(uint32_t param1, uint16_t msgIndex, uin
         
         // Extract some field by rotating and masking
         // rlwinm r6,r10,27,8,31 - rotate left 27, keep bits 8-31
-        uint32_t rotatedField = ((objHeader << 27) | (objHeader >> 5)) & 0x00FFFFFF;
+        calculatedOffset = ((objHeader << 27) | (objHeader >> 5)) & 0x00FFFFFF;
         
         // Extract lower 16 bits of index
         uint16_t indexLower = msgIndex & 0xFFFF;  // clrlwi r11,r31,16
@@ -218,7 +221,8 @@ void msgMsgSink::ProcessMessageWithIndex(uint32_t param1, uint16_t msgIndex, uin
         // Check if index is non-zero and message type is 18
         if (indexLower != 0 && msgType == 18) {
             // Load a 32-bit value from offset +11 in the message object
-            uint32_t msgData = *(uint32_t*)((uint8_t*)msgObj + 11);
+            uint32_t msgData;
+            memcpy(&msgData, (uint8_t*)msgObj + 11, sizeof(msgData));
             
             // Extract upper 16 bits (count/limit)
             uint16_t msgCount = (uint16_t)(msgData >> 16);
@@ -235,7 +239,7 @@ void msgMsgSink::ProcessMessageWithIndex(uint32_t param1, uint16_t msgIndex, uin
     }
     
     // Call the actual message processing function
-    msgMsgSink_E860_g(this, param1, param2, calculatedOffset);
+    return msgMsgSink_E860_g(this, source, outHandle, calculatedOffset);
 }
 
 /**
@@ -530,8 +534,7 @@ uint32_t msgMsgSink::ProcessMessage(uint32_t messageFlags) {
         if (msgObj != nullptr) {
             int32_t mode = *(int32_t*)((uint8_t*)this + 60);
             bool shouldDelete = (mode == 3);
-            
-            extern uint32_t msgMsgSink_5098_g(void*, bool);
+
             result = msgMsgSink_5098_g(msgObj, shouldDelete);
         }
     }
@@ -660,8 +663,7 @@ uint32_t msgMsgSink::GetNestedObjectValue() {
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 // Forward declarations for tail-call targets
-extern void msgMsgSink_6220_w(void*);
-extern void rage_C1A8(void*);
+
 extern void atSingleton_5CD0_fw(void*, uint32_t);
 extern void* RtlEnterCriticalSection_D6F0_fw(void*);
 extern void msgMsgSink_D168_sp(void*);
@@ -693,14 +695,14 @@ extern uint32_t g_msgSinkBitfield;  // @ 0x825B0C30 (.data)
 
 // msgMsgSink_vfn_23_6130_1 @ 0x82456130 | size: 0x8
 // Adjusts this by -8 and tail-calls msgMsgSink_6220_w
-void msgMsgSink_vfn_23_6130_1(void* self) {
-    msgMsgSink_6220_w((uint8_t*)self - 8);
+void msgMsgSink_vfn_23_6130_1(void* self, uint32_t flags) {
+    msgMsgSink_6220_w((uint8_t*)self - 8, flags);
 }
 
 // msgMsgSink_vfn_42_EFE8_1 @ 0x8244EFE8 | size: 0x8
 // Adjusts this by +60 and tail-calls rage_C1A8
-void msgMsgSink_vfn_42_EFE8_1(void* self) {
-    rage_C1A8((uint8_t*)self + 60);
+void* msgMsgSink_vfn_42_EFE8_1(void* self, void* value) {
+    return rage_C1A8((uint8_t*)self + 60, value);
 }
 
 // msgMsgSink_3258_wrh @ 0x82353258 | size: 0xC
@@ -1208,9 +1210,9 @@ void msgMsgSink::ProcessPendingMessages() {
     // Check bits 3-4 (mask 0x18) for pending message indicators
     if (stateFlags & 0x18) {
         // Check if message queue at offset +24 has data
-        extern int32_t msgMsgSink_3B48_g(void*);
+
         void* msgQueue = (uint8_t*)this + 24;
-        int32_t hasData = msgMsgSink_3B48_g(msgQueue);
+        int32_t hasData = rage::xactFade_Update(static_cast<rage::XactFade*>(msgQueue));
 
         if (hasData != 0) {
             // Process pending messages from the message object
@@ -1483,8 +1485,8 @@ void msgMsgSink::ForwardProcessMessage() {
 // msgMsgSink::ForwardToRageHandler() [vtable slot 78 @ 0x824514E8 | 8 bytes]
 // Adjusts this by +20 to the embedded rage sub-object, tail-calls rage_C1A8.
 // ─────────────────────────────────────────────────────────────────────────────
-void msgMsgSink::ForwardToRageHandler() {
-    rage_C1A8((uint8_t*)this + 20);
+void* msgMsgSink::ForwardToRageHandler(void* value) {
+    return rage_C1A8((uint8_t*)this + 20, value);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1546,30 +1548,6 @@ void msgMsgSink::DispatchEventWithSessionInfo() {
     void* target = (uint8_t*)this + 24;
     extern void jumptable_3A48(void*, uint32_t, uint32_t, uint32_t);
     jumptable_3A48(target, 2, channelId, reliabilityMode);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// msgMsgSink::SetActiveAndReleaseObject() @ 0x8244A670 | 88 bytes
-// Sets the active flag (bit 4) at offset +24, then if the object pointer
-// at +40 is non-null, calls vtable[7] (Release) on it and clears the pointer.
-// ─────────────────────────────────────────────────────────────────────────────
-void msgMsgSink::SetActiveAndReleaseObject() {
-    // Set bit 4 (0x10) of the flag byte at offset +24
-    uint8_t flags = *(uint8_t*)((uint8_t*)this + 24);
-    flags |= 0x10;
-    *(uint8_t*)((uint8_t*)this + 24) = flags;
-
-    // Check if object pointer at +40 is valid
-    void* obj = *(void**)((uint8_t*)this + 40);
-    if (obj != nullptr) {
-        // Call vtable slot 7 (Release) on the object
-        typedef void (*ReleaseFn)(void*);
-        void** vt = *(void***)obj;
-        ((ReleaseFn)vt[7])(obj);
-
-        // Clear the object pointer
-        *(void**)((uint8_t*)this + 40) = nullptr;
-    }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1901,17 +1879,6 @@ void msgMsgSink::ForwardToBaseProcess() {
 }
 
 /**
- * msgMsgSink::ForwardToEmbeddedObject() [vtable slot 78 @ 0x824514E8]
- * size: 0x8 (8 bytes)
- *
- * Adjusts this pointer by +20 to reach an embedded sub-object,
- * then tail-calls rage_C1A8 for processing.
- */
-void msgMsgSink::ForwardToEmbeddedObject() {
-    rage_C1A8((uint8_t*)this + 20);
-}
-
-/**
  * msgMsgSink::GetSessionLock() [vtable slot 119 @ 0x8244F768]
  * size: 0xC (12 bytes)
  *
@@ -1944,7 +1911,7 @@ void* msgMsgSink::GetMessageBufferPtr() {
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 // External callees for group 23
-extern void msgMsgSink_5098_g(void* self, uint32_t mode);
+
 extern void msgMsgSink_EC28_g(void* self, uint32_t param1, uint32_t param2, uint32_t param3);
 extern void msgMsgSink_7970_w(void* self);
 extern void msgMsgSink_7DD8_w(void* self);
@@ -2564,10 +2531,8 @@ void msgMsgSink::DisconnectMatchingHandlers(void* key) {
  *  and .26.cpp for the full PPC traces.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-extern uint32_t msgMsgSink_vfn_34(void*, void*);                      // 0x8244E1D8
 extern int32_t  msgMsgSink_vfn_35(void*, void*);                      // 0x8244E2A0
 extern void msgMsgSink_vfn_36_5FD0_1(void*);                          // 0x82455FD0
-extern void msgMsgSink_42D0_v12(void*, int32_t);                      // 0x824542D0
 extern void* atSingleton_64D8_g(void*);                               // 0x824564D8
 extern void* atSingleton_6F98_g();                                    // 0x82566F98
 extern void  jumptable_3A48(void*, uint32_t, uint32_t, uint32_t);
@@ -2581,7 +2546,6 @@ extern int32_t RtlEnterCriticalSection_6D70_h(void*);                 // 0x82456
 extern void   msgMsgSink_DC40_g(void*, int32_t);                      // 0x8244DC40
 extern void   msgMsgSink_7970_w(void*, bool);                         // 0x82457970
 extern void   sub_8245EE98(void*, bool, int, int, int, int, int, int);// 0x8245EE98
-extern void*  msgMsgSink_C078_fw(void*, void*, void*, uint32_t, uint32_t); // 0x8245C078
 extern int32_t msgMsgSink_5EB0_g(void*, uint32_t, void*);             // 0x82455EB0
 extern void   msgMsgSink_1B98_g(void*);                               // 0x82451B98
 extern uint32_t grcTextureReferenceBase_vfn_4(void*);                 // 0x8215D6A8
@@ -2608,7 +2572,7 @@ uint32_t msgMsgSink::vfn_56(void* param) {
     void* cs = *reinterpret_cast<uint8_t**>(self + 56) + 144;
     RtlEnterCriticalSection(cs);
 
-    uint32_t result = msgMsgSink_vfn_34(this, param);
+    uint32_t result = SetMessageBuffer(param);
 
     void* sub1 = *reinterpret_cast<void**>(self + 392);
     if (sub1 != nullptr) {
@@ -2840,7 +2804,7 @@ void msgMsgSink::vfn_65() {
 void msgMsgSink::vfn_66() {
     uint8_t* self = reinterpret_cast<uint8_t*>(this);
 
-    msgMsgSink_42D0_v12(this, 0);
+    DispatchVirtualMethod();
     void* ptr = atSingleton_64D8_g(this);
     *reinterpret_cast<void**>(self + 376) = ptr;
     *reinterpret_cast<uint32_t*>(self + 380) = 1;
@@ -2875,8 +2839,7 @@ void msgMsgSink::vfn_75() {
     if (err >= 0) {
         uint8_t* argPtr = *reinterpret_cast<uint8_t**>(self + 48);
         uint32_t code = *reinterpret_cast<uint32_t*>(argPtr + 1);
-        msgMsgSink_E860_g(this, code,
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&outSlot)), 0);
+        msgMsgSink_E860_g(this, reinterpret_cast<void*>(static_cast<uintptr_t>(code)), &outSlot, 0);
         if (err >= 0) {
             *reinterpret_cast<uint32_t*>(self + 52) = outSlot;
         }
@@ -2909,9 +2872,9 @@ void msgMsgSink::vfn_105() {
     void* buf = rage_01B8(216, 545521664 | 32795);
     if (buf != nullptr) {
         uint32_t f20 = *reinterpret_cast<uint32_t*>(self + 20);
-        void* msg = msgMsgSink_C078_fw(buf, reinterpret_cast<void*>(f20),
-                                        this,
-                                        static_cast<uint32_t>(msgId), arg2);
+        void* msg = static_cast<msgMsgSink*>(buf)->InitializeExtended(reinterpret_cast<void*>(static_cast<uintptr_t>(f20)),
+                                        this, static_cast<uint16_t>(msgId),
+                                        reinterpret_cast<void*>(static_cast<uintptr_t>(arg2)));
         if (msg != nullptr) {
             outBuf = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(msg));
         }
@@ -3292,7 +3255,7 @@ void msgMsgSink::vfn_128() {
 // External helpers used by this batch (resolved via resolve_address)
 extern void msgMsgSink_43A8_g(void* self);                            // PostRebindInit  @ 0x824543A8
 extern void msgMsgSink_46B8_g(void* self, int32_t phase);             // TransitionBuildPhase  @ 0x824546B8
-extern void msgMsgSink_5098_g(void* self, int32_t mode);              // WalkAndDispatchEvents  @ 0x82455098
+
 extern void msgMsgSink_5708_fw(void* self, uint32_t slotIndex);       // ResolveSlotDescriptorOffset  @ 0x82455708
 extern void* msgMsgSink_A4F8_g(void* node, void* self, uint32_t tag,
                                uint32_t slotDescArg, uint32_t slotIdx); // InitEventNode @ 0x8245A4F8

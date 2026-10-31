@@ -21,7 +21,7 @@ MUTATIONS = (
     ("continue after failed start", "if (static_cast<int32_t>(msgMsgSink_4EB8_g(self)) < 0) return;",
      "if (static_cast<int32_t>(msgMsgSink_4EB8_g(self)) > 0) return;"),
     ("ignore stopping voices", "voice->state == 4 || voice->state == 5", "voice->state == 4"),
-    ("ignore control queue", "if (msgMsgSink_3B48_g(self->control))", "if (!msgMsgSink_3B48_g(self->control))"),
+    ("ignore control queue", "if (rage::xactFade_Update(reinterpret_cast<rage::XactFade*>(self->control)))", "if (!rage::xactFade_Update(reinterpret_cast<rage::XactFade*>(self->control)))"),
     ("wrong completed state", "self->state = 6;", "self->state = 5;"),
     ("leave instance counted", "self->countedInstance = 0;", "self->countedInstance = 1;"),
     ("truncate packed category", "msgMsgSink_8B90_g(self->engine, category);",
