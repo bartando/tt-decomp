@@ -1329,11 +1329,11 @@ struct pongMover {
     /* non-virtual methods */
     pongMover(void* creaturePool);              /* @ 0x820CB5F0 */
     ~pongMover();                               /* @ 0x820C9EF8 */
-    void Reset(void* creaturePool);             /* @ 0x820C9F40 */
+    void Reset(bool alternate);                 /* @ 0x820C9F40 */
     void UpdateVelocity();                      /* @ 0x820CA080 */
     /* Called by Reset. outMatrix and self must be 16-byte aligned.
      * bAltData: if low byte non-zero, uses global alt matrix source. */
-    void CalcInitMatrix(float* outMatrix, pongMover* self, void* creaturePool); /* @ 0x820CAC78 */
+    static float* CalcInitMatrix(float* outMatrix, pongMover* self, uint32_t alternate); /* @ 0x820CAC78 */
 };
 
 // ── pongPlayerShaderParams  [vtable @ 0x8203A8F8] ──────────────────────────
