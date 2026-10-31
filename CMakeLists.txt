@@ -236,6 +236,7 @@ set(SOURCES
     src/game/pong_render.cpp
     src/game/match/hsm_log_strings.cpp
     src/game/match/pong_match.cpp
+    src/game/match/replay_state_publish.cpp
     src/game/match/lvl_table.cpp
     src/game/match/pong_states.cpp
     src/game/match/match_rtti_strings.cpp
