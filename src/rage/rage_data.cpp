@@ -115,3 +115,12 @@ extern "C" alignas(16) const uint32_t g_affineHomogeneousW[4] = { // @ 0x82619BD
 };
 TT_DATA_ALIAS("lbl_82619BE0", "g_affineXYZMask");
 TT_DATA_ALIAS("lbl_82619BD0", "g_affineHomogeneousW");
+
+// SWF execution pools selected temporarily by a Flash page group.
+void* g_swfStringPool = nullptr;     // @ 0x82604C50
+void* g_swfNodePool = nullptr;       // @ 0x82604C5C
+void* g_swfMemberNodePool = nullptr; // @ 0x82604C54
+void* g_swfTextPool = nullptr;       // @ 0x82602844
+namespace rage {
+void* g_swfAuxiliaryScope = nullptr; // @ 0x82602834
+}
