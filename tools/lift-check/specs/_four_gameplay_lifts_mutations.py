@@ -18,7 +18,7 @@ CASES = [
          ("invert flip", "if (static_cast<uint8_t>(flip))", "if (!static_cast<uint8_t>(flip))"),
          ("test all flip bits", "if (static_cast<uint8_t>(flip))", "if (flip)"),
          ("omit output w", "lane < 4", "lane < 3"),
-         ("scalar add without VMX flushing", "flushVmx(flushVmx(outPos[lane]) + flushVmx(offset[lane]))",
+         ("scalar add without VMX flushing", "rage::vmxAddFloat(outPos[lane], offset[lane])",
           "outPos[lane] + offset[lane]"),
          ("wrong Z factor", "lerpFactors[1] * rangeZ", "lerpFactors[0] * rangeZ"),
          ("omit height bias", "courtHeight + g_kCourtHeightOffset", "courtHeight"),

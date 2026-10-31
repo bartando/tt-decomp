@@ -55,6 +55,7 @@ set(SOURCES
     # CRT layer
     src/crt/crt_init.c
     src/crt/ctrlfp.cpp
+    src/crt/exp.cpp
     src/crt/fp_helpers.cpp
     src/crt/entry.c
     src/crt/exit.c
@@ -262,6 +263,8 @@ set(SOURCES
     src/game/player/player_spin_helpers.cpp
     src/game/player/ai_swing_direction.cpp
     src/game/player/player_shot_reset.cpp
+    src/game/player/player_court.cpp
+    src/game/player/player_shot_position.cpp
     src/game/player/camera_node_cast.cpp
     src/game/player/player_camera_side.cpp
     src/game/player/player_camera_side_data.cpp
@@ -287,6 +290,7 @@ set(SOURCES
     src/anim/bone_transform_lookup.cpp
     src/anim/motion_lookup_data.cpp
     src/anim/pcr_anim_blenders.cpp
+    src/anim/locomotion_heading.cpp
     src/anim/look_at_controller.cpp
     src/anim/locomotion.cpp
     src/anim/angle_helpers.cpp
@@ -298,6 +302,9 @@ set(SOURCES
     src/physics/collider_velocity.cpp
     src/physics/ph_float_property.cpp
     src/physics/ph_physics.cpp
+    src/physics/archetype_refs.cpp
+    src/physics/bound_copy.cpp
+    src/physics/composite_bounds.cpp
     src/physics/bound_lookup.cpp
     src/physics/articulated_constraints.cpp
     src/physics/ph_update_object.cpp
@@ -369,6 +376,8 @@ set(SOURCES
     src/rage/math/polygon_clip.cpp
     src/rage/math/swf_matrix.cpp
     src/rage/math/mat44.cpp
+    src/rage/math/normal_density.cpp
+    src/rage/math/quat_ops.cpp
     src/rage/math/mat33_extract_euler.cpp
     src/rage/math/mat33.cpp
     src/rage/math/mat33_orthonormalize.cpp

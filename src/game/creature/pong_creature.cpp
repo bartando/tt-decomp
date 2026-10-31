@@ -1,6 +1,10 @@
+#include "../../physics/archetype_refs.hpp"
+#include "rage/ptr32.hpp"
+#include "../../physics/composite_bounds.hpp"
 #include "game/player_manager_state.hpp"
 #include <cstddef>
 #include "../../anim/look_at_controller.hpp"
+#include "../../anim/locomotion_heading.hpp"
 #include "rage/mat33.hpp"
 
 
@@ -2736,12 +2740,8 @@ void LocomotionStateMf::SerializeTriple(void* serializer, void* data) {  // 7480
 ////////////////////////////////////////////////////////////////////////////////
 
 // External helpers used by newly-lifted functions
-extern void phBoundCapsule_FindSegmentIndex(void* capsule, void* outResult);
 extern float LocomotionStateAnim_A1F8_g(float value, float rangeMin, float rangeMax);
 extern void LocomotionStateAnim_B218_g(float* out, const float* matrix); // @ 0x8223B218
-extern void LocomotionStateAnim_6E90_w(void* self, float weight);
-extern void util_BBB0(void* dst, float* src, float* work);
-extern void util_B9A8(void* dst, void* quat, void* axis);
 // @ 0x8224C128 / 0x8224C288 — apply one animation entry to a skeleton. Both read
 // the skeleton from r5 and never read r4; callers leave junk there.
 extern void LocomotionStateAnim_C128_g(void* entry, void* unusedR4, void* skeleton, float weight);
@@ -2796,37 +2796,22 @@ void LocomotionStateAnim_AD30_g(float* dst, const float* src) {
     dst[10] = 1.0f - (yy + xx);
 }
 
-/**
- * ComputeCapsuleAngle @ 0x822347E8 | size: 0x84
- *
- * Computes a signed angle from a capsule query result. If the
- * result is negative, wraps it by adding 2*PI. Stores the result at self+0.
- * Also copies 16 bytes from capsule+48 to self+16.
- */
-// LocomotionStateAnim_47E8_g @ 0x822347E8
-void LocomotionStateAnim_47E8_g(void* self, void* capsule) {
-    float result[6];
+extern "C" const float g_twoPi; // @ 0x8202C02C
 
-    // Store 0.0f at self+0 as default
-    *(float*)((char*)self + 0) = 0.0f;
-
-    // Copy 16 bytes from capsule+48 to self+16 (lvx/stvx)
-    memcpy((char*)self + 16, (char*)capsule + 48, 16);
-
-    // Call capsule angle computation
-    phBoundCapsule_FindSegmentIndex(capsule, result);
-
-    // Read the angle from result[1]
-    float angle = result[1];
-
-    // If negative, wrap by adding 2*PI
-    if (angle < 0.0f) {
-        extern const float g_twoPi;  // @ 0x8202C02C
-        angle += g_twoPi;
-    }
-
-    // Store final angle
-    *(float*)((char*)self + 0) = angle;
+// @ 0x822347E8 — cache the translation and canonicalize the extracted Y angle.
+// The zero and vector stores precede extraction, including when self aliases matrix.
+void* LocomotionStateAnim_47E8_g(void* self, void* matrix) {
+    auto* output = static_cast<uint8_t*>(self);
+    *reinterpret_cast<float*>(output) = 0.0f;
+    alignas(16) float translation[4];
+    std::memcpy(translation, static_cast<uint8_t*>(matrix) + 0x30, 16);
+    std::memcpy(output + 0x10, translation, 16);
+    alignas(16) float angles[4];
+    rage::mat33ToEulerXZY(static_cast<const float*>(matrix), angles);
+    float heading = angles[1];
+    if (heading < 0.0f) heading += g_twoPi;
+    *reinterpret_cast<float*>(output) = heading;
+    return self;
 }
 
 /**
@@ -3084,46 +3069,6 @@ float LocomotionStateAnim_BB48_g(void* self, int count) {
     return lastWeight / total;
 }
 
-/**
- * InvertAndCombineQuaternions @ 0x8223BE20 | size: 0xB0
- *
- * Inverts quaternion src (negates xyz, keeps w), multiplies with
- * dst quaternion using util_BBB0, applies reference subtraction
- * and position addition via SIMD, and normalizes via util_B9A8.
- */
-// LocomotionStateAnim_BE20_g @ 0x8223BE20
-void LocomotionStateAnim_BE20_g(void* dst, void* src) {
-    float* srcQ = (float*)src;
-    float* dstQ = (float*)dst;
-
-    // Invert src quaternion: negate xyz, keep w
-    dstQ[0] = -srcQ[0];
-    dstQ[1] = -srcQ[1];
-    dstQ[2] = -srcQ[2];
-    dstQ[3] =  srcQ[3];
-
-    // Multiply inverted src quaternion with src position
-    float* srcPos = (float*)((char*)src + 16);
-    util_BBB0(dst, srcPos, (float*)((char*)dst + 16));
-
-    // result_pos = reference_zero - combined_pos (vsubfp with zero vector)
-    extern const float g_zeroVec4[4];  // @ 0x82606750 (.data, zero in the image)
-    float* dstPos = (float*)((char*)dst + 16);
-    dstPos[0] = g_zeroVec4[0] - dstPos[0];
-    dstPos[1] = g_zeroVec4[1] - dstPos[1];
-    dstPos[2] = g_zeroVec4[2] - dstPos[2];
-    dstPos[3] = g_zeroVec4[3] - dstPos[3];
-
-    // Add dst position back (vaddfp with src position)
-    float* origSrcPos = (float*)((char*)src + 16);
-    dstPos[0] += origSrcPos[0];
-    dstPos[1] += origSrcPos[1];
-    dstPos[2] += origSrcPos[2];
-    dstPos[3] += origSrcPos[3];
-
-    // Normalize the result
-    util_B9A8(dst, dst, src);
-}
 
 /**
  * GetTransformFromAnimPair @ 0x822E0A30 | size: 0xB4
@@ -3152,46 +3097,6 @@ void* LocomotionStateAnim_0A30_g(void* dst, void* animSrc) {
     }
 
     return dst;
-}
-
-/**
- * ComputeBlendWeight @ 0x820E6DD8 | size: 0xB4
- *
- * Computes a blend weight for animation transitions. Calls the
- * vtable slot 11 handler to get the current frame position, looks
- * up the animation's start/end range from the container data at
- * self+304 (indexed by self+28), and interpolates.
- */
-// LocomotionStateAnim_6DD8_w @ 0x820E6DD8
-float LocomotionStateAnim_6DD8_w(void* self, float maxWeight, float frameTime) {
-    LocomotionStateAnim* lsa = (LocomotionStateAnim*)self;
-
-    // Set up frame state
-    LocomotionStateAnim_6E90_w(self, frameTime);
-
-    // Call vtable slot 11 to get current position
-    float pos = VCALL(self, 11, float(*)(void*))(self);
-
-    // Get animation entry index and container data
-    uint32_t animIdx = lsa->field_0x001c;
-    char* containerData = (char*)lsa->field_0x0130;
-    char* entry = containerData + animIdx * 68;
-
-    float rangeStart = *(float*)(entry + 56);
-    float rangeEnd   = *(float*)(entry + 60);
-
-    if (pos < rangeStart) {
-        return 0.0f;
-    } else if (pos < rangeEnd) {
-        float t = (pos - rangeStart) / (rangeEnd - rangeStart);
-        extern const float g_blendCurveScale;   // @ 0x82079B20
-        extern float g_blendCurveOffset;         // @ 0x825C8078 (.data)
-        float blendVal = t * g_blendCurveScale + g_blendCurveOffset;
-        float diff = blendVal - maxWeight;
-        return (diff >= 0.0f) ? maxWeight : blendVal;
-    } else {
-        return maxWeight;
-    }
 }
 
 /**
@@ -3546,11 +3451,6 @@ void pongCreatureInst_CopyTransform(void* dst, void* src, void* helper) {
     (void)dst; (void)src; (void)helper;
 }
 
-// @ 0x8228E888 / 0x8228ECB0 / 0x8228F3E0 — rage::phBound helpers, unlifted.
-extern "C" void util_E888(phBoundView* bound);
-extern "C" float util_ECB0(phBoundView* bound, void* partMatrices, const float* centroid);
-extern "C" void pongCreatureInst_F3E0_v12(phBoundView* bound);
-
 /**
  * pongCreatureInst_E828_v12 @ 0x8228E828 | size: 0x60
  *
@@ -3562,11 +3462,11 @@ extern "C" void pongCreatureInst_F3E0_v12(phBoundView* bound);
  * lift of this address.)
  */
 extern "C" void pongCreatureInst_E828_v12(void* self, unsigned int flags) {
-    phBoundView* bound = static_cast<phBoundView*>(self);
-    util_E888(bound);
-    bound->radiusAroundCentroid = util_ECB0(bound, bound->partMatrices, bound->centroidOffset);
+    rage::phBoundComposite_RebuildExtents(self);
+    auto* values = static_cast<float*>(self);
+    values[2] = rage::phBoundComposite_ComputeRadius(self, rage::load_ptr32<float>(self, 0x78), values + 12);
     if (static_cast<uint8_t>(flags) != 0)
-        pongCreatureInst_F3E0_v12(bound);
+        rage::phBoundComposite_Symmetrize(self);
 }
 
 // ── pongCreature vtable slots (batch 2) ────────────────────────────────────
@@ -4530,7 +4430,6 @@ void pongCreature::RequestTeleport(const char* caller, const pongCreatureMatrix*
 // @ 0x822C9D98 — phArchetype release: does nothing (returns 1) while the byte at
 // 0x826064E1 is clear; otherwise drops the u16 refcount at +0x1A and, when it
 // reaches zero, calls slot 0 with flags 1 (deleteWhenUnused set) or slot 3.
-extern "C" void util_9D98(void* archetype, int deleteWhenUnused);
 
 /**
  * phInst::Cleanup @ 0x822C8FD0 | size: 0x5C

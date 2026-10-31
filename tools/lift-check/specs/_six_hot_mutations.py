@@ -10,8 +10,8 @@ from liftcheck.runner import Checker, Options
 ROOT = Path(__file__).resolve().parents[3]
 CASES = {
     "cr_anim_dof_quaternion_evaluate": [
-        ("wrong output", "crAnimDof_BlendQuaternion(outQuat, animContext,", "crAnimDof_BlendQuaternion(this, animContext,"),
-        ("wrong context", "crAnimDof_BlendQuaternion(outQuat, animContext,", "crAnimDof_BlendQuaternion(outQuat, this,"),
+        ("wrong output", "crAnimEvaluateQuaternionChannels(outQuat, animContext,", "crAnimEvaluateQuaternionChannels(this, animContext,"),
+        ("wrong context", "crAnimEvaluateQuaternionChannels(outQuat, animContext,", "crAnimEvaluateQuaternionChannels(outQuat, this,"),
         ("wrong quaternion offset", "reinterpret_cast<char*>(this) + 16));", "reinterpret_cast<char*>(this) + 20));"),
     ],
     "cr_anim_dof_quaternion_set_value": [
@@ -45,6 +45,9 @@ CASES = {
 
 
 def main():
+    caught = 0
+    total = sum(len(cases) for name, cases in CASES.items()
+                if len(sys.argv) == 1 or name in sys.argv[1:])
     for name, cases in CASES.items():
         if len(sys.argv) > 1 and name not in sys.argv[1:]:
             continue
@@ -63,10 +66,14 @@ def main():
             with contextlib.redirect_stdout(output):
                 rc = Checker(spec, Options(trials=1000, seed=1,
                     patches=((function, function.replace(old, new, 1)),))).run()
-            print(f"{name}: {'CAUGHT' if rc == 1 else 'MISSED'} {label}: {output.getvalue().splitlines()[0]}", flush=True)
-            if rc != 1:
-                print(output.getvalue())
+            report = output.getvalue()
+            detected = rc == 1 and "FAIL" in report
+            print(f"{name}: {'CAUGHT' if detected else 'MISSED'} {label}: {report.splitlines()[0]}", flush=True)
+            if not detected:
+                print(report)
                 return 1
+            caught += 1
+    print(f"Caught {caught}/{total} mutations", flush=True)
     return 0
 
 
