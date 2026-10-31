@@ -4,7 +4,7 @@ FUNCTION = "msgMsgSink_3C88_g"
 ADDRESS = 0x82453C88
 SOURCE = "src/game/network/pong_network_io.cpp"
 TRIALS = 600
-CALLS = {"atSingleton_6F98_g": stub(args=()), "game_9D70_h": stub(args=('r3', 'r4'))}
+CALLS = {"atSingleton_6F98_g": stub(args=()), "msgChild_SetPaused": stub(args=('r3', 'r4'))}
 def inputs(t):
     sink = t.alloc(0x80, 'sink')
     t.w32(sink + 0x50, t.rng.choice([-1, 0, 3, 4, 5, 6]))

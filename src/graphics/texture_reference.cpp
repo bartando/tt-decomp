@@ -37,8 +37,16 @@ namespace rage {
 #define RAGE_ASSERT(expr) ((void)(expr))
 #endif
 
-// Release helper for grcTexture ref-counting (rage_ReleaseRef)
-extern void Release(grcTexture* pTex);
+// @ 0x820C2E18
+uint32_t Release(grcTexture* texture) {
+    auto& references = *reinterpret_cast<uint16_t*>(reinterpret_cast<uint8_t*>(texture) + 6);
+    references = static_cast<uint16_t>(references - 1u);
+    if (references == 0) {
+        texture->destructor(true);
+        return 0;
+    }
+    return references;
+}
 
 // ---------------------------------------------------------------------------
 // grcTextureReferenceBase  —  virtual destructor (slot 0)
@@ -502,12 +510,12 @@ void rage::grcTextureReferenceBase::ForwardSlot15()
 // grcTextureReferenceBase::ForwardSlot16  [vtable slot 16 @ 0x8215D940]
 // Forwards slot 16 call with one parameter to the texture from GetTexture2().
 // ─────────────────────────────────────────────────────────────────────────────
-void rage::grcTextureReferenceBase::ForwardSlot16(void* param)
+void rage::grcTextureReferenceBase::ForwardSlot16(uint32_t level)
 {
     grcTexture* texture = GetTexture2();   // VCALL slot 12
     
     if (texture) {
-        texture->vfn_16(param);
+        texture->SetLodLevel(level);
     }
 }
 

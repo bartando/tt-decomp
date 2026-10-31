@@ -388,8 +388,8 @@ struct msgMsgSink {
     void vfn_61();  // [61] @ 0x82457130
     void vfn_62();  // [62] @ 0x82457c10
     void vfn_63();  // [63] @ 0x82457540
-    void vfn_65();  // [65] @ 0x82456810
-    void vfn_66();  // [66] @ 0x82456920
+    void vfn_65(void* key);  // [65] @ 0x82456810
+    void vfn_66(msgMsgSink* peer);  // [66] @ 0x82456920
     void vfn_67();  // [67] @ 0x82456968
     void ForwardMessageToSession(uint32_t param);  // [68] @ 0x82456f28
     void vfn_75();  // [75] @ 0x82456278
@@ -424,7 +424,7 @@ struct msgMsgSink {
     msgMsgSink* InitializeExtended(void* rttiArg, void* bucket, uint16_t hdr16, void* callback);  // @ 0x8245C078
     int32_t ProcessMessageWithIndex(void* source, uint32_t unusedR5, uint16_t msgIndex,
                                     uint32_t unusedR7, uint32_t unusedR8, uint32_t* outHandle);  // @ 0x8244E978
-    void DispatchVirtualMethod();  // @ 0x824542D0 [related to vtable slot 12]
+    void DispatchVirtualMethod(uint32_t flags);  // @ 0x824542D0 [related to vtable slot 12]
     uint16_t GetNestedValue(void* dataPtr);  // @ 0x8244F490
     int32_t GenerateWithLock();  // @ 0x8244DCF0 (non-virtual wrapper)
     void CleanupSession();
