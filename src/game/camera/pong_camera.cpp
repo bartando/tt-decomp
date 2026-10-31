@@ -1,5 +1,6 @@
 #include "game/camera_queries.hpp"
 #include "rage/operator_new.hpp"
+#include "rage/ptr32.hpp"
 /**
  * pong_camera.cpp
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -2613,7 +2614,7 @@ void* pongCameraMgr_9DE8_g(void* owner, uint32_t param1, uint32_t /*unused*/,
     }
 
     // Insert into the camera sample machine bank at owner+4
-    void** slot = (void**)atFreeList_Alloc((char*)owner + 4, 16);
+    auto* slot = static_cast<rage::ptr32<void>*>(atFreeList_Alloc((char*)owner + 4, 16));
     *slot = newObj;
 
     return newObj;

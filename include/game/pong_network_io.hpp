@@ -49,18 +49,6 @@ uint32_t ReadBitsFromStream(void* client, uint32_t value, int bitWidth);
 void BeginNetworkWrite(void* client);
 
 /**
- * EndNetworkWrite @ 0x822288DF8 | size: unknown
- * 
- * Finalizes a network write operation and flushes the stream.
- * Must be called after all Write* functions complete.
- * 
- * @param client  SinglesNetworkClient managing the network stream
- * 
- * Original symbol: SinglesNetworkClient_8DF8_g
- */
-void EndNetworkWrite(void* client);
-
-/**
  * WriteUInt8Bits @ 0x820D6838 | size: 0x6c
  * 
  * Writes an unsigned 8-bit value with variable bit width to the network stream.
@@ -91,18 +79,6 @@ void WriteInt8Bits(void* client, int8_t value, int bitWidth);
 // ══════════════════════════════════════════════════════════════════════════════
 // NETWORK STATE MANAGEMENT
 // ══════════════════════════════════════════════════════════════════════════════
-
-/**
- * ProcessNetworkPacket @ 0x821D51C8 | size: 0xC8
- * 
- * Processes an incoming network packet.
- * Deserializes packet data and dispatches to appropriate message handlers.
- * 
- * @param client  SinglesNetworkClient receiving the packet
- * 
- * Original symbol: SinglesNetworkClient_51C8_g
- */
-void ProcessNetworkPacket(void* client);
 
 // ══════════════════════════════════════════════════════════════════════════════
 // NETWORK UTILITY FUNCTIONS

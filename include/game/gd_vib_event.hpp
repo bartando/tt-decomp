@@ -52,7 +52,6 @@ protected:
 };
 
 // External dependencies
-extern "C" void SinglesNetworkClient_GetPlayerID_E408(void* client, uint32_t param);
 extern "C" void ApplyControllerVibration(void** controllers, uint32_t controllerIndex, void* vibrationPattern);
 extern "C" bool ValidateControllerVibration(void* controller);
 namespace rage { void ReleaseSingleton(void* obj); }

@@ -118,6 +118,7 @@ set(SOURCES
     src/rage/memory/rage_memory.cpp
     src/rage/memory/singleton_array.cpp
     src/rage/memory/sysMemSimpleAllocator.cpp
+    src/rage/data/parameter_node.cpp
     src/rage/io/rage_par.cpp
     src/rage/io/rage_stream_manager.cpp
     src/rage/io/fiDevice.cpp
@@ -202,6 +203,7 @@ set(SOURCES
     src/game/network/pong_network.cpp
     src/game/network/pong_network_classes.cpp
     src/game/network/pong_network_io.cpp
+    src/game/network/score_payload.cpp
     src/game/network/network_context.cpp
     src/game/network/msg_msg_sink.cpp
     src/game/network/xonline_strings.cpp
