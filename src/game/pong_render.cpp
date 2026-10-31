@@ -15,6 +15,7 @@
  * Sources: recomp/structured_pass5_final/tt-decomp_recomp.{3,9}.cpp
  */
 
+#include "rage/indexed_registry.h"
 #include "pong_render.hpp"
 #include "camera/pong_camera.hpp"
 #include <cstring>
@@ -447,7 +448,6 @@ void pongShadowMap::applyShaderParameters(int32_t pass) {
 // ─────────────────────────────────────────────────────────────────────────────
 extern void util_FFF8(void* callback, int32_t argument);  // @ 0x8225FFF8
 extern void pongLightState_Reset(pongLightState* state, int32_t mask);  // @ 0x82154628
-extern void* pg_C2A0_g(void* root, int32_t key);  // @ 0x821DC2A0
 extern void cmOperatorCtor_0B50_w(void* overrideState);  // @ 0x820F0B50
 extern "C" void* rage_A980(void* device);  // @ 0x8235A980
 extern uint32_t* grc_9B60(void* commands);  // @ 0x82359B60

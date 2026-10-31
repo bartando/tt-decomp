@@ -11,6 +11,8 @@
 #include "../../anim/locomotion.hpp"
 #include "globals.h"
 #include "game/pong_strings.hpp"
+#include "rage/mat33.hpp"
+#include "../player/pong_gameplay_queries.hpp"
 #include <cstring>
 
 // ── Vtable dispatch helpers ─────────────────────────────────────────────────
@@ -43,7 +45,7 @@ struct AnimSubData {
     uint8_t  _pad0D[3];
     float    m_blendRange;         // +0x10  blend range / fixed time value
     uint8_t  _pad14[12];
-    uint8_t  m_simpleAnimData[16]; // +0x20  simple animation data (passed to ApplyAnimData)
+    uint8_t  m_simpleAnimData[16]; // +0x20  Euler angles (passed to mat33FromEuler)
     uint8_t  m_bUseCapsule;        // +0x30  capsule collision flag
     uint8_t  m_bCapsuleEnabled;    // +0x31  capsule enabled flag
     uint8_t  _pad32[14];
@@ -205,6 +207,130 @@ extern float g_kTransitionStep; // @ 0x825CAEC0
 extern void** g_pInputArrayTable; // @ 0x825EAB28
 extern uint8_t lbl_82606326; // @ 0x82606326 — enable velocity adjustment
 extern float lbl_825C9D64; // @ 0x825C9D64 — stationary speed/timer threshold
+}
+
+extern "C" float g_moverStartDelay; // @ 0x825C9D60
+extern "C" const float g_moverStopDelay; // @ 0x820290F0
+extern "C" void* g_gameDataMgr; // @ 0x8271A2E4
+extern void* pongMatch_GetCharacterForSlot(void* match, uint32_t playerSlot); // @ 0x821C9C00
+
+// These were misidentified as capsule flags/radius in two physics lifts.
+// pongMover_GetBlendWeight (was phBoundCapsule_B598_g) @ 0x820CB598 | size: 0x58
+float pongMover_GetBlendWeight(pongMover* mover) {
+    return (mover->m_flags & 0x12) ? 1.0f : mover->m_unk1C;
+}
+
+// pongMover_GetInputSpeed (was pg_B4D0_g) @ 0x820CB4D0 | size: 0xC8
+float pongMover_GetInputSpeed(pongMover* mover) {
+    const auto movementData = []() {
+        return *reinterpret_cast<const uint8_t* const*>(
+            static_cast<const uint8_t*>(g_gameDataMgr) + 0x14);
+    };
+    if (mover->m_flags & 4)
+        return *reinterpret_cast<const float*>(movementData() + 0x64);
+    auto* match = reinterpret_cast<const uint8_t*>(g_pInputArrayTable);
+    const uint32_t index = mover->m_creatureIndex;
+    if (match[uint32_t(index * 36 + 0xC4)] != 0)
+        return *reinterpret_cast<const float*>(movementData() + 0x58);
+    const auto* character = static_cast<const uint8_t*>(pongMatch_GetCharacterForSlot(
+        const_cast<uint8_t*>(match), index));
+    const auto* movement = *reinterpret_cast<const uint8_t* const*>(character + 0x28);
+    const float scale = *reinterpret_cast<const float*>(movement + 0x64);
+    return scale * *reinterpret_cast<const float*>(movementData() + 0x58);
+}
+
+// pongMover_UpdateMovementState (was game_A390) @ 0x820CA390 | size: 0xF4
+void pongMover_UpdateMovementState(pongMover* mover) {
+    if (__builtin_fabsf(mover->m_unk20) == 0.0f &&
+        __builtin_fabsf(mover->m_unk24) == 0.0f) {
+        if (!mover->m_bIsMoving) {
+            mover->m_targetTimer += g_kTransitionStep;
+            if (mover->m_targetTimer > g_moverStopDelay) {
+                mover->m_moveTimer = 0.0f;
+                mover->m_unk28 = 0.0f;
+                mover->m_unk2C = 0.0f;
+                mover->m_targetTimer = 0.0f;
+                mover->m_bIsMoving = 1;
+            }
+        } else {
+            mover->m_bHasTarget = 0;
+        }
+        return;
+    }
+    bool reset = mover->m_unk28 * mover->m_unk20 < 0.0f ||
+                 mover->m_unk2C * mover->m_unk24 < 0.0f;
+    if (!reset && mover->m_bIsMoving) {
+        mover->m_moveTimer += g_kTransitionStep;
+        reset = mover->m_moveTimer >= g_moverStartDelay;
+    }
+    if (reset) {
+        mover->m_bHasTarget = 0;
+        mover->m_bIsMoving = 0;
+    }
+    mover->m_targetTimer = 0.0f;
+}
+
+// The movement rate used by court-boundary braking. The interpolation's
+// identical endpoints are intentional: retain its rounding and NaN behavior.
+// pongMover_GetMovementRate (was game_B368) @ 0x820CB368 | size: 0x164
+float pongMover_GetMovementRate(pongMover* mover) {
+    const auto movementData = []() {
+        return *reinterpret_cast<const uint8_t* const*>(
+            static_cast<const uint8_t*>(g_gameDataMgr) + 0x14);
+    };
+    auto* match = reinterpret_cast<uint8_t*>(g_pInputArrayTable);
+    const uint32_t index = mover->m_creatureIndex;
+    const bool special = match[uint32_t(index * 36 + 0xC4)] != 0;
+    if (mover->m_bHasTarget) {
+        const float elapsed = mover->m_moveTimer * 0.5714285969734192f;
+        const double nonnegative = elapsed >= 0.0f ? elapsed : 0.0;
+        const float fraction = static_cast<float>(nonnegative - 1.0 >= 0.0 ? 1.0 : nonnegative);
+        const float rate = *reinterpret_cast<const float*>(movementData() + 0x5C);
+        const float delta = rate - rate;
+        if (special)
+            return __builtin_fmaf(delta, fraction, rate);
+        const auto* character = static_cast<const uint8_t*>(
+            pongMatch_GetCharacterForSlot(match, index));
+        const auto* movement = *reinterpret_cast<const uint8_t* const*>(character + 0x28);
+        return __builtin_fmaf(delta, fraction, rate) *
+               *reinterpret_cast<const float*>(movement + 0x6C);
+    }
+    if (special)
+        return *reinterpret_cast<const float*>(movementData() + 0x60);
+    const auto* character = static_cast<const uint8_t*>(
+        pongMatch_GetCharacterForSlot(match, index));
+    const auto* movement = *reinterpret_cast<const uint8_t* const*>(character + 0x28);
+    const float scale = *reinterpret_cast<const float*>(movement + 0x6C);
+    return scale * *reinterpret_cast<const float*>(movementData() + 0x60);
+}
+
+extern double crt_sqrt(double value); // @ 0x824301D0
+
+// Limit each velocity component to the stopping speed before its court edge.
+// pongMover_AdjustVelocity (was phBoundCapsule_A488_g) @ 0x820CA488 | size: 0x1B4
+void pongMover_AdjustVelocity(pongMover* mover, float* x, float* z) {
+    alignas(16) float lower[4], upper[4], position[4];
+    pongMatchSettings_GetCourtBounds(g_pInputArrayTable, mover->m_creatureIndex, lower, upper);
+    const auto* creature = static_cast<const uint8_t*>(mover->m_pCreature);
+    const auto* instance = *reinterpret_cast<const uint8_t* const*>(creature + 0xA4);
+    memcpy(position, instance + 0x40, sizeof(position));
+    const float rate = pongMover_GetMovementRate(mover);
+    const auto adjust = [rate](float* velocity, float coordinate, float low, float high) {
+        if (*velocity < 0.0f) {
+            const float distance = __builtin_fabsf(coordinate - low);
+            const float limit = -static_cast<float>(crt_sqrt((distance * rate) * 2.0f));
+            const float delta = *velocity - limit;
+            const float bounded = delta >= 0.0f ? *velocity : limit;
+            *velocity = bounded >= 0.0f ? 0.0f : bounded;
+        } else if (*velocity > 0.0f) {
+            const float distance = __builtin_fabsf(coordinate - high);
+            const float limit = static_cast<float>(crt_sqrt((distance * rate) * 2.0f));
+            const double nonnegative = *velocity >= 0.0f ? *velocity : 0.0;
+            *velocity = static_cast<float>(nonnegative - limit >= 0.0 ? limit : nonnegative);
+        }
+    };
+    adjust(x, position[0], lower[0], upper[0]);
+    adjust(z, position[2], lower[2], upper[2]);
 }
 
 // Blend input and local/remote movement, mirror it for the court side, and
@@ -721,7 +847,6 @@ extern void LocomotionStateAnim_BaseDtor(void* obj);
 extern void phLoader_CheckAnimExists(void* loader, const char* name, int flag);
 extern int phLoader_ReadFileName(void* loader, void* outBuffer, int maxLen, int param1, int param2);
 extern void phBoundCapsule_ApplyCollision(void* capsule, void* params, void* data);
-extern void LocomotionStateAnim_ApplyAnimData(void* state, void* animData);
 
 // Global constants
 extern const float g_floatZero;      // @ 0x8202D110
@@ -1135,7 +1260,8 @@ void LocomotionStateAnim::UpdateAnimationState(void* outputState) {
     } else {
         // Use simple animation data
         void* simpleAnimData = animSubData->m_simpleAnimData;
-        LocomotionStateAnim_ApplyAnimData(outputState, simpleAnimData);
+        rage::mat33FromEuler(static_cast<float*>(outputState),
+                             static_cast<const float*>(simpleAnimData));
     }
     
     // Copy final capsule data to output
@@ -2633,10 +2759,9 @@ void LocomotionStateMf::SerializeTriple(void* serializer, void* data) {  // 7480
 
 // External helpers used by newly-lifted functions
 extern void phBoundCapsule_FindSegmentIndex(void* capsule, void* outResult);
-extern void phBoundCapsule_ExtractPosition(void* matrix, float* outVec);
+extern void phBoundCapsule_ExtractPosition(void* matrix, float* outVec); // @ 0x82137B08 — Euler extraction
 extern float LocomotionStateAnim_A1F8_g(float value, float rangeMin, float rangeMax);
-extern void LocomotionStateAnim_ApplyAnimData(void* matrix, float* vec);
-extern void LocomotionStateAnim_CopyMatrixData(void* dst, void* srcMatrix);
+extern void LocomotionStateAnim_B218_g(float* out, const float* matrix); // @ 0x8223B218
 extern void LocomotionStateAnim_6E90_w(void* self, float weight);
 extern bool LocomotionStateAnim_04F0_g(void* animData, uint16_t animID_high, uint16_t* outIndex);
 extern void util_BBB0(void* dst, float* src, float* work);
@@ -2751,19 +2876,18 @@ bool LocomotionStateAnim_09A0_g(void* self) {
 /**
  * ClampAndTransformVector @ 0x82138110 | size: 0x8C
  *
- * Builds a rotation matrix from a quaternion, extracts a position
- * vector, clamps each XYZ component between min/max bounds, writes
- * the result back into the matrix, and applies it to the destination.
+ * Converts a quaternion to Euler angles, clamps the angles to the supplied
+ * bounds, then converts the constrained rotation back to a quaternion.
  */
 // LocomotionStateAnim_8110_g @ 0x82138110
 void LocomotionStateAnim_8110_g(void* quat, float* minVec, float* maxVec) {
-    float matrix[12];
-    float vec[4];
+    alignas(16) float matrix[16];
+    alignas(16) float vec[4];
 
     // Build rotation matrix from quaternion
     LocomotionStateAnim_AD30_g(matrix, (const float*)quat);
 
-    // Extract position vector from matrix
+    // Extract Euler angles from the rotation matrix.
     phBoundCapsule_ExtractPosition(matrix, vec);
 
     // Clamp each component: LocomotionStateAnim_A1F8_g(value, min, max)
@@ -2771,11 +2895,11 @@ void LocomotionStateAnim_8110_g(void* quat, float* minVec, float* maxVec) {
     vec[1] = LocomotionStateAnim_A1F8_g(vec[1], minVec[1], maxVec[1]);
     vec[2] = LocomotionStateAnim_A1F8_g(vec[2], minVec[2], maxVec[2]);
 
-    // Write clamped vector back into matrix
-    LocomotionStateAnim_ApplyAnimData(matrix, vec);
+    // Rebuild the rotation matrix from the constrained Euler angles.
+    rage::mat33FromEuler(matrix, vec);
 
-    // Apply matrix to destination
-    LocomotionStateAnim_CopyMatrixData(quat, matrix);
+    // Convert the matrix back to the destination quaternion.
+    LocomotionStateAnim_B218_g(static_cast<float*>(quat), matrix);
 }
 
 /**

@@ -35,7 +35,7 @@ struct bpMatchTiming {
 extern "C" bpMatchTiming* g_pongMatchTiming;       // @ 0x8271A2E8
 extern "C" uint8_t*       g_pReplayStateData;      // @ 0x8271A2EC
 extern "C" void*          g_pAtSingletonPtr;       // @ 0x8271A328
-extern "C" const bpFunctor g_defaultData16;        // @ 0x8261A0C0
+extern "C" const uint32_t g_defaultData16[4];      // @ 0x8261A0C0
 
 namespace {
 // *(u32*)(replay + 0x68CF0) != 0 while the replay is playing back rather than recording.
@@ -104,7 +104,9 @@ void gdBallPredictData::Reset(const char* caller) {
     m_complete = 0;
     m_timeLimit = -1.0f;
     m_hitVel = bpVec4{0.0f, 0.0f, 0.0f, 0.0f};
-    m_onPop = g_defaultData16;
+    for (int i = 0; i < 4; ++i) {
+        m_onPop.words[i] = g_defaultData16[i];
+    }
     m_bounceCount = 0;
     m_bouncesBuilt = 0;
 }

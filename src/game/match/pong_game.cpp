@@ -28,6 +28,7 @@
  *   [22] PostLoadChildren()
  */
 
+#include "rage/indexed_registry.h"
 #include "pong_game.hpp"
 #include "../../scene/sg_scene_graph.hpp"
 
@@ -40,7 +41,6 @@ extern "C" {
     void pongPlayer_ADE8_p42(void* r3, uint32_t r4, void* base);
     void rage_DebugLog(void* r3, const char* format, ...);
     void gdGameData_CalculateVariation(void* gdData, uint32_t r4, uint32_t r5, uint32_t r6, int32_t r7);
-    void* pg_C2A0_g(void* r3, uint32_t r4);
     void game_7208(void* r3);
     void PongNetExhibitionCoordinator_2BA8_g(void* r3);
     // atSingleton lookup — reads/writes a slot into sp+112 via r5 out-ptr.

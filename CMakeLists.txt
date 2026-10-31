@@ -83,6 +83,7 @@ set(SOURCES
     src/rage/core/fsmMachine.c
     src/rage/core/game_loop.c
     src/rage/core/hsm.cpp
+    src/rage/core/indexed_registry.cpp
     src/rage/core/io_input.cpp
     src/rage/core/main.c
     src/rage/rage_grm.cpp
