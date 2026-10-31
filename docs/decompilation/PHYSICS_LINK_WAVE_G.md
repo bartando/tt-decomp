@@ -1,8 +1,8 @@
 # Physics link wave G — completed and remaining
 
-This pass addresses 8 of the 85 ABI entries supplied in `/tmp/tt-wave-G/physics.txt`.
-It adds six original PPC routines (one is a dependency absent from that list).
-The 77 entries below were not addressed by this pass.
+This pass addresses 10 of the 85 ABI entries supplied in `/tmp/tt-wave-G/physics.txt`.
+It adds eight original PPC routines (one is a dependency absent from that list).
+The 75 entries below were not addressed by this pass.
 
 ## Completed
 
@@ -58,7 +58,25 @@ Mutation runners live in `tools/lift-check/specs/`:
 `_articulated_velocity_mutations.py`, `_bound_lookup_mutations.py`,
 `_world_centroid_mutations.py`.
 
-## Remaining input entries (77)
+## Continuation — velocity limits and caller ABI
+
+- `0x822560F8` — `phArticulatedCollider_60F8`: clamp linear/angular xyz speed,
+  scale all four lanes, apply timestep damping, and rebuild cached velocities.
+  Spec `ph_articulated_clamp_damp_velocities`: 800 trials on seeds 1 and 2.
+- `0x82256B40` — `phArticulatedCollider_RestoreVelocities`: restore saved angular
+  and point velocities, then recover origin linear velocity. This replaces the
+  misleading declared-only name `phArticulatedCollider_RebuildJointWeights`.
+  Spec `ph_articulated_restore_velocities`: 600 trials on both seeds.
+- Re-lifted `SetTimestep` (`0x8224F040`) to pass linear limit, angular limit and
+  timestep in the correct registers; retain the initial joint pointer through
+  integration, then reload for later stages. Spec: 400 trials on both seeds.
+- Corrected `PostIntegrate` (`0x8224EA28`) and the integration declaration to take
+  and forward timestep; reload joint data between calls. Spec: 400 trials per seed.
+- `_articulated_step_mutations.py` catches 11/11 mutations, and
+  `_articulated_timestep_mutations.py` catches 4/4. All are behavioral failures.
+- The native physics translation unit compiles with these changes.
+
+## Remaining input entries (75)
 
 - `_phDemoWorld_67D0_g`
 - `_ph_2E08`
@@ -76,12 +94,10 @@ Mutation runners live in `tools/lift-check/specs/`:
 - `game_CE58(void*)`
 - `phArticulatedCollider_5D58(void*)`
 - `phArticulatedCollider_5FE0(void*)`
-- `phArticulatedCollider_60F8(void*, float, float, float)`
 - `phArticulatedCollider_8450(void*)`
 - `phArticulatedCollider_ApplyJointDelta(void*, int, float const*)`
 - `phArticulatedCollider_CreateJointConstraints(void*, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int)`
 - `phArticulatedCollider_F0E0(void*)`
-- `phArticulatedCollider_RebuildJointWeights(void*)`
 - `phArticulatedCollider_ResetForceAccumulators(void*)`
 - `phArticulatedCollider_ResetJointChain(void*)`
 - `phArticulatedCollider_ResetJointLink(void*, int)`
