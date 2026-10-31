@@ -2737,7 +2737,6 @@ void LocomotionStateMf::SerializeTriple(void* serializer, void* data) {  // 7480
 
 // External helpers used by newly-lifted functions
 extern void phBoundCapsule_FindSegmentIndex(void* capsule, void* outResult);
-extern void phBoundCapsule_ExtractPosition(void* matrix, float* outVec); // @ 0x82137B08 — Euler extraction
 extern float LocomotionStateAnim_A1F8_g(float value, float rangeMin, float rangeMax);
 extern void LocomotionStateAnim_B218_g(float* out, const float* matrix); // @ 0x8223B218
 extern void LocomotionStateAnim_6E90_w(void* self, float weight);
@@ -2864,7 +2863,7 @@ void LocomotionStateAnim_8110_g(void* quat, float* minVec, float* maxVec) {
     LocomotionStateAnim_AD30_g(matrix, (const float*)quat);
 
     // Extract Euler angles from the rotation matrix.
-    phBoundCapsule_ExtractPosition(matrix, vec);
+    rage::mat33ToEuler(matrix, vec);
 
     // Clamp each component: LocomotionStateAnim_A1F8_g(value, min, max)
     vec[0] = LocomotionStateAnim_A1F8_g(vec[0], minVec[0], maxVec[0]);

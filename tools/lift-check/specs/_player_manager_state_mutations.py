@@ -1,7 +1,7 @@
-"""Mutation proof for the creature teleport lifts.
+"""Mutation proof for player-manager clearing and character lookup.
 
 PYTHONPATH=tools/lift-check tools/lift-check/.venv/bin/python \
-    tools/lift-check/specs/_creature_teleport_link_mutations.py
+    tools/lift-check/specs/_player_manager_state_mutations.py
 
 Only cache copies are patched. A behavioral FAIL must kill every mutant;
 BUILD, SPEC, UNSUPPORTED, crashes and surviving mutants fail this runner.

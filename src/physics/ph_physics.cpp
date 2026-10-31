@@ -17,8 +17,10 @@
 #include "articulated_response.hpp"
 #include "articulated_constraints.hpp"
 #include "collider_velocity.hpp"
+#include "stream_configuration.hpp"
 #include "joint_initialization.hpp"
 #include "rage/math.hpp"
+#include "rage/swf_value.hpp"
 #include "rage/ptr32.hpp"
 
 extern "C" void* rage_alloc(uint32_t size);  // RAGE heap alloc (defined in heap.c)
@@ -153,7 +155,6 @@ extern void ph_vt5A60_61_7A38(void* obj);
 extern void ph_vt5A60_62_8F80(void* obj);
 extern void ph_vt5A7C_63_6A98(void* obj);
 extern void ph_vt5A84_63_6B90(void* obj);
-extern void ph_vt5A8C_63_6A50(void* obj);
 extern void ph_vt5B98_40_8D50(void* obj);
 extern void ph_vt5B98_41_8E50(void* obj);
 extern void* phArchetype_Load(const char*, void*);
@@ -162,7 +163,6 @@ extern void* ph_9EC0_1(void*);
 extern void* ph_E010(void*, void*, const char*);
 
 /* --- RAGE / kernel functions --- */
-extern void  rage_Alloc(int size, void* allocator);  // rage_AllocInternal
 extern void ke_ConstructObject(void* obj);
 extern void ke_DestroyObjectA(void* obj);
 extern void ke_DestroyObjectB(void* obj);
@@ -3805,12 +3805,15 @@ void phBoundCapsule_WritePacked24Shifted(int32_t value, uint8_t* base, void* /*r
 
 // ---------------------------------------------------------------------------
 // 17. phBoundCapsule_AllocArray @ 0x8256BAF0 | size: 0x14
-//     Multiplies r3 * r4, then tail-calls rage_Alloc with that size
-//     and allocator pointer 0x6489_0018.
+//     Multiplies the low 32 bits, then tail-calls the tagged allocator.
+//     0x648A0018 is an allocation-attribute word, not a pointer.
 // ---------------------------------------------------------------------------
-void phBoundCapsule_AllocArray(int32_t elemSize, int32_t count) {
-    int32_t totalSize = elemSize * count;
-    rage_Alloc(totalSize, g_phAllocator);
+extern "C" void* rage_AllocInternal(uint32_t size, uint32_t attributes); // @ 0x820C01B8
+
+// @ 0x8256BAF0
+void* phBoundCapsule_AllocArray(int32_t elemSize, int32_t count) {
+    const uint32_t totalSize = static_cast<uint32_t>(elemSize) * static_cast<uint32_t>(count);
+    return rage_AllocInternal(totalSize, 0x648a0018u);
 }
 
 // ---------------------------------------------------------------------------
@@ -4114,9 +4117,9 @@ void ph_vt5A60_23_Thunk(void* thisPtr) {
 }
 
 // ph_vt5A60_32_7238 @ 0x82467238 | size: 0x8
-// Adjusts this by -16, tail-calls ph_vt5A8C_63_6A50
-void ph_vt5A60_32_Thunk(void* thisPtr) {
-    ph_vt5A8C_63_6A50((char*)thisPtr - 16);
+// Adjusts this by -16, tail-calls phStream_ConfigurePrimary
+int32_t ph_vt5A60_32_Thunk(void* thisPtr, const uint32_t* configuration, uint32_t mode) {
+    return phStream_ConfigurePrimary((char*)thisPtr - 16, configuration, mode);
 }
 
 // ph_vt5A60_34_7240 @ 0x82467240 | size: 0x8
@@ -4181,9 +4184,9 @@ void ph_vt5A60_49_Thunk(void* thisPtr) {
 }
 
 // ph_vt5A60_24_8D00 @ 0x82468D00 | size: 0x8
-// Adjusts this by -16, tail-calls ph_vt5A8C_63_6A50
-void ph_vt5A60_24_Thunk(void* thisPtr) {
-    ph_vt5A8C_63_6A50((char*)thisPtr - 16);
+// Adjusts this by -16, tail-calls phStream_GetRecordField
+int32_t ph_vt5A60_24_Thunk(void* thisPtr, uint32_t* output) {
+    return phStream_GetRecordField((char*)thisPtr - 16, output);
 }
 
 // ph_vt5A60_25_8D08 @ 0x82468D08 | size: 0x8
@@ -4210,10 +4213,12 @@ void ph_vt5A60_31_Thunk(void* thisPtr) {
     ph_vt5A60_57_6858((char*)thisPtr - 16);
 }
 
+int ph_vt5A78_63_GetFloat108(void* thisPtr, float* out); // @ 0x824689B0
+
 // ph_vt5A60_33_8D30 @ 0x82468D30 | size: 0x8
-// Adjusts this by -16, tail-calls ph_vt5A8C_63_6A50
-void ph_vt5A60_33_Thunk(void* thisPtr) {
-    ph_vt5A8C_63_6A50((char*)thisPtr - 16);
+// Adjusts this by -16, tail-calls ph_vt5A78_63_GetFloat108
+int32_t ph_vt5A60_33_Thunk(void* thisPtr, float* output) {
+    return ph_vt5A78_63_GetFloat108((char*)thisPtr - 16, output);
 }
 
 // ph_vt5A60_35_8D40 @ 0x82468D40 | size: 0x8
@@ -4283,9 +4288,9 @@ void ph_vt5B98_38_Thunk(void* thisPtr) {
 }
 
 // ph_vt5B98_12_8D28 @ 0x82468D28 | size: 0x8
-// Adjusts this by -16, tail-calls ph_vt5A8C_63_6A50
-void ph_vt5B98_12_Thunk(void* thisPtr) {
-    ph_vt5A8C_63_6A50((char*)thisPtr - 16);
+// Adjusts this by -16, tail-calls phStream_ConfigurePacked
+int32_t ph_vt5B98_12_Thunk(void* thisPtr, const uint32_t* configuration, uint32_t mode) {
+    return phStream_ConfigurePacked((char*)thisPtr - 16, configuration, mode);
 }
 
 // ph_vt5B98_14_8D38 @ 0x82468D38 | size: 0x8
@@ -6689,7 +6694,6 @@ extern void ph_TestCollisionPairDetailed(uint32_t, uint32_t, uint32_t, uint32_t,
                                           uint8_t*, uint32_t, uint8_t*, int);
 extern void ph_ProfilerBegin(const char*, int);
 extern void ph_ResolveCollisionConstraint(uint32_t, uint32_t, void*);
-extern void ph_DebugAssertPositive(const char*, double);
 
 // ---------------------------------------------------------------------------
 // 1. phMatrix34_TransposeDotProduct @ 0x821181C8 | size: 0xB0 (176 bytes)
@@ -6769,27 +6773,9 @@ void phCollisionResolver_ProfiledResolve(void* thisPtr, void* input) {
     ph_ProfilerBegin(g_phResolveProfileTagEnd, 1);
 }
 
+
 // ---------------------------------------------------------------------------
-// 5. phBound_ComputeClampedExtent @ 0x82123E78 | size: 0x9C (156 bytes)
-//    Computes safe collision margin from bound's vtable slot 8. Logs warning
-//    and takes abs if negative. Clamps result via fsel.
-// ---------------------------------------------------------------------------
-float phBound_ComputeClampedExtent(void* bound) {
-    float scale = g_phExtentScale;
-    float result = scale;
-    uint32_t extentSrc = *(uint32_t*)((uint8_t*)bound + 256);
-    if (extentSrc != 0) {
-        void** vt = *(void***)(uintptr_t)extentSrc;
-        typedef float (*GetExtFn)(void*);
-        result = ((GetExtFn)vt[8])((void*)(uintptr_t)extentSrc);
-        if (result < scale) {
-            ph_DebugAssertPositive("phBound extent negative", (double)result);
-            if (result < 0.0f) result = -result;
-        }
-    }
-    float clamped = result * g_phClampMax;
-    return (-clamped >= 0.0f) ? 0.0f : clamped;
-}
+
 
 // ---------------------------------------------------------------------------
 // 6. phJoint1Dof_Constructor @ 0x82126D00 | size: 0x98 (152 bytes)
@@ -6913,11 +6899,9 @@ void phBound_RelocatePointers(void* thisPtr, void* relocDesc) {
 // coordinate transformation utilities.
 // =========================================================================
 
-extern float phBoundCapsule_GetJointAngle(void* capsuleData);
 extern int32_t phBoundCapsule_ResolvePlayerIndex(void* capsuleData);
 extern void phBoundCapsule_ComputeAngleXZ(void* camera, float fovHoriz, float fovVert);
 extern void phBoundCapsule_UpdateCapsuleState(void* camera);
-extern void phBoundCapsule_DecomposeRotation(float* inMatrix, float* row0, float* row1, float* row2, float* row3);
 
 // ---------------------------------------------------------------------------
 // 1. phBoundCapsule::TestPointContainment @ 0x822A4288 | size: 0xAC
@@ -7073,17 +7057,15 @@ int32_t phBoundCapsule_ClassifyValueBySign(float* input) {
     return -1;
 }
 
-// ---------------------------------------------------------------------------
-// 6. phBoundCapsule::ComputeJointAngleSin @ 0x823FD888 | size: 0x44
-//    Sets the joint type to 4 (capsule constraint), computes angle from
-//    joint data via phBoundCapsule_GetJointAngle, stores sin of result.
-// ---------------------------------------------------------------------------
-void phBoundCapsule_ComputeJointAngleSin(void* /*r3*/, void* /*r4*/,
-                                          void* jointData, float* output) {
-    output[1] = 4;  // joint type = 4
-    float angle = phBoundCapsule_GetJointAngle(jointData);
-    float sinVal = (float)ph_Sinf(angle);
-    output[0] = sinVal;
+extern "C" float swfValueToFloat(const void* value); // @ 0x823FA688
+
+// @ 0x823FD888
+extern "C" void swfMathSin(void*, void*, const SwfVmValue* input, SwfVmValue* output) {
+    // Tag precedes conversion, including when the input and output alias.
+    output->tag = 4;
+    const float angle = swfValueToFloat(input);
+    const float sine = static_cast<float>(crt_sin(angle));
+    memcpy(&output->payload, &sine, sizeof(sine));
 }
 
 // ---------------------------------------------------------------------------
@@ -7179,57 +7161,7 @@ float phBoundCapsule_TransformPointToLocal(void* capsule, const float* worldPoin
     return capsuleDistance;
 }
 
-// ---------------------------------------------------------------------------
-// 10. phBoundCapsule::DecomposeMatrixToEuler @ 0x820D0658 | size: 0xE8
-//     Decomposes a 4x4 rotation matrix into Euler angles (stored as a
-//     3-component vector). Extracts pitch from the matrix, computes yaw
-//     and roll via atan2 on the remaining matrix rows.
-//     Output: [0]=roll, [1]=yaw, [2]=pitch (in capsule convention)
-// ---------------------------------------------------------------------------
-void phBoundCapsule_DecomposeMatrixToEuler(const float* matrix, float* outEuler) {
 
-    // Copy the 4x4 matrix to local storage for decomposition
-    float localMatrix[16];
-    memcpy(localMatrix + 0,  matrix + 0,  16);  // row 0
-    memcpy(localMatrix + 4,  matrix + 4,  16);  // row 1
-    memcpy(localMatrix + 8,  matrix + 8,  16);  // row 2
-    memcpy(localMatrix + 12, matrix + 12, 16);  // row 3
-
-    // Decompose: extract axis angles from the 3x3 rotation sub-matrix
-    phBoundCapsule_DecomposeRotation(localMatrix, localMatrix, localMatrix + 4,
-                          localMatrix + 8, localMatrix + 12);
-
-    // Compute pitch angle from rows 1 and 2 (atan2)
-    float pitchY = localMatrix[6];   // row1[2] = element (1,2)
-    float pitchX = localMatrix[5];   // row1[1] = element (1,1)
-
-    float pitch;
-    if (pitchY == g_floatZero && pitchX == g_floatZero) {
-        pitch = g_floatZero;
-    } else {
-        pitch = (float)ph_Atan2f(pitchX, pitchY);
-    }
-
-    // Compute yaw from rows 2 and 3
-    float yawY = localMatrix[10];   // row2[2]
-    float yawX = localMatrix[8];    // row2[0]
-
-    float yaw;
-    if (yawY == g_floatZero && yawX == g_floatZero) {
-        yaw = g_floatZero;
-    } else {
-        yaw = (float)ph_Atan2f(yawX, yawY);
-    }
-
-    // Compute roll from the Z-axis component
-    float rollInput = -localMatrix[9];  // -row2[1]
-    float roll = (float)crt_asin(rollInput);
-
-    // Store Euler angles
-    outEuler[1] = (float)yaw;
-    outEuler[2] = (float)pitch;
-    outEuler[0] = (float)roll;
-}
 
 // =========================================================================
 // rage::phArticulatedCollider -- Additional Virtual Methods
@@ -8396,7 +8328,6 @@ extern void ph_1EF8(void* shapeKey, uint32_t materialOverride, uint32_t contactM
 extern void phBound_LockChannel(void* allocator, const char* tag, int alignment);
 extern void rage_CopyChannelData(void* pool, uint32_t handle, void* outPtr);
 extern void ph_ctor_ABE8(void* thisPtr);
-extern void rage_debugLog(const char* msg, uint64_t val);
 
 // External globals
 extern uint8_t g_phDisableFlag;          // @ 0x826064E0
@@ -8477,41 +8408,39 @@ void phPool_ResolveHandleLocked(void* outPtr, void* handle) {
     phBound_LockChannel((void*)(uintptr_t)allocator2, (const char*)0x8202766C, 1);
 }
 
-/**
- * ph_3E78 — Compute clamped contact impulse from virtual elasticity
- * @ 0x82123E78 | size: 0x9C (156 bytes)
- *
- * Computes the contact impulse magnitude for a collision response.
- * If the source object (r4) has a contact body at offset +256,
- * queries its elasticity via VCALL slot 8. Clamps the result to
- * be non-negative, scales by a constant factor (from rdata), and
- * returns the absolute value if negative (via fsel).
- *
- * Returns: Clamped impulse magnitude as float in f1.
- */
-// ph_3E78
-float phContact_ComputeImpulse(void* thisPtr, void* contactPair) {
-    void* contactBody = *(void**)((char*)contactPair + 256);
-    float zero = 0.0f;
-    float elasticity = zero;
+// Contact volume query: optional bound, negative-volume diagnostic, 300x scale.
+extern "C" const float g_phContactVolumeScale; // @ 0x8202D114
+extern "C" const char g_phNegativeVolumeWarning[]; // @ 0x82033020
+extern "C" void nop_8240E6D0(const char*, ...); // @ 0x8240E6D0
 
-    if (contactBody != nullptr) {
-        // VCALL slot 8: GetElasticity()
-        typedef float (*GetElasticityFn)(void*);
-        void** vt = *(void***)contactBody;
-        elasticity = ((GetElasticityFn)vt[8])(contactBody);
+namespace {
+struct phContactVolumeOps {
+    virtual void ReservedSlot0() = 0;
+    virtual void ReservedSlot1() = 0;
+    virtual void ReservedSlot2() = 0;
+    virtual void ReservedSlot3() = 0;
+    virtual void ReservedSlot4() = 0;
+    virtual void ReservedSlot5() = 0;
+    virtual void ReservedSlot6() = 0;
+    virtual void ReservedSlot7() = 0;
+    virtual float GetVolume() = 0;
+};
+}
 
-        if (elasticity < zero) {
-            rage_debugLog((const char*)0x82033420, *(uint64_t*)&elasticity);
-            elasticity = (elasticity < 0.0f) ? -elasticity : elasticity;
+// @ 0x82123E78
+float phContact_GetScaledVolume(void* /*unused*/, void* contactPair) {
+    auto* body = rage::load_ptr32<phContactVolumeOps>(contactPair, 0x100);
+    float volume = g_phZeroFloat;
+    if (body) {
+        volume = body->GetVolume();
+        if (volume < g_phZeroFloat) {
+            // Retail's diagnostic is a blr; it discards the payload.
+            nop_8240E6D0(g_phNegativeVolumeWarning);
+            volume = __builtin_fabsf(volume);
         }
     }
-
-    float scale = g_physOneF;  // 1.0f from rdata
-    float impulse = elasticity * scale;
-    float negImpulse = -impulse;
-    // fsel: if negImpulse >= 0 (i.e. impulse <= 0), return 0.0; else return impulse
-    return (negImpulse >= 0.0f) ? 0.0f : impulse;
+    const float scaled = volume * g_phContactVolumeScale;
+    return -scaled >= 0.0f ? 0.0f : scaled;
 }
 // VMX dot products accumulate in double before one float rounding; vector
 // operands/results flush subnormals. Bit shuffles must preserve raw input bits.

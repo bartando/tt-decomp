@@ -12,6 +12,7 @@
  * This file intentionally keeps the surface minimal and self-contained.
  */
 
+#include "rage/tokenizer_token.hpp"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -478,6 +479,71 @@ bool fiAsciiTokenizer::CloseAndFlush(const char* closingStr) {
 }
 
 } // namespace rage
+
+extern "C" int _stricmp(const char*, const char*); // @ 0x82433A40
+
+// @ 0x822E5310
+void fiTokenizer_PushBackToken(void* tokenizer, const char* token, int32_t length) {
+    auto* bytes = static_cast<uint8_t*>(tokenizer);
+    auto* count = reinterpret_cast<uint32_t*>(bytes + 0x18);
+    uint32_t index = static_cast<uint32_t>(length);
+    *count = index + 1;
+    bool unquoted = token[0] == '"';
+    if (!unquoted) {
+        unquoted = std::strchr(token, ' ') == nullptr;
+        if (unquoted)
+            unquoted = std::strchr(token, '\t') == nullptr;
+    }
+    if (!unquoted) {
+        *count += 2;
+        bytes[0x1c + static_cast<int32_t>(index + 2)] = '"';
+        ++index;
+    }
+    // Copy backwards into the tokenizer's LIFO buffer. Read each next input
+    // byte after the previous store, preserving overlapping input behavior.
+    uint8_t byte = static_cast<uint8_t>(*token);
+    if (byte) {
+        auto* destination = bytes + 0x1c + static_cast<int32_t>(index);
+        do {
+            ++token;
+            *destination-- = byte;
+            byte = static_cast<uint8_t>(*token);
+        } while (byte);
+    }
+    if (!unquoted) bytes[0x1d] = '"';
+    bytes[0x1c] = ' ';
+}
+
+// @ 0x822E5908
+bool fiTokenizer_CheckToken(fiTokenizerView* tokenizer, const char* expected, bool consume) {
+    char token[128];
+    token[0] = 0;
+    auto* bytes = reinterpret_cast<uint8_t*>(tokenizer);
+    const uint32_t saved = *reinterpret_cast<uint32_t*>(bytes + 0x10);
+    const int length = reinterpret_cast<rage::fiAsciiTokenizer*>(tokenizer)->GetToken(token, 128);
+    const bool matched = length != 0 && std::strcmp(expected, token) == 0;
+    if (!matched || !consume) {
+        fiTokenizer_PushBackToken(tokenizer, token, length);
+        *reinterpret_cast<uint32_t*>(bytes + 0x10) = saved;
+    }
+    return matched;
+}
+
+// @ 0x822E59C8
+bool fiTokenizer_CheckTokenInsensitive(void* tokenizer, const char* expected, bool consume) {
+    char token[128];
+    token[0] = 0;
+    auto* bytes = static_cast<uint8_t*>(tokenizer);
+    const uint32_t saved = *reinterpret_cast<uint32_t*>(bytes + 0x10);
+    const int length = static_cast<rage::fiAsciiTokenizer*>(tokenizer)->GetToken(token, 128);
+    const bool matched = length != 0 && _stricmp(expected, token) == 0;
+    if (!matched || !consume) {
+        fiTokenizer_PushBackToken(tokenizer, token, length);
+        *reinterpret_cast<uint32_t*>(bytes + 0x10) = saved;
+    }
+    return matched;
+}
+
 
 // Note: slot 36 is WriteStringWithPadding @ 0x822E6998 (see CloseAndFlush).
 // ═════════════════════════════════════════════════════════════════════════════
