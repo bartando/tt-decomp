@@ -58,6 +58,8 @@ set(SOURCES
     # XAM (Xbox Application Model)
     src/xam/audio.c
     src/xam/input.c
+    src/platform/host_sync.cpp
+    src/platform/host_memory.cpp
     src/xam/kernel.c
     src/xam/kernel_shims.c
     src/xam/network.c
