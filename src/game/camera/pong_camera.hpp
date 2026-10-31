@@ -301,8 +301,6 @@ struct pongCameraMgr {
     bool TryTransitionMode5_Variant3(void* gameState);  // @ 0x821F3BF8
     
     // Core transition helpers
-    bool ValidateAndClampTransition(void* gameState, int mode);  // @ 0x821F3500
-    bool ValidateAndClampTransitionWithFlags(void* gameState, int mode);  // @ 0x821F3650
     bool ValidateAndAdjustTransition(void* gameState, int mode);  // @ 0x821F3780
     
     // Parameter management

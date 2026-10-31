@@ -92,13 +92,6 @@ uint32_t g_nScreenWidth = 1280;
 void* g_nonWsConfig = NULL;
 
 
-/* Shader constant data table @ 0x8202C328 (.rdata, 440 bytes)
- * Used by grc_CB48 for GPU shader constant initialization */
-const uint8_t g_shaderConstantData[440] = {
-    /* This is a placeholder - actual data would need to be extracted from binary */
-    0
-};
-
 // ============================================================================
 // Render Loop Globals
 // ============================================================================
@@ -520,7 +513,7 @@ const char* k_fpsUpperBound = "120.0";
 const char* k_frontendFieldName_1 = "field1";
 const char* k_frontendFieldName_2 = "field2";
 const char* k_holdTime = "holdTime";
-const char* k_initRefreshRate = "60.0";
+const float k_initRefreshRate = 60.0f; // @ 0x825C4948
 const char* k_initSceneTime = "0.0";
 const char* k_lineSpacing = "lineSpacing";
 const char* k_SAVING = "SAVING";
