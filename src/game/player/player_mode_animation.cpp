@@ -1,13 +1,8 @@
 // Animation resets used when the inner player state changes movement mode.
 #include <cstdint>
 #include <cstring>
-#include "link/tt_alias.h"
-
-// Isolated declaration of the member's recovered ABI while the creature
-// thread owns its implementation. Bind directly to that member's native symbol.
-extern bool SetupAnimationPair(void* animations, uint32_t first, uint32_t second,
-                               void* unusedR6, const void* parameters)
-    __asm__(TT_ASM_SYMBOL("_ZN19LocomotionStateAnim18SetupAnimationPairEjjPvPKv")); // @ 0x8224C418
+#include "../creature/pong_creature.hpp"
+#include "../../anim/locomotion.hpp"
 
 extern "C" uint8_t g_swingInFlightFlag; // @ 0x8260633C
 extern "C" uint32_t g_swingCountFlag; // @ 0x82606340
@@ -15,8 +10,6 @@ extern void crAnimBlenderState_Init(void*); // @ 0x8224C810
 extern void LocomotionStateAnim_6D48(void*); // @ 0x820D6D48
 extern void LocomotionStateAnim_2130_g(void*); // @ 0x820C2130
 extern void game_CD20(void*); // @ 0x820DCD20
-extern void LocomotionStateAnim_BlendLocomotionAnims(uint32_t, void*, void*, float); // @ 0x8224C128
-extern void LocomotionStateAnim_TransitionLocomotionState(uint32_t, void*, void*, float); // @ 0x8224C288
 extern "C" void* g_input_obj_ptr; // @ 0x825EAB28
 extern "C" uint32_t g_prngState[2]; // @ 0x825CA2C8
 extern "C" uint8_t g_faceAnimDirty; // @ 0x82606324
@@ -104,15 +97,15 @@ extern "C" void LocomotionStateAnim_BBC8_g(void* state) {
     void* skeleton = at<void*>(state, 0x1C);
     at<float>(state, 0xB0) = lbl_825C5938;
     at<uint8_t>(state, 0x13) = 0;
-    using Apply = void (*)(uint32_t, void*, void*, float);
+    using Apply = void (*)(void*, void*, void*, float);
     const Apply apply = at<uint32_t>(at<void*>(skeleton, 4), 0x14) & 1
-        ? LocomotionStateAnim_TransitionLocomotionState : LocomotionStateAnim_BlendLocomotionAnims;
+        ? LocomotionStateAnim_C288_g : LocomotionStateAnim_C128_g;
     // The original snapshots the list length, but reloads the entry pointer.
     const uint16_t count = at<uint16_t>(state, 0x4C);
     for (uint32_t i = 0; i < count; ++i)
-        apply(at<uint32_t*>(state, 0x48)[i], nullptr, skeleton, 0.0f);
-    SetupAnimationPair(static_cast<uint8_t*>(state) + 0x40, 5, 6, nullptr,
-                       g_playerModeAnimationPairParams);
+        apply(at<void**>(state, 0x48)[i], nullptr, skeleton, 0.0f);
+    reinterpret_cast<LocomotionStateAnim*>(static_cast<uint8_t*>(state) + 0x40)
+        ->SetupAnimationPair(5, 6, nullptr, g_playerModeAnimationPairParams);
     at<uint32_t>(state, 0xAC) = 1;
     const uint32_t slot = at<uint32_t>(state, 8);
     std::memset(g_playerModeAnimationBytes + slot * 14, 0, 14);

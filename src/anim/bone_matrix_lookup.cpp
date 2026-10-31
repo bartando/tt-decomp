@@ -1,7 +1,7 @@
 // Copy a bone's sampled matrix after converting its skeleton ID to an index.
 #include <cstdint>
+#include "locomotion.hpp"
 
-extern bool LocomotionStateAnim_04F0_g(void*, uint16_t, uint16_t*); // @ 0x821D04F0
 extern void rage_debugLog(const char*, ...); // @ 0x8240E6D0
 extern "C" const char g_boneMatrixLookupFailed[]; // @ 0x8203D34C
 

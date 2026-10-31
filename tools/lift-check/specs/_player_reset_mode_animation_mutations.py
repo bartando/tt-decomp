@@ -15,8 +15,8 @@ MUTATIONS = [
     ("wrong locomotion mode", "locomotion->Start(1, transform, 0)", "locomotion->Start(0, transform, 0)"),
     ("ignore skeleton flags", "at<uint32_t>(at<void*>(skeleton, 4), 0x14) & 1", "false"),
     ("reload live list count", "i < count", "i < at<uint16_t>(state, 0x4C)"),
-    ("cache old entry array", "apply(at<uint32_t*>(state, 0x48)[i]", "apply(cachedEntries[i]"),
-    ("wrong pair ID", "+ 0x40, 5, 6, nullptr,", "+ 0x40, 5, 7, nullptr,"),
+    ("cache old entry array", "apply(at<void**>(state, 0x48)[i]", "apply(cachedEntries[i]"),
+    ("wrong pair ID", "->SetupAnimationPair(5, 6, nullptr,", "->SetupAnimationPair(5, 7, nullptr,"),
     ("leave final mask byte", "slot * 14, 0, 14", "slot * 14, 0, 13"),
 ]
 
@@ -28,7 +28,7 @@ def main():
         assert old in source, label
         mutated = source.replace(old, new)
         if label == "cache old entry array":
-            mutated = mutated.replace("    const uint16_t count =", "    const uint32_t* cachedEntries = at<uint32_t*>(state, 0x48);\n    const uint16_t count =")
+            mutated = mutated.replace("    const uint16_t count =", "    void* const* cachedEntries = at<void**>(state, 0x48);\n    const uint16_t count =")
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             rc = Checker(Path(__file__).with_name("player_reset_mode_animation.py"),

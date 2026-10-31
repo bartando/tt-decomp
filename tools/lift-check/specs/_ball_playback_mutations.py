@@ -28,7 +28,7 @@ CASES = [
         ("lose flag low-byte check", "static_cast<uint8_t>(BallPredict_HasFlag9Crossing(prediction))", "BallPredict_HasFlag9Crossing(prediction)"),
         ("lose bank predicate low-byte check", "static_cast<uint8_t>(BallPredict_ShouldUsePrevious(state))", "BallPredict_ShouldUsePrevious(state)"),
         ("omit previous bank", "BallPredict_AdvanceSamples(0, false);", "(void)state;"),
-        ("wrong descending message", "pg_E6E0(11, 0x40", "pg_E6E0(12, 0x40"),
+        ("wrong descending message", "PostGameMessage(11, 0x40", "PostGameMessage(12, 0x40"),
         ("wrong table crossing axis", "previous.pos.z) < halfLength", "previous.pos.x) < halfLength"),
         ("omit launch position", "matrix.d = sample.pos;", "matrix.d = sample.vel;"),
         ("omit angular velocity", "instance->angularVelocity = spin;", "instance->angularVelocity = bpVec4{};"),
@@ -37,7 +37,7 @@ CASES = [
         ("omit level sync", "static_cast<Level*>(g_pPhysicsLevel)->UpdateTransform(instance->levelIndex);", "(void)instance;"),
         ("wrong bounce message", "localBounce ? 1 : 2", "localBounce ? 2 : 1"),
         ("wrong impact scaling", "impulse * impactScale", "impulse"),
-        ("omit paired net event", "pg_E6E0(44, 0x40, 0, 0);", "(void)instance;"),
+        ("omit paired net event", "PostGameMessage(44, 0x40, 0, nullptr);", "(void)instance;"),
         ("wrong player bit", "(1u << playerSide) | 0x40", "1u | 0x40"),
     ]),
 ]
