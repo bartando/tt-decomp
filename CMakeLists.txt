@@ -233,6 +233,7 @@ set(SOURCES
     src/rage/math/mat44.cpp
     src/rage/math/mat33.cpp
     src/rage/math/mat33_orthonormalize.cpp
+    src/rage/math/mat34_transform.cpp
     src/game/input/button_edges.cpp
     src/game/player/player_state_queries.cpp
     src/game/misc/ccal_ring_buffer.cpp

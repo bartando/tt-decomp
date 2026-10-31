@@ -56,7 +56,7 @@ CALLS = {
     0x82389FD8: stub(ret="void"),                       # splash update
     0x82430978: stub(ret=_cast),
     0x822870C8: model(_predict),
-    0x820D2038: stub(ret="void"),                       # util_2038: fills the point
+    0x820D2038: run(),                                  # affine trail point transform
     "ballInst.vfn_3": stub(ret="void", args=("r3", "r4")),
     0x82160C98: run(),      # pg_0C98_g: leaf; Update relies on it leaving r4 alone
     SQRTF: model(lambda ctx: ctx.ret(f1=math.sqrt(ctx.f(1)) if ctx.f(1) >= 0 else math.nan),
