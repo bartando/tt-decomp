@@ -61,6 +61,13 @@ extern "C" const float g_capsuleInertiaThird = 0.333333343f;
 extern "C" const float g_capsuleVolK1 = 1.33333337f;
 TT_DATA_ALIAS("g_phTaperedCapsuleVolK1", "g_capsuleVolK1");
 
+// @ 0x825CB790 (.data) — consecutive X/Y/Z unit vectors
+extern "C" const float g_phResponseBasis[3][4] = {
+    {1.0f, 0.0f, 0.0f, 0.0f},
+    {0.0f, 1.0f, 0.0f, 0.0f},
+    {0.0f, 0.0f, 1.0f, 0.0f},
+};
+
 // @ 0x82079C58 (.rdata) — rotation vector squared-length cutoff
 extern "C" const float g_phRotationMinSquared = 9.99999996e-13f;
 

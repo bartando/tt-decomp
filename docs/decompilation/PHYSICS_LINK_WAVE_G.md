@@ -1,8 +1,8 @@
 # Physics link wave G — completed and remaining
 
-This pass addresses 20 of the 85 ABI entries supplied in `/tmp/tt-wave-G/physics.txt`.
-It adds 32 original PPC routines (16 are dependencies absent from that list).
-The 65 entries below were not addressed by this pass.
+This pass addresses 23 of the 85 ABI entries supplied in `/tmp/tt-wave-G/physics.txt`.
+It adds 37 original PPC routines (18 are dependencies absent from that list).
+The 62 entries below were not addressed by this pass.
 
 ## Completed
 
@@ -238,12 +238,41 @@ Verification and limits:
 - Reciprocal estimates follow the checker's true reciprocal; hardware estimate
   bits and FP exception flags remain outside this emulator proof.
 
-## Remaining input entries (65)
+## Continuation — selected impulse responses and point matrix ABI
 
-Next gameplay targets confirmed in `.text.s` (not lifted in this batch):
-The delta/reset helpers are `0x822577F0` / `0x82257918`, calling
-`0x822571C8` / `0x82257368`. `phJoint_ApplyDelta` is `0x82257A30`; r6 is an output
-matrix pointer, despite the current `int` declaration/caller parameter.
+- Lifted `0x822571C8` / `0x82257368` as point/angular impulse responses.
+  The selected body receives the tensor product in its selected +10/+30/+50
+  column; real joint virtuals reduce its ancestor path and propagate through
+  unvisited branches. Shared C++ traversal preserves flags, selectors and order.
+- `0x822577F0` / `0x82257918` build all three response columns with named unit
+  X/Y/Z vectors, then restore body selectors. These replace the missing
+  `phArticulatedCollider_ApplyJointDelta` / `ResetJointLink` spellings.
+- `0x82257A30` is `phArticulatedCollider_GetPointResponseMatrix`, replacing
+  `phJoint_ApplyDelta`. Its fourth argument (r6) is an output matrix pointer.
+  Sequential skew construction retains point/output alias behavior; matrix
+  composition reuses the existing lift. Only three undefined final scratch W
+  words are ignored; C++ preserves those 12 destination padding bytes.
+- Corrected callers `0x822501F8`, `0x82250818` and `0x82250870`: matrix output
+  pointer, alternate target/bone r8, bone/point argument order, VMX relative
+  position, and joint-data reload after bone resolution. Removed obsolete names.
+- Eight specs cover random acyclic trees, root/interior/leaf seeds, all selectors,
+  zero/negative counts, repeated body pointers, aliased point/force/output,
+  nonfinite inputs, live caller data replacement and guard integrity.
+  Trial counts per seed: 400/400 impulse, 300/300 columns, 600 matrix,
+  400 matrix caller, 200/200 column callers. All pass seeds 1 and 2; finite
+  results compare exactly.
+- `_articulated_response_mutations.py` checks impulse seeding, selected stride,
+  path/branch virtuals and flags, columns/cleanup, matrix signs/aliasing and ABI;
+  all 26 mutations are caught as behavioral failures.
+- Native compilation succeeds; completed missing spellings no longer occur in
+  linker errors. Remaining unrelated symbols still prevent linking.
+
+## Remaining input entries (62)
+
+Next audited target: `phArticulatedCollider_CreateJointConstraints` is
+`0x82258C98`, a joint constraint/error-array gather returning a count, with five
+output array pointers. The current declaration treats them as integers and
+mislabels the return as a handle. Its caller is `0x82250528`.
 
 - `_phDemoWorld_67D0_g`
 - `_ph_2E08`
@@ -259,9 +288,7 @@ matrix pointer, despite the current `int` declaration/caller parameter.
 - `_sub_823517F8`
 - `aud_2478(double)`
 - `game_CE58(void*)`
-- `phArticulatedCollider_ApplyJointDelta(void*, int, float const*)`
 - `phArticulatedCollider_CreateJointConstraints(void*, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int)`
-- `phArticulatedCollider_ResetJointLink(void*, int)`
 - `phBoundCapsule_ACB0_p45(void*)`
 - `phBoundCapsule_ComputeAngleXZ(void*, float, float)`
 - `phBoundCapsule_DecomposeRotation(float*, float*, float*, float*, float*)`
@@ -279,7 +306,6 @@ matrix pointer, despite the current `int` declaration/caller parameter.
 - `phInst_8F10_p42(void*, unsigned int, void*, void*, void*, void*)`
 - `phInst_AB00(rage::phInst*, void*, char const*)`
 - `phInst_AC00_2hr(rage::phInst*)`
-- `phJoint_ApplyDelta(void*, int, float const*, int)`
 - `phObject::CreateViews(phObject*)`
 - `phObject::ReleaseResources()`
 - `phObject_4F28_p46(void*)`

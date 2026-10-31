@@ -443,12 +443,12 @@ struct phArticulatedCollider {
     void CopyJointTransformMatrix(float* outMatrix, int boneIndex);
     void CopyJointVelocityMatrix(float* outMatrix, int boneIndex);
     void CopyJointRotationMatrix(float* outMatrix, int boneIndex);
-    void ApplyDeltaPositionToJoint(int param, const float* targetPos, const float* altTarget, int solverParam);
+    void GetJointPointResponseMatrix(float* output, const float* target, const float* alternateTarget, int boneIndex, int alternateBoneIndex);
     void GetJointBackupForce(float* outVec, phArticulatedCollider* srcCollider, int boneIndex);
     void AccumulateScaledJointForces(float* outVec, float scale);
     void GetJointOrientationVector(float* outVec, int boneIndex);
-    void ApplyDeltaToJointForce(const float* targetPos, int boneIndex);
-    void ResetJointConstraintState(int boneIndex);
+    void BuildJointPointResponse(int boneIndex, const float* point);
+    void BuildJointAngularResponse(int boneIndex);
     void DispatchJointSlot12(int jointIndex, float* outVec);
     void DispatchJointSlot7(int jointIndex);
     void DelegateToBoundCapsule();
