@@ -117,6 +117,7 @@ set(SOURCES
     src/rage/memory/rage_memory.cpp
     src/rage/memory/singleton_array.cpp
     src/rage/memory/sysMemSimpleAllocator.cpp
+    src/rage/data/parameter_node.cpp
     src/rage/io/rage_par.cpp
     src/rage/io/rage_stream_manager.cpp
     src/rage/io/fiDevice.cpp
