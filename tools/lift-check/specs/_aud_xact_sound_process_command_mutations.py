@@ -15,7 +15,7 @@ from liftcheck.runner import Checker, Options
 MUTATIONS = (
     ("dispatch upper command bits", "command & 0xffff", "command"),
     ("wrong pool for 2000 commands", "opcode < 0x4000 ?", "false ?"),
-    ("wrong instance index", ")[params[0]];", ")[(params[0] + 1) % 16];"),
+    ("wrong instance index", ")[params[0]].get();", ")[(params[0] + 1) % 16].get();"),
     ("turn load into an unknown command", "case 0x2002:", "case 0x2004:"),
     ("turn empty slot into an unknown command", "    case 0x2003:\n", ""),
     ("wrong play cue", "params[1], params[2], params[3], params[4],",
