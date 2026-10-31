@@ -1,4 +1,5 @@
 #include "audio/xact_sink_io.hpp"
+#include "grc/resource_release.hpp"
 #include "game/message_sink_time.hpp"
 #include "rage/xact_list.hpp"
 #include "audio/xact_fade.hpp"
@@ -628,7 +629,6 @@ extern void* RtlEnterCriticalSection_D6F0_fw(void*);
 extern void msgMsgSink_D168_sp(void*);
 extern void msgMsgSink_D1D8_sp(void*);
 extern void msgMsgSink_6138_2hr(void*);
-extern void grc_2CC8(void*, uint32_t, uint32_t);
 extern void atSingleton_8E88_p42(void*, void*, uint32_t, uint32_t, uint32_t);
 extern void ph_EF40(void*, void*);
 extern void game_9CF8_h(void*, const void*);
@@ -665,10 +665,10 @@ void* msgMsgSink_vfn_42_EFE8_1(void* self, void* value) {
 }
 
 // msgMsgSink_3258_wrh @ 0x82353258 | size: 0xC
-// Loads field at +12, passes it with zero to grc_2CC8
+// Releases pages on this resource, using its data word at +12.
 void msgMsgSink_3258_wrh(void* self) {
-    uint32_t val = *(uint32_t*)((uint8_t*)self + 12);
-    grc_2CC8((void*)(uintptr_t)val, 0, 0);
+    const uint32_t data = *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(self) + 12);
+    grc_2CC8(self, data, 0);
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
