@@ -146,22 +146,6 @@ bpShot* ballPredict_CopyShot(bpShot* dst, const bpShot* src) {
     return dst;
 }
 
-// @ 0x82287040 | size: 0x88
-void CopyVectorThreadSafe(void* context, const bpShot* shot) {
-    auto* bytes = static_cast<uint8_t*>(context);
-    if (bytes[0x105]) {
-        bytes[0x104] = 0;
-    } else {
-        nop_8240E6D0("Cannot Lock when Unlock is not enabled");
-    }
-    ballPredict_CopyShot(reinterpret_cast<bpShot*>(bytes + 0x40), shot);
-    if (bytes[0x105]) {
-        bytes[0x104] = 1;
-    } else {
-        nop_8240E6D0("Cannot Lock when Lock is not enabled");
-    }
-}
-
 // @ 0x82287B50
 void ballPredict_ProcessHit(void* hitPtr, const BallFlightVec4* velocity,
                             const BallFlightVec4* spin, int /*unusedR6*/,
