@@ -203,3 +203,5 @@ float g_practiceTargetGridShape[8] = {  // @ 0x825C99E0 (.data)
     -1.0f, -0.33f, 0.33f, 1.0f, -1.0f, -0.78f, -0.59f, -0.4f
 };
 int32_t g_practiceTargetSelectedIndex = 0; // @ 0x826063B0 (.data)
+
+extern const float g_practiceTargetNearEdge = -0.2f; // @ 0x82079EB4 (.rdata)

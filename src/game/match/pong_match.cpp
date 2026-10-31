@@ -1977,3 +1977,33 @@ void gmPracticeTarget_SelectSet(void* /*unused*/, int32_t setId, int /*unused*/,
     for (int i = 0; i < 8; ++i) g_practiceTargetGridShape[i] = selected.gridShape[i];
     gmPracticeTarget_LayOutTableGrid();
 }
+
+extern const float g_fPrngNormalize;                // @ 0x82079E68
+extern "C" const float g_ambientCubeFalloff;         // @ 0x825C8084 — shared 0.2 placement margin
+extern const float g_practiceTargetNearEdge;        // @ 0x82079EB4 — -0.2
+extern void* gmPracticeTarget_SetPosition(void* target, const float* position); // @ 0x82113BA8
+
+// @ 0x82113A98 | size: 0x110
+void gmPracticeTarget_PlaceRandomly(gmPracticeTarget* target, int /*unused*/) {
+    struct TableDimensions {
+        uint8_t _pad00[0x10];
+        float width, height, length;
+    };
+    const auto* table = static_cast<const TableDimensions*>(g_pTableDims);
+    float margin = g_ambientCubeFalloff;
+    float halfWidth = table->width * 0.5f;
+    float halfLength = table->length * 0.5f;
+    float xLower = margin - halfWidth;
+    float xUpper = halfWidth - margin;
+    float xRange = xUpper - xLower;
+    float zRange = (margin - halfLength) - g_practiceTargetNearEdge;
+    float randomX = static_cast<float>(AdvancePracticeTargetRandom() & 0x7FFFFFu) * g_fPrngNormalize;
+    float randomZ = static_cast<float>(AdvancePracticeTargetRandom() & 0x7FFFFFu) * g_fPrngNormalize;
+    alignas(16) float position[4] = {
+        __builtin_fmaf(xRange, randomX, xLower),
+        table->height,
+        __builtin_fmaf(randomZ, zRange, -margin),
+        margin
+    };
+    gmPracticeTarget_SetPosition(target, position);
+}
