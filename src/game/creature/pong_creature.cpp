@@ -2740,8 +2740,6 @@ void LocomotionStateMf::SerializeTriple(void* serializer, void* data) {  // 7480
 // External helpers used by newly-lifted functions
 extern float LocomotionStateAnim_A1F8_g(float value, float rangeMin, float rangeMax);
 extern void LocomotionStateAnim_B218_g(float* out, const float* matrix); // @ 0x8223B218
-extern void util_BBB0(void* dst, float* src, float* work);
-extern void util_B9A8(void* dst, void* quat, void* axis);
 // @ 0x8224C128 / 0x8224C288 — apply one animation entry to a skeleton. Both read
 // the skeleton from r5 and never read r4; callers leave junk there.
 extern void LocomotionStateAnim_C128_g(void* entry, void* unusedR4, void* skeleton, float weight);
@@ -3069,46 +3067,6 @@ float LocomotionStateAnim_BB48_g(void* self, int count) {
     return lastWeight / total;
 }
 
-/**
- * InvertAndCombineQuaternions @ 0x8223BE20 | size: 0xB0
- *
- * Inverts quaternion src (negates xyz, keeps w), multiplies with
- * dst quaternion using util_BBB0, applies reference subtraction
- * and position addition via SIMD, and normalizes via util_B9A8.
- */
-// LocomotionStateAnim_BE20_g @ 0x8223BE20
-void LocomotionStateAnim_BE20_g(void* dst, void* src) {
-    float* srcQ = (float*)src;
-    float* dstQ = (float*)dst;
-
-    // Invert src quaternion: negate xyz, keep w
-    dstQ[0] = -srcQ[0];
-    dstQ[1] = -srcQ[1];
-    dstQ[2] = -srcQ[2];
-    dstQ[3] =  srcQ[3];
-
-    // Multiply inverted src quaternion with src position
-    float* srcPos = (float*)((char*)src + 16);
-    util_BBB0(dst, srcPos, (float*)((char*)dst + 16));
-
-    // result_pos = reference_zero - combined_pos (vsubfp with zero vector)
-    extern const float g_zeroVec4[4];  // @ 0x82606750 (.data, zero in the image)
-    float* dstPos = (float*)((char*)dst + 16);
-    dstPos[0] = g_zeroVec4[0] - dstPos[0];
-    dstPos[1] = g_zeroVec4[1] - dstPos[1];
-    dstPos[2] = g_zeroVec4[2] - dstPos[2];
-    dstPos[3] = g_zeroVec4[3] - dstPos[3];
-
-    // Add dst position back (vaddfp with src position)
-    float* origSrcPos = (float*)((char*)src + 16);
-    dstPos[0] += origSrcPos[0];
-    dstPos[1] += origSrcPos[1];
-    dstPos[2] += origSrcPos[2];
-    dstPos[3] += origSrcPos[3];
-
-    // Normalize the result
-    util_B9A8(dst, dst, src);
-}
 
 /**
  * GetTransformFromAnimPair @ 0x822E0A30 | size: 0xB4
