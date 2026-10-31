@@ -908,7 +908,21 @@ extern SwipePattern g_swipePatterns[17];  // @ 0x825D09A0
 extern void util_PackColorRGBA(uint32_t* outColor, const float* inVector);  // @ 0x8223F840
 extern void hudFlashBase_DrawFlashOverlay(void* hudObj, void* corner1, void* corner2, 
                                  float alpha, int reverseFlag);  // @ 0x82140420
-extern void pongScrnTransFadeIn_EndTransition(void* obj);  // @ 0x82378460
+extern "C" uint32_t g_sceneResetMatrix[4]; // @ 0x8261A0C0
+
+// @ 0x82378460 | size: 0x90
+void pongScrnTransFadeIn_EndTransition(void* obj) {
+    auto* callbacks = reinterpret_cast<SysCallback*>(static_cast<uint8_t*>(obj) + 0x10);
+    SysCallback& completion = callbacks[1];
+    if (completion.mode != 0)
+        sysCallback_Invoke(&completion, 0);
+    // Reload the template after the callback, which can update either callback.
+    completion.self = reinterpret_cast<void*>(static_cast<uintptr_t>(g_sceneResetMatrix[0]));
+    completion.target = g_sceneResetMatrix[1];
+    completion.context = g_sceneResetMatrix[2];
+    completion.mode = g_sceneResetMatrix[3];
+    callbacks[0] = completion;
+}
 
 // Global pointers (accessed via SDA and absolute addresses)
 extern struct hudFlashBase* g_hudFlashBase;  // @ 0x82606454 (SDA, r2+25556)
@@ -1286,7 +1300,6 @@ void pongScrnTransFreezeAndCrossFade::Render() {
 // ─────────────────────────────────────────────────────────────────────────────
 void pongScrnTransFreezeAndCrossFade::End() {
     // Forward to pongScrnTransFadeIn implementation
-    extern void pongScrnTransFadeIn_EndTransition(void* thisPtr);
     pongScrnTransFadeIn_EndTransition(this);
 }
 
