@@ -1,3 +1,4 @@
+#include "rage/ptr32.hpp"
 /**
  * rage_audio.hpp — Skeleton class declarations
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -174,9 +175,9 @@ struct audVoice {
 struct audVoiceSfx {
     // The compiler supplies the vptr. Words +4/+8 are intrusive list links,
     // not another vtable followed by state/control fields.
-    audVoiceSfx* m_previous;      // +0x04
-    audVoiceSfx* m_next;          // +0x08
-    void* m_pSfxRef;              // +0x0c
+    ptr32<audVoiceSfx> m_previous;      // +0x04
+    ptr32<audVoiceSfx> m_next;          // +0x08
+    ptr32<void> m_pSfxRef;              // +0x0c
 
     // ── virtual methods ──
     virtual void Stop();              // [5] @ 0x821635b8 — cmdId 16388

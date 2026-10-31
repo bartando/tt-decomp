@@ -19,7 +19,7 @@ CASES = [
         ("wrong upper clamp", "low - 3.0 >= 0.0 ? 3.0 : low", "low - 1.0 >= 0.0 ? 1.0 : low"),
         ("lose negative wrap", "clamped, 90.0, 360.0", "clamped, 90.0, 0.0"),
         ("wrong command", "16391, params, 2", "16394, params, 2"),
-        ("drop handle", "*static_cast<uint32_t*>(m_pSfxRef)", "0"),
+        ("drop handle", "*static_cast<uint32_t*>(m_pSfxRef.get())", "0"),
     ]),
     ("aud_sfx_set_stereo_volume", "void audVoiceSfx::SetStereoVolume(", [
         ("wrong gain scale", "volume * 1000.0f", "volume * 100.0f"),

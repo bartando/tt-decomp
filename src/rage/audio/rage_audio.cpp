@@ -174,12 +174,12 @@ void audVoiceSfx::PlayByEntry(
 
     if (bankEntry.ShouldEmitPlayEvent()) {
         uint32_t streamHandle = 0;
-        std::memcpy(&streamHandle, m_pSfxRef, sizeof(streamHandle));
+        std::memcpy(&streamHandle, m_pSfxRef.get(), sizeof(streamHandle));
         PushSfxPlayCommand(streamHandle);
     }
 
     audVoiceSfx_PlayInternal(
-        m_pSfxRef,
+        m_pSfxRef.get(),
         bankEntry.GetBankSlot(),
         bankEntry.GetBankEntryData(),
         volume,
@@ -458,7 +458,7 @@ void audVoiceSfx::SetReverbVolume(void* bankEntry, float volume) // @ 0x821639A0
         return;
     }
 
-    uint32_t* sfxData = static_cast<uint32_t*>(m_pSfxRef);
+    uint32_t* sfxData = static_cast<uint32_t*>(m_pSfxRef.get());
     uint32_t voiceHandle = sfxData[0];
 
     float offset = g_audVolumeOffset;
@@ -487,7 +487,7 @@ void audVoiceSfx::SetEffectVolume(void* bankEntry, float volume) // @ 0x82163A28
         return;
     }
 
-    uint32_t* sfxData = static_cast<uint32_t*>(m_pSfxRef);
+    uint32_t* sfxData = static_cast<uint32_t*>(m_pSfxRef.get());
     uint32_t voiceHandle = sfxData[0];
 
     float offset = g_audVolumeOffset;
@@ -1002,7 +1002,7 @@ const char* audControlGroup::GetTypeNameB() {
  * Pauses the SFX voice by delegating to audVoiceSfx_SetPaused with flag=0.
  */
 void audVoiceSfx::Pause() {
-    audVoiceSfx_SetPaused(m_pSfxRef, 0);
+    audVoiceSfx_SetPaused(m_pSfxRef.get(), 0);
 }
 
 /**
@@ -1010,7 +1010,7 @@ void audVoiceSfx::Pause() {
  * Unpauses the SFX voice by delegating to audVoiceSfx_SetPaused with flag=1.
  */
 void audVoiceSfx::Unpause() {
-    audVoiceSfx_SetPaused(m_pSfxRef, 1);
+    audVoiceSfx_SetPaused(m_pSfxRef.get(), 1);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1944,7 +1944,7 @@ void audControlGroup::ProcessAllControls() {
  * Sends a stop command to the audio thread via the command ring buffer.
  */
 void audVoiceSfx::Stop() {
-    uint32_t voiceHandle = *static_cast<uint32_t*>(m_pSfxRef);
+    uint32_t voiceHandle = *static_cast<uint32_t*>(m_pSfxRef.get());
     PushAudioCommand(2, 16388, 1, &voiceHandle);
 }
 
@@ -1959,7 +1959,7 @@ void audVoiceSfx::Stop() {
  * Sends an immediate stop command to the audio thread.
  */
 void audVoiceSfx::StopImmediate() {
-    uint32_t voiceHandle = *static_cast<uint32_t*>(m_pSfxRef);
+    uint32_t voiceHandle = *static_cast<uint32_t*>(m_pSfxRef.get());
     PushAudioCommand(2, 16389, 1, &voiceHandle);
 }
 
@@ -1974,7 +1974,7 @@ void audVoiceSfx::StopImmediate() {
  * Sends a play command to the audio thread.
  */
 void audVoiceSfx::Play() {
-    uint32_t voiceHandle = *static_cast<uint32_t*>(m_pSfxRef);
+    uint32_t voiceHandle = *static_cast<uint32_t*>(m_pSfxRef.get());
     PushAudioCommand(2, 16387, 1, &voiceHandle);
 }
 
@@ -1990,7 +1990,7 @@ void audVoiceSfx::Play() {
  * volume-change command to the audio thread.
  */
 void audVoiceSfx::SetVolume(float vol) {
-    uint32_t voiceHandle = *static_cast<uint32_t*>(m_pSfxRef);
+    uint32_t voiceHandle = *static_cast<uint32_t*>(m_pSfxRef.get());
 
     float offset = g_audVolumeOffset;
     float scale  = g_audVolumeScaleFactor;
@@ -2015,7 +2015,7 @@ void audVoiceSfx::SetPitch(float pitch) {
     if (__builtin_isnan(scaled) || scaled <= -0x1p31f) command = INT32_MIN;
     else if (scaled >= 0x1p31f) command = INT32_MAX;
     else command = static_cast<int32_t>(scaled);
-    const uint32_t params[2] = {*static_cast<uint32_t*>(m_pSfxRef), static_cast<uint32_t>(command)};
+    const uint32_t params[2] = {*static_cast<uint32_t*>(m_pSfxRef.get()), static_cast<uint32_t>(command)};
     audCommand_Enqueue(2, 16394, params, 2);
 }
 
@@ -2027,7 +2027,7 @@ void audVoiceSfx::SetPan(float pan) {
     float scaled;
     if (clamped >= 0.0) scaled = static_cast<float>(clamped * 90.0f);
     else scaled = static_cast<float>(__builtin_fma(clamped, 90.0, 360.0));
-    const uint32_t params[2] = {*static_cast<uint32_t*>(m_pSfxRef), static_cast<uint32_t>(static_cast<int32_t>(scaled))};
+    const uint32_t params[2] = {*static_cast<uint32_t*>(m_pSfxRef.get()), static_cast<uint32_t>(static_cast<int32_t>(scaled))};
     audCommand_Enqueue(2, 16391, params, 2);
 }
 
@@ -2042,7 +2042,7 @@ void audVoiceSfx::SetStereoVolume(float left, float right) {
         else integer = static_cast<int64_t>(scaled);
         return static_cast<uint32_t>(integer);
     };
-    const uint32_t params[3] = {*static_cast<uint32_t*>(m_pSfxRef), commandWord(left), commandWord(right)};
+    const uint32_t params[3] = {*static_cast<uint32_t*>(m_pSfxRef.get()), commandWord(left), commandWord(right)};
     audCommand_Enqueue(2, 16396, params, 3);
 }
 
@@ -2057,7 +2057,7 @@ void audVoiceSfx::SetStereoVolume(float left, float right) {
  * Sends a looping state change to the audio thread.
  */
 void audVoiceSfx::SetLooping(uint32_t handle, bool loop) {
-    uint32_t voiceHandle = *static_cast<uint32_t*>(m_pSfxRef);
+    uint32_t voiceHandle = *static_cast<uint32_t*>(m_pSfxRef.get());
 
     uint32_t params[3];
     params[0] = voiceHandle;
@@ -2078,7 +2078,7 @@ void audVoiceSfx::SetLooping(uint32_t handle, bool loop) {
  * currently playing or queued for playback.
  */
 bool audVoiceSfx::IsPlaying() {
-    uint32_t state = static_cast<uint32_t*>(m_pSfxRef)[1]; // state at sfxRef+4
+    uint32_t state = static_cast<uint32_t*>(m_pSfxRef.get())[1]; // state at sfxRef+4
     switch (state) {
         case 17:
         case 18:
