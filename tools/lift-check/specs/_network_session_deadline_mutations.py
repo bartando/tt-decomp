@@ -13,14 +13,14 @@ CASES={
   ('pending cleanup','    auto* head = bytes + 0x24;','    if (*reinterpret_cast<int32_t*>(bytes + 0x50) == 6) return;\n    auto* head = bytes + 0x24;'),
  ]),
  'network_sink_target_pending':(CHILDREN,[
-  ('target offset','(sink, 0x24)','(sink, 0x20)'),
+  ('target offset','(sink, 0x24);\n    return target ? target->HasPending()','(sink, 0x20);\n    return target ? target->HasPending()'),
   ('raw result','target->HasPending() : 0','(target->HasPending() != 0) : 0'),
  ]),
  'network_sink_target_pause':(CHILDREN,[
   ('forward pause','target->SetPaused(paused)','target->SetPaused(0)'),
  ]),
  'network_sink_child_pending':(CHILDREN,[
-  ('inner sink offset','(child, 0x18)','(child, 0x14)'),
+  ('inner sink offset','(child, 0x18);\n    return sink ? msgMsgSink_8E60_sp(sink)','(child, 0x14);\n    return sink ? msgMsgSink_8E60_sp(sink)'),
  ]),
  'network_sink_child_pause':(CHILDREN,[
   ('child pause value','msgMsgSink_8E88_sp(sink, paused)','msgMsgSink_8E88_sp(sink, 1)'),
@@ -45,7 +45,7 @@ CASES={
   ('tertiary state','tertiary + 0x50) != 3','tertiary + 0x50) != 4'),
  ]),
  'network_image_base_size':(IMAGE,[
-  ('packed flag','words[1] & 1u','words[1] & 2u'),
+  ('packed flag','return (words[1] & 1u)','return (words[1] & 2u)'),
   ('size mask','0x1FFFF800u','0x1FFFF000u'),
  ]),
  'network_image_aligned_size':(IMAGE,[
@@ -64,7 +64,7 @@ CASES={
  ]),
  'network_sink_deadline_overrun':(SINK,[
   ('pause sign','pausedAt > 0','pausedAt >= 0'),
-  ('duration offset','bytes + 0x16C','bytes + 0x168'),
+  ('duration offset','int32_t msgSink_GetDeadlineOverrun(void* sink) {\n    auto* bytes = static_cast<uint8_t*>(sink);\n    if (*reinterpret_cast<uint32_t*>(bytes + 0x16C)','int32_t msgSink_GetDeadlineOverrun(void* sink) {\n    auto* bytes = static_cast<uint8_t*>(sink);\n    if (*reinterpret_cast<uint32_t*>(bytes + 0x168)'),
   ('deadline sign','bytes + 0x170) - paused -','bytes + 0x170) + paused -'),
  ]),
  'network_sink_dispatch_clock':(SINK,[
@@ -88,7 +88,7 @@ def main():
  for spec,(path,mutations) in CASES.items():
   source=(root/path).read_text()
   for label,old,new in mutations:
-   assert old in source,(spec,label)
+   assert source.count(old)==1,(spec,label,source.count(old))
    output=io.StringIO()
    with contextlib.redirect_stdout(output):
     rc=Checker(Path(__file__).with_name(spec+'.py'),Options(trials=192,seed=1,patches=((old,new),))).run()

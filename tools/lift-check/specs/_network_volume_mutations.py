@@ -17,7 +17,7 @@ CASES={
   ('forward volume','target->SetVolume(volume);','target->SetVolume(0);'),
  ],
  'network_volume_child':[
-  ('nested sink','(child, 0x18)','(child, 0x1C)'),
+  ('nested sink','if (!rage::load_ptr32<void>(child, 0x18)) return;','if (!rage::load_ptr32<void>(child, 0x1C)) return;'),
   ('child fade','scaled * fade);','scaled + fade);'),
  ],
  'network_volume_children':[
@@ -29,9 +29,11 @@ CASES={
  ],
 }
 def main():
+    source=(Path(__file__).resolve().parents[3]/'src/rage/audio/xact_volume.cpp').read_text()
     total=0
     for spec,mutations in CASES.items():
         for label,old,new in mutations:
+            assert source.count(old)==1,(spec,label,source.count(old))
             output=io.StringIO()
             with contextlib.redirect_stdout(output):
                 rc=Checker(Path(__file__).with_name(spec+'.py'),Options(trials=192,seed=1,patches=((old,new),))).run()

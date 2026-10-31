@@ -7,15 +7,15 @@ RANDOM='src/rage/math/random_range.cpp'
 SELECT='src/game/network/network_selection.cpp'
 CASES={
  'network_random_next':(RANDOM,[
-  ('multiplier','0x7FFFFFEDu','0x7FFFFFEBu'),
+  ('multiplier','*seed * 0x7FFFFFEDu','*seed * 0x7FFFFFEBu'),
   ('seed transition','*seed = second;','*seed = first;'),
   ('shuffle mask','second & 0x7F','second & 0x3F'),
   ('shuffle replacement','g_randomShuffleTable[index] = first;','g_randomShuffleTable[index] = second;'),
  ]),
  'network_random_range':(RANDOM,[
-  ('equal range','if (low == high) return low;','if (low == high) return low + 1;'),
+  ('equal range','uint32_t high) {\n    if (low == high) return low;','uint32_t high) {\n    if (low == high) return low + 1;'),
   ('inclusive bound','width = high - low + 1u;','width = high - low;'),
-  ('seed offset','owner) + 0xAC','owner) + 0xA8'),
+  ('seed offset','uint32_t high) {\n    if (low == high) return low;\n    auto* seed = reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(owner) + 0xAC);','uint32_t high) {\n    if (low == high) return low;\n    auto* seed = reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(owner) + 0xA8);'),
  ]),
  'network_random_range_signed':(RANDOM,[
   ('inclusive signed bound','static_cast<uint32_t>(low) + 1u;','static_cast<uint32_t>(low) + 2u;'),
@@ -34,7 +34,7 @@ def main():
     for spec,(path,mutations) in CASES.items():
         source=(root/path).read_text()
         for label,old,new in mutations:
-            assert old in source,(spec,label)
+            assert source.count(old)==1,(spec,label,source.count(old))
             output=io.StringIO()
             with contextlib.redirect_stdout(output):
                 rc=Checker(Path(__file__).with_name(spec+'.py'),Options(trials=192,seed=1,patches=((old,new),))).run()

@@ -375,7 +375,7 @@ struct msgMsgSink {
     void ClearPointers();  // [43] @ 0x8244e138
     int32_t vfn_44();  // [44] @ 0x82457b40
     int32_t vfn_45(uint32_t flag);  // [45] @ 0x824577d0
-    uint32_t GetNestedObjectValue();  // [46] @ 0x8244e148
+    uint32_t GetNestedObjectValue(void* key);  // [46] @ 0x8244e148
     void FlushAndDisconnect();  // [49] @ 0x8244e628
     void BeginDisconnect();  // [50] @ 0x8244e680
     void SendEvent();  // [52] @ 0x8244db58
@@ -431,7 +431,6 @@ struct msgMsgSink {
     void OnDisconnect();
     void OnReconnect();
     void ResetEventDispatch();
-    uint32_t GetConnectionCount();
     void NotifyStateChange();
     void* CreateSessionLocked(uint32_t sessionParam, uint32_t flags);
     uint32_t QueryConnectionStatus(uint32_t* outStatus);
