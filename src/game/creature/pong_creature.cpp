@@ -1,3 +1,5 @@
+#include "rage/ptr32.hpp"
+#include "../../physics/composite_bounds.hpp"
 #include "../../anim/look_at_controller.hpp"
 #include "../../anim/locomotion_heading.hpp"
 #include "rage/mat33.hpp"
@@ -3504,9 +3506,7 @@ void pongCreatureInst_CopyTransform(void* dst, void* src, void* helper) {
     (void)dst; (void)src; (void)helper;
 }
 
-// @ 0x8228E888 / 0x8228ECB0 / 0x8228F3E0 — rage::phBound helpers, unlifted.
-extern "C" void util_E888(phBoundView* bound);
-extern "C" float util_ECB0(phBoundView* bound, void* partMatrices, const float* centroid);
+// @ 0x8228F3E0 — composite mass-property update.
 extern "C" void pongCreatureInst_F3E0_v12(phBoundView* bound);
 
 /**
@@ -3520,11 +3520,11 @@ extern "C" void pongCreatureInst_F3E0_v12(phBoundView* bound);
  * lift of this address.)
  */
 extern "C" void pongCreatureInst_E828_v12(void* self, unsigned int flags) {
-    phBoundView* bound = static_cast<phBoundView*>(self);
-    util_E888(bound);
-    bound->radiusAroundCentroid = util_ECB0(bound, bound->partMatrices, bound->centroidOffset);
+    rage::phBoundComposite_RebuildExtents(self);
+    auto* values = static_cast<float*>(self);
+    values[2] = rage::phBoundComposite_ComputeRadius(self, rage::load_ptr32<float>(self, 0x78), values + 12);
     if (static_cast<uint8_t>(flags) != 0)
-        pongCreatureInst_F3E0_v12(bound);
+        pongCreatureInst_F3E0_v12(static_cast<phBoundView*>(self));
 }
 
 // ── pongCreature vtable slots (batch 2) ────────────────────────────────────
