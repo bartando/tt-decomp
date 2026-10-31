@@ -16,7 +16,7 @@ from liftcheck.runner import Checker, Options
 CASES = [('grc_emergency_command_buffer',
   'src/graphics/grc_command_reserve.cpp',
   'extern "C" void grcDevice_UseEmergencyCommandBuffer(',
-  [('wrong emergency process', 'KeGetCurrentProcessType() == 2', 'KeGetCurrentProcessType() == 1'),
+  [('wrong emergency process', 'if (KeGetCurrentProcessType() == 2) {', 'if (KeGetCurrentProcessType() == 1) {'),
    ('wrong soft limit', 'start + 0x1220', 'start + 0x12C0'),
    ('wrong failure flag', '|= 0x80', '|= 0x40')]),
  ('grc_reserve_command_window',
@@ -79,7 +79,7 @@ def main():
         end = source.index("\n}\n", start) + 2
         body = source[start:end]
         for label, old, new in mutations:
-            assert body.count(old) >= 1, f"mutation anchor changed: {spec}: {label}"
+            assert body.count(old) == 1, f"mutation anchor changed: {spec}: {label}"
             output = io.StringIO()
             try:
                 with contextlib.redirect_stdout(output):
