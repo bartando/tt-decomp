@@ -1,3 +1,4 @@
+#include "rage/time_state.hpp"
 // Crowd animation playback. Names below are descriptive, inferred from the
 // crowd-manager tick at 0x8238AE10 and the resource constructor at 0x82386918.
 #include "fx_effects.hpp"
@@ -5,7 +6,6 @@
 #include "../rage/animation/rage_anim.hpp"
 
 extern uint32_t g_prngState[2]; // @ 0x825CA2C8 (seed, carry)
-extern float lbl_825CAEB8[];    // @ 0x825CAEB8 (sysTimeManager; +8 is delta time)
 
 extern void LocomotionStateAnim_6E50_w(fxCrowdAnimPlayback* playback, float* phase,
                                       void* animation, uint32_t advanceState); // @ 0x82386E50
@@ -84,7 +84,7 @@ void fxCrowdAnimPlayback_Update(fxCrowdAnimPlayback* self) {
 
     const bool blendNext = self->next && self->delay <= 0.0f;
     if (self->delay > 0.0f)
-        self->delay -= lbl_825CAEB8[2];
+        self->delay -= lbl_825CAEB8.frameSeconds;
 
     void* clip = self->current->clips[self->state];
     const float duration = *reinterpret_cast<const float*>(static_cast<const uint8_t*>(clip) + 12);

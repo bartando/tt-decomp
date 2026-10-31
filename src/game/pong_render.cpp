@@ -1,3 +1,5 @@
+#include "grc/image_state.hpp"
+#include "grc/progress_state.h"
 #include "rage/grc_command_stream.hpp"
 #include "rage/sys_callback.hpp"
 /**
@@ -53,13 +55,6 @@ float flushLightVmx(float value) {
     return value;
 }
 }  // namespace
-
-extern pongLightState lbl_825CA610;             // @ 0x825CA610  applied light-state snapshot
-extern uint32_t lbl_825EBB18;                   // @ 0x825EBB18  Diffuse handle / initialization sentinel
-extern uint32_t lbl_825EBAAC;                   // @ 0x825EBAAC  Position handle
-extern uint32_t lbl_825EBC30;                   // @ 0x825EBC30  LightCount handle
-extern uint32_t lbl_825EBAB0;                   // @ 0x825EBAB0  LightType handle
-extern uint32_t lbl_825EBC34;                   // @ 0x825EBC34  Ambient handle
 extern ShaderTable* lbl_825EBC40;          // @ 0x825EBC40
 extern "C" const uint8_t g_shaderParameterDirtyMasks[8];           // @ 0x825D4C80  MSB-first dirty-bit masks
 extern "C" const uint32_t g_shaderMatrixTransposeMasks[3][4]; // @ 0x8202F0A0
@@ -180,10 +175,6 @@ void pongLightState_Apply(const pongLightState* state) {
 extern "C" {
     extern uint32_t g_grmShaderFx_flushRequired;       // @ 0x825EBB1C
     extern uint32_t g_grmShaderFx_forceResetFlag;      // @ 0x825EBAB4
-    extern uint32_t g_grcAppliedRenderState[22];       // @ 0x825EBB80
-    extern uint32_t g_grcPendingTextureState[24];      // @ 0x825EBB20
-    extern uint32_t g_grcAppliedTextureState[24];      // @ 0x825EBAB8
-    extern void* g_grcDefaultTexture;                 // @ 0x825EBA20
     extern uint32_t g_grcFormatId;                    // @ 0x825C9030
     extern void* lbl_826063C8;                        // @ 0x826063C8
 }
@@ -330,11 +321,6 @@ static_assert(__builtin_offsetof(pongShadowMap, m_config) == 8, "shadow config p
 static_assert(__builtin_offsetof(pongShadowMap, m_draw_430) == 1072, "last shader handle");
 #endif
 
-extern void* g_grcDefaultTexture;                       // @ 0x825EBA20  fallback texture
-extern ShaderVector lbl_82617DF0;               // @ 0x82617DF0  softness upload scratch
-extern const float lbl_825CA430[2];             // @ 0x825CA430  half-texel offsets
-extern const ShaderVector lbl_825CA4A8[4];       // @ 0x825CA4A8  paired sampling taps
-extern const float lbl_825C4890;                // @ 0x825C4890  shadow blend (0.3)
 // @ 0x821453C8 | size: 0x90
 void* game_53C8(pongShadowMap* map, int32_t player, int32_t layer) {
     if (map->m_config->slots[3 + layer * 2 + player].enabled == 0)
@@ -945,7 +931,6 @@ void pongScrnTransFadeIn_EndTransition(void* obj) {
 
 // Global pointers (accessed via SDA and absolute addresses)
 extern struct hudFlashBase* g_hudFlashBase;  // @ 0x82606454 (SDA, r2+25556)
-extern void* g_someRenderObj1;         // @ 0x82606654 (via r11+25844)
 extern void* g_someRenderObj2;         // @ 0x825FEAB0 (via r11-21712)
 
 // Random number generator state (for pattern selection)
@@ -1008,7 +993,7 @@ void pongScrnTransSwipe::Begin() {
 
     // If this pattern has the pause flag set, disable rendering on two objects
     if (pattern->pauseFlag) {
-        *(uint8_t*)((uint8_t*)g_someRenderObj1 + 80) = 0;
+        *(uint8_t*)((uint8_t*)grcProgressRenderObject() + 80) = 0;
         *(uint8_t*)((uint8_t*)g_someRenderObj2 + 492) = 0;
     }
 }
@@ -1111,7 +1096,7 @@ void pongScrnTransSwipe::OnComplete() {
     
     // If this pattern had the pause flag, re-enable rendering
     if (pattern->pauseFlag) {
-        *(uint8_t*)((uint8_t*)g_someRenderObj1 + 80) = 1;
+        *(uint8_t*)((uint8_t*)grcProgressRenderObject() + 80) = 1;
         *(uint8_t*)((uint8_t*)g_someRenderObj2 + 492) = 1;
     }
 
@@ -1420,7 +1405,6 @@ void util_03C0(void* context, uint32_t* colorPtr) {
 
 extern void* g_loop_obj_ptr;                     // @ 0x825EAB30
 extern void* lbl_8271A310;                       // @ 0x8271A310 — lighting registry
-extern void* lbl_82606564;                       // @ 0x82606564 — active scene
 extern uint32_t g_ambientCubeXPosHandle;         // @ 0x82606380
 extern uint32_t g_ambientCubeXNegHandle;         // @ 0x82606384
 extern uint32_t g_ambientCubeYPosHandle;         // @ 0x82606388

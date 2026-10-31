@@ -76,7 +76,7 @@ CALLS = {
     "atSingleton_A6C8": model(notify),
     # Run the actual finalizer: sets flags bit 0x10, releases instance slot 7,
     # and clears the pointer. It is separate from the instance retirement call.
-    "msgMsgSink_A670_2hr": run(),
+    "xactWave_Finalize": run(),
     "atSingleton_2378_g": stub(ret="void"),
     "instance.vfn_7": stub(ret="void", args=("r3",)),
     "instance.vfn_8": model(update_instance, args=("r3",)),

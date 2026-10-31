@@ -1,3 +1,4 @@
+#include "game/network_context.hpp"
 #include "rage/sys_callback.hpp"
 /**
  * pong_network_classes.cpp — Network utility classes implementation
@@ -13,7 +14,6 @@
 
 #include <stdint.h>
 #include <cstring>
-#include "rage/sys_callback.hpp"
 
 // Forward declarations
 extern "C" void rage_free(void* ptr);
@@ -814,8 +814,7 @@ void NetDataQuery_InitNested(NetDataQuery* self) {
     grcDevice_FinalizeRenderSetup_1((char*)self + 4364);
     
     // Initialize component at offset +2096
-    extern void SinglesNetworkClient_2BE8_g(void* obj);
-    SinglesNetworkClient_2BE8_g((char*)self + 2096);
+    UpdateNetworkState((char*)self + 2096);
     
     // Initialize nested state object at offset +1508
     void** stateObj = (void**)((char*)self + 1508);
@@ -1462,7 +1461,6 @@ void fsmMachine_Destructor_27A8(void* obj);
 
 // Network/rendering subsystem initializers
 void grcDevice_FinalizeRenderSetup_1(void* obj);
-void SinglesNetworkClient_2BE8_g(void* obj);
 void SinglesNetworkClient_51C8_g(void* obj);
 void SinglesNetworkClient_2E88_isl(void* obj);
 void SinglesNetworkClient_DA08(void* obj);

@@ -68,14 +68,3 @@ extern "C" void* g_pTournamentData = nullptr;
 
 // @ 0x8271A340 (.data)
 extern "C" void* g_pNetworkStateFlags = nullptr;
-
-// @ 0x825CAEB8 (.data) — the rage::sysTimeManager instance: vtable (null in the
-// port), a word, then seconds per frame and frames per second as the image has
-// them. Laid out like pong_match.cpp's sysTimeManagerView.
-struct sysTimeManagerImage {
-    void**   vtable;
-    uint32_t field_04;
-    float    frameSeconds;
-    float    framesPerSecond;
-};
-extern "C" sysTimeManagerImage g_sysTimeManager = {nullptr, 0u, 0.0166666675f, 60.0f};

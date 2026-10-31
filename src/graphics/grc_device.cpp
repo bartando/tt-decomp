@@ -1,3 +1,8 @@
+#include "grc/render_context.hpp"
+#include "grc/image_state.hpp"
+#include "platform/video_imports.h"
+#include "grc/device_state.h"
+#include "xam/kernel.h"
 #include "rage/grc_command_stream.hpp"
 /**
  * graphics/grc_device.cpp — Graphics Device Lifecycle and Sampler State
@@ -56,7 +61,6 @@ extern void grcDevice_cleanupInternal(void* pDevice);   /* @ 0x82151068 — Clea
 extern void grcDevice_releaseSharedResources(void);      /* @ 0x8214F338 — Release shared grc resources */
 extern void grcDeviceXenon_teardown(void* pTarget);      /* @ 0x82366CA0 — Full GPU teardown (VdShutdownEngines) */
 extern void _locale_register(void* pLocale, uint32_t flags);  /* @ 0x820C02D0 */
-extern void thunk_DbgBreakPoint(void);             /* @ 0x82566B70 */
 extern void grcDevice_setRenderTarget(void* pDevice, int32_t arg); /* @ 0x82357400 — Set active render target */
 
 /* Forward declaration — defined below */
@@ -68,7 +72,6 @@ extern uint32_t g_grcDeviceState[100];       /* @ 0x825EBB8C — device state fl
 extern void*    g_pGrcDeviceObj __asm__("_g_binkVideoPlayer");  /* @ 0x825EB988, defined in globals.c */
 extern void*    g_pGrcDeviceAlt;             /* @ 0x825EBA9C — alternate device object pointer */
 extern void*    g_pGrcTextureCache;          /* @ 0x825EBC40 — texture cache pointer */
-extern void*    g_grcRenderObjects[2];       /* @ 0x82617E60 — render object pair */
 extern void*    g_grcRefCountedObjs[4];      /* @ 0x826063E8 — refcounted render objects (2 pairs) */
 
 /* ── Structure Definitions ────────────────────────────────────────────────── */
@@ -145,7 +148,7 @@ void grcDevice_shutdown(void)
                 typedef void (*DtorFn)(void*, int);
                 ((DtorFn)pObj->vtable[0])(pObj, 1);
             } else {
-                thunk_DbgBreakPoint();  /* Unexpected refcount */
+                DbgBreakPoint();  /* Unexpected refcount */
             }
 
             g_grcRefCountedObjs[i] = NULL;
@@ -169,7 +172,7 @@ void grcDevice_shutdown(void)
             pTargetData[3] = refCount - 1;
 
             if (refCount - 1 == 0) {
-                thunk_DbgBreakPoint();
+                DbgBreakPoint();
             }
 
             g_pGrcDeviceObj = NULL;
@@ -288,7 +291,6 @@ extern "C" void grcDevice_SetScissorRect(void* device, int32_t left, int32_t top
 }
 
 extern const uint32_t g_grcAnisoFilterTable[17];  // @ 0x82065D10
-extern const float g_grcLodBiasScale;             // @ 0x82079AF0
 
 // The color half of RB_BLENDCONTROL lives at +0x2CB8; +0x2CBC holds blending
 // enabled (bit 31) and separate alpha (bit 30). Without separate alpha the
@@ -502,11 +504,8 @@ void grcDevice_setSamplerLodBias(void* device, uint32_t sampler, uint32_t biasBi
 
 extern "C" void grcTexture_ReleaseResource(void* texture); // @ 0x82352708
 
-extern "C" uint32_t KeGetCurrentProcessType();   // @ 0x82585E9C
 extern "C" uint32_t xe_GetCurrentThreadId();     // @ 0x82566B78
 extern "C" void rage_AA78(void* gpuDevice, uint32_t* handle);  // @ 0x8235AA78
-extern const uint32_t __imp_VdGlobalDevice;      // @ 0x82000730
-extern const uint32_t __imp_VdGlobalXamDevice;   // @ 0x82000734
 
 // @ 0x8235EAD8 | size: 0x54 (was rage_EAD8 / rmcDrawable_Release)
 extern "C" uint32_t grcDevice_Release(void* device) {
@@ -534,9 +533,7 @@ static uint32_t releaseGpuResource(void* resource, uint32_t dataWord, uint32_t f
         return references;
     }
     if (words[dataWord] != 0) {
-        const uint32_t slot = KeGetCurrentProcessType() == 2 ? __imp_VdGlobalXamDevice : __imp_VdGlobalDevice;
-        void* gpuDevice = reinterpret_cast<void*>(static_cast<uintptr_t>(
-            *reinterpret_cast<const uint32_t*>(static_cast<uintptr_t>(slot))));
+        void* gpuDevice = *(KeGetCurrentProcessType() == 2 ? __imp_VdGlobalXamDevice : __imp_VdGlobalDevice);
         if (gpuDevice != nullptr) {
             uint32_t handle = words[2];
             xe_GetCurrentThreadId();
@@ -1133,18 +1130,7 @@ extern "C" {
     extern uint32_t g_grmShaderFx_flushRequired;       // @ 0x825EBB1C
     extern uint32_t g_grmShaderFx_forceResetFlag;      // @ 0x825EBAB4
     extern uint32_t g_grmShaderFx_variantTable[];      // @ 0x825EBBD8 — pending render state
-    extern uint32_t g_grcAppliedRenderState[22];      // @ 0x825EBB80
-    extern uint32_t g_grcPendingTextureState[24];     // @ 0x825EBB20 — eight 12-byte entries
-    extern uint32_t g_grcAppliedTextureState[24];     // @ 0x825EBAB8
-    extern uint8_t g_grcUsePendingTexture;            // @ 0x825C89E5
-    extern uint32_t g_grcTextureParameter;            // @ 0x825EB980
-    extern void* g_grcDefaultTexture;                 // @ 0x825EBA20
     extern uint32_t g_grcFormatId;                    // @ 0x825C9030
-    extern const uint32_t g_grcCullModeTable[3];       // @ 0x825D4CC4
-    extern const uint32_t g_grcColorWriteMaskTable[16]; // @ 0x825D4CD0
-    extern const uint32_t g_grcCompareFuncTable[8];    // @ 0x825D4D10
-    extern const uint32_t g_grcFillModeTable[3];       // @ 0x825D4D30
-    extern const uint32_t g_grcFormatCompareTable[8];  // @ 0x825D4D3C
     void hudFlashBase_A830_g(void* context, uint32_t parameter, void* texture); // @ 0x8215A830
 }
 
@@ -1283,8 +1269,6 @@ extern void grcDevice_SetDepthStencilClear(void* device, uint32_t unusedR4,
 // The color arrives in v1 on Xenon, independently of r3..r6.
 extern void fiAsciiTokenizer_D808_fw(uint32_t format, uint32_t numberFormat,
                                     uint32_t* low, uint32_t* high);  // @ 0x8235D808
-extern void game_37B0(void* device, int32_t left, int32_t top,
-                      int32_t right, int32_t bottom);  // @ 0x823537B0
 extern void grc_3E20(void* device);  // @ 0x82363E20
 extern uint32_t* grc_DBF8(void* device, uint32_t* cursor);  // @ 0x8235DBF8
 extern void grc_CFD8(void* device, uint32_t flags, const int32_t* rect, const float* color,
@@ -1292,17 +1276,6 @@ extern void grc_CFD8(void* device, uint32_t flags, const int32_t* rect, const fl
 extern void rage_AD98(void* device);  // @ 0x8235AD98
 extern void grcDevice_FlushDirtyState(void* device);  // @ 0x82363C00
 }
-extern const float g_grcResolveConstants[];  // @ 0x8202D10C
-extern const uint16_t g_grcResolveFormatInfo[64];  // @ 0x82065C68
-extern const int32_t g_grcResolveOrigin[2];  // @ 0x82065E50
-extern const uint32_t g_grcResolveVertexProgram[15];  // @ 0x8202C12C
-extern const uint32_t g_grcResolveViewport[6];  // @ 0x82065CE8
-extern const uint32_t g_grcResolveScissor[4];  // @ 0x82065D00
-extern uint32_t g_grcResolveDisableWait;  // @ 0x82606640
-extern uint32_t g_grcResolveForceShaderControl;  // @ 0x82606644
-extern uint32_t g_grcResolveExtraWaits;  // @ 0x82606648
-extern uint32_t g_grcResolveSubmit;  // @ 0x8260664C
-extern uint32_t g_grcResolveSkipShaderControl;  // @ 0x82606650
 
 // Begin a draw from caller-filled vertex memory. Returns the 16-byte-aligned
 // allocation, or null on allocation failure; the caller fills it before submission.
@@ -1536,7 +1509,7 @@ extern "C" void grcDevice_Resolve(void* device, uint32_t flags, const int32_t* s
     const bool expandScissor = left < signed15(word(11524)) || top < signed15(word(11524) >> 16)
         || right > signed15(word(11528)) || bottom > signed15(word(11528) >> 16);
     if (expandScissor) {
-        game_37B0(device, left, top, right, bottom);
+        grcDevice_SetScissorRect(device, left, top, right, bottom);
     }
     grc_3E20(device);
     bool tiledTargets = (state[10432] & 16u) != 0;
@@ -1630,7 +1603,7 @@ extern "C" void grcDevice_Resolve(void* device, uint32_t flags, const int32_t* s
     *++cursor = 8199; *++cursor = word(11484);
     saveCursor(cursor);
     if (expandScissor) {
-        game_37B0(device, signed15(word(11524)), signed15(word(11524) >> 16),
+        grcDevice_SetScissorRect(device, signed15(word(11524)), signed15(word(11524) >> 16),
                    signed15(word(11528)), signed15(word(11528) >> 16));
     }
     const uint32_t resolveBytes = destinationHeight * pitch * bytesPerBlock;

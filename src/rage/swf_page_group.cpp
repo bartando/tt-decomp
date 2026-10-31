@@ -1,9 +1,8 @@
+#include "rage/swf_state.hpp"
 #include "rage/hud_page_group.hpp"
 #include <cstdint>
 
 extern void* g_swfStringPool;      // @ 0x82604C50
-extern void* g_swfNodePool;        // @ 0x82604C5C
-extern void* g_swfMemberNodePool;  // @ 0x82604C54
 extern void* g_swfScriptObjectPool;// @ 0x82604C60
 extern void* g_swfScriptArrayPool; // @ 0x82604C58
 extern void* g_swfTextPool;        // @ 0x82602844

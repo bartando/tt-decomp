@@ -1,12 +1,13 @@
-"""0x82134350, the strip list's erase (lifted in pong_network.cpp as
-pongNetMessageHolder::RemoveElementByPointer): finds `slot` by address, frees the
-strip's two arrays and the strip, closes the gap."""
+"""0x82134350: erase by slot address, free a strip's two arrays and the strip,
+then close the gap. Covers empty lists, null slots, first/interior/last matches,
+strip-address and unrelated-pointer misses, with all writes/calls compared."""
 from liftcheck.spec import *  # noqa: F401,F403
 
-FUNCTION = "pongNetMessageHolder::RemoveElementByPointer"
+FUNCTION = "TriStripList::Erase"
 ADDRESS = 0x82134350
-SOURCE = "src/game/network/pong_network.cpp"
-EXTERNS = {"sysMemAllocator_Free": 0x820C00C0}
+SOURCE = "src/graphics/tri_strip_list.cpp"
+TRIALS = 1000
+CALLS = {"rage_free": stub(ret="void", args=("r3",))}
 
 
 def inputs(t):

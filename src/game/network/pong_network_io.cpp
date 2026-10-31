@@ -1,3 +1,4 @@
+#include "audio/xact_sink_io.hpp"
 #include "rage/hud_page_group.hpp"
 // pong_network_io.cpp — Network I/O helper functions | Rockstar Presents Table Tennis (Xbox 360, 2006)
 
@@ -457,12 +458,7 @@ extern "C" {
     
     // SinglesNetworkClient_6838_g — lifted in src/game/network.cpp
     // SinglesNetworkClient_68A8_g — lifted in src/game/network.cpp
-    
-    // Original name: SinglesNetworkClient_2BE8_g
-    void SinglesNetworkClient_2BE8_g(void* client) {
-        UpdateNetworkState(client);
-    }
-    
+
     // Original name: SinglesNetworkClient_51C8_g
     void SinglesNetworkClient_51C8_g(void* client) {
         ProcessNetworkPacket(client);
@@ -474,7 +470,6 @@ extern "C" {
     }
     
     // SinglesNetworkClient_A818_g — lifted in src/game/network.cpp
-    
     // Original name: SinglesNetworkClient_GetPlayerID_E408
     void SinglesNetworkClient_GetPlayerID_E408(void* client, uint32_t param) {
         GetPlayerID(client, param);
@@ -845,7 +840,7 @@ void msgMsgSink_6138_2hr(void* self)
  * Invokes msgMsgSink_6138_2hr(self); if the low bit of the `flag` argument
  * is set, additionally calls _locale_register(self, 0x20408861).
  */
-void msgMsgSink_6220_w(void* self, uint32_t flag = 0)
+void msgMsgSink_6220_w(void* self, uint32_t flag)
 {
     msgMsgSink_6138_2hr(self);
     if ((flag & 1) != 0) {

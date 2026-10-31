@@ -1,11 +1,9 @@
 #include "xam/thread_sync.h"
+#include "xam/kernel.h"
+#include "platform/host_error.h"
 #include <cstdint>
 
 extern "C" void* g_sda_base; // @ 0x82600000 — host representation of r13
-extern "C" uint32_t RtlNtStatusToDosError(int32_t status); // @ 0x82585E5C
-extern "C" int32_t NtWaitForSingleObjectEx(void* handle, uint32_t mode,
-                                          uint32_t alertable, const int64_t* timeout); // @ 0x82585EFC
-extern "C" int32_t NtReleaseSemaphore(void* handle, int32_t count, int32_t* previousCount); // @ 0x8258666C
 
 // @ 0x8242C390 | size: 0x20
 extern "C" int64_t* sysThread_MillisecondsTimeout(int64_t* storage, uint32_t milliseconds) {
@@ -17,11 +15,15 @@ extern "C" int64_t* sysThread_MillisecondsTimeout(int64_t* storage, uint32_t mil
 // @ 0x8242C330 | size: 0x34
 extern "C" uint32_t sysThread_SetErrorFromStatus(int32_t status) {
     uint32_t error = RtlNtStatusToDosError(status);
+#if !defined(__powerpc__) && !defined(__ppc__)
+    hostSetLastError(error);
+#else
     auto* sda = static_cast<uint8_t*>(g_sda_base);
     if (*reinterpret_cast<uint32_t*>(sda + 0x150) == 0) {
         auto* thread = *reinterpret_cast<uint8_t**>(sda + 0x100);
         *reinterpret_cast<uint32_t*>(thread + 0x160) = error;
     }
+#endif
     return error;
 }
 

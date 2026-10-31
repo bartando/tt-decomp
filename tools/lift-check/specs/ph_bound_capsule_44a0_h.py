@@ -19,7 +19,7 @@ import struct
 
 from liftcheck.spec import *
 
-FUNCTION = "rage::crAnimDofQuaternion::EvaluateChannels"
+FUNCTION = "rage::crAnimEvaluateQuaternionChannels"
 ADDRESS = 0x820C44A0
 SOURCE = "src/rage/animation/rage_anim.cpp"
 TRIALS = 2000

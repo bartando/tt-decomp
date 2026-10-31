@@ -1,16 +1,11 @@
+#include "platform/audio.hpp"
 #include <cstddef>
 #include <cstdint>
 
 namespace rage {
 
 // The buffer interface passed to Process is at +8 in its owning object.
-struct AudMixerBufferDesc {
-    uint8_t format;
-    uint8_t channels;
-    uint16_t reserved;
-    uint32_t sampleRate;
-    float* samples;                  // planar, 256 floats (1024 bytes) per channel
-};
+using AudMixerBufferDesc = AudioFrame;
 
 struct AudMixerRoute {
     uint8_t source;
@@ -30,13 +25,7 @@ struct AudChannelMixer {
     uint8_t overwrite;               // +26: exactly 1 also updates the output descriptor
 };
 
-struct AudMixerLock {
-    uint32_t spinLock;
-    uint32_t depth;
-    uintptr_t owner;
-    uint8_t savedIrql;
-    uint8_t reserved[3];
-};
+using AudMixerLock = XAudioLock;
 
 static_assert(sizeof(AudMixerRoute) == 12);
 static_assert(sizeof(void*) != 4 || offsetof(AudMixerBufferDesc, samples) == 8);
@@ -49,8 +38,6 @@ extern "C" uint32_t KeRaiseIrqlToDpcLevel(); // @ 0x8258653C
 extern "C" void KeAcquireSpinLockAtRaisedIrql(void* lock); // @ 0x8258634C
 extern "C" void KeReleaseSpinLockFromRaisedIrql(void* lock); // @ 0x8258631C
 extern "C" void KfLowerIrql(uint32_t irql); // @ 0x8258654C
-extern int32_t ph_5D80(void* buffer, AudMixerBufferDesc* desc); // @ 0x82465D80
-extern int32_t ph_5EF0(void* buffer, const AudMixerBufferDesc* desc, uint32_t flags); // @ 0x82465EF0
 extern void* util_6898(void* destination, int value, uint32_t bytes); // @ 0x82566898
 extern void* util_8680(void* destination, const void* source, uint32_t bytes); // @ 0x82568680
 
@@ -81,19 +68,19 @@ static inline __attribute__((always_inline)) float mixerMultiply(float a, float 
 int32_t audChannelMixer_Process(AudChannelMixer* mixer, void* sourceBuffer, void* destinationBuffer) {
     AudMixerBufferDesc source;
     AudMixerBufferDesc destination;
-    void* sourceOwner = sourceBuffer ? static_cast<char*>(sourceBuffer) - 8 : nullptr;
-    void* destinationOwner = destinationBuffer ? static_cast<char*>(destinationBuffer) - 8 : nullptr;
-    int32_t status = ph_5D80(sourceOwner, &source);
+    void* sourceOwner = sourceBuffer ? static_cast<char*>(sourceBuffer) - offsetof(AudioFrameBuffer, kind) : nullptr;
+    void* destinationOwner = destinationBuffer ? static_cast<char*>(destinationBuffer) - offsetof(AudioFrameBuffer, kind) : nullptr;
+    int32_t status = PcmFrame_Get(sourceOwner, &source);
     if (status < 0) {
         return status;
     }
-    status = ph_5D80(destinationOwner, &destination);
+    status = PcmFrame_Get(destinationOwner, &destination);
     if (status < 0) {
         return status;
     }
     if (mixer->overwrite == 1) {
         destination.channels = mixer->outputChannels;
-        status = ph_5EF0(destinationOwner, &destination, 1);
+        status = PcmFrame_Resize(destinationOwner, &destination, 1);
     }
     if (status < 0) {
         return status;
@@ -105,8 +92,7 @@ int32_t audChannelMixer_Process(AudChannelMixer* mixer, void* sourceBuffer, void
     // Xenon's r13 identifies the current processor/TLS block for this lock.
     __asm__ volatile("mr %0, 13" : "=r"(thread));
 #else
-    static thread_local uint8_t threadToken;
-    thread = reinterpret_cast<uintptr_t>(&threadToken);
+    thread = hostAudioThreadIdentity();
 #endif
     AudMixerLock& lock = g_audMixerLock;
     if (lock.depth == 0 || lock.owner != thread) {

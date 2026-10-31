@@ -1,3 +1,4 @@
+#include "audio/xact_fade.hpp"
 #include "audio/xact_sound.hpp"
 
 #include <cstddef>
@@ -141,7 +142,6 @@ int32_t cueOwnsTransitions(void* cue) {
 }
 } // namespace
 
-extern int32_t msgMsgSink_3B48_g(void*); // @ 0x82453B48
 extern void msgMsgSink_3DC8_g(void*); // @ 0x82453DC8
 extern void msgMsgSink_DC40_g(void*, uint32_t); // @ 0x8244DC40
 extern uint32_t msgMsgSink_4EB8_g(void*); // @ 0x82454EB8
@@ -155,7 +155,6 @@ extern int32_t game_2880_h(void*); // @ 0x82452880
 extern void atSingleton_28A8_g_28A8_1(void*); // @ 0x824528A8
 extern void msgMsgSink_8B90_g(void*, uint16_t); // @ 0x82448B90
 extern void atSingleton_A6C8(void*, uint32_t); // @ 0x8244A6C8
-extern void msgMsgSink_A670_2hr(void*); // @ 0x8244A670
 extern void atSingleton_2378_g(void*); // @ 0x82452378
 
 void xactSound_Update(void* sound) { // @ 0x82455148
@@ -163,7 +162,7 @@ void xactSound_Update(void* sound) { // @ 0x82455148
     if (self->flags & 0x20) return;
 
     if (self->state == 4 || self->state == 5) {
-        if (msgMsgSink_3B48_g(self->control)) msgMsgSink_3DC8_g(self);
+        if (rage::xactFade_Update(reinterpret_cast<rage::XactFade*>(self->control))) msgMsgSink_3DC8_g(self);
         bool running = false;
         for (auto link = self->tracks.next; link != &self->tracks; link = link->next) {
             auto voice = reinterpret_cast<XactTrack*>(link)->voice;
@@ -301,11 +300,11 @@ void xactWave_Update(void* wave) {
             self->instance = nullptr;
             table = *static_cast<void***>(retained);
             reinterpret_cast<void (*)(void*, uint32_t, uint32_t)>(table[2])(retained, 0, 0);
-            msgMsgSink_A670_2hr(self);
+            xactWave_Finalize(self);
         } else if (instance) {
             atSingleton_2378_g(instance);
         } else {
-            msgMsgSink_A670_2hr(self);
+            xactWave_Finalize(self);
         }
         return;
     }
@@ -327,5 +326,29 @@ void xactWave_Update(void* wave) {
     stop();
     auto instance = self->instance;
     if (instance) atSingleton_2378_g(instance);
-    else msgMsgSink_A670_2hr(self);
+    else xactWave_Finalize(self);
+}
+
+namespace {
+struct XactWaveInstance {
+    virtual void Unknown0() = 0;
+    virtual void Unknown1() = 0;
+    virtual void Unknown2() = 0;
+    virtual void Unknown3() = 0;
+    virtual void Unknown4() = 0;
+    virtual void Unknown5() = 0;
+    virtual void Unknown6() = 0;
+    virtual void Release() = 0;
+};
+} // namespace
+
+// @ 0x8244A670
+void xactWave_Finalize(void* wave) {
+    auto* self = static_cast<XactWaveRuntime*>(wave);
+    self->flags |= 0x10;
+    auto* instance = static_cast<XactWaveInstance*>(self->instance);
+    if (instance != nullptr) {
+        instance->Release();
+        self->instance = nullptr;
+    }
 }
