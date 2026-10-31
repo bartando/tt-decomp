@@ -6,7 +6,44 @@ from liftcheck.runner import Checker, Options
 SESSION='src/rage/network/session_state_helpers.cpp'
 SINK='src/game/network/msg_sink_timing.cpp'
 IMAGE='src/graphics/image_descriptor_queries.cpp'
+CHILDREN='src/game/network/msg_sink_children.cpp'
 CASES={
+ 'network_sink_cleanup_children':(CHILDREN,[
+  ('closing flag','->Delete(1);','->Delete(0);'),
+  ('pending cleanup','    auto* head = bytes + 0x24;','    if (*reinterpret_cast<int32_t*>(bytes + 0x50) == 6) return;\n    auto* head = bytes + 0x24;'),
+ ]),
+ 'network_sink_target_pending':(CHILDREN,[
+  ('target offset','(sink, 0x24)','(sink, 0x20)'),
+  ('raw result','target->HasPending() : 0','(target->HasPending() != 0) : 0'),
+ ]),
+ 'network_sink_target_pause':(CHILDREN,[
+  ('forward pause','target->SetPaused(paused)','target->SetPaused(0)'),
+ ]),
+ 'network_sink_child_pending':(CHILDREN,[
+  ('inner sink offset','(child, 0x18)','(child, 0x14)'),
+ ]),
+ 'network_sink_child_pause':(CHILDREN,[
+  ('child pause value','msgMsgSink_8E88_sp(sink, paused)','msgMsgSink_8E88_sp(sink, 1)'),
+ ]),
+ 'network_sink_children_pending':(CHILDREN,[
+  ('empty list','    return 0;','    return 1;'),
+  ('boolean result','if (msgChild_HasPendingTarget(child)) return 1;','if (msgChild_HasPendingTarget(child)) return 2;'),
+ ]),
+ 'network_sink_completed_session':(SINK,[
+  ('status byte','static_cast<uint8_t>(target->GetState()) == 0xFF','target->GetState() == 0xFF'),
+  ('completed status','== 0xFF;','== 0xFE;'),
+ ]),
+ 'network_sink_adjusted_overrun':(SINK,[
+  ('time adjustment','overrun + *reinterpret_cast<uint32_t*>(context + 0x28)','overrun - *reinterpret_cast<uint32_t*>(context + 0x28)'),
+ ]),
+ 'network_sink_peer_ready':(SINK,[
+  ('connection gate','word(0x158) != 8 && word(0x3C) != 1','word(0x158) != 8 || word(0x3C) != 1'),
+  ('deadline comparison','word(0x178) > overrun','word(0x178) < overrun'),
+  ('primary state','state != 5 && state != 6','state != 5 || state != 6'),
+  ('peer kind mask','& 0xE0;','& 0xC0;'),
+  ('secondary state','secondary + 0x50) != 3','secondary + 0x50) != 4'),
+  ('tertiary state','tertiary + 0x50) != 3','tertiary + 0x50) != 4'),
+ ]),
  'network_image_base_size':(IMAGE,[
   ('packed flag','words[1] & 1u','words[1] & 2u'),
   ('size mask','0x1FFFF800u','0x1FFFF000u'),
