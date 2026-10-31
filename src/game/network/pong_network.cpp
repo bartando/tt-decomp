@@ -83,7 +83,6 @@ extern void Player_ApplyServeStarted(void* matchObj, void* slotA, void* slotB, f
 
 // pongNetMessageHolder helpers used by static init/dtor wrappers.
 extern void pongNetMessageHolder_vfn_2_0868_1(pongNetMessageHolder* holder);
-extern void pongNetMessageHolder_vfn_2_3878_1(pongNetMessageHolder* holder);
 extern void pongNetMessageHolder_vfn_2_18D0_1(pongNetMessageHolder* holder);
 extern void pongNetMessageHolder_vfn_2_FD70_1(pongNetMessageHolder* holder);
 extern void pongNetMessageHolder_vfn_2_1628_1(pongNetMessageHolder* holder);
@@ -579,7 +578,7 @@ void pongNetMessageHolder_4718_w() {
 void pongNetMessageHolder_4AD8_w() {
     auto* holder = reinterpret_cast<pongNetMessageHolder*>(&g_holderInstance_String);
     holder->vtable = reinterpret_cast<void**>(VTABLE_pongNetMessageHolder_0248);
-    pongNetMessageHolder_vfn_2_3878_1(holder);
+    holder->CleanupInternalArray();
     holder->vtable = reinterpret_cast<void**>(VTABLE_pongNetMessageHolderBase);
     --NetMessageHolderLiveCount();
 }
@@ -5616,7 +5615,6 @@ extern void pongNetMessageHolder_vfn_2_0B58_1(pongNetMessageHolder* holder);  //
 extern void pongNetMessageHolder_vfn_2_1628_1(pongNetMessageHolder* holder);  // @ 0x823C1628
 extern void pongNetMessageHolder_vfn_2_18D0_1(pongNetMessageHolder* holder);  // @ 0x823C18D0 (declared earlier)
 extern void pongNetMessageHolder_vfn_2_1770_1(pongNetMessageHolder* holder);  // @ 0x823C1770 (declared earlier)
-extern void pongNetMessageHolder_vfn_2_3878_1(pongNetMessageHolder* holder);  // @ 0x823C3878 (declared earlier)
 extern void pongNetMessageHolder_0838_w(void* dst, void* src);                // @ 0x82220838 — evtSet-like copy
 extern void PongNetRoundRobinCoordinator_FC20_w(void* obj);                    // @ 0x8220FC20
 extern void* ke_8F70(void* obj);                                               // @ 0x822C8F70 — ctor returning this
@@ -5708,7 +5706,7 @@ pongNetMessageHolder* pongNetMessageHolder_vfn_0_5490_1(pongNetMessageHolder* se
 // ─────────────────────────────────────────────────────────────────────────────
 pongNetMessageHolder* pongNetMessageHolder_vfn_0_59E0_1(pongNetMessageHolder* self, int flags) {
     self->vtable = reinterpret_cast<void**>(VTABLE_pongNetMessageHolder_03C4);
-    pongNetMessageHolder_vfn_2_3878_1(self);
+    self->CleanupInternalArray();
     self->vtable = reinterpret_cast<void**>(VTABLE_pongNetMessageHolderBase);
     --NetMessageHolderLiveCount();
 
@@ -6673,7 +6671,7 @@ void pongNetMessageHolder_vfn_0_4D10_1(pongNetMessageHolder* self, uint32_t delF
 // ─────────────────────────────────────────────────────────────────────────────
 void pongNetMessageHolder_vfn_0_5788_1(pongNetMessageHolder* self, uint32_t delFlag) {
     self->vtable = reinterpret_cast<void**>(VTABLE_pongNetMessageHolder_0360);
-    pongNetMessageHolder_vfn_2_3878_1(self);
+    self->CleanupInternalArray();
     self->vtable = reinterpret_cast<void**>(VTABLE_pongNetMessageHolderBase);
     g_netMessageHolderLiveCount--;
     if (delFlag & 1u) {
@@ -6687,7 +6685,7 @@ void pongNetMessageHolder_vfn_0_5788_1(pongNetMessageHolder* self, uint32_t delF
 // ─────────────────────────────────────────────────────────────────────────────
 void pongNetMessageHolder_vfn_0_5AD0_1(pongNetMessageHolder* self, uint32_t delFlag) {
     self->vtable = reinterpret_cast<void**>(VTABLE_pongNetMessageHolder_03EC);
-    pongNetMessageHolder_vfn_2_3878_1(self);
+    self->CleanupInternalArray();
     self->vtable = reinterpret_cast<void**>(VTABLE_pongNetMessageHolderBase);
     g_netMessageHolderLiveCount--;
     if (delFlag & 1u) {

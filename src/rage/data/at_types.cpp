@@ -1,3 +1,4 @@
+#include "rage/xml_tree.hpp"
 /**
  * at_types.cpp — RAGE at* / datRef / datResource / datArray bridging stubs
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
