@@ -1,3 +1,4 @@
+#include "game/camera_queries.hpp"
 /**
  * pong_camera_helpers.cpp
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -15,17 +16,6 @@
 #include <cstring>
 
 #include "pong_camera.hpp"
-
-// Forward struct decls (defined in pong_camera.cpp — same TU-local layout).
-struct TransitionParams {
-    float    value;
-    uint32_t vtableOrState;
-    uint32_t padding;
-};
-struct TransitionFlags {
-    uint32_t flag1;
-    uint32_t flag2;
-};
 
 // .rdata float threshold used by pongCameraMgr_3500_fw / 35A0_fw / 3650_fw.
 // Located at 0x825C5EC0 (loaded via `lis r11,-32164 ; lfs f13,24256(r11)`).
@@ -102,7 +92,6 @@ bool pongCameraMgr_3500_fw(pongCameraMgr* self, void* gameState, int mode) {
     TransitionParams params;
     params.value         = lower;
     params.vtableOrState = *reinterpret_cast<uint32_t*>(self);
-    params.padding       = 0;
 
     uint8_t ok = pongCameraMgr_6E08(gameState, &params, mode, nullptr, -1);
     if (ok == 0) return false;
@@ -135,7 +124,6 @@ bool pongCameraMgr_35A0_fw(pongCameraMgr* self, void* gameState, int mode) {
     TransitionParams params;
     params.value         = lower;
     params.vtableOrState = *reinterpret_cast<uint32_t*>(self);
-    params.padding       = 0;
 
     TransitionFlags flags = { 3u, 0u };
 
@@ -159,7 +147,6 @@ bool pongCameraMgr_3650_fw(pongCameraMgr* self, void* gameState, int mode) {
     TransitionParams params;
     params.value         = lower;
     params.vtableOrState = *reinterpret_cast<uint32_t*>(self);
-    params.padding       = 0;
 
     TransitionFlags flags = { 3u, 1u };
 
