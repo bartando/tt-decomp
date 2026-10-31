@@ -1,3 +1,4 @@
+#include "grc/resource_release.hpp"
 #include "grc/render_context.hpp"
 #include "grc/image_state.hpp"
 #include "platform/video_imports.h"
@@ -57,8 +58,6 @@ extern void rage_free(void* ptr);                        /* @ 0x820C00C0 — rag
 /* Device management functions */
 extern void grmShaderGroup_destroy(void* pObj);    /* @ 0x82445BF8 — Destroy shader group (refcounted) */
 extern void grcTextureDictionary_destroy(void* pCache); /* @ 0x824456A8 — Destroy texture dictionary */
-extern void grcDevice_cleanupInternal(void* pDevice);   /* @ 0x82151068 — Cleanup internal device struct */
-extern void grcDevice_releaseSharedResources(void);      /* @ 0x8214F338 — Release shared grc resources */
 extern void grcDeviceXenon_teardown(void* pTarget);      /* @ 0x82366CA0 — Full GPU teardown (VdShutdownEngines) */
 extern void _locale_register(void* pLocale, uint32_t flags);  /* @ 0x820C02D0 */
 extern void grcDevice_setRenderTarget(void* pDevice, int32_t arg); /* @ 0x82357400 — Set active render target */

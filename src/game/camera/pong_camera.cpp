@@ -113,69 +113,6 @@ static bool doClampedTransition(void* self, void* gameState, int mode, void* fla
 }
 
 /**
- * pongCameraMgr::TryTransition
- * @ 0x821F7338 | size: 0xE4
- *
- * Attempts to transition the camera to a new state, validating the transition
- * is within acceptable bounds. This function uses a threshold value to clamp
- * the camera state and calls helper functions to validate and apply the transition.
- *
- * @param gameState - Pointer to game state object (pg*)
- * @return true if transition succeeded, false otherwise
- */
-bool pongCameraMgr::TryTransition(void* gameState) {
-    // Load current camera value (appears to be at offset 0, overlapping with vtable)
-    // This is likely a union or the first field after vtable
-    float currentValue = *(float*)((char*)this + 0);
-    
-    // Load threshold constant from .data section
-    // Address: 0x825C5EC0 (calculated from lis r11,-32164 + lfs f13,24256(r11))
-    // Sentinel value 99999.0f ("infinite"/no-cap marker) — see float_constants.txt.
-    extern float g_cameraThreshold;  // @ 0x825C5EC0 (defined in globals.c)
-    float threshold = g_cameraThreshold;
-    
-    // Compute clamped values using fsel pattern
-    // fsel chooses first operand if condition >= 0, else second operand
-    float diff1 = threshold - currentValue;
-    float diff2 = currentValue - threshold;
-    
-    // Clamp to minimum (choose currentValue if it's <= threshold, else threshold)
-    float clampedMin = (diff1 >= 0.0f) ? currentValue : threshold;
-    
-    // Clamp to maximum (choose currentValue if it's >= threshold, else threshold)  
-    float clampedMax = (diff2 >= 0.0f) ? currentValue : threshold;
-    
-    // Prepare parameters for validation call
-    TransitionParams params;
-
-    params.value = clampedMin;
-    params.vtableOrState = *(uint32_t*)this;  // Copy vtable/state
-
-    TransitionFlags flags;
-
-    flags.flag1 = 3;
-    flags.flag2 = 1;
-
-    uint8_t validationResult = pongCameraMgr_ValidateTransition(gameState, &params, 7, &flags, 1);
-
-    if (validationResult != 0) {
-        // Validation succeeded, check if we need to apply the transition
-        float modifiedValue = params.value;
-
-        if (modifiedValue <= clampedMax) {
-            return pg_ApplyTransition(gameState, &params, 16, &flags, 1) != 0;
-        } else {
-            // Value exceeds maximum, store it directly
-            *(float*)((char*)this + 0) = modifiedValue;
-            return true;
-        }
-    }
-    
-    // Validation failed
-    return false;
-}
-
-/**
  * pongCameraMgr::IsStateNine
  * @ 0x821F7F40 | size: 0x20
  * 
@@ -1071,7 +1008,7 @@ extern "C" bool pg_6F68(void* gameState, void* params, int mode, unsigned int* f
 extern "C" bool pongCameraMgr_6EC0(void* statePtr, void* gameState);
 extern "C" bool pongCameraMgr_6FA8(void* statePtr, void* gameState, float f1, float f2);
 extern "C" bool pongCameraMgr_7250(void* statePtr, void* gameState, float f1, float f2);
-extern "C" bool pongCameraMgr_7338_helper(void* statePtr, void* gameState, float f1, float f2);
+extern "C" bool pongCameraMgr_7338_helper(void* statePtr, void* gameState);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // pongCameraMgr_3498_g  @ 0x821F3498 | size: 0x64
@@ -1457,7 +1394,7 @@ bool pongCameraMgr::CheckAllCameraQueries(void* gameState, float f1, float f2) {
 
     // 7. pongCameraMgr_7338
     stateCopy = *(uint64_t*)this;
-    bool r7 = pongCameraMgr_7338_helper(&stateCopy, gameState, f1, f2);
+    bool r7 = pongCameraMgr_7338_helper(&stateCopy, gameState);
 
     // Return true if ANY query succeeded (OR logic)
     return r1 || r2 || r3 || r4 || r5 || r6 || r7;
@@ -2564,7 +2501,6 @@ extern const char kCamViewCS_DebugLabel[];    // @ 0x820362F8 "camViewCS"
 // for display mode gameLoop+0x200 in the 4-entry table at 0x825CB75C (1.0 when
 // the mode isn't listed). A leaf that leaves f6/f7 alone, which is why the
 // original keeps the clip planes in f6/f7 across the call.
-extern float gameLoop_GetDisplayAspect(void* gameLoop);
 
 // @ 0x825EAB30 — the gameLoop object (globals.c)
 extern "C" void* g_loop_obj_ptr;
