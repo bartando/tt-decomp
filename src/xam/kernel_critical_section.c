@@ -6,7 +6,7 @@
  * CRITICAL_SECTION/pthread mutex cannot live there. Key native recursive locks
  * by guest address, without overwriting neighbouring image fields. */
 typedef struct CriticalSectionEntry {
-    const void* address;
+    const void* address; // ptr32-check: host — registry key; this node never lives in game memory.
     tt_mutex mutex;
     struct CriticalSectionEntry* next;
 } CriticalSectionEntry;

@@ -41,9 +41,10 @@ ctest --test-dir build/macos --output-on-failure
 
 The macOS checks also run the platform layer's existing SDK synchronization,
 TLS, IRQL, allocation and wait/error contract tests. Both checks passed after
-merging `5faf20b`. All 256 game translation units compiled as COFF i386 with
-the pointer-size guard. The full Windows link reported 706 distinct undefined
-game symbols, compared with 707 on macOS. There were no Windows-only missing
+merging `75130be` (which includes `5faf20b`). All 260 game translation units
+compiled as COFF i386 with the pointer-size guard. The full Windows link
+reported 696 distinct undefined game symbols, compared with 697 on macOS.
+There were no Windows-only missing
 symbols. The one macOS-only diagnostic was `typeinfo for pongTrainingDrill`:
 `llvm-nm` confirms that the Windows drill object defines this RTTI record,
 while the macOS drill object references it without defining it. This is a

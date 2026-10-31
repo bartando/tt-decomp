@@ -15,7 +15,7 @@ static struct { uint32_t native; int allocated; } tls_slots[64];
 /* KeInitializeEvent receives embedded guest storage, while NtCreateEvent
  * returns a native handle. Keep those representations behind one lookup. */
 typedef struct EmbeddedEvent {
-    void* storage;
+    void* storage; // ptr32-check: host — native registry key for externally supplied guest event storage.
     HANDLE handle;
     struct EmbeddedEvent* next;
 } EmbeddedEvent;

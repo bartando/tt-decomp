@@ -139,15 +139,15 @@ void XGetVideoMode(void* mode) {
  * @param b  Manual reset flag (1 = manual, 0 = auto)
  * @param c  Initial state (1 = signaled, 0 = nonsignaled)
  * @param d  Reserved
- * @return   Handle to the event object (cast to uint32_t)
+ * @return   Opaque host handle (four bytes on the Windows x86 target)
  */
-uint32_t xam_CreateEvent(uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
+void* xam_CreateEvent(uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
     (void)a;
     (void)d;
 
     HANDLE event = NULL;
     if (NtCreateEvent(&event, 0, NULL, b ? NotificationEvent : SynchronizationEvent, c) < 0) return 0;
-    return (uint32_t)(uintptr_t)event;
+    return event;
 }
 
 /**

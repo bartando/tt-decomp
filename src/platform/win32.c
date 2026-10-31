@@ -87,7 +87,7 @@ typedef struct { void* (*start)(void*); void* parameter; } ThreadStart;
 static DWORD WINAPI start_thread(void* parameter) {
     ThreadStart info = *(ThreadStart*)parameter;
     free(parameter);
-    return (DWORD)(uintptr_t)info.start(info.parameter);
+    return (DWORD)(uintptr_t)info.start(info.parameter); // ptr32-check: host — Win32 thread exit code, not a stored game pointer.
 }
 int32_t tt_win_create_thread(void** handle, uint32_t stack, uint32_t* id,
                              void* start, void* parameter, uint32_t flags) {

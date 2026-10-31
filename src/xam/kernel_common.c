@@ -201,7 +201,7 @@ void* RtlImageXexHeaderField(void* XexHeaderBase, uint32_t ImageField) {
 uint64_t MmGetPhysicalAddress(void* BaseAddress) {
     // On Xbox 360, virtual addresses are directly mapped to physical
     // For cross-platform, return the virtual address
-    return (uint64_t)(uintptr_t)BaseAddress;
+    return (uint64_t)(uintptr_t)BaseAddress; // ptr32-check: host — opaque host address reported by the physical-memory shim.
 }
 
 /**
@@ -248,10 +248,10 @@ void RtlCaptureContext(CONTEXT* ContextRecord) {
 
 #if defined(__GNUC__) || defined(__clang__)
     // Capture program counter (return address)
-    ContextRecord->Pc = (uint32_t)(uintptr_t)__builtin_return_address(0);
+    ContextRecord->Pc = (uint32_t)(uintptr_t)__builtin_return_address(0); // ptr32-check: host — diagnostic register low bits, not a dereferenceable game pointer.
 
     // Capture frame pointer
-    ContextRecord->Gpr[1] = (uint32_t)(uintptr_t)__builtin_frame_address(0);
+    ContextRecord->Gpr[1] = (uint32_t)(uintptr_t)__builtin_frame_address(0); // ptr32-check: host — diagnostic register low bits only.
 #endif
 }
 
