@@ -159,6 +159,8 @@ set(SOURCES
     src/game/player/player_control_queries.cpp
     src/game/player/player_control_queries_data.cpp
     src/game/player/player_mode_data.cpp
+    src/game/player/player_apply_movement_target.cpp
+    src/game/player/player_pose_easing.cpp
     src/game/player/player_serve_callbacks.cpp
     src/game/player/player_serve_hit_point.cpp
     src/game/player/player_serve_hit_point_data.cpp

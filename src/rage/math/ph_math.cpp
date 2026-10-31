@@ -409,6 +409,14 @@ double crt_acos(double x) {
     return crt_asin_acos(x, 0, 1);
 }
 
+// Clamp out-of-domain inputs; the PPC ble also maps unordered inputs to pi.
+// @ 0x8227DD20 | size: 0x74
+extern "C" float phBoundCapsule_DD20_fw(float value) {
+    if (!(value > -1.0f)) return 3.1415927410125732f;
+    if (value >= 1.0f) return 0.0f;
+    return static_cast<float>(crt_acos(value));
+}
+
 // ph_physics.cpp's names. Its callers pass and keep floats.
 float ph_Sinf(float x) { return static_cast<float>(crt_sin(x)); }
 float ph_Cosf(float x) { return static_cast<float>(crt_cos(x)); }
