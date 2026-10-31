@@ -1,6 +1,6 @@
 #include "pong_gameplay_queries.hpp"
+#include "../ball/ball_predict.hpp"
 
-void SinglesNetworkClient_51C8_g(void* shot); // @ 0x821D51C8 — full shot reset
 extern "C" const float lbl_825C5938; // @ 0x825C5938
 
 namespace {
@@ -33,7 +33,7 @@ void pongPlayer_5F70_g(void* entry) {
     field<float>(entry, 0x130) = 0.0f;
     field<float>(entry, 0x134) = lbl_825C5938;
     field<float>(entry, 0x14C) = 0.0f;
-    SinglesNetworkClient_51C8_g(static_cast<uint8_t*>(entry) + 0x10);
+    bpShot_Reset(reinterpret_cast<bpShot*>(static_cast<uint8_t*>(entry) + 0x10));
     field<float>(entry, 0x13C) = 0.0f;
     field<float>(entry, 0x154) = 0.0f;
     field<uint8_t>(entry, 0x150) = 0;
