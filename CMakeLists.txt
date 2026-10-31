@@ -128,6 +128,8 @@ set(SOURCES
     src/rage/io/fiDevice.cpp
     src/rage/io/fiAsciiTokenizer.cpp
     src/rage/io/fiStreamBuf.cpp
+    src/rage/io/fiPath.cpp
+    src/rage/io/fi_image_data.cpp
     src/rage/render_loop.c
     src/rage/scene_render.c
     src/rage/network/session_events.cpp
@@ -290,6 +292,7 @@ set(SOURCES
     src/graphics/grc_debug_strings.cpp
     src/graphics/grc_gpu_hang.cpp
     src/graphics/grc_cache.cpp
+    src/graphics/grc_resource_release.cpp
     src/graphics/grc_state_helpers.cpp
     src/graphics/grc_command_stream.cpp
     src/graphics/grc_device.cpp

@@ -3,7 +3,6 @@
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
  *
  * Implements the core file device lookup and stream open functions:
- *   fiDeviceMemory_AllocateDeviceMemory  — allocate from the memory device
  *   fiDevice_GetDevice                   @ 0x822E12A0 | size: 0x244
  *   fiStream_Open                        @ 0x822E3518 | size: 0x134
  *
@@ -52,19 +51,6 @@ extern void* lbl_825F5CF0;  // g_pFileOpenCallback
 extern int  pg_1218(void* entry, const char* path, uint16_t priority);
 extern void ref_fi_34C0(const char* path);
 extern void pg_3378(const char* path, int handle, void* device);
-
-/**
- * fiDeviceMemory_AllocateDeviceMemory @ synthetic
- *
- * Allocates a block of memory from the memory device. In the original
- * Xbox 360 binary this goes through the physical memory allocator;
- * on the host platform we use standard malloc.
- */
-void* fiDeviceMemory_AllocateDeviceMemory(size_t size) {
-    if (size == 0)
-        return nullptr;
-    return std::malloc(size);
-}
 
 /**
  * fiDevice_GetDevice @ 0x822E12A0 | size: 0x244

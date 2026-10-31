@@ -1,0 +1,5 @@
+from specs._fi_path_inputs import append_input as inputs, CALLS, EXTERNS
+FUNCTION = "fiPath_AppendName"
+ADDRESS = 0x822e2830
+SOURCE = "src/rage/io/fiPath.cpp"
+TRIALS = 500

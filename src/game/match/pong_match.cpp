@@ -1,3 +1,4 @@
+#include "rage/fi_stream.hpp"
 #include "game/match_ai_array.hpp"
 #include "rage/time_state.hpp"
 /**
@@ -1518,12 +1519,6 @@ extern fiAssetManagerView g_fiAssetManager;  // @ 0x825D0080
 struct fiStream;
 // @ 0x822E2E60 — pushes a folder ("$/..." is taken as is).
 extern void fiAssetManager_PushFolder(fiAssetManagerView* assets, const char* path);
-// @ 0x822E3040 — opens name.ext in the current folder; the loaders pass 0, 1.
-extern fiStream* fiAssetManager_Open(fiAssetManagerView* assets, const char* name, const char* ext,
-                                     int arg3, int arg4);
-// @ 0x822E3B38
-extern void fiStream_Close(fiStream* stream);
-
 // rage::fiTokenizer as the loaders build it on the stack (vtable 0x8205A594).
 struct fiTokenizerView {
     void**      vtable;        // +0x00
@@ -1592,14 +1587,14 @@ static uint32_t ReadColor(fiTokenizerView* tokenizer) {
 
 // Opens name.fx and loads one Fx from it.
 static void LoadFx(gmPracticeTargetFx* fx, const char* name) {
-    fiStream* stream = fiAssetManager_Open(&g_fiAssetManager, name, "fx", 0, 1);
+    fiStream* stream = static_cast<fiStream*>(fiStreamBuf_OpenAll(&g_fiAssetManager, name, "fx", 0, 1));
     if (stream == nullptr) {
         return;
     }
     fiTokenizerView tokenizer;
     fiTokenizer_Init(&tokenizer, name, stream);
     gmPracticeTargetFx_Load(fx, &tokenizer);
-    fiStream_Close(stream);
+    fiStreamBuf_Close(stream);
 }
 
 /**
@@ -1621,7 +1616,7 @@ void gmPracticeTarget::LoadData() {
     LoadFx(&m_fx2, "fx_target2");
 
     int32_t maxTargets = 0;
-    fiStream* stream = fiAssetManager_Open(&g_fiAssetManager, "practice_targets", "fx", 0, 1);
+    fiStream* stream = static_cast<fiStream*>(fiStreamBuf_OpenAll(&g_fiAssetManager, "practice_targets", "fx", 0, 1));
     if (stream != nullptr) {
         fiTokenizerView tokenizer;
         fiTokenizer_Init(&tokenizer, "practice_targets", stream);
@@ -1675,7 +1670,7 @@ void gmPracticeTarget::LoadData() {
                 }
             }
         }
-        fiStream_Close(stream);
+        fiStreamBuf_Close(stream);
     }
 
     gmPracticeTargetWordArray_Init(m_wordArray, maxTargets, false, true);
