@@ -1,3 +1,4 @@
+#include "grc/resource_release.hpp"
 /**
  * rage_system.cpp -- RAGE engine system-level utility functions
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -20,7 +21,6 @@ extern "C" {
     void datBase_DestroyArray8(void* obj);                           // @ 0x820E74B8
     void crAnimFrame_Dtor(void* obj);                                // @ 0x8224AC28
     void sysMemAllocator_FreeAligned(void* ptr);                    // @ 0x82186228
-    void rage_ReleaseRef(void* ptr);                                 // @ 0x82352EE0
     void datBase_DestroyWithFlag(void* obj, int flags);              // @ 0x82156160
     void rage_UpdateDeviceState(void* devicePtr);                    // @ 0x82357400
     void rage_ApplyRenderState(void* device, void* state,
@@ -248,7 +248,7 @@ void rage_CleanupRenderResources(void* obj) {
         uint32_t flags = *(uint32_t*)refObject;
         // Check if bit 24 is set (owned reference flag)
         if ((flags & 0x01000000) != 0) {
-            rage_ReleaseRef(refObject);
+            grcResource_ReleaseRef(refObject);
         }
     }
 

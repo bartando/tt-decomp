@@ -283,6 +283,7 @@ set(SOURCES
     src/graphics/grc_debug_strings.cpp
     src/graphics/grc_gpu_hang.cpp
     src/graphics/grc_cache.cpp
+    src/graphics/grc_resource_release.cpp
     src/graphics/grc_state_helpers.cpp
     src/graphics/grc_command_stream.cpp
     src/graphics/grc_device.cpp
