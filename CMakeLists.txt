@@ -101,6 +101,7 @@ set(SOURCES
     src/rage/audio/xma_source.cpp
     src/rage/audio/ld_xaudio_data.cpp
     src/rage/audio/xact_fade.cpp
+    src/rage/audio/xact_volume.cpp
     src/rage/audio/xact_sound.cpp
     src/rage/audio/xaudio_effect_buffer.cpp
     src/rage/audio/xaudio_effect.cpp
@@ -223,6 +224,7 @@ set(SOURCES
     src/game/network/pong_network_classes.cpp
     src/game/network/pong_network_io.cpp
     src/game/network/network_timestamp.cpp
+    src/game/network/network_selection.cpp
     src/game/network/round_robin_state.cpp
     src/game/network/score_payload.cpp
     src/game/network/network_context.cpp
@@ -356,6 +358,8 @@ set(SOURCES
     src/xam/kernel_import_thunks.c
     src/rage/math/float_approach.cpp
     src/rage/math/index_wrap.cpp
+    src/rage/math/random_range.cpp
+    src/rage/math/random_shuffle_data.cpp
     src/rage/math/ph_math.cpp
     src/rage/math/polygon_clip.cpp
     src/rage/math/swf_matrix.cpp
