@@ -10,6 +10,7 @@
  */
 
 #include "pong_gameplay_queries.hpp"
+#include "game/game_message.hpp"
 #include "pong_player.hpp"
 #include "../creature/pong_creature.hpp"
 #include <cstring>   // memset
@@ -1832,8 +1833,6 @@ extern void pongPlayer_EF38_g(void* self, uint8_t r9, uint8_t r10, uint32_t r6,
                                uint32_t r3, float f3, float f2, float f1);
 extern void pongPlayer_F2A0_g(void* self, void* subObj);
 extern uint32_t pongPlayer_SetupShotTarget(void* target, vec3* position, float f1, float f2); // @ 0x821A5DF8
-extern void pg_E6E0(int code, uint8_t mask, int p3, int p4);
-extern void pongPlayer_9108_g(void* target, void* syncData);
 
 // g_pCamShotMgr @ 0x8271A318 and g_pCameraSharedState @ 0x8271A32C declared at file scope
 
@@ -2024,7 +2023,7 @@ void pongPlayer::ResetSwingSlotEntries(void* slotsBase) {  // pongPlayer_6080_p3
  *
  * When a slot's dirty byte is clear, sends a page-group notification
  * (code 4130 with slot mask | 64) and marks it dirty. Then synchronises
- * via pongPlayer_9108_g (SyncByteField).
+ * via SyncByteField.
  *
  * Used for network synchronisation of player slot state changes.
  */
@@ -2050,7 +2049,7 @@ void pongPlayer::NotifySlotChangeAndSync(void* slotsBase, uint32_t slotIndex,
 
     if (dirtyFlag == 0) {
         uint8_t slotMask = static_cast<uint8_t>(1 << slotIndex) | 64;
-        pg_E6E0(4130, slotMask, 1, static_cast<int>(columnIndex));
+        PostGameMessage(4130, slotMask, 1, &columnIndex);
 
         *(base + slotIndex + 288) = 1;
     }
@@ -2058,7 +2057,7 @@ void pongPlayer::NotifySlotChangeAndSync(void* slotsBase, uint32_t slotIndex,
     // Sync byte field
     uint8_t syncBuf[4];
     syncBuf[0] = 1;
-    pongPlayer_9108_g(dirtyAddr, syncBuf);
+    SyncByteField(dirtyAddr, syncBuf);
 }
 
 
@@ -2466,7 +2465,7 @@ bool pongPlayer_04B0_g(void* pad, int32_t button) {
  * Compares byte[0] of target with byte[0] of source.  If different:
  *   - If field +8 (callback pointer) is non-null, invokes the callback
  *     with field +4 as the argument (marks the field dirty for network sync).
- *   - Copies the new byte value from source to target.
+ *   - Reloads the source byte after the callback, then copies it to target.
  */
 void pongPlayer::SyncByteField(void* target, void* source) {  // pongPlayer_9108_g @ 0x82199108
     uint8_t* tgt = static_cast<uint8_t*>(target);
@@ -2479,7 +2478,7 @@ void pongPlayer::SyncByteField(void* target, void* source) {  // pongPlayer_9108
             void* arg = *reinterpret_cast<void**>(tgt + 4);
             reinterpret_cast<void(*)(void*)>(callback)(arg);
         }
-        tgt[0] = newVal;
+        tgt[0] = *static_cast<uint8_t*>(source);
     }
 }
 
@@ -4268,7 +4267,6 @@ extern bool pongPlayer_D6B8_IsCreatureReady(void* characterSub);
 extern void ServeStartedMessage_CFE8_2h(void* msgObj, void* targetData, int param);
 extern void PlayerMovementMessage_D258_2hr(void* msgObj, float posX, float posZ);
 extern void pongPlayer_B208_g(void* state, vec3* swingVec, uint8_t suppressFlip);
-extern void pg_E6E0_msg(int messageId, int flags, int count, void* data);
 
 extern uint32_t g_rngState[2];              // RNG state (lo, hi) @ 0x825CA2C8
 extern const float g_kFloatConst_79E68;     // random scale factor @ 0x82079E68
@@ -4383,9 +4381,9 @@ void pongPlayer::ResetButtonSlotTrackingData(
             slotResult = flag1 ? 1 : (flag2 ? 2 : 0);
         }
 
-        // Post tracking reset event (pg_E6E0 @ 0x8225E6E0)
+        // Post tracking reset event (PostGameMessage @ 0x8225E6E0)
         uint8_t bitMask = static_cast<uint8_t>((1 << slotIndex) & 0xFF) | 64;
-        pg_E6E0_msg(4131, static_cast<int>(bitMask), 1, &slotResult);
+        PostGameMessage(4131, static_cast<int>(bitMask), 1, &slotResult);
     }
 
     // Clear float at computed offset (slotIndex + 61) * 4
@@ -4394,7 +4392,7 @@ void pongPlayer::ResetButtonSlotTrackingData(
     // Clear 3 tracking entries (12 bytes apart) via SyncByteField
     uint8_t clearByte = 0;
     for (int i = 0; i < 3; i++) {
-        pongPlayer_9108_g(trackBase + i * 12, &clearByte);
+        SyncByteField(trackBase + i * 12, &clearByte);
     }
 
     // Clear float at computed offset (slotIndex + 63) * 4
@@ -6311,9 +6309,6 @@ extern void* g_networkTimingObject;  // @ 0x8271A328
 extern const char* util_1480(void* clock, int slot);
 // @ 0x821D3860 — records a named transition on the game state object.
 extern void game_3860(void* gameState, int kind, const char* name);
-// @ 0x8225E6E0 — posts a game message (same declaration as message.cpp;
-// PostPageGroupMessage above gives it a fifth argument it doesn't take).
-extern void PostGameMessage(uint32_t messageId, uint32_t flags, uint32_t param1, uint32_t param2);
 // @ 0x82198A48 — StartServe's query callback: *answer = io_Input_poll_9D68 && +0x17EC != 0.
 extern void io_8A48(pongPlayer* player, int32_t* answer);
 // Flags argument of PostGameMessage: one bit per player.
@@ -6396,10 +6391,10 @@ bool pongServeBlender_Start(pongSwingAnimView* blender, const vec3* position, bo
 
     blender->fieldA8 = 0.0f;   // @ 0x8202D110
     blender->progress = 0.0f;
-    PostGameMessage(0x1004, (uint8_t)(1u << playerIndex) | 0x40, 0, 0);
+    PostGameMessage(0x1004, (uint8_t)(1u << playerIndex) | 0x40, 0, nullptr);
     if (lbl_825C9A2C != 1)
         game_E0F0(lbl_8271A2EC);
-    PostGameMessage(0x1002, (uint8_t)(1u << blender->field_04) | 0x40, 0, 0);
+    PostGameMessage(0x1002, (uint8_t)(1u << blender->field_04) | 0x40, 0, nullptr);
     return false;
 }
 
@@ -6489,7 +6484,7 @@ int32_t pongPlayer_SelectShotType(pongServeTypeFlags* flags, int32_t playerIndex
 {
     int32_t shotType = 5;
     if (flags->flag4) {
-        PostGameMessage(0x101A, (uint8_t)(1u << playerIndex) | 0x40, 0, 0);
+        PostGameMessage(0x101A, (uint8_t)(1u << playerIndex) | 0x40, 0, nullptr);
         shotType = 9;
     }
     if (flags->flag6)
@@ -6924,7 +6919,7 @@ void pongPlayer_Serve(pongPlayer* player)
     ball->inst->archetype->vfn_15(1.0f);  // 1.0f @ 0x8202D108
     pongPlayer_TossServeBall(player, ball, hitDelay);
 
-    PostGameMessage(0x820, PlayerMessageBit(self->playerIndex), 0, 0);
+    PostGameMessage(0x820, PlayerMessageBit(self->playerIndex), 0, nullptr);
     shotTarget_AdjustAimDepthForBall(self->shotTarget, ball);
     self->field_18BA = 0;
 }
@@ -6954,7 +6949,7 @@ void pongPlayer_StartServe(pongPlayer* player)
     pongCreature_StartServeBlender(self->creature, &serveCallback, &queryCallback);
 
     self->field_18C8 = 1;
-    PostGameMessage(0x380B, PlayerMessageBit(self->playerIndex) | 0x40, 0, 0);
+    PostGameMessage(0x380B, PlayerMessageBit(self->playerIndex) | 0x40, 0, nullptr);
 
     PlayerShotEntries()[self->playerIndex].flag04 = 0;
     PlayerShotEntries()[self->playerIndex].flag05 = 0;

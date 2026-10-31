@@ -364,7 +364,7 @@ struct pongPlayer {
     void UpdateCreatureSlotAnims(uint8_t resetFlag);
     void InitMovementAndContact();
     void ResetSwingSlotEntries(void* slotsBase);
-    void NotifySlotChangeAndSync(void* slotsBase, uint32_t slotIndex,
+    static void NotifySlotChangeAndSync(void* slotsBase, uint32_t slotIndex,
                                  uint32_t columnIndex);
     void UpdateServeSpeed();
     void InitializeReplaySnapshot(void* outSnapshot);
@@ -376,7 +376,7 @@ struct pongPlayer {
     int GetFrameIndexDelta(void* frameData);
     void ComputePositionWithOffsets(void* inputData);
     void ComputePositionWithOffset();
-    void SyncByteField(void* target, void* source);
+    static void SyncByteField(void* target, void* source);
     void SyncFloatField(void* target, void* source);
     void UpdateDirtyFlags(void* obj, uint8_t forceReset);
     void MarkNetDirtyPosition();
