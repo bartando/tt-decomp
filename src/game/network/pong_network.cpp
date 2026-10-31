@@ -71,8 +71,8 @@ extern int   SinglesNetworkClient_8CC0_w(void* client);                       //
 // Network I/O helpers (implemented in pong_network_io.cpp)
 extern void WriteFloatToNetworkStream(void* client, float value);              // @ 0x820D6990
 extern void WriteBallHitDataToNetwork(void* ballHitData, void* client);       // @ 0x821D5738
+extern void CopyVectorThreadSafe(void* destination, void* source); // @ 0x82287040
 extern void DeserializeNetworkData(void* client, void* dst, int size);  // @ 0x821D5538 - read size-bit aligned block
-extern void CopyVectorThreadSafe(void* dst, void* src);       // @ 0x82287040 - copy 16-byte vector
 extern void ReadBitsFromStream(void* client, void* field, int size); // @ 0x820D7A08 - read byte from net stream
 // Serve setup
 extern void  ServeStartedMessage_CFE8_2h(void* matchState);
@@ -311,12 +311,10 @@ void ServeStartedMessage::Process(void* matchObj)
         rage_debugLog("ServeStartedMessage::Process(): player action state is null");
     }
 
-    // Step 3: copy target position into the player's lerp table entry.
-    // The lerp table is indexed by (lerpSlot + 17) * 4.
-    // Python-verified: rlwinm(lerpSlot+17, 2, 0, 29) = (lerpSlot+17)*4
+    // Publish the full shot at message +0x10 into the per-player context.
+    // The helper applies the destination +0x40 offset itself.
     int32_t  lerpSlot   = *(int32_t*)((uint8_t*)player + 464);
-    uint8_t* lerpTable  = g_pPlayerLerpTable + (lerpSlot * 416) + 12;
-    void*    lerpEntry  = (void*)(lerpTable + (lerpSlot + 17) * 4);
+    uint8_t* lerpEntry = g_pPlayerLerpTable + lerpSlot * 416;
     CopyVectorThreadSafe(lerpEntry, &m_targetPos);
 
     // Step 4: write handedness flag into the recovery state.
@@ -1408,48 +1406,7 @@ void SinglesNetworkClient::ProcessNetworkTimingUpdate(uint32_t timestamp)
  * @return Length of string + 1, or 0 if no space available
  */
 uint32_t SinglesNetworkClient::ReadStringFromStream(const char* stringBuffer) {
-    // Calculate available buffer space
-    // Fields +20 and +32 appear to be buffer pointers/positions
-    uint32_t bufferEnd = *(uint32_t*)((char*)this + 20);
-    uint32_t bufferCurrent = *(uint32_t*)((char*)this + 32);
-    int32_t availableSlots = (bufferEnd - bufferCurrent) >> 3;  // Divide by 8
-    
-    // If no space available, return 0
-    if (availableSlots <= 0) {
-        return 0;
-    }
-    
-    // Clamp to maximum 16 bytes
-    if (availableSlots > 16) {
-        availableSlots = 16;
-    }
-    
-    // Scan string for null terminator
-    uint32_t stringLength = 0;
-    if (stringBuffer[0] != '\0') {
-        // Find string length (max availableSlots-1 bytes)
-        while (stringLength < (uint32_t)(availableSlots - 1)) {
-            stringLength++;
-            if (stringBuffer[stringLength] == '\0') {
-                break;
-            }
-        }
-        
-        // If we found a non-empty string, write it to the stream
-        if (stringLength > 0) {
-            // Call netStream_WriteString to write the string
-            // This is likely WriteStringToStream(this, stringBuffer, stringLength)
-            extern uint32_t netStream_WriteString(void* client, const char* str, uint32_t length);
-            netStream_WriteString(this, stringBuffer, stringLength);
-        }
-    }
-    
-    // Clear/reset 8 bits in the stream
-    // snBitStream_WriteBits is ReadBitsFromStream
-    snBitStream_WriteBits(this, 0, 8);
-    
-    // Return string length + 1
-    return stringLength + 1;
+    return datBitBuffer_WriteShortString(this, stringBuffer);
 }
 
 
@@ -2459,7 +2416,6 @@ extern void* g_pDataSendMsgSingleton;    // @ 0x825D12A8
 extern const char g_szDataSendTypeName[];  // @ 0x8206EA88
 
 // Network I/O helpers
-extern void netStream_ReadBlock(void* client, void* data, int16_t size);
 extern void SinglesNetworkClient_0598_g(void* data, void* client);
 
 
@@ -2490,7 +2446,7 @@ void DataSendMessage::Deserialise(void* client)
     
     // Read variable-length data payload
     // Size is determined by m_dataSize field
-    netStream_ReadBlock(client, &m_dataPayload, m_dataSize);
+    snBitStream_ReadString(client, &m_dataPayload, m_dataSize);
 }
 
 
@@ -3309,36 +3265,8 @@ void pongNetMessageHolder_vfn_2_2D20_1(pongNetMessageHolder* holder)
 // Returns:
 //   Number of characters read, or 0 on failure
 // ───────────────────────────────────────────────────────────────────────────
-int SinglesNetworkClient::ReadStringFromStream(char* buffer, int maxSize) {
-    // Save current bit position (offset 0x1C)
-    int savedBitPos = *(int*)((char*)this + 0x1C);
-
-    // Try to read the string data
-    extern int netStream_ReadStringRaw(void* ctx, void* base);  // 2-arg overload of bit-stream read helper
-    int bytesRead = netStream_ReadStringRaw(this, buffer);
-
-    if (bytesRead > 0) {
-        // Null-terminate the string
-        buffer[bytesRead + maxSize - 1] = '\0';
-
-        // Update bit position (8 bits per character)
-        *(int*)((char*)this + 0x1C) = savedBitPos + 8;
-
-        // Count the actual string length
-        int length = 1;
-        char* ptr = buffer;
-        while (*ptr != '\0') {
-            ptr++;
-            *(int*)((char*)this + 0x1C) += 8;
-            length++;
-        }
-        
-        return length;
-    } else {
-        // Read failed - clear buffer and return 0
-        buffer[0] = '\0';
-        return 0;
-    }
+int SinglesNetworkClient::ReadStringFromStream(char* buffer, int /*unusedWidth*/) {
+    return datBitBuffer_ReadShortString(this, buffer);
 }
 
 
@@ -3346,7 +3274,7 @@ int SinglesNetworkClient::ReadStringFromStream(char* buffer, int maxSize) {
 // SinglesNetworkClient::Read64BitValue @ 0x822609F0 | size: 0x7C
 //
 // Reads a 64-bit value from the network stream by reading two 32-bit values
-// and combining them (high 32 bits, then low 32 bits).
+// and combining them (low 32 bits, then high 32 bits).
 //
 // Parameters:
 //   outValue - Pointer to receive the 64-bit result
@@ -3355,18 +3283,7 @@ int SinglesNetworkClient::ReadStringFromStream(char* buffer, int maxSize) {
 //   true if read succeeded, false otherwise
 // ───────────────────────────────────────────────────────────────────────────
 bool SinglesNetworkClient::Read64BitValue(uint64_t* outValue) {
-    uint32_t highBits = 0;
-    uint32_t lowBits = 0;
-
-    // Read high 32 bits (32-bit field size)
-    snBitStream_ReadBits(this, &highBits, 32);
-
-    // Read low 32 bits
-    snBitStream_ReadBits(this, &lowBits, 32);
-
-    // Combine into 64-bit value: (high << 32) | low
-    *outValue = ((uint64_t)highBits << 32) | lowBits;
-    return false;
+    return datBitBuffer_ReadU64(this, outValue);
 }
 
 
@@ -3383,18 +3300,8 @@ bool SinglesNetworkClient::Read64BitValue(uint64_t* outValue) {
 //   true if validation and read succeeded, false otherwise
 // ───────────────────────────────────────────────────────────────────────────
 bool SinglesNetworkClient::ValidateAndReadData(void* outData) {
-    // Check if we have at least 16 bits available
-    int available = ReadStringFromStream(nullptr, 16);
-    
-    if (available > 0) {
-        // Read 64-bit value at offset +16 from the output pointer
-        uint64_t* dataPtr = (uint64_t*)((char*)outData + 16);
-        bool success = Read64BitValue(dataPtr);
-        
-        return success;
-    }
-    
-    return false;
+    if (datBitBuffer_ReadShortString(this, static_cast<char*>(outData)) <= 0) return false;
+    return datBitBuffer_ReadU64(this, reinterpret_cast<uint64_t*>(static_cast<uint8_t*>(outData) + 0x10));
 }
 
 
@@ -3919,7 +3826,6 @@ void ForceMatchTimeSyncMessage_Process(void* thisPtr) {
 // All are vtable slot 1 (labeled scalar_dtor but actually read from stream).
 // ═══════════════════════════════════════════════════════════════════════════
 
-extern void snBitStream_ReadString(void* client, void* dst, int maxBytes);  // util_0AF0 @ 0x82260AF0
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BallHitMessage_Deserialise  [vtable slot 1 @ 0x823B65F8 | size: 0x68]
@@ -4114,7 +4020,6 @@ void ServeFaultMessage_Deserialise(void* thisPtr, void* client) {
 // Reads timing float, signed 8-bit byte at +0x08, signed 16-bit at +0x0A.
 // The 8-bit field uses netStream_ReadS8SignMagnitude (signed-byte read with sign extension).
 // ─────────────────────────────────────────────────────────────────────────────
-extern void netStream_ReadS8SignMagnitude(void* client, void* dst, int bitWidth);  // signed 8-bit read @ 0x82101668
 
 void ServeLetMessage_Deserialise(void* thisPtr, void* client) {
     uint8_t* obj = (uint8_t*)thisPtr;
@@ -4125,7 +4030,7 @@ void ServeLetMessage_Deserialise(void* thisPtr, void* client) {
     *(float*)(obj + 0x04) = timingRef;
 
     // Signed 8-bit let-code at +0x08 (sign-extended read)
-    netStream_ReadS8SignMagnitude(client, obj + 0x08, 8);
+    datBitBuffer_ReadS8(client, reinterpret_cast<int8_t*>(obj + 0x08));
 
     // Signed 16-bit index at +0x0A
     netStream_ReadS16(client, obj + 0x0A, 16);
@@ -5438,26 +5343,24 @@ void ForceMatchTimeSyncMessage::Deserialise(void* client)
 //
 // Shared helpers used below:
 //   SinglesNetworkClient_8DF8_g(client, &tmp, 32)    - read 32-bit float via stack scratch
-//   netStream_ReadBlock(client, dst, sizeBits)       - read N-bit fixed-width block
-//   netStream_ReadU32ScoreVariant(client, dst, 32)     - read 32-bit variant (ScoreMessage)
+//   snBitStream_ReadString(client, dst, byteCount) - read a byte block
+//   netScore_Deserialise(score, client) - decode the 16-byte score payload
 //   netStream_ReadU32GamerHandleVariant(client, dst, 32)     - read 32-bit variant (SpectatorQuit)
 //   snBitStream_ReadUnsigned(client, dst, N)         - read unsigned N-bit integer
 // ═══════════════════════════════════════════════════════════════════════════
 
-extern void netStream_ReadU32ScoreVariant(void* client, void* dst, int sizeBits);  // @ 0x82390608
+extern void netScore_Deserialise(void* score, void* client); // @ 0x82390608
 extern void netStream_ReadU32GamerHandleVariant(void* client, void* dst, int sizeBits);  // @ 0x82260E18
 
 // NOTE: BallHitMessage_Deserialise, ServeFaultMessage_Deserialise,
 // ServeLetMessage_Deserialise, SessionTimeSyncMessage_Deserialise are defined
 // earlier in this file (around lines 4148-4337). Do not redefine here.
 
-extern void netStream_ReadS8SignMagnitude(void* client, void* dst, int sizeBits);  // @ 0x82101668
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ScoreMessage_Deserialise  @ 0x823BD7C8 | size: 0x58
 //
-// Reads timing float (+0x04) and a 32-bit score/state blob at +0x08 via the
-// _0608_g variant (used only by ScoreMessage in this subsystem).
+// Reads the timing float (+0x04), then the score payload at +0x08.
 // ─────────────────────────────────────────────────────────────────────────────
 void ScoreMessage_Deserialise(void* thisPtr, void* client) {
     uint8_t* obj = (uint8_t*)thisPtr;
@@ -5466,15 +5369,14 @@ void ScoreMessage_Deserialise(void* thisPtr, void* client) {
     snBitStream_ReadBits(client, &timingRef, 32);
     *(float*)(obj + 0x04) = timingRef;
 
-    // +0x08: 32-bit score payload.
-    netStream_ReadU32ScoreVariant(client, obj + 0x08, 32);
+    // +0x08: complete score payload.
+    netScore_Deserialise(obj + 0x08, client);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MatchScoreMessage_Deserialise  @ 0x823BCE78 | size: 0x5C
 //
-// Reads timing float (+0x04) and an 88-bit fixed block at +0x08 via netStream_ReadBlock
-// (block contains packed score state — 11 byte fields, see Serialise side).
+// Reads the timing float (+0x04), then 88 bytes of score state at +0x08.
 // ─────────────────────────────────────────────────────────────────────────────
 void MatchScoreMessage_Deserialise(void* thisPtr, void* client) {
     uint8_t* obj = (uint8_t*)thisPtr;
@@ -5483,8 +5385,8 @@ void MatchScoreMessage_Deserialise(void* thisPtr, void* client) {
     snBitStream_ReadBits(client, &timingRef, 32);
     *(float*)(obj + 0x04) = timingRef;
 
-    // +0x08: 88-bit packed score-state block.
-    netStream_ReadBlock(client, obj + 0x08, 88);
+    // +0x08: 88-byte score-state block.
+    snBitStream_ReadString(client, obj + 0x08, 88);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -5516,8 +5418,8 @@ void GamerReadyMessage_Deserialise(void* thisPtr, void* client) {
     snBitStream_ReadBits(client, &timingRef, 32);
     *(float*)(obj + 0x04) = timingRef;
 
-    // +0x08: 24-bit ready-flag block.
-    netStream_ReadBlock(client, obj + 0x08, 24);
+    // +0x08: 24-byte ready-state block.
+    snBitStream_ReadString(client, obj + 0x08, 24);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -5532,8 +5434,8 @@ void LevelConfigMessage_Deserialise(void* thisPtr, void* client) {
     snBitStream_ReadBits(client, &timingRef, 32);
     *(float*)(obj + 0x04) = timingRef;
 
-    // +0x08: 4-bit level-config nibble.
-    netStream_ReadBlock(client, obj + 0x08, 4);
+    // +0x08: four-byte level configuration.
+    snBitStream_ReadString(client, obj + 0x08, 4);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -5549,11 +5451,11 @@ void ForfeitMatchMessage_Deserialise(void* thisPtr, void* client) {
     snBitStream_ReadBits(client, &timingRef, 32);
     *(float*)(obj + 0x04) = timingRef;
 
-    // +0x08: 4-bit forfeit reason.
-    netStream_ReadBlock(client, obj + 0x08, 4);
+    // +0x08: four-byte forfeit reason.
+    snBitStream_ReadString(client, obj + 0x08, 4);
 
-    // +0x0C: 4-bit auxiliary nibble.
-    netStream_ReadBlock(client, obj + 0x0C, 4);
+    // +0x0C: four-byte auxiliary field.
+    snBitStream_ReadString(client, obj + 0x0C, 4);
 }
 
 
@@ -6904,32 +6806,6 @@ void DeserializeNetworkData(void* client, void* dst, int size) {
     (void)client; (void)dst; (void)size;
 }
 
-// ── util_1668 → netStream_ReadS8SignMagnitude @ 0x82101668 | size: 0x94 ────
-// Proto-RAGE sign-magnitude signed 8-bit bit-stream reader.
-//
-// Wire sequence: (1) read a 1-bit sign flag, (2) read an N-bit magnitude byte
-// into *dst via the shared byte-read primitive (util_7A08), (3) if the sign
-// flag was set, negate the stored byte (s8 neg) so the caller receives a
-// proper signed byte in the 7-bit magnitude range [-127..+127].
-//
-// Used by ball-hit deserialisation (hit-type control byte at ballHitData+32)
-// and serve-let message decode (ServeLetMessage_Deserialise).
-//
-// The existing `extern` decls in this file use `(void*, void*, int)` — we
-// match that signature. The `sizeBits` argument is passed verbatim to the
-// inner magnitude read primitive.
-void netStream_ReadS8SignMagnitude(void* client, void* dst, int sizeBits) {
-    extern void netStream_ReadFloat(void* client, void* outBuf, uint32_t bitCount);
-    extern void netStream_ReadBytes(void* client, void* outBuf, uint32_t bitCount);
-
-    uint32_t signBit = 0;
-    netStream_ReadFloat(client, &signBit, 1);
-    netStream_ReadBytes(client, dst, static_cast<uint32_t>(sizeBits));
-    if (signBit != 0 && dst != nullptr) {
-        int8_t mag = *static_cast<int8_t*>(dst);
-        *static_cast<int8_t*>(dst) = static_cast<int8_t>(-mag);
-    }
-}
 // NetDataQuery_InitNested(NetDataQuery*) lives in pong_network_classes.cpp.
 // A (void*) overload is called from ServeReadyMessage::Process (line 550);
 // forward it to the typed impl.
