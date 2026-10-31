@@ -1,3 +1,4 @@
+#include "archetype_refs.hpp"
 /**
  * ph_update_object.cpp — phUpdateObject physics update object implementation
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -506,24 +507,7 @@ void ph_vt5D38_15_0160(void* self, int flags, void* arg);
 
 extern void util_F8E8(void* self);
 
-// ── ph_9E50 — swap material/archetype owner on a phInst slot ───────────────
-// If newArch != null and g_physicsInstrument is enabled, bump refcount at
-// +96. If slot already has an occupant, release it via ph_CEE0(..., 1).
-// Then stash newArch in the slot at +12.
-extern uint8_t g_phInstrumentEnabled; // @ 0x826064E1
-void ph_CEE0(void* target, int releaseFlag); // forward decl
-void ph_9E50(void* host, void* newArchetype) {
-    if (newArchetype && g_phInstrumentEnabled) {
-        uint16_t* refCount = reinterpret_cast<uint16_t*>(
-            static_cast<uint8_t*>(newArchetype) + 96);
-        ++*refCount;
-    }
-    void* existing = *reinterpret_cast<void**>(
-        static_cast<uint8_t*>(host) + 12);
-    if (existing) ph_CEE0(existing, 1);
-    *reinterpret_cast<void**>(
-        static_cast<uint8_t*>(host) + 12) = newArchetype;
-}
+extern "C" uint8_t g_phInstrumentEnabled; // @ 0x826064E1
 
 // ── ph_9EC0_1 — placement-new initializer for a material wrapper ───────────
 // Sets vtable to phMaterial-subclass (0x82055C3C), calls class init, and
@@ -541,17 +525,6 @@ void* ph_9EC0_1(void* memory, char deleteFlag) {
 }
 // Single-argument overload kept as a convenience (matches older call sites)
 void* ph_9EC0_1(void* memory) { return ph_9EC0_1(memory, 0); }
-
-// ── ph_CEE0 — scalar/vector fused-multiply-add on a 4-vec (glue) ───────────
-// The original is a small dispatcher used by ph_9E50 to decrement refcount;
-// the decompiled vector math form is a support routine. We retain the
-// refcount-release shape since ph_9E50 is the only caller we resolve.
-void ph_CEE0(void* target, int releaseFlag) {
-    if (!target) return;
-    uint16_t* refCount = reinterpret_cast<uint16_t*>(
-        static_cast<uint8_t*>(target) + 96);
-    if (releaseFlag && *refCount) --*refCount;
-}
 
 // ── ph_E010 — allocate + initialize phInst from archetype ──────────────────
 void* ph_E010(void* world, void* archetype, const char* name) {
