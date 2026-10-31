@@ -18,4 +18,6 @@ CALLS = {
 
 def inputs(t):
     obj = t.alloc(0x74, "plrPlayerMgr")
+    t.w32(0x82606430, obj)
+    t.w32(0x82606434, t.u32())  # Adjacent game word must survive the clear.
     t.args(r3=obj, r4=t.rng.randrange(1 << 16) & ~1)

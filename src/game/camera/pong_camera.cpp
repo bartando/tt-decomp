@@ -374,23 +374,6 @@ void pongCameraMgr::CopyParametersToBuffer(uint32_t param1, uint32_t param2,
 extern uint32_t g_cameraMode;     // @ 0x825C5EB8 — current camera mode enum
 extern uint32_t g_cameraFlags;    // @ 0x826064D0 — camera state flags (SDA)
 
-// ── Pattern A: Camera index tail-call thunks (8B each) ─────────────────────
-
-extern "C" void pongCameraMgr_SetCameraByIndex(void* mgr, int index);  // @ 0x821F7CD8
-
-/**
- * pongCameraMgr camera-by-index thunks @ 0x821F7DF8-7E20 | 8B each
- *
- * Six trivial thunks that set r7 = N and tail-call the camera setter.
- * Each selects a different camera preset by index (1-6).
- */
-void pongCameraMgr::SelectCamera1() { pongCameraMgr_SetCameraByIndex(this, 1); }  // 7DF8 @ 0x821F7DF8
-void pongCameraMgr::SelectCamera2() { pongCameraMgr_SetCameraByIndex(this, 2); }  // 7E00 @ 0x821F7E00
-void pongCameraMgr::SelectCamera3() { pongCameraMgr_SetCameraByIndex(this, 3); }  // 7E08 @ 0x821F7E08
-void pongCameraMgr::SelectCamera4() { pongCameraMgr_SetCameraByIndex(this, 4); }  // 7E10 @ 0x821F7E10
-void pongCameraMgr::SelectCamera5() { pongCameraMgr_SetCameraByIndex(this, 5); }  // 7E18 @ 0x821F7E18
-void pongCameraMgr::SelectCamera6() { pongCameraMgr_SetCameraByIndex(this, 6); }  // 7E20 @ 0x821F7E20
-
 // ── Pattern B: RTTI destructor adjustor thunk (8B) ─────────────────────────
 
 /**
@@ -563,56 +546,50 @@ bool pongCameraMgr::CheckThreshold7688() { return pongCameraMgr_FloatThresholdB(
 
 // ─────────────────────────────────────────────────────────────────────────────
 // pongCameraMgr::TryCameraChange_Mode1()  @ 0x821F7DF8
-// Tail-call wrapper: delegates to pg_7CD8_2h with mode 1
+// Tail-call wrapper: requires shot-condition count 1
 // ─────────────────────────────────────────────────────────────────────────────
 bool pongCameraMgr::TryCameraChange_Mode1(void* gameState) {
-    extern bool pg_7CD8_2h(pongCameraMgr* mgr, void* gameState, int mode);
-    return pg_7CD8_2h(this, gameState, 1);
+    return pg_7CD8_2h(this, gameState, 0, 0, 1);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // pongCameraMgr::TryCameraChange_Mode2()  @ 0x821F7E00
-// Tail-call wrapper: delegates to pg_7CD8_2h with mode 2
+// Tail-call wrapper: requires shot-condition count 2
 // ─────────────────────────────────────────────────────────────────────────────
 bool pongCameraMgr::TryCameraChange_Mode2(void* gameState) {
-    extern bool pg_7CD8_2h(pongCameraMgr* mgr, void* gameState, int mode);
-    return pg_7CD8_2h(this, gameState, 2);
+    return pg_7CD8_2h(this, gameState, 0, 0, 2);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // pongCameraMgr::TryCameraChange_Mode3()  @ 0x821F7E08
-// Tail-call wrapper: delegates to pg_7CD8_2h with mode 3
+// Tail-call wrapper: requires shot-condition count 3
 // ─────────────────────────────────────────────────────────────────────────────
 bool pongCameraMgr::TryCameraChange_Mode3(void* gameState) {
-    extern bool pg_7CD8_2h(pongCameraMgr* mgr, void* gameState, int mode);
-    return pg_7CD8_2h(this, gameState, 3);
+    return pg_7CD8_2h(this, gameState, 0, 0, 3);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // pongCameraMgr::TryCameraChange_Mode4()  @ 0x821F7E10
-// Tail-call wrapper: delegates to pg_7CD8_2h with mode 4
+// Tail-call wrapper: requires shot-condition count 4
 // ─────────────────────────────────────────────────────────────────────────────
 bool pongCameraMgr::TryCameraChange_Mode4(void* gameState) {
-    extern bool pg_7CD8_2h(pongCameraMgr* mgr, void* gameState, int mode);
-    return pg_7CD8_2h(this, gameState, 4);
+    return pg_7CD8_2h(this, gameState, 0, 0, 4);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // pongCameraMgr::TryCameraChange_Mode5()  @ 0x821F7E18
-// Tail-call wrapper: delegates to pg_7CD8_2h with mode 5
+// Tail-call wrapper: requires shot-condition count 5
 // ─────────────────────────────────────────────────────────────────────────────
 bool pongCameraMgr::TryCameraChange_Mode5(void* gameState) {
-    extern bool pg_7CD8_2h(pongCameraMgr* mgr, void* gameState, int mode);
-    return pg_7CD8_2h(this, gameState, 5);
+    return pg_7CD8_2h(this, gameState, 0, 0, 5);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // pongCameraMgr::TryCameraChange_Mode6()  @ 0x821F7E20
-// Tail-call wrapper: delegates to pg_7CD8_2h with mode 6
+// Tail-call wrapper: requires shot-condition count 6
 // ─────────────────────────────────────────────────────────────────────────────
 bool pongCameraMgr::TryCameraChange_Mode6(void* gameState) {
-    extern bool pg_7CD8_2h(pongCameraMgr* mgr, void* gameState, int mode);
-    return pg_7CD8_2h(this, gameState, 6);
+    return pg_7CD8_2h(this, gameState, 0, 0, 6);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

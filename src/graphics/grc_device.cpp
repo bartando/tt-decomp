@@ -1,3 +1,4 @@
+#include "crt/crt_init.h"
 #include "grc/resource_release.hpp"
 #include "grc/render_context.hpp"
 #include "grc/image_state.hpp"
@@ -59,7 +60,6 @@ extern void rage_free(void* ptr);                        /* @ 0x820C00C0 — rag
 extern void grmShaderGroup_destroy(void* pObj);    /* @ 0x82445BF8 — Destroy shader group (refcounted) */
 extern void grcTextureDictionary_destroy(void* pCache); /* @ 0x824456A8 — Destroy texture dictionary */
 extern void grcDeviceXenon_teardown(void* pTarget);      /* @ 0x82366CA0 — Full GPU teardown (VdShutdownEngines) */
-extern void _locale_register(void* pLocale, uint32_t flags);  /* @ 0x820C02D0 */
 extern void grcDevice_setRenderTarget(void* pDevice, int32_t arg); /* @ 0x82357400 — Set active render target */
 
 /* Forward declaration — defined below */

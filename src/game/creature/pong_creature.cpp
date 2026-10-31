@@ -1,6 +1,8 @@
 #include "../../physics/archetype_refs.hpp"
 #include "rage/ptr32.hpp"
 #include "../../physics/composite_bounds.hpp"
+#include "game/player_manager_state.hpp"
+#include <cstddef>
 #include "../../anim/look_at_controller.hpp"
 #include "../../anim/locomotion_heading.hpp"
 #include "rage/mat33.hpp"
@@ -4346,16 +4348,18 @@ void pongCreatureInst_ApplyTeleportMatrix(pongCreatureInst* inst, const pongCrea
 }
 
 extern void pongCreatureWorker_Reset(pongCreatureWorker* worker, pongCreatureSkeleton* skeleton); // @ 0x820FAB78
-extern "C" void* g_plrPlayerMgr_state; // @ 0x82606430
 extern "C" uint8_t* g_large_buffer_ptr; // @ 0x8260637C
 
 struct pongCreatureTeleportSignals {
     uint8_t _pad0000[0x1814];
-    uint8_t** entries; // +0x1814
+    rage::ptr32<rage::ptr32<uint8_t>> entries; // +0x1814
     uint16_t count; // +0x1818
     uint8_t _pad181A[2];
-    uint8_t* secondary; // +0x181C
+    rage::ptr32<uint8_t> secondary; // +0x181C
 };
+
+static_assert(offsetof(pongCreatureTeleportSignals, count) == 0x1818);
+static_assert(offsetof(pongCreatureTeleportSignals, secondary) == 0x181C);
 
 // Apply a requested teleport and invalidate animation/physics caches.
 // pongCreature_Teleport @ 0x820C7A28 | size: 0x24C
@@ -4383,13 +4387,13 @@ void pongCreature_Teleport(pongCreature* creature, const pongCreatureMatrix* mat
         for (auto* worker : workers)
             if (worker) pongCreatureWorker_Reset(worker, self->skeleton);
     }
-    const auto* table = static_cast<const uintptr_t*>(g_plrPlayerMgr_state);
-    const uint32_t entry = static_cast<uint32_t>(table[uint32_t(self->playerIndex) + 33]);
-    auto* signals = reinterpret_cast<pongCreatureTeleportSignals*>(table[uint32_t(entry + 29)]);
+    const auto* table = reinterpret_cast<const uint32_t*>(g_plrPlayerMgr_state.get());
+    const uint32_t entry = table[uint32_t(self->playerIndex) + 33];
+    auto* signals = rage::load_ptr32<pongCreatureTeleportSignals>(table, uint32_t(entry + 29) * 4u);
     for (unsigned i = 0; i < signals->count; ++i)
-        signals->entries[i][0x3E] = 1;
+        signals->entries.get()[i].get()[0x3E] = 1;
     if (signals->secondary)
-        signals->secondary[0xA4] = 1;
+        signals->secondary.get()[0xA4] = 1;
     g_large_buffer_ptr[g_phFrameIndex + 0x91] = 1;
 }
 

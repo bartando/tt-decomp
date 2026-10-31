@@ -1,6 +1,9 @@
 #include "audio/xact_sink_io.hpp"
+#include "grc/resource_release.hpp"
+#include "game/message_sink_time.hpp"
 #include "rage/xact_list.hpp"
 #include "audio/xact_fade.hpp"
+#include "audio/xact_volume.hpp"
 /**
  * msg_msg_sink.cpp — msgMsgSink constructor & destructor
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -241,48 +244,6 @@ int32_t msgMsgSink::ProcessMessageWithIndex(void* source, uint32_t /*unusedR5*/,
     // Call the actual message processing function
     return msgMsgSink_E860_g(this, source, outHandle, calculatedOffset);
 }
-
-/**
- * msgMsgSink::DispatchVirtualMethod() @ 0x824542D0 | size: 0x30
- * [vtable slot 12]
- *
- * Dispatches a virtual method call through a chain of object pointers.
- * This is a common pattern in the RAGE engine for delegating operations
- * through a hierarchy of objects.
- *
- * Call chain:
- *   this->field_0x0028 (offset +40)
- *     ->field_0x0018 (offset +24)
- *       ->field_0x0024 (offset +36)
- *         ->vtable[9] (offset +36 in vtable)
- *
- * Returns early if any pointer in the chain is null.
- */
-void msgMsgSink::DispatchVirtualMethod() {
-    // Get first object pointer at offset +40
-    void* obj1 = *(void**)((char*)this + 40);
-    if (obj1 == nullptr) {
-        return;
-    }
-    
-    // Get second object pointer at offset +24 from first object
-    void* obj2 = *(void**)((char*)obj1 + 24);
-    
-    // Get third object pointer at offset +36 from second object
-    void* obj3 = *(void**)((char*)obj2 + 36);
-    if (obj3 == nullptr) {
-        return;
-    }
-    
-    // Get vtable from third object
-    void** vtable = *(void***)obj3;
-    
-    // Call virtual method at slot 9 (offset +36 in vtable)
-    typedef void (*VirtualMethod)(void*);
-    VirtualMethod method = (VirtualMethod)vtable[9];
-    method(obj3);
-}
-
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * msgMsgSink_8DE0_sp @ 0x82458DE0 | size: 0x20 (32 bytes)
@@ -669,7 +630,6 @@ extern void* RtlEnterCriticalSection_D6F0_fw(void*);
 extern void msgMsgSink_D168_sp(void*);
 extern void msgMsgSink_D1D8_sp(void*);
 extern void msgMsgSink_6138_2hr(void*);
-extern void grc_2CC8(void*, uint32_t, uint32_t);
 extern void atSingleton_8E88_p42(void*, void*, uint32_t, uint32_t, uint32_t);
 extern void ph_EF40(void*, void*);
 extern void game_9CF8_h(void*, const void*);
@@ -706,10 +666,10 @@ void* msgMsgSink_vfn_42_EFE8_1(void* self, void* value) {
 }
 
 // msgMsgSink_3258_wrh @ 0x82353258 | size: 0xC
-// Loads field at +12, passes it with zero to grc_2CC8
+// Releases pages on this resource, using its data word at +12.
 void msgMsgSink_3258_wrh(void* self) {
-    uint32_t val = *(uint32_t*)((uint8_t*)self + 12);
-    grc_2CC8((void*)(uintptr_t)val, 0, 0);
+    const uint32_t data = *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(self) + 12);
+    grc_2CC8(self, data, 0);
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -832,34 +792,6 @@ void msgMsgSink_8E40_sp(void* self) {
     typedef void (*Fn)(void*);
     void** vt = *(void***)nested;
     ((Fn)vt[20])(nested);
-}
-
-/* ───────────────────────────────────────────────────────────────────────────
- * GROUP 8: Virtual dispatch thunks through +36, return 0 if null
- * ─────────────────────────────────────────────────────────────────────────── */
-
-// msgMsgSink_8E60_sp @ 0x82458E60 | size: 0x24
-// Forwards to nested->vtable[11] (offset 44), returns 0 if nested is null
-uint32_t msgMsgSink_8E60_sp(void* self) {
-    void* nested = *(void**)((uint8_t*)self + 36);
-    if (nested != nullptr) {
-        typedef uint32_t (*Fn)(void*);
-        void** vt = *(void***)nested;
-        return ((Fn)vt[11])(nested);
-    }
-    return 0;
-}
-
-// msgMsgSink_8E88_sp @ 0x82458E88 | size: 0x24
-// Forwards to nested->vtable[21] (offset 84), returns 0 if nested is null
-uint32_t msgMsgSink_8E88_sp(void* self) {
-    void* nested = *(void**)((uint8_t*)self + 36);
-    if (nested != nullptr) {
-        typedef uint32_t (*Fn)(void*);
-        void** vt = *(void***)nested;
-        return ((Fn)vt[21])(nested);
-    }
-    return 0;
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -1217,7 +1149,6 @@ void msgMsgSink::ProcessPendingMessages() {
         if (hasData != 0) {
             // Process pending messages from the message object
             void* msgObj = *(void**)((uint8_t*)this + 52);
-            extern void msgMsgSink_3DC8_g(void*);
             msgMsgSink_3DC8_g(msgObj);
         }
     }
@@ -2533,11 +2464,9 @@ void msgMsgSink::DisconnectMatchingHandlers(void* key) {
 
 extern int32_t  msgMsgSink_vfn_35(void*, void*);                      // 0x8244E2A0
 extern void msgMsgSink_vfn_36_5FD0_1(void*);                          // 0x82455FD0
-extern void* atSingleton_64D8_g(void*);                               // 0x824564D8
 extern uint32_t atSingleton_6F98_g(); // @ 0x82566F98
 extern void  jumptable_3A48(void*, uint32_t, uint32_t, uint32_t);
 extern uint32_t msgMsgSink_4EB8_g(void*);                             // 0x82454EB8
-extern int32_t  msgMsgSink_66B0_h(void*);                             // 0x824566B0
 extern void* rage_01B8(uint32_t, uint32_t);                           // 0x820C01B8
 extern void  _locale_register(void*, uint32_t);                       // 0x820C02D0
 extern void* msgMsgSink_B110_g(void*, void*, uint32_t);               // 0x8245B110
@@ -2619,8 +2548,8 @@ void msgMsgSink::vfn_61() {
     int32_t state = *reinterpret_cast<int32_t*>(self + 412);
 
     if (state == 1) {
-        // State 1: negotiate → transition based on msgMsgSink_66B0_h result
-        if (msgMsgSink_66B0_h(this) != 0) {
+        // State 1: negotiate once the peer and its pending operations are ready.
+        if (msgSink_IsPeerReady(this) != 0) {
             // Populate connection flags at +412/+416/+420 from peer type
             void* peerInfo = *reinterpret_cast<void**>(self + 408);
             uint16_t raw = *reinterpret_cast<uint16_t*>(
@@ -2751,75 +2680,6 @@ void msgMsgSink::vfn_63() {
     }
 
     RtlLeaveCriticalSection(cs);
-}
-
-// ---------------------------------------------------------------------------
-// Slot 65 @ 0x82456810 — remove-peer: clears fields matching supplied key
-// ---------------------------------------------------------------------------
-void msgMsgSink::vfn_65() {
-    uint8_t* self = reinterpret_cast<uint8_t*>(this);
-    void* key = nullptr;  // original signature took void*; conservative default
-    void** slot52 = reinterpret_cast<void**>(self + 52);
-
-    if (*slot52 == key) {
-        *slot52 = nullptr;
-        *reinterpret_cast<int16_t*>(self + 404) = -1;
-        *reinterpret_cast<uint32_t*>(self + 40) = 0;
-        if (*reinterpret_cast<int32_t*>(self + 412) != 1) return;
-        if (*reinterpret_cast<int32_t*>(self + 380) != 0) return;
-
-        uint8_t* peerInfo = *reinterpret_cast<uint8_t**>(self + 408);
-        uint16_t raw = *reinterpret_cast<uint16_t*>(peerInfo + 24);
-        uint32_t code = (raw >> 5) & 0x7;
-        if (code != 4 && code != 3) return;
-
-        void* newPtr = atSingleton_64D8_g(this);
-        *reinterpret_cast<void**>(self + 376) = newPtr;
-        *reinterpret_cast<uint32_t*>(self + 380) = 1;
-        return;
-    }
-
-    void** slot396 = reinterpret_cast<void**>(self + 396);
-    if (*slot396 == key) {
-        *reinterpret_cast<int16_t*>(self + 406) = -1;
-        *slot396 = nullptr;
-        return;
-    }
-
-    void** slot392 = reinterpret_cast<void**>(self + 392);
-    if (*slot392 == key) {
-        *slot392 = nullptr;
-        return;
-    }
-
-    void** slot400 = reinterpret_cast<void**>(self + 400);
-    if (*slot400 == key) {
-        *slot400 = nullptr;
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Slot 66 @ 0x82456920 — state-init helper: wires up 64D8 singleton at +376
-// ---------------------------------------------------------------------------
-void msgMsgSink::vfn_66() {
-    uint8_t* self = reinterpret_cast<uint8_t*>(this);
-
-    DispatchVirtualMethod();
-    void* ptr = atSingleton_64D8_g(this);
-    *reinterpret_cast<void**>(self + 376) = ptr;
-    *reinterpret_cast<uint32_t*>(self + 380) = 1;
-}
-
-// ---------------------------------------------------------------------------
-// Slot 67 @ 0x82456968 — reset session: clears +388, reassigns +376 singleton
-// ---------------------------------------------------------------------------
-void msgMsgSink::vfn_67() {
-    uint8_t* self = reinterpret_cast<uint8_t*>(this);
-
-    *reinterpret_cast<uint32_t*>(self + 388) = 0;
-    void* ptr = atSingleton_64D8_g(this);
-    *reinterpret_cast<void**>(self + 376) = ptr;
-    *reinterpret_cast<uint32_t*>(self + 380) = 1;
 }
 
 // ---------------------------------------------------------------------------

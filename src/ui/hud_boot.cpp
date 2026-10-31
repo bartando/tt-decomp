@@ -38,7 +38,7 @@ static const char* const k_bootNameKey = reinterpret_cast<const char*>(0x8205E32
 
 static void SetNumericBootSetting(void* networkClient, const char* key, uint32_t value) {
     BootNumericSetting* setting =
-        reinterpret_cast<BootNumericSetting*>(SinglesNetworkClient_BindEntry(networkClient, key));
+        reinterpret_cast<BootNumericSetting*>(swfGetOrCreatePageGroupValue(networkClient, key));
     if (setting == nullptr) {
         return;
     }
@@ -49,7 +49,7 @@ static void SetNumericBootSetting(void* networkClient, const char* key, uint32_t
 
 static void SetStringBootSetting(void* networkClient, const char* key, char* value) {
     BootStringSetting* setting =
-        reinterpret_cast<BootStringSetting*>(SinglesNetworkClient_BindEntry(networkClient, key));
+        reinterpret_cast<BootStringSetting*>(swfGetOrCreatePageGroupValue(networkClient, key));
     if (setting == nullptr) {
         return;
     }

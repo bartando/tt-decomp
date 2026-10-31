@@ -14,7 +14,8 @@ from liftcheck.runner import Checker, Options
 
 MUTATIONS = [
     ("wrong output interface adjustment",
-     "static_cast<uint8_t*>(output) - 8", "static_cast<uint8_t*>(output) - 4"),
+     "static_cast<uint8_t*>(output) - offsetof(AudioFrameBuffer, kind)",
+     "static_cast<uint8_t*>(output) - (offsetof(AudioFrameBuffer, kind) - 4)"),
     ("discard output channels", "frame.channels = self->channels;", "frame.channels = 0;"),
     ("swallow resize failure", "return result;", "return 0;"),
     ("wrong inactive return", "return 1;", "return 0;"),
@@ -67,7 +68,8 @@ MUTATIONS = [
 
 def main():
     source = (Path(__file__).resolve().parents[3] / SOURCE).read_text()
-    target = source[source.index("int32_t PcmSource_Render("):]
+    start = source.index("int32_t PcmSource_Render(")
+    target = source[start:source.index("\n}", start) + 2]
     spec = Path(__file__).with_name("pcm_source_render.py")
     for name, old, new in MUTATIONS:
         assert target.count(old) == 1, f"mutation anchor changed: {name}"

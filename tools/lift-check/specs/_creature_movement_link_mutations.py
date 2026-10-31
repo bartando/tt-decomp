@@ -14,6 +14,8 @@ from liftcheck.build import BuildError
 from liftcheck.runner import Checker, Options
 
 SOURCE = "src/game/creature/pong_creature.cpp"
+# Per-spec source overrides for lifts that moved out of pong_creature.cpp.
+SOURCES = {"pong_mover_get_input_speed": "src/game/creature/mover_input_speed.cpp"}
 CASES = [
     ("pong_mover_get_blend_weight", "float pongMover_GetBlendWeight(", [
         ("empty result", "return (mover->m_flags & 0x12) ? 1.0f : mover->m_unk1C;", "return 0.0f;"),
@@ -22,12 +24,11 @@ CASES = [
         ("wrong weight field", "mover->m_unk1C", "mover->m_unk20"),
     ]),
     ("pong_mover_get_input_speed", "float pongMover_GetInputSpeed(", [
-        ("empty result", "    const auto movementData", "    return 0.0f;\n    const auto movementData"),
+        ("empty result", "    if (mover->m_flags & 4)", "    return 0.0f;\n    if (mover->m_flags & 4)"),
         ("wrong override bit", "m_flags & 4", "m_flags & 2"),
-        ("wrong override speed", "movementData() + 0x64", "movementData() + 0x60"),
-        ("wrong match slot stride", "index * 36", "index * 32"),
-        ("only canonical true", "+ 0xC4)] != 0", "+ 0xC4)] == 1"),
-        ("wrong character scale", "movement + 0x64", "movement + 0x60"),
+        ("wrong override speed", "0x14), 0x64)", "0x14), 0x60)"),
+        ("wrong match slot stride", "slot * 36", "slot * 32"),
+        ("wrong character scale", "0x28), 0x64)", "0x28), 0x60)"),
         ("omit scale", "return scale *", "return 1.0f *"),
     ]),
     ("pong_mover_update_movement_state", "void pongMover_UpdateMovementState(", [
@@ -47,9 +48,9 @@ CASES = [
 
 def main():
     root = Path(__file__).resolve().parents[3]
-    source = (root / SOURCE).read_text()
     total = 0
     for spec, signature, mutations in CASES:
+        source = (root / SOURCES.get(spec, SOURCE)).read_text()
         # Skip declarations: each definition begins at column zero.
         start = source.index("\n" + signature) + 1
         end = source.index("\n}\n", start) + 2

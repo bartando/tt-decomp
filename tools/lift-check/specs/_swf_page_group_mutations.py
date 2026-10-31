@@ -12,7 +12,18 @@ CASES = {
   ('wrong array pool', 'g_swfScriptArrayPool = group->arrayPool;', 'g_swfScriptArrayPool = group->objectPool;'),
   ('ignore selector low byte', '(bindGlobals & 0xFFu) != 0', 'bindGlobals != 0'),
   ('selector low bit only', '(bindGlobals & 0xFFu) != 0', '(bindGlobals & 1) != 0'),
-  ('omit scope binding', 'rage::g_swfGlobalScope = group->globalScope;', '/* scope binding lost */'),
+  ('omit scope binding', 'rage::g_swfGlobalScope = group->globalScope.get();', '/* scope binding lost */'),
+ ],
+ 'swf_find_page_group_value': [
+  ('wrong lookup selector', 'swfSelectPageGroup(object, 1);', 'swfSelectPageGroup(object, 0);'),
+  ('omit lookup cleanup', 'clearPageGroupGlobals(static_cast<SwfPageGroupView*>(object));', '/* cleanup lost */'),
+  ('drop lookup result', 'clearPageGroupGlobals(static_cast<SwfPageGroupView*>(object));\n    return entry;',
+   'clearPageGroupGlobals(static_cast<SwfPageGroupView*>(object));\n    return nullptr;'),
+ ],
+ 'swf_get_page_group_integer': [
+  ('clear missing output', 'if (!value) return false;', 'if (!value) { *output = 0; return false; }'),
+  ('drop output', '*output = swfValueToInteger(value);', '(void)swfValueToInteger(value);'),
+  ('truncate result', '*output = swfValueToInteger(value);', '*output = static_cast<uint8_t>(swfValueToInteger(value));'),
  ],
  'swf_bind_entry': [
   ('wrong binding selector', 'swfSelectPageGroup(group, 1);', 'swfSelectPageGroup(group, 0);'),

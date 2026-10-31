@@ -102,6 +102,7 @@ set(SOURCES
     src/rage/audio/xma_source.cpp
     src/rage/audio/ld_xaudio_data.cpp
     src/rage/audio/xact_fade.cpp
+    src/rage/audio/xact_volume.cpp
     src/rage/audio/xact_sound.cpp
     src/rage/audio/xaudio_effect_buffer.cpp
     src/rage/audio/xaudio_effect.cpp
@@ -129,12 +130,14 @@ set(SOURCES
     src/rage/io/fiDevice.cpp
     src/rage/io/fiAsciiTokenizer.cpp
     src/rage/io/fiStreamBuf.cpp
+    src/rage/io/fiStreamOpen.cpp
     src/rage/io/fiPath.cpp
     src/rage/io/fi_image_data.cpp
     src/rage/render_loop.c
     src/rage/scene_render.c
     src/rage/network/session_events.cpp
     src/rage/network/snSessionStates.cpp
+    src/rage/network/session_state_helpers.cpp
     src/rage/core/subsystem_init.c
     src/rage/swf.cpp
     src/rage/swf_image_data.cpp
@@ -149,6 +152,7 @@ set(SOURCES
     src/rage/localized_font.cpp
     src/rage/localized_font_lifecycle.cpp
     src/rage/localized_font_effect.cpp
+    src/rage/localized_font_array.cpp
     src/rage/swf_clip_events.cpp
     src/rage/core/timer.cpp
     src/rage/core/rage_core_utils.cpp
@@ -164,6 +168,7 @@ set(SOURCES
     src/game/cutscene/gd_cutscene_strings.cpp
     src/game/cutscene/pong_cutscene.cpp
     src/game/data/gd_data.cpp
+    src/game/data/player_manager_state.cpp
     src/game/template_registry.cpp
     src/game/game_message.cpp
     src/game/game_message_data.cpp
@@ -221,10 +226,13 @@ set(SOURCES
     src/game/network/pong_network_classes.cpp
     src/game/network/pong_network_io.cpp
     src/game/network/network_timestamp.cpp
+    src/game/network/network_selection.cpp
     src/game/network/round_robin_state.cpp
     src/game/network/score_payload.cpp
     src/game/network/network_context.cpp
     src/game/network/msg_msg_sink.cpp
+    src/game/network/msg_sink_timing.cpp
+    src/game/network/msg_sink_children.cpp
     src/game/network/xonline_strings.cpp
     src/game/player/pong_player.cpp
     src/game/player/pong_player_swing.cpp
@@ -249,6 +257,8 @@ set(SOURCES
     src/game/player/player_serve_hit_point_data.cpp
     src/game/player/player_shot_target_setup.cpp
     src/game/player/player_spin_helpers.cpp
+    src/game/player/ai_swing_direction.cpp
+    src/game/player/player_shot_reset.cpp
     src/game/player/camera_node_cast.cpp
     src/game/player/player_camera_side.cpp
     src/game/player/player_camera_side_data.cpp
@@ -333,6 +343,7 @@ set(SOURCES
     src/game/player/player_data.cpp
     src/graphics/grc_data.cpp
     src/graphics/image_data.cpp
+    src/graphics/image_descriptor_queries.cpp
     src/physics/ph_data.cpp
     src/physics/ld_ph_data.cpp
     src/rage/animation/anim_data.cpp
@@ -353,6 +364,8 @@ set(SOURCES
     src/xam/kernel_import_thunks.c
     src/rage/math/float_approach.cpp
     src/rage/math/index_wrap.cpp
+    src/rage/math/random_range.cpp
+    src/rage/math/random_shuffle_data.cpp
     src/rage/math/ph_math.cpp
     src/rage/math/polygon_clip.cpp
     src/rage/math/swf_matrix.cpp
