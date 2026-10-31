@@ -290,7 +290,7 @@ extern "C" const char* rage_StringFindChar(const char* str, char c) {
     return std::strchr(str, c);
 }
 
-// rage_atStringCopy (0x82228990) is defined in pong_network_io.cpp. It is not
+// rage_atStringCopy (0x82228990) is defined in data/localized_text.cpp. It is not
 // a strncpy: it looks the key up in the string table (0x82408F08) and writes
 // the entry as UTF-8.
 
