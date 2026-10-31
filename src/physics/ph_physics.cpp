@@ -1,3 +1,4 @@
+#include "archetype_refs.hpp"
 #include "rage/mat33.hpp"
 #include "rage/ref_counted_header.hpp"
 /**
@@ -133,9 +134,7 @@ extern void phInst_5910_p39(void* obj);
 extern void phJoint1Dof_AFF8_p42(rage::phJoint3Dof*, int, float*);
 extern void phJoint_1388(rage::phJoint3Dof*, int, float, float*, float*);
 extern void phJoint_PreSyncState(rage::phJoint3Dof*);
-extern void ph_9E50(void*, void*);
 extern void ph_A330(void* obj);
-extern void ph_CEE0(void*, int);
 extern void ph_E088(void*, void*, void*, float, int);
 extern void ph_E1E8(void* obj);
 extern void ph_FE48(void* obj, void* p);

@@ -1,3 +1,4 @@
+#include "../../physics/archetype_refs.hpp"
 #include "rage/ptr32.hpp"
 #include "../../physics/composite_bounds.hpp"
 #include "../../anim/look_at_controller.hpp"
@@ -4470,7 +4471,6 @@ void pongCreature::RequestTeleport(const char* caller, const pongCreatureMatrix*
 // @ 0x822C9D98 — phArchetype release: does nothing (returns 1) while the byte at
 // 0x826064E1 is clear; otherwise drops the u16 refcount at +0x1A and, when it
 // reaches zero, calls slot 0 with flags 1 (deleteWhenUnused set) or slot 3.
-extern "C" void util_9D98(void* archetype, int deleteWhenUnused);
 
 /**
  * phInst::Cleanup @ 0x822C8FD0 | size: 0x5C

@@ -285,6 +285,7 @@ set(SOURCES
     src/physics/collider_velocity.cpp
     src/physics/ph_float_property.cpp
     src/physics/ph_physics.cpp
+    src/physics/archetype_refs.cpp
     src/physics/composite_bounds.cpp
     src/physics/bound_lookup.cpp
     src/physics/articulated_constraints.cpp
