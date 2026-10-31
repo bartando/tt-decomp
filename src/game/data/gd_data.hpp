@@ -1694,34 +1694,6 @@ namespace rage {
 }
 
 /**
- * PostStateTransitionRequest @ 0x822228B8
- * Original symbol: game_28B8
- * 
- * Posts a state transition request to the HSM (Hierarchical State Machine).
- * 
- * This is the core HSM transition mechanism used by all game states.
- * When a state wants to transition to another state, it calls this function
- * with the target state index.
- * 
- * Flow:
- * 1. Calls vtable slot 6 on the HSM context (CanTransition check)
- * 2. If transition is blocked, returns an error string pointer
- * 3. If allowed, retrieves the target state object from the state array
- * 4. Calls vtable slot 13 on the target state (CreateTransitionRequest)
- * 5. Returns the transition request object
- * 
- * Used by:
- * - All pong*State::OnEnter/OnExit methods
- * - Network client state transitions
- * - Game loop state management
- * 
- * @param hsmContext The HSM context managing state transitions
- * @param stateIndex Index of the target state to transition to
- * @return Transition request object, or error string if blocked
- */
-void* PostStateTransitionRequest(rage::hsmContext* hsmContext, int stateIndex);
-
-/**
  * InitializePageGroup @ 0x8231F4C0
  * Original symbol: game_F4C0
  * 

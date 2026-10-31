@@ -67,8 +67,6 @@ extern void pongPlayer_EnterServeMode(void* player);
 
 // Post a game event with arbitrary data payload.
 // @ 0x8225E480
-extern void PostGameEvent(uint32_t eventId, uint32_t flags,
-                          void* data, uint8_t param);
 
 // Copy a vec3 from a source into a destination buffer.
 // @ 0x821E6470
@@ -478,7 +476,7 @@ void SignalReadyToServeMessage_Use(SignalReadyToServeMessage* self)
 
         if (stateId == 25 || stateId == 23 || stateId == 24) {
             // Play states → post serve event with player index
-            PostGameEvent(14371, 64, const_cast<char*>("i"), self->m_playerIndex);
+            PostGameMessageFmt(14371, 64, "i", self->m_playerIndex);
             return;
         }
 

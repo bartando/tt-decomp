@@ -97,7 +97,6 @@ extern float     g_kPowerBlend;                  // power blend constant @ 0x825
 extern float     g_kFrameToSecScale;             // frames-to-seconds   @ 0x8202D100
 
 extern bool CheckButtonPressed(void* record);                              // pg_FFF8_g @ 0x821DFFF8
-extern void PostPageGroupMessage(void* rec, int code, int mask, int a3, int opActive); // pg_E6E0
 extern bool pongPlayer_CheckServeInput(pongPlayer* p);                            // @ 0x82195B60
 extern void pongPlayer_InitActionState(void* actionState, int released);            // @ 0x821A1460
 
@@ -842,107 +841,46 @@ bool pongPlayer::CheckOpponentSwingApex() const
 }
 
 
-// ===========================================================================
-// SECTION 17 — CheckButtonInput  (vfn_7) @ 0x8218EE10 | size: 0x1BC
-// vtable slot 7
-//
-// Per-frame button-state handler.  Called every frame when the player is
-// active. Skipped when the game clock is at frame 10 (pause/replay guard).
-//
-// Logic:
-//  1. Read global clock (lis(-32161) + -21712 → +12). If it equals 10
-//     (a special frame count used during replay scrubbing), skip entirely.
-//
-//  2. Check whether m_inputSlotIdx (+14 in g_pButtonStateTable) is in
-//     "button pressed" state (value == 1).  If not pressed, bail.
-//
-//  3. If pressed, look up this player's 808-byte data record via the
-//     global player data table (g_pPlayerDataTable), using the vtable
-//     entry from slot 1 of our own vtable as the lookup key.
-//
-//  4. Call CheckButtonPressed on (record + 796) — checks whether this button press
-//     is "new" (first frame down) vs already-held.
-//       - If newly pressed: compute a bit mask `1 << m_inputSlotIdx` and
-//         check whether the opponent's input slot (15 - m_inputSlotIdx)
-//         is also active. Call PostPageGroupMessage to fire the "button down" event
-//         with code 2125.
-//       - If held (not new): accumulate a float into the record via
-//         pongPlayer_0508_g (reads analog input) and fmadds/fadds into the
-//         record's score field. This implements "power charging" while
-//         the button is held.
-//
-// New confirmed fields:
-//   +0x1D0 (464) = m_inputSlotIdx   — confirmed used as direct integer index
-//   +0x1F0 (496) = m_pActionState   — confirmed from vfn_9
-// ===========================================================================
+// The retail player exposes its input query at virtual slot 1. The older
+// pongPlayer declaration still conflates this slot with a scalar destructor.
+namespace {
+class PlayerInputQuery {
+public:
+    virtual void Destroy() = 0;
+    virtual uint32_t IsInputEnabled() = 0;
+};
+}
+extern "C" void* g_loop_obj_ptr; // @ 0x825EAB30
+extern "C" void* g_pReplayStateData; // @ 0x8271A2EC
+
+// pongPlayer::CheckButtonInput @ 0x8218EE10
 void pongPlayer::CheckButtonInput()
 {
-    // Guard: skip during replay/pause frame.
-    // g_pClockObj → ptr → +12 = frame state int
-    uint32_t* clockPtr = reinterpret_cast<uint32_t*>(g_pClockObj);
-    int32_t clockState = reinterpret_cast<int32_t*>(clockPtr[0])[3];  // deref + offset 12/4
-    if (clockState == 10)
+    if (*reinterpret_cast<const int32_t*>(static_cast<const uint8_t*>(g_loop_obj_ptr) + 12) == 10)
+        return;
+    const auto slot = [this]() { return *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(this) + 0x1D0); };
+    if (static_cast<const int32_t*>(g_input_obj_ptr)[slot() + 14] != 1)
         return;
 
-    // Check if this player's button is currently pressed (state == 1 = "down").
-    int32_t buttonState = ((int32_t*)g_pButtonStateTable)[m_inputSlotIdx + 14];
-    if (buttonState != 1)
-        return;
-
-    // Look up per-player 808-byte data record.
-    // Key = vtable[1] of this object (the scalar dtor pointer, used as player ID).
-    void*    vtableKey  = ((void**)*(void**)this)[1];
-    uint32_t slotIdx    = g_pPlayerSlotTable[m_inputSlotIdx + 1];   // (+14 alternate index)
-    // Each row in g_pPlayerDataTable is 808 bytes; the per-player record begins at +12 within the row.
-    // TODO(researched): the 808-byte record spans input, button history, charge
-    //       accumulators, and slot-mirror state; there is no RTTI-visible type
-    //       for it (it's a flat .data array, verified via data_section_structs.txt).
-    //       Leaving the byte-offset arithmetic until a dedicated pass models the
-    //       record from the ~15 functions that touch it.
-    uint8_t* record     = reinterpret_cast<uint8_t*>(g_pPlayerDataTable) + (slotIdx * 808) + 12;
-
-    // Is this the first frame the button is down?
-    bool isNewPress = CheckButtonPressed((void*)(record + 796));
-
-    if (isNewPress) {
-        // Check if opponent's slot is also active (mirrored slot = 15 - mySlot).
-        int32_t mirrorSlot = 15 - m_inputSlotIdx;
-        bool    opponentActive;
-        if (((int32_t*)g_pButtonStateTable)[mirrorSlot] == 0) {
-            // Verify against the saved slot in the player data table.
-            opponentActive = (g_pPlayerDataTable_slot == m_inputSlotIdx);
-        } else {
-            opponentActive = true;
-        }
-
-        // Fire the "button down" event: mask = 1 << m_inputSlotIdx, code 2125.
-        uint8_t buttonMask = (uint8_t)(1u << (m_inputSlotIdx & 31));
-        PostPageGroupMessage(record, /*code*/ 2125, /*mask*/ buttonMask,
-                /*unused*/ 0, /*opponentActive*/ (int)opponentActive);
-    } else {
-        // Button held: accumulate power into the record's score float.
-        // Read the analog-axis float return, then blend via fmadds or fadds.
-        const float delta = pongPlayer_0508_g(record, 30);
-
-        // Blend constant from global table: g_kPowerBlend @ 0x825C2EA0
-        float blend = g_kPowerBlend;
-        float threshold = g_kZero;
-
-        // Score accumulator @ g_pButtonStateTable + 0x8CEC (36076).
-        // TODO(researched): g_pButtonStateTable is another flat .data array
-        //       (no RTTI type); offset +0x8CEC falls inside the final quarter
-        //       of the table, consistent with a per-player charge accumulator.
-        //       Pending a dedicated modelling pass.
-        float& scoref = *reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(g_pButtonStateTable) + 0x8CEC);
-
-        if (delta < threshold) {
-            // Linear blend: scoref = delta * blend + threshold
-            scoref = delta * blend + threshold;
-        } else {
-            // Additive: scoref = delta + threshold
-            scoref = delta + threshold;
+    auto* table = g_pPlayerDataTable; // @ 0x8271A31C
+    const uint32_t index = reinterpret_cast<const uint32_t*>(table)[slot() + 1];
+    auto* record = table + index * 0x328u + 12;
+    const uint8_t enabled = static_cast<uint8_t>(reinterpret_cast<PlayerInputQuery*>(this)->IsInputEnabled());
+    const auto* input = static_cast<const int32_t*>(g_input_obj_ptr);
+    auto* replay = static_cast<uint8_t*>(g_pReplayStateData);
+    if (enabled != 0 && CheckButtonPressed(rage::load_ptr32<uint8_t>(record, 0x31C) + 8)) {
+        const uint32_t playerSlot = slot();
+        if (input[15 - playerSlot] == 0 ||
+            *reinterpret_cast<const uint32_t*>(replay + 0x68D00) == playerSlot) {
+            PostGameMessage(2125, static_cast<uint8_t>(1u << (playerSlot & 31)), 0, nullptr);
+            return;
         }
     }
+    if (replay[0x68CFA] == 0 || slot() != 0 || input[14] != 1)
+        return;
+    const float delta = pongPlayer_0508_g(record, 30);
+    *reinterpret_cast<float*>(replay + 0x68CEC) =
+        delta < 0.0f ? std::fma(delta, g_kPowerBlend, 1.0f) : delta + 1.0f;
 }
 
 

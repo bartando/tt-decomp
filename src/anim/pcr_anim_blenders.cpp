@@ -1,3 +1,4 @@
+#include "game/game_message.hpp"
 /**
  * pcr_anim_blenders.cpp — Pong Creature Animation Blenders
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -78,10 +79,6 @@ extern uint32_t util_CDF0(void* blender,
                       const void* clipDesc,
                       uint32_t flags);           // @ 0x8224CDF0  start clip
 extern void SetPageGroupVisible(void* obj);              // @ 0x8224CFE0  GetCurrentClip
-extern void PostPageGroupMessage(uint32_t msg,
-                    uint8_t  flags,
-                    uint32_t, uint32_t,
-                    uint32_t, uint32_t);         // @ 0x8225E6E0  send message
 extern void pcrAnimBlender_ApplyClipWeights(void* player,
                                              uint32_t clipRef,
                                              float weightA,
@@ -342,9 +339,9 @@ void pcrEmoteBlender::Update()
         else if (wasActive && !isNowActive)
         {
             uint32_t bit = (uint32_t(1) << m_emoteIndex);
-            PostPageGroupMessage(0x100F,            // message id 4111
+            PostGameMessage(0x100F,            // message id 4111
                     uint8_t(bit | 64), // channel flags
-                    0, 0, 0, 0);
+                    0, nullptr);
         }
     }
 }
@@ -604,9 +601,9 @@ void pcrPostPointBlender::Update()
 
                     // Send post-point completion message to the UI.
                     uint32_t bit = (uint32_t(1) << m_emoteIndex);
-                    PostPageGroupMessage(0x100F,           // msg 4111
+                    PostGameMessage(0x100F,           // msg 4111
                             uint8_t(bit | 64),
-                            0, 0, 0, 0);
+                            0, nullptr);
 
                     // If the active clip index is still negative after
                     // reselection, mark as complete.

@@ -1,3 +1,4 @@
+#include "game/game_message.hpp"
 #include "crt/host_format.h"
 // pong_drill.cpp — Training drill implementations | Rockstar Presents Table Tennis (Xbox 360, 2006)
 
@@ -18,7 +19,6 @@
 
 // External function declarations
 extern "C" {
-    void NotifyUIEvent(int eventId, int flags, int param3, int param4);  // pg_E6E0 @ 0x8225E6E0
     void SetTrainingState(void* pStateMachine, int nState);             // atSingleton_E9F8_w @ 0x821EE9F8
     void rage_debugLog(const char* message);  // @ 0x8240E6D0 (empty in this build)
     void xmlNodeStruct_vfn_2(void* self);  // @ base class PostLoadProperties
@@ -115,7 +115,6 @@ static inline float NextRandomBits() {
     return (float)(g_prngState[0] & 0x7FFFFF);
 }
 
-extern void PostPageGroupMessageFmt(uint32_t messageId, uint32_t mask, const char* format, ...);  // @ 0x8225E480
 // @ 0x8210CB88 — fadds/fsubs round to float before truncating toward zero.
 int RoundHalfAwayFromZero(float value) {
     float rounded = value >= 0.0f ? value + 0.5f : value - 0.5f;
@@ -137,7 +136,7 @@ struct DrillHudEntry { int32_t value, type; };
 static void SetTrainingHudInteger(DrillTrainingHud* hud, const char* key, int32_t value) {
     uint8_t acquired = hudFlashBase_IsNetworkDirty(hud);
     void* group = hudFlashBase_GetPageGroup(hud);
-    auto* entry = static_cast<DrillHudEntry*>(SinglesNetworkClient_BindEntry(group, key));
+    auto* entry = static_cast<DrillHudEntry*>(swfGetOrCreatePageGroupValue(group, key));
     if (entry) {
         entry->value = value;
         entry->type = 3;
@@ -167,7 +166,7 @@ void hudTrainingHUD_PushArrowDirection(DrillTrainingHud* hud) {
     void* group = hudFlashBase_GetPageGroup(hud);
     int32_t direction = hud->m_arrowDirection;
     auto* entry = static_cast<DrillHudEntry*>(
-        SinglesNetworkClient_BindEntry(group, g_trainingHudArrowKey));
+        swfGetOrCreatePageGroupValue(group, g_trainingHudArrowKey));
     if (entry) {
         entry->value = direction;
         entry->type = 3;
@@ -271,7 +270,7 @@ inline void pongTrainingDrill::TickTimeLimit(float dt) {
         m_timeRemaining -= dt;
         if (m_timeRemaining <= 0.0f) {
             m_timeRemaining = g_fDrillDefaultTime;
-            NotifyUIEvent(0x10, 0x40, 0, 0);
+            PostGameMessage(0x10, 0x40, 0, 0);
         }
     }
 }
@@ -350,7 +349,7 @@ void pongTrainingDrill::NextAttempt(int count) {
     if (GetDrillTypeIndex() != 5 && m_numAttempts > 0 &&
         m_prevSuccesses == m_numSuccesses && !m_completionFlag) {
         // The original leaves r6 unspecified for this three-argument message.
-        NotifyUIEvent(0x5009, 0x40, 0, 0);
+        PostGameMessage(0x5009, 0x40, 0, 0);
         m_completionFlag = 1;
     }
     m_prevSuccesses = m_numSuccesses;
@@ -360,12 +359,12 @@ void pongTrainingDrill::NextAttempt(int count) {
     ApplyTargetSet();
     hudTrainingHUD_SetRemaining(g_pTrainingHud, m_pConfig->m_totalNumTries - m_numAttempts + 1);
     if (UseAlternateAttemptEvent()) {
-        NotifyUIEvent(0x23, 0x40, 0, 0);
+        PostGameMessage(0x23, 0x40, 0, 0);
     } else {
-        NotifyUIEvent(0x0F, 0x40, 0, 0);
-        NotifyUIEvent(0x24, 0x40, 0, 0);
+        PostGameMessage(0x0F, 0x40, 0, 0);
+        PostGameMessage(0x24, 0x40, 0, 0);
     }
-    NotifyUIEvent(0x5005, 0x40, 0, 0);
+    PostGameMessage(0x5005, 0x40, 0, 0);
 }
 
 /**
@@ -531,7 +530,7 @@ void pongTrainingDrill::IncreaseNumSuccesses(int increment) {
         m_numSuccesses = totalNumTries;
     }
     hudTrainingHUD_SetCompleted(g_pTrainingHud, m_numSuccesses);
-    PostPageGroupMessageFmt(0x5008, 0x40, "i", 1);
+    PostGameMessageFmt(0x5008, 0x40, "i", 1);
 }
 
 /**
@@ -543,7 +542,7 @@ void pongTrainingDrill::IncreaseNumSuccesses(int increment) {
  * moves the training state machine to state 5.
  */
 void pongTrainingDrill::Finish() {
-    NotifyUIEvent(0x5004, 0x40, 0, 0);
+    PostGameMessage(0x5004, 0x40, 0, 0);
 
     DrillReticle* reticle = ActivePlayerReticle();
     if (reticle != nullptr) {
@@ -625,7 +624,7 @@ void pongTrainingDrill::UpdateRank(bool saveBest) {
 
     // Write new best score and notify UI
     g_pDrillSaveData[nSaveIdx] = m_rank;
-    NotifyUIEvent(20491, 64, 0, 0);
+    PostGameMessage(20491, 64, 0, 0);
 }
 
 /**
@@ -810,7 +809,7 @@ void pongDrillMovement::Update(float dt) {
     if (PassedMark(before, m_timeLeft, 5.0f) || PassedMark(before, m_timeLeft, 4.0f) ||
         PassedMark(before, m_timeLeft, 3.0f) || PassedMark(before, m_timeLeft, 2.0f) ||
         PassedMark(before, m_timeLeft, 1.0f)) {
-        NotifyUIEvent(0x1806, 0x40, 0, 0);
+        PostGameMessage(0x1806, 0x40, 0, 0);
     }
     UpdateTimeDisplay();
 
@@ -833,7 +832,7 @@ void pongDrillMovement::Update(float dt) {
     if (gmPracticeTarget_IsPointOnTarget(g_pPracticeTarget, 0, &match->m_pPlayerTransform->m_position,
                                          m_pMovementData->m_detectRadius)) {
         m_numSuccesses++;
-        PostPageGroupMessageFmt(0x5008, 0x40, "i", 1);
+        PostGameMessageFmt(0x5008, 0x40, "i", 1);
         m_hitHoldTimer = m_pMovementData->m_targetHitTime;
         if (m_hitHoldTimer <= 0.0f) {
             NextAttempt(1);
@@ -979,7 +978,7 @@ void pongDrillMovement::UpdateRank(bool saveBest) {
     }
     slot = g_pTrainingData->m_drillSetIndex * 12 + GetDrillTypeIndex() + 3;
     g_pDrillSaveData[slot] = m_rank;
-    NotifyUIEvent(0x500B, 0x40, 0, 0);
+    PostGameMessage(0x500B, 0x40, 0, 0);
 }
 
 /**

@@ -1,18 +1,24 @@
 #include "localized_font_internal.hpp"
 #include "rage/grc_texture.hpp"
+#include <cstring>
 
 extern "C" {
 void rage_free(void* pointer); // @ 0x820C00C0
 uint32_t rage_FindSingleton(void* pointer); // @ 0x820F90D0
+void sysMemAllocator_InitThreadHeap(); // @ 0x820C0038
 }
 void nop_8240E6D0(const char*, ...); // @ 0x8240E6D0
 
 namespace {
 template <typename T>
-void releaseBlock(rage::ptr32<T>& slot) {
-    T* pointer = slot.get();
+void freeBlock(T* pointer) {
     if (pointer && static_cast<uint8_t>(rage_FindSingleton(pointer)) == 0)
         currentFontAllocator()->Free(pointer);
+}
+
+template <typename T>
+void releaseBlock(rage::ptr32<T>& slot) {
+    freeBlock(slot.get());
     slot = nullptr;
 }
 
@@ -100,6 +106,36 @@ void localizedFontClearResources(void* raw) {
     releaseBlock(font->name);
     releaseBlock(font->glyphs);
     font->glyphCount = 0;
+}
+
+// Incoming flags/name are not read by the retail reset routine.
+// @ 0x82409578
+void localizedFontReset(void* raw, uint32_t /*flags*/, const char* /*name*/) {
+    auto* font = static_cast<LocalizedFont*>(raw);
+    releaseElements(font);
+    clearArray(font->textures);
+    clearArray(font->auxiliaryTextures);
+    clearArray(font->effects);
+    clearArray(font->auxiliaryEffects);
+    clearArray(font->pages);
+    // Keep the old name field visible through the allocator callback.
+    freeBlock(font->name.get());
+    const uint32_t bytes = static_cast<uint32_t>(std::strlen(g_localizedFontResetName)) + 1;
+    sysMemAllocator_InitThreadHeap();
+    void* thread = rage::load_ptr32<void>(g_sda_base, 0);
+    auto* allocator = rage::load_ptr32<FontAllocator>(thread, 4);
+    auto* name = static_cast<char*>(allocator->Allocate(bytes, 16));
+    font->name = static_cast<char*>(std::memcpy(name, g_localizedFontResetName, bytes));
+    auto* glyphs = font->glyphs.get();
+    if (glyphs && static_cast<uint8_t>(rage_FindSingleton(glyphs)) == 0) {
+        // Retail retains this TLS block, then reloads its allocator after the
+        // ownership callback; it does not reload the root from r13 here.
+        rage::load_ptr32<FontAllocator>(thread, 4)->Free(glyphs);
+    }
+    font->glyphs = nullptr;
+    font->glyphCount = 0;
+    std::memset(font->glyphIndex, 0, sizeof(font->glyphIndex));
+    font->fallbackGlyph = 0;
 }
 
 // @ 0x82409490
