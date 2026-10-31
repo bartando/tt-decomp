@@ -47,9 +47,29 @@ extern "C" const float g_phJoint1Dof_angleMax = 3.40282347e+38f;
 extern "C" const float g_capsuleVolK2 = 3.14159274f;
 TT_DATA_ALIAS("g_phTaperedCapsuleVolK2", "g_capsuleVolK2");
 
+// Capsule inertia polynomial coefficients, read from the retail image.
+// @ 0x82079BC4 (.rdata) — 16/15
+extern "C" const float g_capsuleInertiaAxialK = 1.06666672f;
+// @ 0x82079BC8 (.rdata) — 9/4
+extern "C" const float g_capsuleInertiaMixedK = 2.25f;
+// @ 0x82079BCC (.rdata) — 8/5
+extern "C" const float g_capsuleInertiaRadialK = 1.60000002f;
+// @ 0x825C806C (.data) — 1/3
+extern "C" const float g_capsuleInertiaThird = 0.333333343f;
+
 // @ 0x82079BD0 (.rdata) — 4/3
 extern "C" const float g_capsuleVolK1 = 1.33333337f;
 TT_DATA_ALIAS("g_phTaperedCapsuleVolK1", "g_capsuleVolK1");
+
+// @ 0x825CB790 (.data) — consecutive X/Y/Z unit vectors
+extern "C" const float g_phResponseBasis[3][4] = {
+    {1.0f, 0.0f, 0.0f, 0.0f},
+    {0.0f, 1.0f, 0.0f, 0.0f},
+    {0.0f, 0.0f, 1.0f, 0.0f},
+};
+
+// @ 0x82079C58 (.rdata) — rotation vector squared-length cutoff
+extern "C" const float g_phRotationMinSquared = 9.99999996e-13f;
 
 // @ 0x8207A04C (.rdata)
 extern "C" const float g_phJoint1Dof_maxCorr = -1.0e+08f;
@@ -116,3 +136,6 @@ extern "C" const float g_segmentTriangleMinArea = 0.00000762939453125f;
 RTTITypeDescriptor g_typeDescriptor_phBoundComposite = {
     nullptr, nullptr, ".?AVphBoundComposite@rage@@"
 };
+
+// @ 0x8202D18C (.rdata) — trace-scaled symmetric-inverse pivot floor.
+extern "C" const float g_phInertiaPivotRatio = 9.999999747378752e-6f;
