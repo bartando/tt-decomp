@@ -22,6 +22,9 @@ extern "C" const float g_cameraSampleInitFloat2 = 0.0f;
 // @ 0x8202D168 (.rdata)
 extern "C" const float g_cameraTransitionOffset = 0.00100000005f;
 
+// @ 0x825C5EBC (.data)
+extern "C" float g_cameraShotChangeGate = 99999.0f;
+
 // @ 0x82032868 (.rdata)
 extern "C" const char kCamViewCS_TypeName[5] = "tune";
 

@@ -472,8 +472,6 @@ extern void  msgMsgSink_EA00(void);                                   // @ 0x824
 extern void  _locale_register(void* sink, uint32_t tag);              // @ 0x820c02d0
 extern int32_t snNotifyGamerAdded_E790(void* self, void* param,
                                        void** outHandle);             // @ 0x8244e790
-extern uint32_t atSingleton_7CE0_w(void* bucket, int inBounds,
-                                   int boundExcl);                    // @ 0x82447ce0
 extern int32_t net_1CC8(uint32_t* outSlot, int one, int zero,
                         int zero2, int zero3, uint32_t flags,
                         int eight, int zero4, int zero5);              // @ 0x82481cc8

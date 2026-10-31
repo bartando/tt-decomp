@@ -1,5 +1,6 @@
 #include "audio/xact_fade.hpp"
 #include "audio/xact_sound.hpp"
+#include "audio/xact_volume.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -142,7 +143,6 @@ int32_t cueOwnsTransitions(void* cue) {
 }
 } // namespace
 
-extern void msgMsgSink_3DC8_g(void*); // @ 0x82453DC8
 extern void msgMsgSink_DC40_g(void*, uint32_t); // @ 0x8244DC40
 extern uint32_t msgMsgSink_4EB8_g(void*); // @ 0x82454EB8
 extern uint32_t rage_4318(void*); // @ 0x82454318
