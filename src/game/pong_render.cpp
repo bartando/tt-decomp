@@ -65,9 +65,40 @@ extern const float lbl_8202D108;               // @ 0x8202D108  1.0f
 extern "C" uint32_t g_grmShaderFx_variantTable[23];  // @ 0x825EBBD8  pending render state
 extern "C" uint32_t g_grmShaderFx_boundContext;      // @ 0x825EBC54  shader-global write counter
 
-extern void game_E0A8(pongLightState* dst, const pongLightState* src);  // @ 0x8213E0A8
+// @ 0x8213E0A8 | size: 0x64
+pongLightState* game_E0A8(pongLightState* dst, const pongLightState* src) {
+    pongLightState_CopyLights(dst, src);
+    dst->ambient = src->ambient;
+    dst->count = src->count;
+    dst->field_212 = src->field_212;
+    return dst;
+}
 extern uint32_t game_A2F8(const char* name, int create);              // @ 0x8215A2F8
-extern void game_A670(uint32_t handle, const ShaderVector* values, int count);  // @ 0x8215A670
+// @ 0x8215A670 | size: 0xCC
+void game_A670(uint32_t handle, const ShaderVector* values, int count) {
+    ShaderTable* table = lbl_825EBC40;
+    uint32_t* entry = table->entries + (handle >> 18) * 2;
+    uint32_t bit = (handle >> 1) & 0x1FFFFu;
+    uint32_t header = entry[0];
+    ++g_grmShaderFx_boundContext;
+    uint32_t length = count != 0 ? static_cast<uint32_t>(count) : ((header >> 2) & 0x3FFFu);
+    uint32_t end = bit + length;
+    while (bit < end) {
+        uint8_t vector[16];
+        const void* source = reinterpret_cast<const void*>(
+            reinterpret_cast<uintptr_t>(values) & ~uintptr_t(15));
+        memcpy(vector, source, sizeof(vector));
+        ShaderVector* bank = table->values;
+        table->dirtyBits[bit >> 3] |= g_shaderParameterDirtyMasks[bit & 7];
+        entry += 2;
+        uint32_t slot = entry[1] & 0xFFFFu;
+        void* destination = reinterpret_cast<void*>(
+            reinterpret_cast<uintptr_t>(bank + slot) & ~uintptr_t(15));
+        memcpy(destination, vector, sizeof(vector));
+        ++bit;
+        ++values;
+    }
+}
 
 // @ 0x82154320 | size: 0x308 (game_4320)
 // Inferred name: upload the light state to Diffuse/Position/LightCount/LightType/Ambient.

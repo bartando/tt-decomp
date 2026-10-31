@@ -1861,3 +1861,131 @@ void game_3860(void* gameState, int /*kind*/, const char* name) {
         4,
     }};
 }
+
+// Practice-target selection state, shared with the training drills.
+extern gmPracticeTarget* g_pPracticeTarget;       // @ 0x826063A8
+extern void* g_pTableDims;                        // @ 0x8271A304
+extern uint32_t g_prngState[2];                   // @ 0x825CA2C8
+extern float g_practiceTargetGrid[9][8];          // @ 0x82617C90
+extern int32_t g_practiceTargetActiveZones[9];    // @ 0x825EB280
+extern float g_practiceTargetGridShape[8];        // @ 0x825C99E0
+extern int32_t g_practiceTargetSelectedIndex;     // @ 0x826063B0
+
+static uint32_t AdvancePracticeTargetRandom() {
+    uint64_t next = static_cast<uint64_t>(g_prngState[0]) * 0x5CDCFAA7u + g_prngState[1];
+    g_prngState[0] = static_cast<uint32_t>(next);
+    g_prngState[1] = static_cast<uint32_t>(next >> 32);
+    return g_prngState[0];
+}
+
+// @ 0x821B2B28 | size: 0xE0
+// A forward shuffle that always swaps with a later element. The final swap
+// is deterministic and consumes no random number; cursor restarts at zero.
+void gmPracticeTargetWordArray_Shuffle(gmPracticeTargetWordArray* array) {
+    for (int32_t i = 0; i < array->m_count - 1; ++i) {
+        int32_t j = array->m_count - 1;
+        if (i < array->m_count - 2) {
+            uint32_t bits = AdvancePracticeTargetRandom() & 0x7FFFFFFFu;
+            j = i + 1 + bits % (array->m_count - i - 1);
+        }
+        uint32_t saved = array->m_data[i];
+        array->m_data[i] = array->m_data[j];
+        array->m_data[j] = saved;
+    }
+    array->field_0C = 0;
+}
+
+// @ 0x821B2C08 | size: 0x90
+uint32_t gmPracticeTargetWordArray_Next(gmPracticeTargetWordArray* array) {
+    uint32_t selected = array->m_data[array->field_0C];
+    array->field_0C = (array->field_0C + 1) % array->m_count;
+    if (array->field_0C == 0 && (array->m_flags & 0x80)) {
+        gmPracticeTargetWordArray_Shuffle(array);
+    }
+    return selected + ((array->m_flags & 0x40) ? 1u : 0u);
+}
+
+// @ 0x821132B0 | size: 0x194
+void gmPracticeTarget_LayOutTableGrid() {
+    struct TableDimensions {
+        uint8_t _pad00[0x10];
+        float width, height, length;
+    };
+    const auto* table = static_cast<const TableDimensions*>(g_pTableDims);
+    float halfWidth = table->width * 0.5f;
+    float halfLength = table->length * 0.5f;
+    float x[4], z[4];
+    for (int i = 0; i < 4; ++i) {
+        x[i] = g_practiceTargetGridShape[i] * halfWidth;
+        z[i] = g_practiceTargetGridShape[4 + i] * halfLength;
+    }
+    for (int row = 0; row < 3; ++row) {
+        for (int col = 0; col < 3; ++col) {
+            float* zone = g_practiceTargetGrid[row * 3 + col];
+            zone[0] = x[col];     zone[1] = z[row];
+            zone[2] = x[col];     zone[3] = z[row + 1];
+            zone[4] = x[col + 1]; zone[5] = z[row];
+            zone[6] = x[col + 1]; zone[7] = z[row + 1];
+        }
+    }
+}
+
+// Each set contains NumTargets records: nine active-zone words followed by
+// four normalized x boundaries and four normalized z boundaries.
+struct PracticeTargetDefinition {
+    int32_t activeZones[9];
+    float gridShape[8];
+};
+static_assert(sizeof(PracticeTargetDefinition) == 0x44, "practice target record stride");
+
+// @ 0x821137B0 | size: 0x2E8
+void gmPracticeTarget_SelectSet(void* /*unused*/, int32_t setId, int /*unused*/, int /*unused*/) {
+    // The PPC ignores its object argument and uses the target singleton.
+    gmPracticeTarget* target = g_pPracticeTarget;
+    if (setId != static_cast<int32_t>(target->field_44)) {
+        target->field_44 = setId;
+        gmPracticeTargetWordArray* array = target->m_wordArray;
+        int32_t count = target->m_sets[setId].m_numTargets;
+        array->m_count = count == -1 ? array->m_capacity : count;
+        for (int32_t i = 0; i < array->m_capacity; ++i) array->m_data[i] = i;
+        gmPracticeTargetWordArray_Shuffle(array);
+    }
+    uint32_t index = gmPracticeTargetWordArray_Next(target->m_wordArray);
+    g_practiceTargetSelectedIndex = index;
+    const auto* definitions = static_cast<const PracticeTargetDefinition*>(
+        target->m_sets[target->field_44].m_targets);
+    const PracticeTargetDefinition& selected = definitions[index];
+    for (int i = 0; i < 9; ++i) g_practiceTargetActiveZones[i] = selected.activeZones[i];
+    for (int i = 0; i < 8; ++i) g_practiceTargetGridShape[i] = selected.gridShape[i];
+    gmPracticeTarget_LayOutTableGrid();
+}
+
+extern const float g_fPrngNormalize;                // @ 0x82079E68
+extern "C" const float g_ambientCubeFalloff;         // @ 0x825C8084 — shared 0.2 placement margin
+extern const float g_practiceTargetNearEdge;        // @ 0x82079EB4 — -0.2
+extern void* gmPracticeTarget_SetPosition(void* target, const float* position); // @ 0x82113BA8
+
+// @ 0x82113A98 | size: 0x110
+void gmPracticeTarget_PlaceRandomly(gmPracticeTarget* target, int /*unused*/) {
+    struct TableDimensions {
+        uint8_t _pad00[0x10];
+        float width, height, length;
+    };
+    const auto* table = static_cast<const TableDimensions*>(g_pTableDims);
+    float margin = g_ambientCubeFalloff;
+    float halfWidth = table->width * 0.5f;
+    float halfLength = table->length * 0.5f;
+    float xLower = margin - halfWidth;
+    float xUpper = halfWidth - margin;
+    float xRange = xUpper - xLower;
+    float zRange = (margin - halfLength) - g_practiceTargetNearEdge;
+    float randomX = static_cast<float>(AdvancePracticeTargetRandom() & 0x7FFFFFu) * g_fPrngNormalize;
+    float randomZ = static_cast<float>(AdvancePracticeTargetRandom() & 0x7FFFFFu) * g_fPrngNormalize;
+    alignas(16) float position[4] = {
+        __builtin_fmaf(xRange, randomX, xLower),
+        table->height,
+        __builtin_fmaf(randomZ, zRange, -margin),
+        margin
+    };
+    gmPracticeTarget_SetPosition(target, position);
+}

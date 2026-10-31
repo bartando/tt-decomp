@@ -23,7 +23,7 @@ T* at(uint32_t address) {
 
 } // namespace
 
-extern uint32_t g_swfNodePool; // @ 0x82604C5C
+extern void* g_swfNodePool; // @ 0x82604C5C
 
 // Replace `instance`'s clip-event list (+0xC8) with one node per record, record 0
 // first, and store `events` at +0xC4. The pool is never checked for running dry:
@@ -37,7 +37,7 @@ void swfSetClipEvents(void* instance, uint32_t events, uint32_t records, int32_t
     auto& list = *reinterpret_cast<uint32_t*>(fields + 0xC8);
     uint32_t node = list;
     list = 0;
-    auto* pool = at<SwfNodePool>(g_swfNodePool);
+    auto* pool = static_cast<SwfNodePool*>(g_swfNodePool);
     while (node != 0) {
         auto* released = at<SwfListNode>(node);
         const uint32_t next = released->next;
@@ -62,7 +62,7 @@ void swfSetClipEvents(void* instance, uint32_t events, uint32_t records, int32_t
     }
 }
 
-extern uint32_t g_swfMemberNodePool; // @ 0x82604C54
+extern void* g_swfMemberNodePool; // @ 0x82604C54
 extern uint32_t g_swfPriorityMemberNames[13]; // @ 0x825C2D30
 extern uint32_t g_swfPriorityMemberHashes[13]; // @ 0x82604CE8
 extern uint8_t g_swfPriorityMemberHashesReady; // @ 0x826066C8
@@ -92,7 +92,7 @@ void swfSetMember(void* list, const char* name, const uint32_t* value) {
         return;
     }
 
-    auto* pool = at<SwfNodePool>(g_swfMemberNodePool);
+    auto* pool = static_cast<SwfNodePool*>(g_swfMemberNodePool);
     const uint32_t node = pool->freeHead;
     const uint32_t nextFree = *at<uint32_t>(node);
     --pool->freeCount;

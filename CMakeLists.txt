@@ -104,6 +104,8 @@ set(SOURCES
     src/rage/network/snSessionStates.cpp
     src/rage/core/subsystem_init.c
     src/rage/swf.cpp
+    src/rage/hud_page_group.cpp
+    src/rage/swf_page_group.cpp
     src/rage/swf_vm.cpp
     src/rage/swf_clip_events.cpp
     src/rage/core/timer.cpp

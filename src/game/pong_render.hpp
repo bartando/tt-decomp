@@ -35,6 +35,7 @@ static_assert(__builtin_offsetof(pongLightState, ambient) == 0x200, "ambient off
 static_assert(__builtin_offsetof(pongLightState, count) == 0x210, "light count offset");
 
 pongLightState* pongLightState_CopyLights(pongLightState* dst, const pongLightState* src); // @ 0x8213E110
+pongLightState* game_E0A8(pongLightState* dst, const pongLightState* src); // @ 0x8213E0A8
 void pongLightState_Apply(const pongLightState* state);  // @ 0x82154320
 void pongLighting_ApplyAmbientCube(uint32_t lightIndex); // @ 0x820FFF78
 
