@@ -3718,7 +3718,7 @@ void RemoteServeReadyMessage_Serialise(void* thisPtr, void* client) {
 // a 16-bit frame counter, then applies a scale factor to the timing value.
 // ─────────────────────────────────────────────────────────────────────────────
 extern void netStream_ReadU64(void* dst, void* client);
-extern char* FormatTimestampForLog(void* timestamp);
+#include "game/network_timestamp.hpp"
 
 void MatchTimeSyncMessage_Deserialise(void* thisPtr, void* client) {
     uint8_t* obj = (uint8_t*)thisPtr;
@@ -6761,7 +6761,6 @@ void NetworkClient_WriteSecondaryPlayerData(void* client, int16_t index, void* d
 
 void SinglesNetworkClient_4FB0_g(void* client) { (void)client; }
 int  SinglesNetworkClient_8CC0_w(void* client) { (void)client; return 0; }
-void SinglesNetworkClient_BE30_g(void* client, int flag) { (void)client; (void)flag; }
 
 // ── Message-level helpers (referenced by serve/movement/hit message code) ──
 
