@@ -1,3 +1,4 @@
+#include "game/game_message.hpp"
 #include "game/network_static_node.hpp"
 #include "game/network_context.hpp"
 #include "rage/dat_bit_buffer.hpp"
@@ -76,7 +77,6 @@ extern void DeserializeNetworkData(void* client, void* dst, int size);  // @ 0x8
 extern void ReadBitsFromStream(void* client, void* field, int size); // @ 0x820D7A08 - read byte from net stream
 // Serve setup
 extern void  ServeStartedMessage_CFE8_2h(void* matchState);
-extern void  PostPageGroupMessage(int eventCode, int arg1, int arg2, int arg3, int arg4);
 // Pool intrinsics
 extern uint8_t* g_pNetMsgPoolBase;    // @ 0x825D11D0 (singleton pointer)
 extern const char g_szServeStartedTypeName[];  // @ 0x8206E9D0
@@ -292,8 +292,8 @@ void ServeStartedMessage::Serialise(void* client)
 //     Stores that inverted flag at pongLerpQueue[500][+360] (m_bIsServer).
 //  7. Checks whether the inner player state is in "serve ready" (stateCode=0,
 //     subState=3) and m_bNotServer is set.  If so fires a network event
-//     PostPageGroupMessage(14348, playerCount|0x40, 0, 0) — "serve accepted" event.
-//  8. Fires a second PostPageGroupMessage(14377, playerCount|0x40, 0, 0) unconditionally
+//     PostGameMessage(14348, playerCount|0x40, 0, 0) — "serve accepted" event.
+//  8. Fires a second PostGameMessage(14377, playerCount|0x40, 0, 0) unconditionally
 //     — "serve started" broadcast event.
 //
 // Python-verified:
@@ -348,14 +348,14 @@ void ServeStartedMessage::Process(void* matchObj)
         // lerpSlot == 0 → playerCount=1, else playerCount=2
         int32_t lerpSlot2    = *(int32_t*)((uint8_t*)player + 464);
         uint8_t playerCount  = (lerpSlot2 == 0) ? 1 : 2;
-        PostPageGroupMessage(14348, (int)(playerCount | 0x40), 0, 0, 0);
+        PostGameMessage(14348, (int)(playerCount | 0x40), 0, nullptr);
     }
 
     // Step 8: unconditional "serve started" broadcast.
     {
         int32_t lerpSlot3   = *(int32_t*)((uint8_t*)player + 464);
         uint8_t playerCount = (lerpSlot3 == 0) ? 1 : 2;
-        PostPageGroupMessage(14377, (int)(playerCount | 0x40), 0, 0, 0);
+        PostGameMessage(14377, (int)(playerCount | 0x40), 0, nullptr);
     }
 }
 
@@ -1730,49 +1730,21 @@ void SinglesNetworkClient::ProcessMessageQueue()
 // TournamentCompleteMessage — Tournament completion network message
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ===========================================================================
-// TournamentCompleteMessage::Process  [vtable slot 4 @ 0x823BC8C8] | size: 0x98
-//
-// Processes a tournament completion message. Checks game state and posts
-// a page group event if conditions are met.
-//
-// Logic:
-//  1. Calls rage_debugLog with "top_spin" string (debug/logging)
-//  2. Checks g_loop_obj_ptr[578] (boolean flag)
-//  3. If flag is false, checks g_loop_obj_ptr[12] == 8 (state check)
-//  4. If state matches, sets g_input_obj_ptr[48] = 4
-//  5. Posts page group message with event code 14386 and m_tournamentId
-// ===========================================================================
+extern "C" void* g_loop_obj_ptr; // @ 0x825EAB30
+extern "C" void* g_input_obj_ptr; // @ 0x825EAB28
+
+// TournamentCompleteMessage::Process @ 0x823BC8C8
+// Notify the input state, then send the signed tournament byte as one word.
 void TournamentCompleteMessage::Process()
 {
-    // Debug logging with "top_spin" string
-    extern const char g_szTopSpin[];  // @ 0x8206CB54
+    extern const char g_szTopSpin[]; // @ 0x8206CB54
     rage_debugLog(g_szTopSpin);
-    
-    // Load global loop object pointer
-    extern void* g_loop_obj_ptr;  // @ 0x825EAB30
-    void* loopObj = *(void**)&g_loop_obj_ptr;
-    
-    // Check flag at offset +578
-    uint8_t flag = *(uint8_t*)((char*)loopObj + 578);
-    
-    if (flag == 0) {
-        // Check state value at offset +12
-        int32_t state = *(int32_t*)((char*)loopObj + 12);
-        
-        if (state == 8) {
-            // Set input object state to 4
-            extern void* g_input_obj_ptr;  // @ 0x825EAB28
-            void* inputObj = *(void**)&g_input_obj_ptr;
-            *(int32_t*)((char*)inputObj + 48) = 4;
-        }
-    }
-    
-    // Post page group message with tournament ID
-    // Event code 14386, mask 128, active flag 1
-    int32_t eventData[2] = { 4, 0 };
-    eventData[0] = (int32_t)*(uint8_t*)((char*)this + 4);  // tournament ID byte at +0x04
-    PostPageGroupMessage(14386, 128, 1, 0, (uintptr_t)eventData);
+    const auto* loop = static_cast<const uint8_t*>(g_loop_obj_ptr);
+    if (loop[0x242] != 0 || *reinterpret_cast<const int32_t*>(loop + 0x0C) == 8)
+        *reinterpret_cast<int32_t*>(static_cast<uint8_t*>(g_input_obj_ptr) + 0x30) = 4;
+
+    const int32_t tournament = reinterpret_cast<const int8_t*>(this)[8];
+    PostGameMessage(14386, 128, 1, &tournament);
 }
 
 

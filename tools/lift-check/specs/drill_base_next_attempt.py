@@ -18,7 +18,7 @@ CALLS = {
     "drill.vfn_19": stub(ret=lambda c: c.rng.randrange(256), args=("r3",), deref={"r3": 0x24}),
     "drill.vfn_25": stub(ret="void", args=("r3",), deref={"r3": 0x24}),
     "drill.vfn_32": stub(ret=lambda c: c.rng.choice([0, 1, 2, 0x80]), args=("r3",), deref={"r3": 0x24}),
-    "NotifyUIEvent": model(_notify, args=("r3", "r4", "r5", "r6")),
+    "PostGameMessage": model(_notify, args=("r3", "r4", "r5", "r6")),
 }
 
 

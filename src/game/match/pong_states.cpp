@@ -78,7 +78,6 @@ extern void  hsmContext_SetNextState(void* ctx, int stateIdx); // HSM transition
 extern void  hsmContext_RequestTransition(void* ctx, int idx);      // HSM request
 extern bool  hsmContext_IsTransitioning(void* ctx);                 // HSM query
 extern void  SendContextMessage(int code, int mask, int a3, int a4);  // @ 0x8220E6E0 — broadcast msg
-extern void  PostPageGroupMessage(void* record, int code, int mask, int a3, int a4); // @ 0x8220E6E0 — targeted
 extern void* CreditsRoll_NotifyEntry(void* obj, uint32_t count);       // credits-roll notify @ 0x8240AD40
 extern void  atSingleton_QueryEventData(void* outData, void* table);    // @ 0x82017888 — event query
 extern void* PostStateTransitionRequest(void* hsmCtx, int stateIdx); // @ 0x822228B8

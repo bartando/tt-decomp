@@ -1,3 +1,4 @@
+#include "game/game_message.hpp"
 /**
  * char_view.cpp — Character View System Implementation
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -22,7 +23,6 @@ extern "C" {
     void xmlNodeStruct_SerializeField(void* obj, const char* name, void* target, void* defaultVal, uint32_t flags);
     int32_t util_2458_FindCharacterIndex(void* gameData, const char* name);
     void rage_debugLog(const char* message, void* a, void* b);
-    void PostPageGroupMessage(int code, int param1, int param2, int param3);
     void PostStateTransitionRequest(void* manager, int32_t eventType);
     void FadePageGroup(void* context, float param, int p2, int p3, int p4, int p5);
     void* GetStateContextName(void* manager);               // @ 0x822228B8
@@ -133,7 +133,7 @@ void pongAttractState::OnExit() {
  */
 void pongAttractState::OnEvent(int32_t eventType) {
     // Call initialization function
-    PostPageGroupMessage(2055, 64, 0, 0);
+    PostGameMessage(2055, 64, 0, 0);
     
     if (eventType == 6) {
         // Event 6: Create UI state
@@ -169,7 +169,7 @@ void pongAttractState::OnEvent(int32_t eventType) {
  * Other: Forwards to state manager and logs unhandled event.
  */
 void pongAttractState::OnExitEvent(int32_t eventType) {
-    PostPageGroupMessage(2056, 64, 0, 0);
+    PostGameMessage(2056, 64, 0, 0);
 
     if (eventType == 6) {
         // Transition UI state to "exiting"
@@ -904,7 +904,7 @@ void pongCharViewState::OnEnterEvent(int32_t eventType) {
         ((uint8_t*)g_loop_obj_ptr)[577] = 1;
 
         // Post enter message
-        PostPageGroupMessage(2065, 64, 0, 0);
+        PostGameMessage(2065, 64, 0, 0);
     } else if (eventType == 12) {
         return;
     } else {
@@ -944,7 +944,7 @@ void pongCharViewState::OnExitEvent(int32_t eventType) {
         ((uint8_t*)g_loop_obj_ptr)[577] = 0;
 
         // Post exit message
-        PostPageGroupMessage(2066, 64, 0, 0);
+        PostGameMessage(2066, 64, 0, 0);
     } else if (eventType == 12) {
         return;
     } else {

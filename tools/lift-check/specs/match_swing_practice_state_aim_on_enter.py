@@ -7,8 +7,8 @@ SOURCE = "src/game/match/pong_match.cpp"
 
 EXTERNS = {
     "game_3860": 0x821D3860,                    # the symbol map's game_3860 is 0x82483860
-    "PostPageGroupMessage": 0x8225E6E0,
-    "PostPageGroupMessageFmt": 0x8225E480,
+    "PostGameMessage": 0x8225E6E0,
+    "PostGameMessageFmt": 0x8225E480,
     "gmPracticeTarget_PlaceRandomly": 0x82113A98,
 }
 
