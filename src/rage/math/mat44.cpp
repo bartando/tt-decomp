@@ -55,8 +55,6 @@ void mat44ComposeAffineInPlace(void* matrix, const void* transform) {
     std::memcpy(out + 8, result[2], 16);
 }
 
-float mat44Determinant(const float* m); // @ 0x8223F008
-
 // A 3x3 minor, with the original single-precision product/FMA ordering.
 // The translation cofactor starts its positive sum with b*f*g instead.
 static float mat44Minor(float a, float b, float c, float d, float e, float f,
@@ -76,6 +74,18 @@ static float mat44Minor(float a, float b, float c, float d, float e, float f,
     sum = -__builtin_fmaf(af, h, -sum);
     sum = -__builtin_fmaf(bd, i, -sum);
     return -__builtin_fmaf(ce, g, -sum);
+}
+
+// Expand along row zero, preserving the PPC minor accumulation and FMA order.
+// @ 0x8223F008 | size: 0x134
+float mat44Determinant(const float* m) {
+    const float c0 = mat44Minor(m[5], m[6], m[7], m[9], m[10], m[11], m[13], m[14], m[15], false);
+    const float c1 = mat44Minor(m[4], m[6], m[7], m[8], m[10], m[11], m[12], m[14], m[15], false);
+    const float c2 = mat44Minor(m[4], m[5], m[7], m[8], m[9], m[11], m[12], m[13], m[15], false);
+    const float c3 = mat44Minor(m[4], m[5], m[6], m[8], m[9], m[10], m[12], m[13], m[14], false);
+    const float first = __builtin_fmaf(m[0], c0, -(m[1] * c1));
+    const float third = __builtin_fmaf(m[2], c2, first);
+    return -__builtin_fmaf(m[3], c3, -third);
 }
 
 // General 4x4 inverse: transpose the signed minors, scaled by 1/determinant.

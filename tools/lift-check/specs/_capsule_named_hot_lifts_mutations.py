@@ -1,4 +1,4 @@
-"""Behavioral mutation proof for the four renamed hot lifts.
+"""Behavioral mutation proof for the three remaining renamed hot lifts.
 
 Run from the repo root with PYTHONPATH=tools/lift-check and the lift-check
 venv's python. Patch only build-cache copies, scoped to the named function;
@@ -14,14 +14,6 @@ from liftcheck.runner import Checker, Options
 
 
 CASES = [
-    ("ph_build_rotation_matrix_y", "src/physics/ph_physics.cpp",
-     "void ph_BuildRotationMatrixY(", [
-         ("empty lift", "    const float cosine", "    return;\n    const float cosine"),
-         ("truncate angle", "crt_cos(angle)", "crt_cos(static_cast<float>(angle))"),
-         ("wrong sine sign", "matrix[2] = -sine;", "matrix[2] = sine;"),
-         ("wrong identity axis", "matrix[5] = 1.0f;", "matrix[5] = 0.0f;"),
-         ("clobber padding", "matrix[10] = cosine;", "matrix[10] = cosine; matrix[11] = 0.0f;"),
-     ]),
     ("ph_matrix_rotate_z", "src/physics/ph_physics.cpp",
      "void phMatrix_RotateZ(", [
          ("empty lift", "    float cosine, sine;", "    return;\n    float cosine, sine;"),

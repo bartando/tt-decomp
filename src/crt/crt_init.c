@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <pthread.h>
+#include "platform/host_sync.h"
 #include <ctype.h>
 
 /*=========================================================================
@@ -41,26 +41,7 @@
 
 #define CRT_MAX_SPINLOCKS 36
 
-static pthread_mutex_t g_crt_spinlocks[CRT_MAX_SPINLOCKS];
-static uint8_t g_crt_spinlocks_initialized[CRT_MAX_SPINLOCKS] = {0};
-static pthread_mutex_t g_crt_spinlock_init_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-/**
- * Ensure a spinlock slot is initialized before use.
- */
-static void _ensure_spinlock_init(int id) {
-    if (id < 0 || id >= CRT_MAX_SPINLOCKS) return;
-
-    if (!g_crt_spinlocks_initialized[id]) {
-        pthread_mutex_lock(&g_crt_spinlock_init_mutex);
-        if (!g_crt_spinlocks_initialized[id]) {
-            pthread_mutex_init(&g_crt_spinlocks[id], NULL);
-            g_crt_spinlocks_initialized[id] = 1;
-        }
-        pthread_mutex_unlock(&g_crt_spinlock_init_mutex);
-    }
-}
-
+static tt_mutex g_crt_spinlocks[CRT_MAX_SPINLOCKS];
 /**
  * _crt_spinlock_acquire @ 0x82433F58 | size: 0x60
  *
@@ -72,8 +53,7 @@ static void _ensure_spinlock_init(int id) {
  */
 void _crt_spinlock_acquire(int id) {
     if (id < 0 || id >= CRT_MAX_SPINLOCKS) return;
-    _ensure_spinlock_init(id);
-    pthread_mutex_lock(&g_crt_spinlocks[id]);
+    tt_mutex_lock(&g_crt_spinlocks[id]);
 }
 
 /**
@@ -85,8 +65,7 @@ void _crt_spinlock_acquire(int id) {
  */
 void _crt_spinlock_release(int id) {
     if (id < 0 || id >= CRT_MAX_SPINLOCKS) return;
-    _ensure_spinlock_init(id);
-    pthread_mutex_unlock(&g_crt_spinlocks[id]);
+    tt_mutex_unlock(&g_crt_spinlocks[id]);
 }
 
 /*=========================================================================
@@ -97,8 +76,6 @@ void _crt_spinlock_release(int id) {
  * to store a per-thread context block.
  *=========================================================================*/
 
-static pthread_key_t g_crt_fiber_key;
-static int g_crt_fiber_key_created = 0;
 
 /**
  * _crt_tls_callback

@@ -1,3 +1,4 @@
+#include "rage/ptr32.hpp"
 /**
  * rage_audio.hpp — Skeleton class declarations
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -172,12 +173,11 @@ struct audVoice {
 // Confirmed methods: Play, PlayByEntry, SetEffectVolume, SetReverbVolume
 // Field hints: m_pSfxRef:ptr
 struct audVoiceSfx {
-    void**      vtable;           // +0x00
-
-    // ── field access clusters ──
-    uint32_t     m_state;        // +0x04  R:2 W:2 — playback state / flags
-    uint32_t     m_pControl;     // +0x08  R:4 W:2 — owning audControl pointer
-    void*        m_pSfxRef;      // +0x0c  R:16 W:0 — sound effect reference (heavily read)
+    // The compiler supplies the vptr. Words +4/+8 are intrusive list links,
+    // not another vtable followed by state/control fields.
+    ptr32<audVoiceSfx> m_previous;      // +0x04
+    ptr32<audVoiceSfx> m_next;          // +0x08
+    ptr32<void> m_pSfxRef;              // +0x0c
 
     // ── virtual methods ──
     virtual void Stop();              // [5] @ 0x821635b8 — cmdId 16388

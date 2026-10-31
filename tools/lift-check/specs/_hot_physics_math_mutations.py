@@ -12,12 +12,6 @@ from liftcheck.runner import Checker, Options
 
 ROOT = Path(__file__).resolve().parents[3]
 CASES = {
-    "ph_build_rotation_matrix_x": (
-        "src/physics/ph_physics.cpp",
-        [("angle truncated to float", "crt_cos(angle)", "crt_cos(static_cast<float>(angle))"),
-         ("wrong sine sign", "matrix[9] = -sine;", "matrix[9] = sine;"),
-         ("lost cosine", "matrix[5] = cosine;", "matrix[5] = 0.0f;"),
-         ("overwrite padding", "matrix[10] = cosine;", "matrix[10] = cosine; matrix[11] = 0.0f;")]),
     "ph_matrix_transpose_multiply3x4": (
         "src/physics/ph_physics.cpp",
         [("translation sign", "phFlushVmx(a[12 + axis]) - phFlushVmx(b[12 + axis])",

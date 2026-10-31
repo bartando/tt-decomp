@@ -141,6 +141,7 @@ void KeInitializeEvent(void* event, EVENT_TYPE type, int32_t initialState);
 NTSTATUS RtlInitializeCriticalSection(struct _RTL_CRITICAL_SECTION* section);
 NTSTATUS RtlDeleteCriticalSection(struct _RTL_CRITICAL_SECTION* section);
 void KfLowerIrql(uint32_t irql);
+void* xam_CreateEvent(uint32_t attributes, uint32_t manualReset, uint32_t initialState, uint32_t reserved);
 
 //=============================================================================
 // Semaphore Functions
