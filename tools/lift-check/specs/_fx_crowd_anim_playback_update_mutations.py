@@ -31,7 +31,7 @@ MUTATIONS = (
      "randomSpeed(self->next)"),
     ("blend before delay expires", "self->next && self->delay <= 0.0f", "self->next != nullptr"),
     ("exclude zero delay", "self->delay <= 0.0f", "self->delay < 0.0f"),
-    ("reverse delay tick", "self->delay -= lbl_825CAEB8[2]", "self->delay += lbl_825CAEB8[2]"),
+    ("reverse delay tick", "self->delay -= lbl_825CAEB8.frameSeconds", "self->delay += lbl_825CAEB8.frameSeconds"),
     ("ignore clip duration", "duration * self->currentPhase", "self->currentPhase"),
     ("evaluate next into current frame",
      "self->nextFrame, 0, 1, nextDuration", "self->currentFrame, 0, 1, nextDuration"),
@@ -54,7 +54,7 @@ def main():
     root = Path(__file__).resolve().parents[3]
     source = (root / "src/graphics/fx_crowd.cpp").read_text()
     spec = Path(__file__).with_name("fx_crowd_anim_playback_update.py")
-    for seed in (1, 7):
+    for seed in (1, 2):
         if Checker(spec, Options(seed=seed)).run() != 0:
             return 1
     for name, old, new in MUTATIONS:
