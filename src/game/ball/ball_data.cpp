@@ -53,6 +53,9 @@ TT_DATA_ALIAS("g_plrPropStorage", "g_intFieldType");
 extern "C" void* g_floatFieldType = nullptr;
 TT_DATA_ALIAS("g_xmlNodeStructFloat", "g_floatFieldType");
 
+// @ 0x825CB7A0 (.data) — upward table-plane normal
+extern "C" alignas(16) const float g_ballTableNormal[4] = {0.0f, 1.0f, 0.0f, 0.0f};
+
 // @ 0x825CBCE0 (.data) — the gravity vector; player_data.cpp defines its y lane separately as g_ballGravity
 extern "C" alignas(16) float g_phGravity[4] = {0.0f, -9.80000019f, 0.0f, 0.0f};
 
