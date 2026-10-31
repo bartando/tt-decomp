@@ -41,6 +41,7 @@ set(SOURCES
     # CRT layer
     src/crt/crt_init.c
     src/crt/ctrlfp.cpp
+    src/crt/fp_helpers.cpp
     src/crt/entry.c
     src/crt/exit.c
     src/crt/fmod.cpp
