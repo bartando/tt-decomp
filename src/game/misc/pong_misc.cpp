@@ -1,3 +1,5 @@
+#include "rage/locked_interface.hpp"
+#include "rage/ptr32.hpp"
 #include "game/movie_worker_helpers.hpp"
 #include "rage/rage_utils_simple.h"
 #include "rage/ref_counted_header.hpp"
@@ -1027,7 +1029,6 @@ int CCalMoviePlayer::ComputeFrameSize() {  // 3F00_h
 // ─────────────────────────────────────────────────────────────────────────────
 
 // External helpers used by batch 2+ functions
-extern "C" void phInst_Release(void* obj);            // @ 0x82460850 - physics instance release
 extern "C" uint32_t xe_GetCurrentThreadId();      // @ 0x82566B78
 extern "C" void _locale_register(void* ptr);     // @ 0x820C02D0 - memory dealloc
 extern "C" void pg_SleepYield(int frames);           // @ 0x82566C80 - wait N frames
@@ -1059,13 +1060,13 @@ void CCalMoviePlayer::DtorIntermediate() {
 /**
  * CCalMoviePlayer::QueryPhysicsInstance @ 0x82483AD8 | size: 0x48
  *
- * Queries the physics instance at field +56 via phInst_Release (release/query),
- * then writes the current value of field +56 into *outResult.
+ * Retains the interface at +56 under the shared lock, then reloads and
+ * publishes its current four-byte pointer through outResult.
  * Returns 0.
  */
 int CCalMoviePlayer::QueryPhysicsInstance(void* outResult) {
-    phInst_Release((void*)m_readIndex);
-    *(void**)outResult = (void*)m_readIndex;
+    phObject_AddRefLocked(rage::load_ptr32<void>(this, 0x38));
+    *static_cast<rage::ptr32<void>*>(outResult) = rage::load_ptr32<void>(this, 0x38);
     return 0;
 }
 

@@ -150,3 +150,6 @@ extern "C" const float g_phStreamInitialInterval = 0.0f;
 
 // @ 0x82005C78 (.rdata) — bytes per packed format element
 extern "C" const uint32_t g_phStreamFormatWidths[3] = {4, 2, 1};
+
+// @ 0x825B2324 (.data) — guest lock bytes; host backends key locks by address.
+extern "C" { alignas(4) uint8_t g_phInterfaceLock[24] = {}; }

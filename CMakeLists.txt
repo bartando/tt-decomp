@@ -259,6 +259,7 @@ set(SOURCES
     src/anim/animation_timing.cpp
 
     # Physics
+    src/physics/locked_interface.cpp
     src/physics/stream_configuration.cpp
     src/physics/collider_velocity.cpp
     src/physics/ph_float_property.cpp
