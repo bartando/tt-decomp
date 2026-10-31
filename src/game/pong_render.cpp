@@ -1,3 +1,4 @@
+#include "rage/grc_command_stream.hpp"
 #include "rage/sys_callback.hpp"
 /**
  * pong_render.cpp — Light state and render bucket implementation
@@ -501,9 +502,6 @@ void pongShadowMap::applyShaderParameters(int32_t pass) {
 // ─────────────────────────────────────────────────────────────────────────────
 extern void pongLightState_Reset(pongLightState* state, int32_t mask);  // @ 0x82154628
 extern void cmOperatorCtor_0B50_w(void* overrideState);  // @ 0x820F0B50
-extern "C" void* rage_A980(void* device);  // @ 0x8235A980
-extern uint32_t* grc_9B60(void* commands);  // @ 0x82359B60
-extern void rage_C660(void* device);  // @ 0x8235C660
 
 // @ 0x82225D90 | size: 0x328 (was rage_5D90)
 // Inferred name from the layer descriptors consumed by pongDrawBucket_AddEntry.

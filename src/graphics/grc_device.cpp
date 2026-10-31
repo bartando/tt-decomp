@@ -1,3 +1,4 @@
+#include "rage/grc_command_stream.hpp"
 /**
  * graphics/grc_device.cpp — Graphics Device Lifecycle and Sampler State
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -207,7 +208,6 @@ void grcDevice_shutdownAlt(void)
     g_pGrcDeviceAlt = NULL;
 }
 
-extern "C" void* rage_A980(void* device); // @ 0x8235A980 — refill the command buffer, return its cursor
 
 // Xenon ABI: r3 = device, r4..r7 = signed left/top/right/bottom (exclusive bounds).
 // The cursor points at the last written word: every command store preincrements it.
@@ -1279,7 +1279,6 @@ extern void grc_CFD8(void* device, uint32_t flags, const int32_t* rect, const fl
                      float depth, uint32_t stencil);  // @ 0x8235CFD8
 extern void rage_AD98(void* device);  // @ 0x8235AD98
 extern void grcDevice_FlushDirtyState(void* device);  // @ 0x82363C00
-extern uint32_t* grc_9B60(void* fixups);  // @ 0x82359B60 — grow the draw-fixup list
 }
 extern const float g_grcResolveConstants[];  // @ 0x8202D10C
 extern const uint16_t g_grcResolveFormatInfo[64];  // @ 0x82065C68

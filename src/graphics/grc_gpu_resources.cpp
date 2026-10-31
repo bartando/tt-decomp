@@ -1,3 +1,4 @@
+#include "rage/grc_command_stream.hpp"
 /**
  * grc_gpu_resources.cpp — GPU resource management functions
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -22,7 +23,6 @@ extern "C" {
 // @ 0x8235EEC0 — takes two addresses (start, end) for a GPU memory region
 extern void rage_EEC0(void* start, void* end);
 
-extern void* rage_A980(void* device);  // @ 0x8235A980
 extern void grcPatchVertexFetchInstructions(void* device, void* shader, uint32_t codeAddress, void* declaration);  // @ 0x82362A68
 extern void rage_32F0(void* device, uint32_t repatch, void* shader, uint32_t* programControl,
                       void* declaration, const void* vertexInfo, const void* pixelInfo);  // @ 0x823632F0
