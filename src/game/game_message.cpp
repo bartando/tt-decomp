@@ -1,9 +1,8 @@
 // Queue or immediately dispatch packed gameplay events.
 #include "game/game_message.hpp"
+#include "xam/kernel.h"
 #include <cstring>
 
-extern "C" void RtlEnterCriticalSection(void*); // @ 0x82585E0C
-extern "C" void RtlLeaveCriticalSection(void*); // @ 0x82585DFC
 extern "C" uint8_t g_gameMessageQueueLock[32]; // @ 0x82619DA0
 extern "C" uint32_t g_gameMessageQueueWords; // @ 0x825F3860
 extern "C" uint8_t g_gameMessageQueueBank; // @ 0x825EE297
@@ -15,7 +14,7 @@ extern "C" uint8_t g_ui_object_flags[64]; // @ 0x825F3A68
 
 struct GameMessageGuard {
     uint8_t entered;
-    void* lock;
+    RTL_CRITICAL_SECTION* lock;
 };
 
 // @ 0x821880D0 | size: 0x60
@@ -64,7 +63,7 @@ void DispatchGameMessage(GameEventHeader* message) {
 void PostGameMessage(uint32_t id, uint32_t flags, uint32_t payloadWords, const void* payload) {
     GameMessageGuard guard;
     guard.entered = 0;
-    guard.lock = g_gameMessageQueueLock;
+    guard.lock = reinterpret_cast<RTL_CRITICAL_SECTION*>(g_gameMessageQueueLock);
     GameMessageGuard_Enter(&guard);
     const uint32_t initialWords = g_gameMessageQueueWords;
     const uint32_t words = static_cast<uint8_t>(payloadWords);

@@ -233,7 +233,7 @@ void* g_singles_network_client = NULL;
 
 uint32_t g_phFrameCounter = 0;      /* @ 0x825C4898 — per-tick ring cursor */
 uint32_t g_phFrameIndex = 0;        /* @ 0x826065DC — rollback frame cursor */
-void* g_matMgrGuard = NULL;
+uint8_t g_matMgrGuard[20] = {0}; // @ 0x825C9EB0 — in-place material guard
 
 /* Renderer-side shadow-atlas / light descriptor slot.
  * SDA offset 25424 (0x82606350). Read by pongCreature::RegisterShadowCasters

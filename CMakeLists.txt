@@ -162,6 +162,9 @@ set(SOURCES
     src/game/player/player_control_queries_data.cpp
     src/game/player/player_mode_data.cpp
     src/game/player/player_mode_animation.cpp
+    src/game/player/player_animation_reset_helpers.cpp
+    src/game/player/player_auxiliary_pose.cpp
+    src/game/player/player_auxiliary_animation_helpers.cpp
     src/game/player/player_swing_pose_helpers.cpp
     src/game/player/player_apply_movement_target.cpp
     src/game/player/player_pose_easing.cpp
@@ -186,6 +189,8 @@ set(SOURCES
     # Animation
     src/anim/anim_blender_state.cpp
     src/anim/root_motion_blend.cpp
+    src/anim/clip_mover_displacement.cpp
+    src/anim/clip_mover_delta.cpp
     src/anim/bone_matrix_lookup.cpp
     src/anim/bone_transform_lookup.cpp
     src/anim/motion_lookup_data.cpp
