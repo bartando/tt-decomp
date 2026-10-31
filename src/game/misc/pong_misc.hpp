@@ -394,7 +394,7 @@ struct msgMsgSink {
     void ForwardMessageToSession(uint32_t param);  // [68] @ 0x82456f28
     void vfn_75();  // [75] @ 0x82456278
     void ForwardToLeaderboard();  // [77] @ 0x82457dd0
-    void ForwardToRageHandler();  // [78] @ 0x824514e8
+    void* ForwardToRageHandler(void* value);  // [78] @ 0x824514e8
     void vfn_79();  // [79] @ 0x824513d0
     void ForwardDispatchMessage();  // [89] @ 0x8244f8b0
     void ForwardToStatsHandler();  // [95] @ 0x82457ff0
@@ -422,12 +422,12 @@ struct msgMsgSink {
     
     // ── non-virtual methods (implemented) ──
     msgMsgSink* InitializeExtended(void* rttiArg, void* bucket, uint16_t hdr16, void* callback);  // @ 0x8245C078
-    void ProcessMessageWithIndex(uint32_t param1, uint16_t msgIndex, uint32_t param2);  // @ 0x8244E978
+    int32_t ProcessMessageWithIndex(void* source, uint32_t unusedR5, uint16_t msgIndex,
+                                    uint32_t unusedR7, uint32_t unusedR8, uint32_t* outHandle);  // @ 0x8244E978
     void DispatchVirtualMethod();  // @ 0x824542D0 [related to vtable slot 12]
     uint16_t GetNestedValue(void* dataPtr);  // @ 0x8244F490
     int32_t GenerateWithLock();  // @ 0x8244DCF0 (non-virtual wrapper)
     void CleanupSession();
-    void SetActiveAndReleaseObject();
     void OnDisconnect();
     void OnReconnect();
     void ResetEventDispatch();
@@ -441,7 +441,6 @@ struct msgMsgSink {
     void ForwardToBaseUpdate();
     void ForwardToBaseNotify();
     void ForwardToBaseProcess();
-    void ForwardToEmbeddedObject();
     void* GetSessionLock();
     void* GetMessageBufferPtr();
     // GetPeerDataPtr() removed — unified with virtual slot 11 GetPayloadPtr().

@@ -37,8 +37,8 @@ CASES = {
         ("definition low byte", "if (uint8_t(reinterpret_cast<DefinitionSetter>(definitionVtable[5])(definition, property, value)))", "if (reinterpret_cast<DefinitionSetter>(definitionVtable[5])(definition, property, value))"),
     ]),
     "swf_actionfunc_set_member": ("uint32_t swfACTIONFUNC::SetMember(", [
-        ("status width", "return reinterpret_cast<Setter>(vtable[11])(innerObj, name, value);", "return static_cast<uint8_t>(reinterpret_cast<Setter>(vtable[11])(innerObj, name, value));"),
-        ("dispatch slot", "vtable[11]", "vtable[10]"),
+        ("status width", "return m_pInnerObject->SetMember(name, value);", "return static_cast<uint8_t>(m_pInnerObject->SetMember(name, value));"),
+        ("dispatch slot", "m_pInnerObject->SetMember(name, value)", "m_pInnerObject->GetMember(name, value)"),
     ]),
     "swf_scriptarray_set_member": ("uint32_t swfSCRIPTARRAY::SetMember(", [
         ("upper bound", "if (index >=", "if (index >"),

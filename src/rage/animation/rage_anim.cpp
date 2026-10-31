@@ -1,3 +1,6 @@
+#include "rage/float_channel_vtables.hpp"
+#include "rage/resource_fixup.hpp"
+#include "rage/operator_new.hpp"
 /**
  * rage_anim.cpp — Animation system implementation
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -12,10 +15,8 @@
 #include <cmath>
 #include <cmath>
 
-extern void crAnimDof_BlendQuaternion(void* outQuat, void* context, float* value); // @ 0x820C44A0
 extern double crt_sqrt(double value); // @ 0x824301D0
 extern "C" void sysMemAllocator_InitThreadHeap(); // @ 0x820C0038
-extern "C" void* xe_Alloc_EC88(uint32_t size); // @ 0x820DEC88
 extern uint32_t* g_sda_base; // @ 0x82600000
 
 namespace rage {
@@ -65,9 +66,6 @@ void crAnimFrame_ApplyMatchingDofs(crAnimFrame* dst, const crAnimFrame* src,
     }
 }
 
-extern void* g_crAnimChannelStaticFloat_vtable[];   // @ 0x8204F8D4
-extern void* g_crAnimChannelQuantizeFloat_vtable[]; // @ 0x8204F9AC
-extern void* g_crAnimChannelRawFloat_vtable[];      // @ 0x8204F76C
 
 // The raw and quantized channels share an atArray header at +8. The
 // quantized channel's scale/bias at +16/+20 are left for its initializer.
@@ -100,7 +98,7 @@ crAnimChannel* CreateFloatAnimChannel(void* /*dof*/, const float* samples,
         return constant;
 
     reinterpret_cast<DestroyFn>(constant->vtable[0])(constant, 1);
-    auto* quantized = static_cast<FloatSampleChannel*>(xe_Alloc_EC88(24));
+    auto* quantized = static_cast<FloatSampleChannel*>(::rage_Alloc(24));
     quantized->vtable = g_crAnimChannelQuantizeFloat_vtable;
     quantized->m_encoding = 6;
     quantized->samples = nullptr;
@@ -112,7 +110,7 @@ crAnimChannel* CreateFloatAnimChannel(void* /*dof*/, const float* samples,
         quantized = nullptr;
     }
 
-    auto* raw = static_cast<FloatSampleChannel*>(xe_Alloc_EC88(16));
+    auto* raw = static_cast<FloatSampleChannel*>(::rage_Alloc(16));
     raw->vtable = g_crAnimChannelRawFloat_vtable;
     raw->m_encoding = 1;
     raw->samples = nullptr;
@@ -490,7 +488,7 @@ void crAnimDofQuaternion::Blend(void* animContext, float blendFactor, float* out
 
     // Evaluate target quaternion from animation channels
     float targetQuat[4] __attribute__((aligned(16)));
-    EvaluateChannels(animContext, 0.0f, targetQuat);
+    crAnimEvaluateQuaternionChannels(this, animContext, 0.0f, targetQuat);
 
     // Get current quaternion at this+16
     float* currentQuat = reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(this) + 16);
@@ -951,8 +949,8 @@ void* crAnimDofQuaternion::GetValue() {
 //
 // Forwards output, context and the quaternion at +16 to the blend helper.
 // ─────────────────────────────────────────────────────────────────────────────
-void crAnimDofQuaternion::Evaluate(void* animContext, float /*time*/, float* outQuat) {
-    crAnimDof_BlendQuaternion(outQuat, animContext,
+void crAnimDofQuaternion::Evaluate(void* animContext, float time, float* outQuat) {
+    crAnimEvaluateQuaternionChannels(outQuat, animContext, time,
         reinterpret_cast<float*>(reinterpret_cast<char*>(this) + 16));
 }
 
@@ -1104,8 +1102,8 @@ int crAnimDofQuaternion::IsQuaternion() {
 //   0x20 — Three scalar channels, reconstructing nonnegative w or normalizing xyz
 // ─────────────────────────────────────────────────────────────────────────────
 // @ 0x820C44A0 | size: 0x1E8 (phBoundCapsule_44A0_h in the symbol map)
-void crAnimDofQuaternion::EvaluateChannels(void* animContext, float time, float* outQuat) {
-    auto* data = reinterpret_cast<uint8_t*>(this);
+void crAnimEvaluateQuaternionChannels(void* channels, void* animContext, float time, float* outQuat) {
+    auto* data = static_cast<uint8_t*>(channels);
     const uint8_t config = data[1] & 0xF0;
     if (config != 0 && config != 0x10 && config != 0x20)
         return;
@@ -1351,9 +1349,6 @@ void crAnimChannelQuantizeFloat::vfn_5(void* context, float time, float* outValu
 
 } // namespace rage
 
-// Pointer elements use the resource-aware constructor at 0x8224DFC0.
-extern "C" void crAnimPointer_Construct(void* slot); // @ 0x8224DFC0
-
 namespace rage {
 
 struct crAnimPointerArray {
@@ -1368,10 +1363,10 @@ struct crAnimPointerArray {
 void** crAnimPointerArray_AppendSlot(crAnimPointerArray* array, uint32_t growth) {
     if (array->count == array->capacity) {
         array->capacity = static_cast<uint16_t>(array->capacity + static_cast<uint16_t>(growth));
-        auto* data = static_cast<void**>(xe_Alloc_EC88(uint32_t(array->capacity) * 4));
+        auto* data = static_cast<void**>(::rage_Alloc(uint32_t(array->capacity) * 4));
         if (data) {
             for (uint32_t i = 0; i < array->capacity; ++i)
-                crAnimPointer_Construct(data + i);
+                datResource_PlacePointer(reinterpret_cast<uint32_t*>(data + i));
         }
         for (uint32_t i = 0; i < array->count; ++i)
             data[i] = array->data[i];

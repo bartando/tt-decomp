@@ -77,219 +77,25 @@ uint32_t KeTlsFree(uint32_t dwTlsIndex) {
  * KeTlsGetValue @ 0x8258621C
  */
 void* KeTlsGetValue(uint32_t dwTlsIndex) {
-    if (dwTlsIndex >= MAX_TLS_SLOTS || !g_tls_slots[dwTlsIndex].allocated) {
-        return NULL;
-    }
-    
-    return pthread_getspecific(g_tls_slots[dwTlsIndex].key);
+    if (dwTlsIndex >= MAX_TLS_SLOTS) return NULL;
+    pthread_mutex_lock(&g_tls_mutex);
+    void* value = g_tls_slots[dwTlsIndex].allocated ? pthread_getspecific(g_tls_slots[dwTlsIndex].key) : NULL;
+    pthread_mutex_unlock(&g_tls_mutex);
+    return value;
 }
 
 /**
  * KeTlsSetValue @ 0x8258622C
  */
 uint32_t KeTlsSetValue(uint32_t dwTlsIndex, void* lpTlsValue) {
-    if (dwTlsIndex >= MAX_TLS_SLOTS || !g_tls_slots[dwTlsIndex].allocated) {
-        return 0;
-    }
-    
-    return pthread_setspecific(g_tls_slots[dwTlsIndex].key, lpTlsValue) == 0 ? 1 : 0;
+    if (dwTlsIndex >= MAX_TLS_SLOTS) return 0;
+    pthread_mutex_lock(&g_tls_mutex);
+    uint32_t result = g_tls_slots[dwTlsIndex].allocated && pthread_setspecific(g_tls_slots[dwTlsIndex].key, lpTlsValue) == 0;
+    pthread_mutex_unlock(&g_tls_mutex);
+    return result;
 }
 
-//=============================================================================
-// Event Synchronization Implementation
-//=============================================================================
-
-// Event object structure (maps to pthread condition variable + mutex)
-typedef struct {
-    pthread_mutex_t mutex;
-    pthread_cond_t cond;
-    int32_t signaled;
-    int32_t manual_reset;  // 0 = auto-reset, 1 = manual-reset
-} KernelEvent;
-
-/**
- * KeSetEvent @ 0x825864EC
- */
-int32_t KeSetEvent(void* Event, int32_t Increment, uint32_t Wait) {
-    (void)Increment;  // Priority increment not used in cross-platform
-    (void)Wait;
-    
-    if (!Event) {
-        return 0;
-    }
-    
-    KernelEvent* event = (KernelEvent*)Event;
-    pthread_mutex_lock(&event->mutex);
-    
-    int32_t previous_state = event->signaled;
-    event->signaled = 1;
-    
-    // Wake up waiting threads
-    if (event->manual_reset) {
-        pthread_cond_broadcast(&event->cond);
-    } else {
-        pthread_cond_signal(&event->cond);
-    }
-    
-    pthread_mutex_unlock(&event->mutex);
-    return previous_state;
-}
-
-/**
- * KeResetEvent @ 0x825864DC
- */
-int32_t KeResetEvent(void* Event) {
-    if (!Event) {
-        return 0;
-    }
-    
-    KernelEvent* event = (KernelEvent*)Event;
-    pthread_mutex_lock(&event->mutex);
-    
-    int32_t previous_state = event->signaled;
-    event->signaled = 0;
-    
-    pthread_mutex_unlock(&event->mutex);
-    return previous_state;
-}
-
-/**
- * KeWaitForSingleObject @ 0x8258652C
- */
-NTSTATUS KeWaitForSingleObject(void* Object, uint32_t WaitReason, uint32_t WaitMode,
-                                uint32_t Alertable, LARGE_INTEGER* Timeout) {
-    (void)WaitReason;
-    (void)WaitMode;
-    (void)Alertable;
-    
-    if (!Object) {
-        return STATUS_INVALID_PARAMETER;
-    }
-    
-    KernelEvent* event = (KernelEvent*)Object;
-    pthread_mutex_lock(&event->mutex);
-    
-    // If already signaled, return immediately
-    if (event->signaled) {
-        if (!event->manual_reset) {
-            event->signaled = 0;  // Auto-reset
-        }
-        pthread_mutex_unlock(&event->mutex);
-        return STATUS_SUCCESS;
-    }
-    
-    // Wait for signal
-    int result;
-    if (Timeout == NULL) {
-        // Infinite wait
-        while (!event->signaled) {
-            result = pthread_cond_wait(&event->cond, &event->mutex);
-            if (result != 0) {
-                pthread_mutex_unlock(&event->mutex);
-                return STATUS_TIMEOUT;
-            }
-        }
-    } else {
-        // Timed wait (Timeout is in 100-nanosecond intervals)
-        int64_t timeout_ns = (*Timeout) * 100;
-        struct timespec ts;
-        clock_gettime(CLOCK_REALTIME, &ts);
-        ts.tv_sec += timeout_ns / 1000000000LL;
-        ts.tv_nsec += timeout_ns % 1000000000LL;
-        if (ts.tv_nsec >= 1000000000LL) {
-            ts.tv_sec++;
-            ts.tv_nsec -= 1000000000LL;
-        }
-        
-        while (!event->signaled) {
-            result = pthread_cond_timedwait(&event->cond, &event->mutex, &ts);
-            if (result == ETIMEDOUT) {
-                pthread_mutex_unlock(&event->mutex);
-                return STATUS_TIMEOUT;
-            } else if (result != 0) {
-                pthread_mutex_unlock(&event->mutex);
-                return STATUS_TIMEOUT;
-            }
-        }
-    }
-    
-    if (!event->manual_reset) {
-        event->signaled = 0;  // Auto-reset
-    }
-    
-    pthread_mutex_unlock(&event->mutex);
-    return STATUS_SUCCESS;
-}
-
-//=============================================================================
-// Semaphore Implementation
-//=============================================================================
-
-// Semaphore structure (maps to pthread condition variable + counter)
-typedef struct {
-    pthread_mutex_t mutex;
-    pthread_cond_t cond;
-    int32_t count;
-    int32_t max_count;
-} KernelSemaphore;
-
-/**
- * NtCreateSemaphore @ 0x8258665C
- */
-NTSTATUS NtCreateSemaphore(HANDLE* SemaphoreHandle, uint32_t DesiredAccess,
-                           void* ObjectAttributes, int32_t InitialCount, int32_t MaximumCount) {
-    (void)DesiredAccess;
-    (void)ObjectAttributes;
-    
-    if (!SemaphoreHandle || InitialCount < 0 || MaximumCount <= 0 || InitialCount > MaximumCount) {
-        return STATUS_INVALID_PARAMETER;
-    }
-    
-    KernelSemaphore* sem = (KernelSemaphore*)malloc(sizeof(KernelSemaphore));
-    if (!sem) {
-        return STATUS_NO_MEMORY;
-    }
-    
-    pthread_mutex_init(&sem->mutex, NULL);
-    pthread_cond_init(&sem->cond, NULL);
-    sem->count = InitialCount;
-    sem->max_count = MaximumCount;
-    
-    *SemaphoreHandle = (HANDLE)sem;
-    return STATUS_SUCCESS;
-}
-
-/**
- * NtReleaseSemaphore @ 0x8258666C
- */
-NTSTATUS NtReleaseSemaphore(HANDLE SemaphoreHandle, int32_t ReleaseCount, int32_t* PreviousCount) {
-    if (!SemaphoreHandle || ReleaseCount <= 0) {
-        return STATUS_INVALID_PARAMETER;
-    }
-    
-    KernelSemaphore* sem = (KernelSemaphore*)SemaphoreHandle;
-    pthread_mutex_lock(&sem->mutex);
-    
-    if (PreviousCount) {
-        *PreviousCount = sem->count;
-    }
-    
-    // Check for overflow
-    if (sem->count + ReleaseCount > sem->max_count) {
-        pthread_mutex_unlock(&sem->mutex);
-        return STATUS_INVALID_PARAMETER;
-    }
-    
-    sem->count += ReleaseCount;
-    
-    // Wake up waiting threads
-    for (int32_t i = 0; i < ReleaseCount; i++) {
-        pthread_cond_signal(&sem->cond);
-    }
-    
-    pthread_mutex_unlock(&sem->mutex);
-    return STATUS_SUCCESS;
-}
+// Synchronization lives in platform/host_sync.cpp.
 
 //=============================================================================
 // Critical Region Implementation
@@ -386,84 +192,7 @@ NTSTATUS NtYieldExecution(void) {
     return STATUS_SUCCESS;
 }
 
-//=============================================================================
-// Memory Management Implementation (Physical Memory)
-//=============================================================================
-
-/**
- * MmAllocatePhysicalMemoryEx @ 0x8258660C
- * 
- * Allocates physical memory with extended options.
- * For cross-platform, we use aligned_alloc or posix_memalign.
- */
-void* MmAllocatePhysicalMemoryEx(uint32_t dwFlags, uint32_t dwMinAddress,
-                                  uint32_t dwMaxAddress, uint32_t dwAlignment,
-                                  uint32_t dwProtect) {
-    (void)dwFlags;
-    (void)dwMinAddress;
-    (void)dwMaxAddress;
-    (void)dwProtect;
-    
-    // Ensure alignment is power of 2 and at least sizeof(void*)
-    if (dwAlignment == 0) {
-        dwAlignment = 16;  // Default to 16-byte alignment
-    }
-    
-    // Calculate size (not provided, use a reasonable default for audio buffers)
-    size_t size = 65536;  // 64KB default
-    
-    void* ptr = NULL;
-    
-#ifdef _WIN32
-    ptr = _aligned_malloc(size, dwAlignment);
-#else
-    if (posix_memalign(&ptr, dwAlignment, size) != 0) {
-        ptr = NULL;
-    }
-#endif
-    
-    if (ptr) {
-        memset(ptr, 0, size);
-    }
-    
-    return ptr;
-}
-
-/**
- * MmFreePhysicalMemory @ 0x8258635C
- * 
- * Frees physical memory.
- */
-void MmFreePhysicalMemory(uint32_t dwFlags, void* pAddress) {
-    (void)dwFlags;
-    
-    if (!pAddress) {
-        return;
-    }
-    
-#ifdef _WIN32
-    _aligned_free(pAddress);
-#else
-    free(pAddress);
-#endif
-}
-
-/**
- * MmQueryAllocationSize @ 0x8258661C
- * 
- * Queries the size of a physical memory allocation.
- * 
- * Note: This is difficult to implement accurately without tracking allocations.
- * Return a reasonable estimate.
- */
-uint32_t MmQueryAllocationSize(void* pAddress) {
-    if (!pAddress) {
-        return 0;
-    }
-    
-    // Return default size (we don't track allocations)
-    return 65536;  // 64KB
-}
+// Aligned allocations and size tracking live in platform/host_memory.cpp.
 
 /**
  * MmQueryStatistics @ 0x825865FC
@@ -569,6 +298,9 @@ uint32_t RtlNtStatusToDosError(NTSTATUS Status) {
         case STATUS_TIMEOUT:
             return 0x000005B4;  // ERROR_TIMEOUT
         
+        case STATUS_SEMAPHORE_LIMIT_EXCEEDED:
+            return 298; // ERROR_TOO_MANY_POSTS
+
         case STATUS_PENDING:
             return 0x000003E5;  // ERROR_IO_PENDING
         
@@ -655,48 +387,7 @@ uint64_t MmGetPhysicalAddress(void* BaseAddress) {
     return (uint64_t)(uintptr_t)BaseAddress;
 }
 
-//=============================================================================
-// Critical Section Functions (Extended) Implementation
-//=============================================================================
-
-// Map RTL_CRITICAL_SECTION to pthread_mutex_t
-// We store the pthread_mutex_t in the LockSemaphore field
-static pthread_mutex_t* get_mutex_from_cs(RTL_CRITICAL_SECTION* cs) {
-    if (!cs->LockSemaphore) {
-        // Lazy initialization
-        pthread_mutex_t* mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
-        pthread_mutexattr_t attr;
-        pthread_mutexattr_init(&attr);
-        pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
-        pthread_mutex_init(mutex, &attr);
-        pthread_mutexattr_destroy(&attr);
-        cs->LockSemaphore = mutex;
-    }
-    return (pthread_mutex_t*)cs->LockSemaphore;
-}
-
-/**
- * RtlTryEnterCriticalSection @ 0x8258625C
- * 
- * Attempts to enter a critical section without blocking.
- */
-uint32_t RtlTryEnterCriticalSection(RTL_CRITICAL_SECTION* CriticalSection) {
-    if (!CriticalSection) {
-        return 0;
-    }
-    
-    pthread_mutex_t* mutex = get_mutex_from_cs(CriticalSection);
-    
-    int result = pthread_mutex_trylock(mutex);
-    if (result == 0) {
-        // Successfully acquired
-        CriticalSection->RecursionCount++;
-        return 1;
-    }
-    
-    // Failed to acquire (already locked by another thread)
-    return 0;
-}
+// Synchronization lives in platform/host_sync.cpp.
 
 //=============================================================================
 // Spinlock Implementation
@@ -889,93 +580,6 @@ NTSTATUS KeDelayExecutionThread(uint32_t WaitMode, uint32_t Alertable, LARGE_INT
 }
 
 //=============================================================================
-// Event Functions (Extended) Implementation
-//=============================================================================
-
-/**
- * NtCreateEvent @ 0x820008ec
- * 
- * Creates an event object.
- */
-NTSTATUS NtCreateEvent(HANDLE* EventHandle, uint32_t DesiredAccess, void* ObjectAttributes,
-                       uint32_t EventType, uint32_t InitialState) {
-    (void)DesiredAccess;
-    (void)ObjectAttributes;
-    
-    if (!EventHandle) {
-        return STATUS_INVALID_PARAMETER;
-    }
-    
-    // Allocate event structure
-    KernelEvent* event = (KernelEvent*)malloc(sizeof(KernelEvent));
-    if (!event) {
-        return STATUS_NO_MEMORY;
-    }
-    
-    // Initialize mutex and condition variable
-    pthread_mutex_init(&event->mutex, NULL);
-    pthread_cond_init(&event->cond, NULL);
-    
-    // Set initial state
-    event->signaled = InitialState ? 1 : 0;
-    
-    // Set event type (0 = manual-reset, 1 = auto-reset)
-    event->manual_reset = (EventType == 0) ? 1 : 0;
-    
-    *EventHandle = (HANDLE)event;
-    return STATUS_SUCCESS;
-}
-
-/**
- * NtSetEvent @ 0x8200082c
- * 
- * Sets an event to the signaled state.
- */
-NTSTATUS NtSetEvent(HANDLE EventHandle, int32_t* PreviousState) {
-    if (!EventHandle) {
-        return STATUS_INVALID_PARAMETER;
-    }
-    
-    KernelEvent* event = (KernelEvent*)EventHandle;
-    pthread_mutex_lock(&event->mutex);
-    
-    if (PreviousState) {
-        *PreviousState = event->signaled;
-    }
-    
-    event->signaled = 1;
-    
-    // Wake up waiting threads
-    if (event->manual_reset) {
-        pthread_cond_broadcast(&event->cond);
-    } else {
-        pthread_cond_signal(&event->cond);
-    }
-    
-    pthread_mutex_unlock(&event->mutex);
-    return STATUS_SUCCESS;
-}
-
-/**
- * NtClearEvent @ 0x82000844
- * 
- * Clears an event to the non-signaled state.
- */
-NTSTATUS NtClearEvent(HANDLE EventHandle) {
-    if (!EventHandle) {
-        return STATUS_INVALID_PARAMETER;
-    }
-    
-    KernelEvent* event = (KernelEvent*)EventHandle;
-    pthread_mutex_lock(&event->mutex);
-    
-    event->signaled = 0;
-    
-    pthread_mutex_unlock(&event->mutex);
-    return STATUS_SUCCESS;
-}
-
-//=============================================================================
 // Thread Management Implementation
 //=============================================================================
 
@@ -1133,44 +737,5 @@ void RtlUnwind(void* TargetFrame, void* TargetIp, void* ExceptionRecord, void* R
     // For cross-platform, we rely on C++ exceptions instead
 }
 
-//=============================================================================
-// Critical Section Functions
-//=============================================================================
-
-/**
- * RtlEnterCriticalSection @ 0x82585E0C
- * 
- * Enters a critical section, blocking if necessary.
- */
-void RtlEnterCriticalSection(RTL_CRITICAL_SECTION* CriticalSection) {
-    if (!CriticalSection) {
-        return;
-    }
-    
-#ifdef _WIN32
-    EnterCriticalSection((CRITICAL_SECTION*)CriticalSection);
-#else
-    // On POSIX, use pthread mutex
-    pthread_mutex_t* mutex = (pthread_mutex_t*)CriticalSection;
-    pthread_mutex_lock(mutex);
-#endif
-}
-
-/**
- * RtlLeaveCriticalSection @ 0x82585DFC
- * 
- * Leaves a critical section.
- */
-void RtlLeaveCriticalSection(RTL_CRITICAL_SECTION* CriticalSection) {
-    if (!CriticalSection) {
-        return;
-    }
-    
-#ifdef _WIN32
-    LeaveCriticalSection((CRITICAL_SECTION*)CriticalSection);
-#else
-    // On POSIX, use pthread mutex
-    pthread_mutex_t* mutex = (pthread_mutex_t*)CriticalSection;
-    pthread_mutex_unlock(mutex);
-#endif
-}
+// Host threads have no hardware IRQL; retain the per-thread nesting value.
+void KfLowerIrql(uint32_t irql) { g_current_irql = irql; }

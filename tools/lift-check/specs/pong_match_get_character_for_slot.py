@@ -23,7 +23,7 @@ def resolve(ctx):
 
 CALLS = {
     "pongMatch_GetCharacterIndex": model(resolve, args=("r3",)),
-    "pongMatch_LogMissingPlayerMgr": stub(ret="void", args=("r3",)),
+    "nop_8240E6D0": stub(ret="void", args=("r3",)),
 }
 
 

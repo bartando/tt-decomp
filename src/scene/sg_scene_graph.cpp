@@ -1,3 +1,4 @@
+#include "rage/xml_tree.hpp"
 #include "sg_scene_graph.hpp"
 
 // RAGE engine heap free — canonical name declared in rage/rage_cm_types.hpp
@@ -8,7 +9,6 @@ extern void rage_free(void* ptr);               // @ 0x820C00C0
 // (skipping +0x1C), then calls atArray_Clear (rage::gameObject base dtor).
 // Named after its address in the translation unit that contains sgSceneGraph.
 // rage_8070 — rage::gameObject base destructor (clears atArray-like state)
-extern void rage_8070(void* obj);  // @ 0x821A8070
 
 // Forward declaration
 void sgSceneGraph_FreeLists(void* obj);
@@ -48,7 +48,7 @@ void sgSceneGraph_FreeLists(void* obj) {
     rage_free(*reinterpret_cast<void**>(self + 16));  // m_pTraverseList1
 
     // Call rage::gameObject base destructor
-    rage_8070(obj);
+    atArray_Clear(obj);
 }
 
 // ---------------------------------------------------------------------------

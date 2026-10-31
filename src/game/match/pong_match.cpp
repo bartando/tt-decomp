@@ -1,3 +1,4 @@
+#include "rage/time_state.hpp"
 /**
  * pong_match.cpp — Match logic and game mode implementations
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -1175,13 +1176,6 @@ static Fn VirtualSlot(const void* object, int slot) {
 
 // rage::sysTimeManager instance (vtable 0x82038CA8). The image holds 1/60 at
 // +0x08 and 60.0 at +0x0C; +0x08 is what the game scales per-frame motion by.
-struct sysTimeManagerView {
-    void**   vtable;            // +0x00
-    uint32_t field_04;          // +0x04
-    float    m_frameSeconds;    // +0x08
-    float    m_framesPerSecond; // +0x0C
-};
-extern sysTimeManagerView g_sysTimeManager;  // @ 0x825CAEB8
 
 extern void* g_game_state_ptr;               // @ 0x8271A2F8
 // Set elsewhere; stateAim moves the target to a new random spot and clears it.
@@ -1255,7 +1249,7 @@ void gmLogicSwingPractice::Update() {
     if (m_targetEnabled != 0) {
         gmPracticeTarget* target = m_pTarget;
         if (target != nullptr && target->m_spinStopped == 0) {
-            target->m_spinAngle = g_sysTimeManager.m_frameSeconds * kTwoPi + target->m_spinAngle;
+            target->m_spinAngle = g_sysTimeManager.frameSeconds * kTwoPi + target->m_spinAngle;
             target->m_spinAngle = WrapValueInRange(target->m_spinAngle, kMinusPi, kPi);
         }
     }
@@ -1266,7 +1260,7 @@ void gmLogicSwingPractice::Update() {
 
     if (HasActiveChild()) {
         gmLogicChild* child = m_children[m_activeChild];
-        VirtualSlot<void (*)(gmLogicChild*, float)>(child, 6)(child, g_sysTimeManager.m_frameSeconds);
+        VirtualSlot<void (*)(gmLogicChild*, float)>(child, 6)(child, g_sysTimeManager.frameSeconds);
     }
 }
 

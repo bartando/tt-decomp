@@ -2,8 +2,6 @@
 #include "rage/math.hpp"
 #include <cstdint>
 
-double crt_cos(double angle); // @ 0x824302B0
-double crt_sin(double angle); // @ 0x824301D8
 
 #if defined(__clang__)
 #pragma clang fp contract(off)
@@ -13,11 +11,50 @@ double crt_sin(double angle); // @ 0x824301D8
 
 namespace rage {
 
-// These helpers are rotations, despite the generated capsule names. Keep their
-// output in r3 and their double angle in f1, without a spurious this argument.
-extern void mat33RotationX(float* out, double angle); // @ 0x820C3F10
-extern void mat33RotationY(float* out, double angle); // @ 0x820C3F98
-extern void mat33RotationZ(float* out, double angle); // @ 0x820C4020
+// @ 0x820C3F10 | size: 0x84
+void mat33RotationX(float* matrix, double angle) {
+    const float cosine = static_cast<float>(crt_cos(angle));
+    const float sine = static_cast<float>(crt_sin(angle));
+    matrix[0] = 1.0f;
+    matrix[1] = 0.0f;
+    matrix[2] = 0.0f;
+    matrix[4] = 0.0f;
+    matrix[5] = cosine;
+    matrix[6] = sine;
+    matrix[8] = 0.0f;
+    matrix[9] = -sine;
+    matrix[10] = cosine;
+}
+
+// @ 0x820C3F98 | size: 0x84
+void mat33RotationY(float* matrix, double angle) {
+    const float cosine = static_cast<float>(crt_cos(angle));
+    const float sine = static_cast<float>(crt_sin(angle));
+    matrix[0] = cosine;
+    matrix[1] = 0.0f;
+    matrix[2] = -sine;
+    matrix[4] = 0.0f;
+    matrix[5] = 1.0f;
+    matrix[6] = 0.0f;
+    matrix[8] = sine;
+    matrix[9] = 0.0f;
+    matrix[10] = cosine;
+}
+
+// @ 0x820C4020 | size: 0x84
+void mat33RotationZ(float* matrix, double angle) {
+    const float cosine = static_cast<float>(crt_cos(angle));
+    const float sine = static_cast<float>(crt_sin(angle));
+    matrix[0] = cosine;
+    matrix[1] = sine;
+    matrix[2] = 0.0f;
+    matrix[4] = -sine;
+    matrix[5] = cosine;
+    matrix[6] = 0.0f;
+    matrix[8] = 0.0f;
+    matrix[9] = 0.0f;
+    matrix[10] = 1.0f;
+}
 
 namespace {
 

@@ -1,3 +1,4 @@
+#include "rage/mat33.hpp"
 #include "rage/ref_counted_header.hpp"
 /**
  * ph_physics.cpp — RAGE physics module utilities
@@ -16,7 +17,6 @@
 #include "articulated_constraints.hpp"
 #include "joint_initialization.hpp"
 #include "rage/math.hpp"
-#include "rage/mat33.hpp"
 #include "rage/ptr32.hpp"
 
 extern "C" void* rage_alloc(uint32_t size);  // RAGE heap alloc (defined in heap.c)
@@ -184,8 +184,7 @@ extern uint8_t fiAsciiTokenizer_ReadBool(void*, void*, void*);
 extern void  fiAsciiTokenizer_ReadToken(void* tokenizer, int mode);
 extern void  msgMsgSink_DispatchNested(void* obj);
 extern void atSingleton_8A48_p42(void* obj);
-extern void fiAsciiTokenizer_Destroy(void* obj);
-extern void strncpy(char*, const char*, int);
+extern "C" void fiAsciiTokenizer_Destroy(void* obj);
 extern void phCollider_RecalcBounds(void* thisPtr);
 extern void phCollider_vfn_1(void* collider);
 extern void* g_display_obj_ptr;
@@ -828,69 +827,6 @@ float ph_ClampAndSin(float value) {
     return static_cast<float>(crt_sin(angle));
 }
 
-extern double crt_cos(double angle); // @ 0x824302B0
-extern double crt_sin(double angle); // @ 0x824301D8
-
-// Build a padded 3x3 X rotation from one double-precision angle.
-// ph_BuildRotationMatrixX (was phBoundCapsule_3F10_g) @ 0x820C3F10 | size: 0x84
-// The three padding words and any translation row remain untouched.
-void ph_BuildRotationMatrixX(float* matrix, double angle) {
-    const float cosine = static_cast<float>(crt_cos(angle));
-    const float sine = static_cast<float>(crt_sin(angle));
-    matrix[0] = 1.0f;
-    matrix[1] = 0.0f;
-    matrix[2] = 0.0f;
-    matrix[4] = 0.0f;
-    matrix[5] = cosine;
-    matrix[6] = sine;
-    matrix[8] = 0.0f;
-    matrix[9] = -sine;
-    matrix[10] = cosine;
-}
-
-// Padded 3x3 Y rotation; padding and translation remain untouched.
-// ph_BuildRotationMatrixY (was phBoundCapsule_3F98_g) @ 0x820C3F98 | size: 0x84
-void ph_BuildRotationMatrixY(float* matrix, double angle) {
-    const float cosine = static_cast<float>(crt_cos(angle));
-    const float sine = static_cast<float>(crt_sin(angle));
-    matrix[0] = cosine;
-    matrix[1] = 0.0f;
-    matrix[2] = -sine;
-    matrix[4] = 0.0f;
-    matrix[5] = 1.0f;
-    matrix[6] = 0.0f;
-    matrix[8] = sine;
-    matrix[9] = 0.0f;
-    matrix[10] = cosine;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ph_BuildRotationMatrixZ @ 0x820C4020 | size: 0x84
-//
-// Initializes a capsule structure with computed geometry values.
-// Sets up a capsule aligned along the Z axis.
-// ─────────────────────────────────────────────────────────────────────────────
-void ph_BuildRotationMatrixZ(void* capsule, float depth, float radius) {
-    uint8_t* obj = (uint8_t*)capsule;
-    
-    float normalizedDepth = ph_Cosf(depth);
-    float transformedRadius = ph_Sinf(radius);
-    
-    const float one = g_floatOne;  // 1.0f
-    const float zero = g_floatZero;
-    
-    // Initialize capsule geometry
-    *(float*)(obj + 0) = normalizedDepth;     // Start cap position
-    *(float*)(obj + 4) = transformedRadius;   // Radius
-    *(float*)(obj + 8) = one;                 // Direction component
-    *(float*)(obj + 16) = -transformedRadius; // End cap offset (negated)
-    *(float*)(obj + 20) = normalizedDepth;    // Total depth
-    *(float*)(obj + 24) = one;                // Padding
-    *(float*)(obj + 32) = one;                // Padding
-    *(float*)(obj + 36) = one;                // Padding
-    *(float*)(obj + 40) = zero;               // Padding
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // ph_MoveTowardTarget2D @ 0x820C9CF8 | size: 0xA0
 //
@@ -969,7 +905,7 @@ void phBoundCapsule_InitFromTemplate(void* capsule, void* sourceObj) {
     if (flags == 0) {
         // Apply radius transformation
         const float defaultRadius = g_capsuleRadius;
-        ph_BuildRotationMatrixY(static_cast<float*>(capsule), defaultRadius);
+        rage::mat33RotationY(static_cast<float*>(capsule), defaultRadius);
     }
     
     // Copy transformation matrix from source object (offset +384, 16 bytes)
@@ -1063,42 +999,6 @@ float rage::phBoundCapsule::ComputeExtent(float param1, float param2) const {
 
     // General case: compute extent with both parameters
     return ph_Atan2f(param1, param2);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// rage::phBoundCapsule::InitializeAxisAlignedZ @ 0x820C4020 | size: 0x84
-//
-// Initializes a capsule aligned along the Z axis.
-// Sets up a 3x3 orientation matrix with Z-axis alignment.
-//
-// Parameters:
-//   halfLength - Half the length of the capsule along Z axis
-//   outMatrix - Pointer to 44-byte output structure (3x3 matrix + padding)
-// ─────────────────────────────────────────────────────────────────────────────
-void rage::phBoundCapsule::InitializeAxisAlignedZ(float halfLength, float* outMatrix) {
-    // Compute capsule parameters
-    float minBound = ph_Cosf(halfLength);
-    float maxBound = ph_Sinf(halfLength);
-    
-    const float* constants = &g_floatOne;  // constant table base
-    const float one = constants[0];   // +0 = 1.0f
-    const float zero = constants[2];  // +8 = 0.0f
-    
-    // Initialize matrix for Z-axis alignment
-    // Row 0: [minBound, maxBound, 0]
-    outMatrix[0] = minBound;
-    outMatrix[1] = maxBound;
-    outMatrix[2] = zero;
-    
-    // Row 1: [0, -maxBound, 0]
-    outMatrix[4] = zero;
-    outMatrix[5] = -maxBound;
-    outMatrix[6] = zero;
-    
-    // Row 2: [0, 0, one]
-    outMatrix[8] = zero;
-    outMatrix[9] = zero;
-    outMatrix[10] = one;
 }
 
 // ═════════════════════════════════════════════════════════════════════════════

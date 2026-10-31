@@ -1,3 +1,4 @@
+#include "rage/time_state.hpp"
 /**
  * rage_cm.cpp — RAGE Curve/Machine Math Node implementations
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -905,9 +906,7 @@ static bool cmApproachOperator_VectorApproach(
     }
 }
 
-// rage::sysTimeManager (defined in match_data.cpp); Tick reads +8.
-struct cmTimeManagerView { void** vtable; uint32_t field_04; float frameSeconds; float framesPerSecond; };
-extern "C" cmTimeManagerView g_sysTimeManager;  // @ 0x825CAEB8
+// The shared time state supplies the frame delta used below.
 
 // Vector step toward target: (current, target, rate, dt); the asm multiplies
 // rate * dt first, then runs the step cmApproachOperator_VectorApproach models.

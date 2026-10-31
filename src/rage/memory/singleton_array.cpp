@@ -1,7 +1,7 @@
+#include "rage/operator_new.hpp"
 #include "rage/atSingleton.hpp"
 #include "rage/singleton.h"
 
-extern void* xe_EC88(uint32_t size);  // @ 0x820DEC88
 extern void* rage_strDuplicate(const char* text);  // @ 0x820C29E0
 struct xmlTreeEntry;
 extern void* xmlTreeEntry_DeleteArray(xmlTreeEntry* entries);  // @ 0x820C2980
@@ -14,7 +14,7 @@ SingletonEntry* InitializeSingleton(SingletonArray* array) {
     if (array->count == array->capacity) {
         array->capacity = static_cast<uint16_t>(array->capacity + 16);
         const uint32_t capacity = array->capacity;
-        auto* block = static_cast<uint32_t*>(xe_EC88(capacity * sizeof(SingletonEntry) + 4));
+        auto* block = static_cast<uint32_t*>(::rage_Alloc(capacity * sizeof(SingletonEntry) + 4));
         SingletonEntry* entries = nullptr;
         if (block) {
             *block = capacity;

@@ -43,10 +43,13 @@ set(SOURCES
     src/crt/ctrlfp.cpp
     src/crt/entry.c
     src/crt/exit.c
+    src/crt/fmod.cpp
     src/crt/heap.c
+    src/crt/host_format.cpp
     src/crt/memory.c
     src/crt/rtti.cpp
     src/crt/startup.c
+    src/crt/version.c
     src/crt/string.c
     src/crt/xe_thread.c
     src/crt/xe_tls.c
@@ -55,6 +58,11 @@ set(SOURCES
     # XAM (Xbox Application Model)
     src/xam/audio.c
     src/xam/input.c
+    src/platform/host_imports.cpp
+    src/platform/audio_frame.cpp
+    src/platform/host_xma.cpp
+    src/platform/host_sync.cpp
+    src/platform/host_memory.cpp
     src/xam/kernel.c
     src/xam/thread_sync.cpp
     src/xam/kernel_shims.c
@@ -82,6 +90,7 @@ set(SOURCES
     src/rage/audio/xaudio_effect.cpp
     src/rage/audio/xaudio_resampler.cpp
     src/rage/core/fsmMachine.c
+    src/rage/core/app_init.c
     src/rage/core/game_loop.c
     src/rage/core/hsm.cpp
     src/rage/core/indexed_registry.cpp
@@ -97,6 +106,7 @@ set(SOURCES
     src/rage/memory/sysMemSimpleAllocator.cpp
     src/rage/io/rage_par.cpp
     src/rage/io/rage_stream_manager.cpp
+    src/rage/io/fiDevice.cpp
     src/rage/io/fiAsciiTokenizer.cpp
     src/rage/io/fiStreamBuf.cpp
     src/rage/render_loop.c
@@ -105,6 +115,7 @@ set(SOURCES
     src/rage/network/snSessionStates.cpp
     src/rage/core/subsystem_init.c
     src/rage/swf.cpp
+    src/rage/swf_image_data.cpp
     src/rage/hud_page_group.cpp
     src/rage/swf_page_group.cpp
     src/rage/swf_vm.cpp
@@ -160,6 +171,8 @@ set(SOURCES
     src/game/ball/ball_prediction_quaternion.cpp
     src/game/camera/pong_camera.cpp
     src/game/camera/pong_camera_helpers.cpp
+    src/game/camera/cm_cam_actions.cpp
+    src/game/camera/dcam_polar_cam.cpp
     src/game/creature/pong_creature.cpp
     src/game/creature/mover_input_speed.cpp
     src/game/creature/creature_pose.cpp
@@ -172,6 +185,7 @@ set(SOURCES
     src/game/network/pong_network.cpp
     src/game/network/pong_network_classes.cpp
     src/game/network/pong_network_io.cpp
+    src/game/network/network_context.cpp
     src/game/network/msg_msg_sink.cpp
     src/game/network/xonline_strings.cpp
     src/game/player/pong_player.cpp
@@ -231,11 +245,14 @@ set(SOURCES
     
     # Graphics
     src/graphics/fx_crowd.cpp
+    src/graphics/tri_strip_list.cpp
     src/graphics/grc_debug_strings.cpp
+    src/graphics/grc_gpu_hang.cpp
     src/graphics/grc_cache.cpp
     src/graphics/grc_command_stream.cpp
     src/graphics/grc_device.cpp
     src/graphics/grc_gpu_resources.cpp
+    src/graphics/fx_billboard.cpp
     src/graphics/grc_vertex_buffer.cpp
     src/graphics/grc_render.cpp
     src/graphics/texture_reference.cpp
@@ -259,15 +276,20 @@ set(SOURCES
     src/game/match/match_data.cpp
     src/game/misc/misc_data.cpp
     src/game/network/net_data.cpp
+    src/game/network/image_data.cpp
     src/game/network/ld_net_data.cpp
     src/game/player/player_data.cpp
     src/graphics/grc_data.cpp
+    src/graphics/image_data.cpp
     src/physics/ph_data.cpp
     src/physics/ld_ph_data.cpp
     src/rage/animation/anim_data.cpp
+    src/rage/animation/float_channel_vtables.cpp
     src/rage/audio/aud_data.cpp
+    src/rage/audio/image_data.cpp
     src/rage/network/sn_data.cpp
     src/rage/rage_data.cpp
+    src/rage/time_state_data.cpp
     src/rage/ld_rage_data.cpp
     src/xam/xam_data.cpp
     src/link/linkage_bridges.cpp
@@ -284,7 +306,6 @@ set(SOURCES
     src/rage/math/mat33.cpp
     src/rage/math/mat33_orthonormalize.cpp
     src/rage/math/mat34_transform.cpp
-    src/game/input/button_edges.cpp
     src/game/player/player_state_queries.cpp
     src/game/misc/ccal_ring_buffer.cpp
     src/game/misc/ccal_movie_player.cpp

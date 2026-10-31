@@ -1,3 +1,4 @@
+#include "grc/progress_state.h"
 /**
  * globals.c — Global Variables Implementation
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -795,7 +796,7 @@ uint32_t g_sgRMDrawable_typeId = 0x825C2D78u;  // @ 0x825C2D78, holds its own ad
 void* g_slowmo_manager_ptr = NULL;         // @ 0x825C6540
 
 // Misc render objects
-void* g_someRenderObj1 = NULL;             // @ 0x82606654
+uintptr_t g_grcProgressState = 0; // @ 0x82606654
 void* g_someRenderObj2 = NULL;             // @ 0x825FEAB0
 
 // State name strings
@@ -966,3 +967,13 @@ CrtTlsDispatch g_tls_dispatch;         /* @ 0x825E6E84 */
 TT_DATA_ALIAS("g_controllerArray", "g_vibrationMgr");  /* @ 0x8271A3A8 */
 TT_DATA_ALIAS("g_playerStateArray", "g_input_obj_ptr"); /* @ 0x825EAB28 */
 TT_DATA_ALIAS("g_messageEventType", "g_gdEventBase_typeId"); /* @ 0x825C5800 */
+
+// Shared image scalars. Values verified as big-endian floats in the image:
+// 0x8202D108 = 1, 0x8202D10C = 0.5, 0x8202D110 = 0, 0x8202D184 = 2.
+TT_DATA_ALIAS("lbl_8202D108", "g_kZeroThreshold");
+TT_DATA_ALIAS("lbl_8202D184", "g_lookAtMultiplier");
+TT_DATA_ALIAS("g_fxVertexDepth", "g_kZero");
+TT_DATA_ALIAS("g_swfZero", "g_kZero");
+TT_DATA_ALIAS("g_grcHalf", "g_lookAtRefAngle");
+// Both declarations are native device pointers, initially null in the image.
+TT_DATA_ALIAS("lbl_825EB988", "g_binkVideoPlayer"); // @ 0x825EB988

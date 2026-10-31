@@ -1,3 +1,4 @@
+#include "grc/image_state.hpp"
 #include "rage/polygon_clip.hpp"
 #include "../../game/camera/pong_camera.hpp"
 
@@ -12,16 +13,12 @@ extern "C" const float lbl_8202D110; // @ 0x8202D110
 extern "C" {
 extern const uint32_t lbl_82619BE0[4]; // @ 0x82619BE0 — xyz mask
 extern const uint32_t lbl_82619BD0[4]; // @ 0x82619BD0 — homogeneous w = 1
-extern const float lbl_82606740[4];    // @ 0x82606740 — zero vector
 extern const float lbl_82606750[4];    // @ 0x82606750 — normalization zero
 extern const float lbl_82619BF0[4];    // @ 0x82619BF0 — positive infinity
 extern const float lbl_825CB7C0[4];    // @ 0x825CB7C0 — (1, 1, 1, 0)
 extern const float lbl_825CB7D0[4];    // @ 0x825CB7D0 — (0.5, 0.5, 0.5, 0)
-extern const float lbl_825CA420[4];    // @ 0x825CA420 — (0.1, 0.1, 0.1, 0)
-extern const float lbl_825C8078;       // @ 0x825C8078 — 0.01
 extern const float lbl_825C5938;       // @ 0x825C5938 — -1
 extern const float lbl_8202D184;       // @ 0x8202D184 — 2
-extern const uint32_t g_boxFaceIndices[24]; // @ 0x825D4A90
 }
 
 namespace rage {

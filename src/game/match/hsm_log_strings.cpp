@@ -1,3 +1,4 @@
+#include "debug_strings.hpp"
 /**
  * hsm_log_strings.cpp — HSM (Hierarchical State Machine) log/debug string constants
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -47,7 +48,7 @@ const char* g_str_hsm_gmLogicNode        = "gmLogicNode";                       
 // ────────────────────────────────────────────────────────────────────────────
 // rage action-system warning format strings
 // ────────────────────────────────────────────────────────────────────────────
-const char* g_str_hsm_warn_actionFallback =
+const char g_str_hsm_warn_actionFallback[] =
     "Warning: Can't run action '%s'. Using '%s' as a fallback";                   // @ 0x820521A0
-const char* g_str_hsm_warn_actionFail     =
+const char g_str_hsm_warn_actionFail[]     =
     "Warning: Can't run action '%s'";                                             // @ 0x820521DC

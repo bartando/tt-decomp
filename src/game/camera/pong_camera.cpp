@@ -1,3 +1,4 @@
+#include "rage/operator_new.hpp"
 /**
  * pong_camera.cpp
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -1629,7 +1630,6 @@ static T& FieldAt(void* base, uint32_t offset) {
 // lbl_825EBAA0 holds the current grcViewport: ~grcViewport clears it and
 // 0x82153070 re-uploads a viewport that is current. globals.c defines the slot
 // as g_pCurrentViewport.
-extern "C" void* g_pCurrentViewport; // @ 0x825EBAA0
 static void*& g_currentViewport = g_pCurrentViewport;
 
 // lbl_8271A318 is the atSingleton<camShotMgr> instance. camShotMgr is an
@@ -2631,18 +2631,7 @@ extern float g_cameraSampleInitFloat2;  // .rdata @ 0x8202D110
 
 void* pongCameraMgr_9DE8_g(void* owner, uint32_t param1, uint32_t /*unused*/,
                             uint8_t param2, uint32_t param3) {
-    sysMemAllocator_InitThreadHeap();
-
-    // Navigate SDA to get allocator: SDA[0] → globalPtr → globalPtr+4 → allocator
-    extern void* g_sdaBase;     // r13+0: the thread's TLS block, not a global
-    void* globalPtr = g_sdaBase;
-    void* allocator = *(void**)((char*)globalPtr + 4);
-
-    // Call allocator->vtable[1](allocator, size=40, align=16)
-    void** allocVtable = *(void***)allocator;
-    typedef void* (*AllocFn)(void*, uint32_t, uint32_t);
-    AllocFn allocFn = (AllocFn)allocVtable[1];
-    void* newObj = allocFn(allocator, 40, 16);
+    void* newObj = ::rage_Alloc(40);
 
     if (newObj != nullptr) {
         // Set vtable pointer (gdPatternSet vtable @ 0x8204911C)

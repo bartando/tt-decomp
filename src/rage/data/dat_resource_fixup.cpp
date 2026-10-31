@@ -1,3 +1,4 @@
+#include "rage/resource_fixup.hpp"
 /**
  * dat_resource_fixup.cpp — relocating a pointer while a resource is placed
  * Rockstar Presents Table Tennis (Xbox 360, 2006)

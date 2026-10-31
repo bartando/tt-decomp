@@ -1,3 +1,5 @@
+#include "debug_strings.hpp"
+#include "rage/math.hpp"
 /**
  * cm_cam_actions.cpp — cmSampleCamActions camera parameter sampler functions
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -99,9 +101,6 @@ void cmSimple_vfn_4(void* node, float* out);
 // cmSampleCamActions_H_SmoothLookAt_LimitedTilt_vfn_10 @ 0x822774B8 | size: 0x90
 void cmSampleCamActions_H_SmoothLookAt_LimitedTilt_vfn_10(void* node, void* data);
 
-// fmod_safe @ 0x82431D78 | size: 0x128
-float fmod_safe(float value, float range);
-
 // rage_DebugLog @ 0x8240E6D0 | size: 0x4 (nop in retail build)
 void rage_DebugLog(const char* fmt, ...);
 
@@ -150,15 +149,15 @@ extern "C" float WrapValueInRange(float value, float min, float max) {
     if (value < min) {
         float range = max - min;
         float dist = min - value;
-        float wrapped = fmod_safe(dist, range);
+        float wrapped = static_cast<float>(crt_fmod(dist, range));
         return max - wrapped;
     }
-    if (value <= max) {
+    if (!(value > max)) {
         return value;
     }
     float range = max - min;
     float dist = value - max;
-    float wrapped = fmod_safe(dist, range);
+    float wrapped = static_cast<float>(crt_fmod(dist, range));
     return wrapped + min;
 }
 
@@ -517,8 +516,6 @@ extern "C" void cmSampleCamActions_P_VelocityFollow_vfn_10(void* self, void* pos
 // static analysis and symbol cross-referencing).
 //   0x820521A0  "Warning: Can't run action '%s'. Using '%s' as a fallback"
 //   0x820521DC  "Warning: Can't run action '%s'"
-extern "C" const char kWarn_CmAction_UsingFallback[];  // @ 0x820521A0
-extern "C" const char kWarn_CmAction_CantRun[];        // @ 0x820521DC
 
 /**
  * cmAction_RunWithFallback @ 0x82260F90 | size: 0x90
@@ -562,12 +559,12 @@ extern "C" void cmAction_RunWithFallback(void* self) {
         // +0x58 = delegation active flag
         obj->m_delegateFlag = 1;
         const char* delegateName = *(const char**)((char*)delegate + 4);
-        rage_DebugLog(kWarn_CmAction_UsingFallback,
+        rage_DebugLog(g_str_hsm_warn_actionFallback,
                       obj->m_actionName, delegateName);
         return;
     }
 
-    rage_DebugLog(kWarn_CmAction_CantRun, obj->m_actionName);
+    rage_DebugLog(g_str_hsm_warn_actionFail, obj->m_actionName);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

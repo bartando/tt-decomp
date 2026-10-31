@@ -2,6 +2,11 @@
 
 namespace rage {
 
+// Padded row-vector principal rotations. r3 = output, f1 = double angle;
+// write xyz only, preserving row padding and any translation row.
+void mat33RotationX(float* out, double angle); // @ 0x820C3F10
+void mat33RotationY(float* out, double angle); // @ 0x820C3F98
+void mat33RotationZ(float* out, double angle); // @ 0x820C4020
 // Compose the xyz basis in place; translation stays untouched. VMX shuffles
 // leave each input row's raw X bits in that output row's W lane.
 void mat33ComposeInPlace(float* matrix, const float* rotation); // @ 0x820C3BC8

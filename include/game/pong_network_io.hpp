@@ -8,6 +8,7 @@
 
 #pragma once
 #include <stdint.h>
+#include "game/network_context.hpp"
 
 // Forward declaration
 struct SinglesNetworkClient;
@@ -90,18 +91,6 @@ void WriteInt8Bits(void* client, int8_t value, int bitWidth);
 // ══════════════════════════════════════════════════════════════════════════════
 // NETWORK STATE MANAGEMENT
 // ══════════════════════════════════════════════════════════════════════════════
-
-/**
- * UpdateNetworkState @ 0x823D2BE8 | size: 0x60
- * 
- * Updates the network client's internal state machine.
- * Called periodically to process pending network events.
- * 
- * @param client  SinglesNetworkClient to update
- * 
- * Original symbol: SinglesNetworkClient_2BE8_g
- */
-void UpdateNetworkState(void* client);
 
 /**
  * ProcessNetworkPacket @ 0x821D51C8 | size: 0xC8
