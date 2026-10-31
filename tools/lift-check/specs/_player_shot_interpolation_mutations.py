@@ -22,6 +22,11 @@ CASES = [
         ("use whole final flag", "static_cast<uint8_t>(adjustForTable) != 0", "adjustForTable != 0"),
         ("omit fourth-lane mirror", "lane < 4; ++lane)\n            spin[lane] = flushVmx", "lane < 3; ++lane)\n            spin[lane] = flushVmx"),
     ]),
+    ("player_classify_spin_direction", SOURCE, [
+        ("prefer x for equal magnitudes", "if (std::fabs(x) > std::fabs(y))", "if (std::fabs(x) >= std::fabs(y))"),
+        ("lose x sign result", "return x < 0.0f ? 1 : 0;", "return x < 0.0f ? 0 : 1;"),
+        ("swap y directions", "return y > 0.0f ? 3 : 2;", "return y > 0.0f ? 2 : 3;"),
+    ]),
     ("ph_rotate_spin_axis", "src/physics/ph_physics.cpp", [
         ("swap rotation terms", "__builtin_fmaf(oldZ, cosine, ySine)", "__builtin_fmaf(oldZ, sine, oldY * cosine)"),
         ("lose negative sine", "__builtin_fmaf(oldY, cosine, -zSine)", "__builtin_fmaf(oldY, cosine, zSine)"),

@@ -87,3 +87,23 @@ void pongPlayer_5010_g(void* axis, void* output, void* hit, int adjustForTable) 
     if (static_cast<uint8_t>(adjustForTable) != 0)
         phBoundCapsule_2E70_fw(hit, spin);
 }
+
+extern "C" const float lbl_825C5938; // @ 0x825C5938
+
+// Classify the dominant local spin axis. Equal nonzero magnitudes prefer y;
+// zero/unordered components contribute no direction. Positive x maps to 1,
+// negative x to 0, positive y to 2 and negative y to 3.
+// @ 0x821D5998 | size: 0x140
+int fxBallSplash2D_5998_g(void* hit) {
+    const float rawX = at<float>(hit, 0x40);
+    const float rawY = at<float>(hit, 0x44);
+    float x = rawX < 0.0f ? -rawX : rawX > 0.0f ? rawX * lbl_825C5938 : 0.0f;
+    float y = rawY > 0.0f ? rawY * lbl_825C5938 : rawY < 0.0f ? -rawY : 0.0f;
+    if (std::fabs(x) > 0.0f && std::fabs(y) > 0.0f) {
+        if (std::fabs(x) > std::fabs(y)) y = 0.0f;
+        else x = 0.0f;
+    }
+    if (std::fabs(x) > 0.0f) return x < 0.0f ? 1 : 0;
+    if (std::fabs(y) > 0.0f) return y > 0.0f ? 3 : 2;
+    return 0;
+}
