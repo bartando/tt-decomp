@@ -23,14 +23,11 @@
 
 #include "texture_reference.hpp"
 #include "rage/memory.h"
+#include "rage/grc_resource_state.hpp"
 
 extern void* g_grcDefaultTexture; // @ 0x825EBA20 — fallback texture, not a factory
 
 namespace rage {
-
-// Global endian-swap / dirty-disc flag used during serialisation
-// @ 0x82606562   .data   1 byte   SDA offset +25954
-extern uint8_t g_bTextureEndianDirty;
 
 // ---------------------------------------------------------------------------
 // Struct definitions are in texture_reference.hpp — see that file.
@@ -141,7 +138,7 @@ void grcTextureReferenceBase::Serialize(grcSerializerCtx* pCtx)
     pCtx->step += 2;    // skip step 7 → 8
 
     // Conditional endian-swap of m_field06 (uint16) when dirty
-    if (g_bTextureEndianDirty)
+    if (rage::g_bTextureEndianDirty)
     {
         uint16_t v = m_field06;
         m_field06 = static_cast<uint16_t>((v >> 8) | (v << 8));
@@ -151,7 +148,7 @@ void grcTextureReferenceBase::Serialize(grcSerializerCtx* pCtx)
     pCtx->step += 4;    // → 12
 
     // Conditional endian-swap of m_field08 (uint32) when dirty
-    if (g_bTextureEndianDirty)
+    if (rage::g_bTextureEndianDirty)
     {
         uint32_t v = m_field08;
         m_field08 = ((v & 0x000000FFu) << 24)

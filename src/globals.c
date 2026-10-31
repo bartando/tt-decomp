@@ -233,7 +233,7 @@ void* g_singles_network_client = NULL;
 
 uint32_t g_phFrameCounter = 0;      /* @ 0x825C4898 — per-tick ring cursor */
 uint32_t g_phFrameIndex = 0;        /* @ 0x826065DC — rollback frame cursor */
-void* g_matMgrGuard = NULL;
+uint8_t g_matMgrGuard[20] = {0}; // @ 0x825C9EB0 — in-place material guard
 
 /* Renderer-side shadow-atlas / light descriptor slot.
  * SDA offset 25424 (0x82606350). Read by pongCreature::RegisterShadowCasters
@@ -420,7 +420,7 @@ float g_kFrameAlpha = 0.9f;
 float g_kFrameSnapThresh = 0.001f;
 float g_kFrameToSecScale = 1.0f / 60.0f;
 float g_kOneMinusAlpha = 0.1f;
-float g_kPowerBlend = 0.5f;
+float g_kPowerBlend = 3.0f; // @ 0x825C2EA0
 float g_kSwingRadiusConst = 1.0f;
 float g_kSwingScaleFactor = 1.0f;
 float g_kTicksPerSec = 60.0f;
@@ -636,7 +636,7 @@ const float g_floatConstant3 = 0.0f;       // @ 0x8202D110
 const float g_floatConstant4 = -11.85f;       // @ 0x825C7600
 const float g_floatEpsilon   = 0.0f;       // @ 0x8202D110
 const float g_floatNegOne    = 0.0f;       // @ 0x8202D110
-const float g_floatOne       = 0.0f;       // @ 0x8202D110
+const float g_floatOne       = 1.0f;       // @ 0x8202D108
 const float g_floatZero      = 0.0f;       // @ 0x8202D110
 
 // FloatAverager vtables (network classes) — RTTI: FloatAverager (4 vtables, MI).

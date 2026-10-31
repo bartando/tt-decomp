@@ -10,7 +10,7 @@
  * archetype's gravity factor, set for the duration of the prediction only.
  */
 
-#include "ball_flight.hpp"
+#include "ball_shot_solve.hpp"
 
 #include <stdint.h>
 
@@ -87,7 +87,6 @@ extern void* g_game_state_ptr;               // @ 0x8271A2F8
 
 extern void  game_2010(gmBallNode* node, int kind);                                      // @ 0x82282010
 extern void  pongPlayer_5010_g(void* sub, void* output, void* parent, int flag);         // @ 0x821D5010
-extern int   BallShot_Solve(void* entry, const Vec4* vec90, const Vec4* target, Vec4* spin, Vec4* vel, float speed);  // @ 0x822851D0
 extern float game_2508(const Vec4* spin, const Vec4* vel);                                // @ 0x82282508
 extern void  game_4B60(void* scene, uint16_t handle);                                    // @ 0x822C4B60
 // r6 is never set by the caller nor read by the callee.

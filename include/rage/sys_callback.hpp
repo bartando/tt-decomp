@@ -1,13 +1,13 @@
 #pragma once
 #include <cstdint>
 
-// Four pointer-sized words in the host port; four 32-bit words in the image.
-// target is a direct function address, mode selects the argument shape.
-struct SysCallback {
-    void* self;
-    uintptr_t target;
-    uintptr_t context;
-    uintptr_t mode;
+// Three pointer words and a 32-bit mode; the Xenon image occupies 16 bytes.
+struct SystemCallback {
+    void* target;
+    void (*function)();
+    void* storedArgument;
+    uint32_t kind;
 };
 
-extern "C" void sysCallback_Invoke(void* callback, uintptr_t argument); // @ 0x8225FFF8
+// @ 0x8225FFF8 — dispatch a datCallback, with an optional runtime argument.
+extern "C" void sysCallback_Invoke(void* callback, void* argument);

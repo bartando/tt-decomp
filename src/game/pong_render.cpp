@@ -510,7 +510,7 @@ extern void cmOperatorCtor_0B50_w(void* overrideState);  // @ 0x820F0B50
 void pongDrawBucketLayer::Render(int32_t pass) {
     auto* callbacks = reinterpret_cast<void**>(0x825C58ECu);
     if (void* callback = callbacks[beforeCallback * 2])
-        sysCallback_Invoke(callback, 0);
+        sysCallback_Invoke(callback, nullptr);
 
     if (enabled != 0) {
         const uint32_t frame = *reinterpret_cast<const uint32_t*>(0x825C4898u);
@@ -588,7 +588,7 @@ void pongDrawBucketLayer::Render(int32_t pass) {
     }
 
     if (void* callback = callbacks[afterCallback * 2])
-        sysCallback_Invoke(callback, 0);
+        sysCallback_Invoke(callback, nullptr);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -931,15 +931,15 @@ extern "C" uint32_t g_sceneResetMatrix[4]; // @ 0x8261A0C0
 
 // @ 0x82378460 | size: 0x90
 void pongScrnTransFadeIn_EndTransition(void* obj) {
-    auto* callbacks = reinterpret_cast<SysCallback*>(static_cast<uint8_t*>(obj) + 0x10);
-    SysCallback& completion = callbacks[1];
-    if (completion.mode != 0)
+    auto* callbacks = reinterpret_cast<SystemCallback*>(static_cast<uint8_t*>(obj) + 0x10);
+    SystemCallback& completion = callbacks[1];
+    if (completion.kind != 0)
         sysCallback_Invoke(&completion, 0);
     // Reload the template after the callback, which can update either callback.
-    completion.self = reinterpret_cast<void*>(static_cast<uintptr_t>(g_sceneResetMatrix[0]));
-    completion.target = g_sceneResetMatrix[1];
-    completion.context = g_sceneResetMatrix[2];
-    completion.mode = g_sceneResetMatrix[3];
+    completion.target = reinterpret_cast<void*>(static_cast<uintptr_t>(g_sceneResetMatrix[0]));
+    completion.function = reinterpret_cast<void (*)()>(static_cast<uintptr_t>(g_sceneResetMatrix[1]));
+    completion.storedArgument = reinterpret_cast<void*>(static_cast<uintptr_t>(g_sceneResetMatrix[2]));
+    completion.kind = g_sceneResetMatrix[3];
     callbacks[0] = completion;
 }
 

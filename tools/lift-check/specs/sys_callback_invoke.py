@@ -1,31 +1,38 @@
-"""All four argument shapes with/without bound self; zero/unknown modes do nothing."""
+"""0x8225FFF8: free/bound dispatch, all four argument modes, empty/unknown kinds."""
 from liftcheck.spec import *
-FUNCTION = 'sysCallback_Invoke'
+
+FUNCTION = "sysCallback_Invoke"
 ADDRESS = 0x8225FFF8
-SOURCE = 'src/rage/core/rage_core_utils.cpp'
-TRIALS = 1400
-state = {}
+SOURCE = "src/rage/core/rage_core_utils.cpp"
+TRIALS = 1000
 
 
-def invoke(ctx):
-    # Compare exactly the arguments this callback mode consumes. Other registers
-    # intentionally retain MSVC-specific leftovers and are not part of its ABI.
-    ctx.rec.derefs['args'] = (b''.join(ctx.r(n).to_bytes(4, 'big') for n in state['regs']), None)
+def invoked(argc):
+    def call(ctx):
+        if argc and (dest := ctx.r(argc + 2)):
+            ctx.write(dest, ctx.rng.getrandbits(32).to_bytes(4, "big"))
+    return model(call, args=tuple(f"r{3 + i}" for i in range(argc)))
 
 
-CALLS = {'target': model(invoke, args=())}
+CALLS = {}
+for kind, argc in ((1, 0), (2, 1), (3, 2), (4, 1)):
+    CALLS[f"free{kind}"] = invoked(argc)
+    CALLS[f"bound{kind}"] = invoked(argc + 1)
 
 
 def inputs(t):
-    r = t.rng
-    callback = t.alloc(16, 'callback')
-    mode = r.choice([0, 1, 2, 3, 4, 5, 0x100, 0xFFFFFFFF])
-    bound = r.choice([False, True])
-    self = t.alloc(16, 'self') if bound else 0
-    t.w32(callback, self)
-    t.w32(callback + 4, t.fake_fn('target') if 1 <= mode <= 4 else 0)
-    t.w32(callback + 8, t.u32())
-    t.w32(callback + 12, mode)
-    n = (1 if bound else 0) + ({1: 0, 2: 1, 3: 2, 4: 1}.get(mode, 0))
-    state['regs'] = tuple(range(3, 3 + n))
-    t.args(r3=callback, r4=t.u32())
+    rng = t.rng
+    callback = t.alloc(16, "callback", ctype="SystemCallback")
+    kind = t.index % 9
+    if kind == 5:
+        kind = 0x100
+    elif kind == 6:
+        kind = 0xFFFFFFFF
+    target = t.alloc(16, "target") if rng.choice([False, True]) else 0
+    stored = t.alloc(16, "storedArgument")
+    runtime = t.alloc(16, "runtimeArgument")
+    t.w32(callback, target)
+    t.w32(callback + 4, t.fake_fn(f"{'bound' if target else 'free'}{kind}"))
+    t.w32(callback + 8, rng.choice([0, stored]))
+    t.w32(callback + 0x0C, kind)
+    t.args(r3=callback, r4=rng.choice([0, runtime]))

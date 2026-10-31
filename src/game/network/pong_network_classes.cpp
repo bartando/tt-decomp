@@ -13,6 +13,7 @@
 
 #include <stdint.h>
 #include <cstring>
+#include "rage/sys_callback.hpp"
 
 // Forward declarations
 extern "C" void rage_free(void* ptr);

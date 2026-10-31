@@ -14,6 +14,9 @@
 // @ 0x8240E6D0 — blr. pong_match.cpp and pong_player.cpp.
 void nop_8240E6D0(const char*, ...) {}
 
+// @ 0x8240E6D0 — the same retail blr used as a vector-constructor callback.
+void nop_8240E6D0(void*) {}
+
 // @ 0x8240E6D0 — blr. pong_creature.cpp (pongMover::Reset, the matrix and
 // anim-load messages) and pong_ball.cpp.
 void rage_DebugLog(const char*, ...) {}

@@ -7,6 +7,9 @@
 
 #include "rage/indexed_registry.h"
 #include "pong_ball.hpp"
+#include "game/game_message.hpp"
+#include "ball_audio.hpp"
+#include "rage/mat44.hpp"
 #include <cstddef>   // offsetof
 #include <cstring>   // memcpy, memset
 #include <cmath>     // fabs
@@ -512,7 +515,6 @@ void pongBallInstance::ActivateBall(void* activationContext) {
     extern void game_D500(void*, void*, void*);
     extern void game_DA60();
     extern void game_3860(void*, int, const char*);
-    extern void pg_E6E0(int, int, int, int);
     
     // Check if ball is already active
     bool isActive = *reinterpret_cast<uint8_t*>(reinterpret_cast<uint8_t*>(this) + 85) != 0;
@@ -604,7 +606,7 @@ void pongBallInstance::ActivateBall(void* activationContext) {
     game_3860(gameState, 1, kActivationEvent);
     
     // Send deactivation event (event ID 37, type 64)
-    pg_E6E0(37, 64, 0, 0);
+    PostGameMessage(37, 64, 0, nullptr);
 }
 
 /**
@@ -991,10 +993,16 @@ inline void** GameVtable(uintptr_t address) { return reinterpret_cast<void**>(ad
 // ── Vector math as the VMX unit does it ─────────────────────────────────────
 inline Vec4 Sub(const Vec4& a, const Vec4& b) { return Vec4{a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w}; }
 inline Vec4 Mul(const Vec4& a, const Vec4& b) { return Vec4{a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w}; }
-inline float Dot3(const Vec4& a, const Vec4& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }  // vmsum3fp
+inline float Dot3(const Vec4& a, const Vec4& b) {
+#pragma clang fp contract(off)
+    // vmsum3 accumulates before its single rounding to float.
+    return static_cast<float>((static_cast<double>(a.x) * b.x +
+        static_cast<double>(a.y) * b.y) + static_cast<double>(a.z) * b.z);
+}
 
 // a × b, from two vpermwi shuffles of each; w comes out as a.w·b.w − a.w·b.w.
 inline Vec4 Cross(const Vec4& a, const Vec4& b) {
+#pragma clang fp contract(off)
     return Vec4{a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x, a.w * b.w - a.w * b.w};
 }
 
@@ -1398,9 +1406,7 @@ void pongDrawBucket_AddEntry(pongDrawBucket* bucket, void* renderable, uint32_t 
 extern void      gmBallNode_UpdateReplay(gmBallNode* node);                   // @ 0x82282110  puts the ball where the replay has it
 extern void      rage_3E10(void* gameState);                                  // @ 0x821D3E10
 extern void      pg_70C8_g();                                                 // @ 0x822870C8  walks the ball prediction
-extern void      util_2038(const gmBallNode::Matrix34* m, gmBallNode::Vec4* point);  // @ 0x820D2038  point = m * (x, y, z, 1)
 extern void      fxBallSplash2D_Update(fxBallSplash2D* splash);               // @ 0x82389FD8
-extern void      pg_0C98_g(gmball::AudioEmitterView* emitter, const gmBallNode::Vec4* position);  // @ 0x82160C98
 extern void      msgMessage_ReadArgs(const gmball::MessageView* msg, const char* format, ...);  // @ 0x8225E998
 void pongBallInstance_4980_g(void* instance, unsigned short s, int a, int b, int c, int d);  // @ 0x822C4980  activates the object
 
@@ -1454,8 +1460,9 @@ inline void SetShaderGlobal(uint32_t handle, const Vec4& value) {
 // startup), then one Newton-Raphson step against (1, 1, 1, 0) and (0.5, 0.5, 0.5, 0).
 // Those zero w lanes leave w multiplied by the raw estimate.
 inline Vec4 Normalize3(const Vec4& v) {
+#pragma clang fp contract(off)
     float lengthSq = Dot3(v, v);
-    float estimate = 1.0f / sqrtf(lengthSq);  // vrsqrtefp
+    float estimate = static_cast<float>(1.0 / __builtin_sqrt(static_cast<double>(lengthSq))); // vrsqrtefp
     auto lane = [&](float one, float half, float suspect, float replacement) {
         float y = (estimate == suspect) ? replacement : estimate;
         return (one - lengthSq * (y * y)) * (half * y) + y;
@@ -1790,7 +1797,7 @@ void gmBallNode::Update() {
 
         // A frame looking along this frame's movement, world up as the hint, at
         // the published ball's position.
-        Matrix34 frame = current ? current->matrix : lbl_825CB800;
+        alignas(16) Matrix34 frame = current ? current->matrix : lbl_825CB800;
         Vec4 moved = Sub(after, before);
         frame.b.x = 0.0f;
         frame.b.y = 1.0f;
@@ -1800,18 +1807,18 @@ void gmBallNode::Update() {
         frame.b = Normalize3(Cross(frame.a, frame.c));
 
         if (trails[0]) {
-            Vec4 centre{0.0f, 0.0f, 0.0f, 0.0f};
-            Vec4 unused{0.0f, 0.0f, 0.0f, 0.0f};  // transformed like `centre`, then never passed on
-            util_2038(&frame, &centre);
-            util_2038(&frame, &unused);
+            alignas(16) Vec4 centre{0.0f, 0.0f, 0.0f, 0.0f};
+            alignas(16) Vec4 unused{0.0f, 0.0f, 0.0f, 0.0f};  // transformed like `centre`, then never passed on
+            rage::mat34TransformPointInPlace(&frame.a.x, &centre.x);
+            rage::mat34TransformPointInPlace(&frame.a.x, &unused.x);
             Vec4 zero{0.0f, 0.0f, 0.0f, 0.0f};
             Trail_AddSample(trails[0], &centre, &zero);
         }
         if (trails[1]) {
-            Vec4 edgeA{lbl_825C8138, 0.0f, 0.0f, 0.0f};
-            Vec4 edgeB{lbl_8207A320, 0.0f, 0.0f, 0.0f};
-            util_2038(&frame, &edgeA);
-            util_2038(&frame, &edgeB);
+            alignas(16) Vec4 edgeA{lbl_825C8138, 0.0f, 0.0f, 0.0f};
+            alignas(16) Vec4 edgeB{lbl_8207A320, 0.0f, 0.0f, 0.0f};
+            rage::mat34TransformPointInPlace(&frame.a.x, &edgeA.x);
+            rage::mat34TransformPointInPlace(&frame.a.x, &edgeB.x);
             Trail_AddSample(trails[1], &edgeA, &edgeB);
         }
     } else {
@@ -1826,7 +1833,7 @@ void gmBallNode::Update() {
     BallInstView* published = View(*g_ppBallInst);
     if (BallAudioView* audio = published->audio) {
         if (audio->emitterAActive) {
-            pg_0C98_g(&audio->emitterA, &published->matrix.d);
+            BallAudio_SetEmitterPosition(&audio->emitterA, &published->matrix.d.x);
         }
         const Vec4* position = &published->matrix.d;
         Vec4 shifted;
@@ -1835,7 +1842,7 @@ void gmBallNode::Update() {
             shifted.x = audio->offsetXB + shifted.x;
             position = &shifted;
         }
-        pg_0C98_g(&audio->emitterB, position);
+        BallAudio_SetEmitterPosition(&audio->emitterB, &position->x);
     }
 
     if (fxFadeTime >= 0.0f) {
@@ -2201,8 +2208,8 @@ void pongBallInstance::ProcessCollisionAndActivate(pongBallInstance* other) {
 
     // 'Missed' path (case 3 / case 2 without physics throttle) and case 4
     // paddle-impact audio are inlined in the original — summarized here.
-    // Full re-expansion depends on pg_E6E0 and pongBall_PlayPaddleImpactCue
-    // getting their own lifts; both are tracked in the ball-audio follow-up.
+    // Full re-expansion still depends on pongBall_PlayPaddleImpactCue;
+    // that lift is tracked in the ball-audio follow-up.
     if (classification == 3 || classification == 2) {
         void* histEntry = pongPhysics_GetHistorySystem();
         int32_t gate = histEntry

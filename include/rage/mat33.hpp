@@ -2,6 +2,10 @@
 
 namespace rage {
 
+// Compose the xyz basis in place; translation stays untouched. VMX shuffles
+// leave each input row's raw X bits in that output row's W lane.
+void mat33ComposeInPlace(float* matrix, const float* rotation); // @ 0x820C3BC8
+
 // Write the xyz entries of three 16-byte rows, preserving padding. Axis is an
 // aligned vec4 and need not be normalized; it may be null when angle is zero.
 // Output and axis must be disjoint. The original accepts a double angle in f1.
@@ -15,7 +19,13 @@ void mat33RotationNormalizedAxis(float* out, const float* axis, double angle);
 // Row 0 and any translation row remain untouched; VMX flushes denormals.
 void mat33RotateX(float* matrix, double angle);
 
+// Rotate rows 0 and 2 about local Y, including w; retain row 1 and translation.
+void mat33RotateY(float* matrix, double angle);
+
 // XYZ Euler angles in radians; input may overlap output. Preserve row padding.
 void mat33FromEuler(float* out, const float* angles); // @ 0x82118278
+
+// Rebuild and normalize the basis; leave the translation row untouched.
+void mat33Orthonormalize(float* matrix); // @ 0x820C9220
 
 } // namespace rage

@@ -202,14 +202,6 @@ void ClearPendingFlag(atSingleton* singleton);
 // Utility Functions
 // ============================================================================
 
-/**
- * CallVirtualDestructor @ 0x821E7BC0 | size: 0xC
- * 
- * Call virtual destructor through vtable.
- * Originally misnamed as "NoOpCallback" - actually dispatches to vtable slot 0.
- * 
- * @param obj Object with vtable
- */
-void CallVirtualDestructor(void* obj);
+
 
 } // namespace rage

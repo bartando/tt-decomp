@@ -7,10 +7,10 @@ from liftcheck.runner import Checker, Options
 CASES = [
     ('omit completion callback', '        sysCallback_Invoke(&completion, 0);', '        ;'),
     ('wrong callback slot', 'sysCallback_Invoke(&completion, 0);', 'sysCallback_Invoke(&callbacks[0], 0);'),
-    ('ignore high mode bits', 'if (completion.mode != 0)', 'if ((completion.mode & 1) != 0)'),
+    ('ignore high mode bits', 'if (completion.kind != 0)', 'if ((completion.kind & 1) != 0)'),
     ('omit begin reset', '    callbacks[0] = completion;', '    ;'),
-    ('wrong reset context', 'completion.context = g_sceneResetMatrix[2];', 'completion.context = g_sceneResetMatrix[1];'),
-    ('wrong reset mode', 'completion.mode = g_sceneResetMatrix[3];', 'completion.mode = 0;'),
+    ('wrong reset context', 'completion.storedArgument = reinterpret_cast<void*>(static_cast<uintptr_t>(g_sceneResetMatrix[2]));', 'completion.storedArgument = reinterpret_cast<void*>(static_cast<uintptr_t>(g_sceneResetMatrix[1]));'),
+    ('wrong reset mode', 'completion.kind = g_sceneResetMatrix[3];', 'completion.kind = 0;'),
 ]
 
 

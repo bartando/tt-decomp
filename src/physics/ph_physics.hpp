@@ -18,6 +18,7 @@
 #pragma once
 #include <stdint.h>
 #include <stddef.h>
+#include "capsule_inertia.hpp"
 
 // Every class here carries the game's vtable as an explicit `vtable` member at
 // +0x00, so slot functions are plain members listed by slot number: a C++
@@ -419,7 +420,7 @@ struct phArticulatedCollider {
     // Non-virtual methods
     void* GetActiveJointsPointer();
     void DelegateToJointProcessor();
-    void DelegateToCapsuleHandler();
+    void ApplyAngularDisplacement(const float* rotationVector); // @ 0x8224FD50
     void DelegateToColliderHandler();
     float GetJointMass(int jointIndex);
     float GetJointInertia(int jointIndex);
@@ -442,12 +443,12 @@ struct phArticulatedCollider {
     void CopyJointTransformMatrix(float* outMatrix, int boneIndex);
     void CopyJointVelocityMatrix(float* outMatrix, int boneIndex);
     void CopyJointRotationMatrix(float* outMatrix, int boneIndex);
-    void ApplyDeltaPositionToJoint(int param, const float* targetPos, const float* altTarget, int solverParam);
+    void GetJointPointResponseMatrix(float* output, const float* target, const float* alternateTarget, int boneIndex, int alternateBoneIndex);
     void GetJointBackupForce(float* outVec, phArticulatedCollider* srcCollider, int boneIndex);
     void AccumulateScaledJointForces(float* outVec, float scale);
     void GetJointOrientationVector(float* outVec, int boneIndex);
-    void ApplyDeltaToJointForce(const float* targetPos, int boneIndex);
-    void ResetJointConstraintState(int boneIndex);
+    void BuildJointPointResponse(int boneIndex, const float* point);
+    void BuildJointAngularResponse(int boneIndex);
     void DispatchJointSlot12(int jointIndex, float* outVec);
     void DispatchJointSlot7(int jointIndex);
     void DelegateToBoundCapsule();
@@ -508,7 +509,7 @@ struct phArticulatedCollider {
     void ClearJointForces();
     void DispatchConstraintSolver(void* param1, void* param2);
     void AccumulateJointForce(int jointParam, const float* forceVec);
-    void PostIntegrate();
+    void PostIntegrate(float timestep);
     void Reset();
     void ClearForces();
     void UpdateChildJoints();
@@ -519,7 +520,7 @@ struct phArticulatedCollider {
     void ApplyScaledMatrixRowX(float scale);
     void ApplyScaledMatrixRowY(float scale);
     void ApplyScaledMatrixRowZ(float scale);
-    void SetupJointConstraints();
+    void UpdateJointConstraintErrors(); // @ 0x82250528
     void DispatchJointUpdate(int index);
     void DispatchJointSolve(int index);
 };
@@ -842,7 +843,7 @@ struct phBoundCapsule {
     void CalcAABB();              // [3] @ 0x822A30C8  — extends base with capsule extents
     void TranslateAndDispatch(); // [7] @ 0x8233AB50
     void GetVolume();            // [8] @ 0x822A2DB0
-    void GetSupportPoint();      // [9] @ 0x822A3258
+    phInertiaDiagonal ComputeInertia(float mass) const; // [9] @ 0x822A3258
     void UpdateBound();          // [11] @ 0x822A2DE0
     void GetMaterialIndex();     // [12] @ 0x8256FBD0
     void SetMaterialIndex();     // [13] @ 0x822A2E00
@@ -862,13 +863,11 @@ struct phBoundCapsule {
 
     // Non-virtual methods
     int32_t ComputeFixedPointDotProduct();  // @ 0x824C35C8
-    void ScaleRadius(float scale);
     float ComputeExtent(float param1, float param2) const;
     void InitializeAxisAlignedZ(float halfLength, float* outMatrix);
     void SetMaterialIndex(uint32_t index);
     uint32_t GetMaterialIndex() const;
     float GetVolume() const;
-    void GetSupportPoint(void* direction, void* outPoint);
     void CopyFrom(const phBoundCapsule* source);
     int CheckValueSign() const;
     int CheckScaledValueSign() const;
@@ -881,7 +880,6 @@ struct phBoundCapsule {
     void InitializeCapsule(float halfHeight, float radius);
     uint32_t GetPolygonCount() const;
     void SetPolygonCount(uint32_t count);
-    void GetExtents(float* outExtents, const void* params);
     void RenderDebug();
     float CalculateVolume() const;
     void SetCentroidOffset(const float* offset);
@@ -1262,8 +1260,7 @@ struct phBoundTaperedCapsule {
     ~phBoundTaperedCapsule();                        // [0] @ 0x820C9168
     void   TransformEndpoints(const float* matrix);   // [3]  @ 0x8233AB98
     float  GetVolume();                               // [8]  @ 0x8233A898
-    void   GetSupportPoint(void* direction,
-                                   void* outPoint);           // [9]  @ 0x8233AD38
+    phInertiaDiagonal ComputeInertia(float mass) const; // [9] @ 0x8233AD38
     void   UpdateBound();                             // [11] @ 0x8233A8C8
     uint32_t GetMaterialIndex();                      // [12] @ 0x8233A8E8
     void   SetMaterialIndex(uint32_t idx);            // [13] @ 0x8233A8F0

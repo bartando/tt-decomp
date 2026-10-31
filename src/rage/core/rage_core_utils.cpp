@@ -381,41 +381,48 @@ struct atRegistryPool {
 // @ 0x82618550
 atRegistryPool g_atRegistryPool = {};
 
-// @ 0x8225FFF8 | size: 0xDC
-extern "C" void sysCallback_Invoke(void* object, uintptr_t argument) {
-    const auto* callback = static_cast<const SysCallback*>(object);
-    const uintptr_t mode = callback->mode;
-    if (mode == 0) return;
-    void* self = callback->self;
-    const uintptr_t target = callback->target;
-    if (self != nullptr) {
-        switch (mode) {
+#if UINTPTR_MAX == 0xFFFFFFFFu
+static_assert(offsetof(SystemCallback, kind) == 0x0C, "callback kind offset");
+#endif
+
+// A bound callback prepends its target. Kinds 2 and 3 pass the stored
+// argument, kinds 3 and 4 pass the runtime argument; kind 1 passes neither.
+// Unknown kinds, including the empty callback (0), do nothing.
+// @ 0x8225FFF8 | size: 0xE0
+extern "C" void sysCallback_Invoke(void* object, void* argument) {
+    const auto* callback = static_cast<const SystemCallback*>(object);
+    if (callback->target) {
+        switch (callback->kind) {
         case 1:
-            reinterpret_cast<void (*)(void*)>(target)(self);
+            reinterpret_cast<void (*)(void*)>(callback->function)(callback->target);
             break;
         case 2:
-            reinterpret_cast<void (*)(void*, uintptr_t)>(target)(self, callback->context);
+            reinterpret_cast<void (*)(void*, void*)>(callback->function)(
+                callback->target, callback->storedArgument);
             break;
         case 3:
-            reinterpret_cast<void (*)(void*, uintptr_t, uintptr_t)>(target)(self, callback->context, argument);
+            reinterpret_cast<void (*)(void*, void*, void*)>(callback->function)(
+                callback->target, callback->storedArgument, argument);
             break;
         case 4:
-            reinterpret_cast<void (*)(void*, uintptr_t)>(target)(self, argument);
+            reinterpret_cast<void (*)(void*, void*)>(callback->function)(
+                callback->target, argument);
             break;
         }
     } else {
-        switch (mode) {
+        switch (callback->kind) {
         case 1:
-            reinterpret_cast<void (*)()>(target)();
+            callback->function();
             break;
         case 2:
-            reinterpret_cast<void (*)(uintptr_t)>(target)(callback->context);
+            reinterpret_cast<void (*)(void*)>(callback->function)(callback->storedArgument);
             break;
         case 3:
-            reinterpret_cast<void (*)(uintptr_t, uintptr_t)>(target)(callback->context, argument);
+            reinterpret_cast<void (*)(void*, void*)>(callback->function)(
+                callback->storedArgument, argument);
             break;
         case 4:
-            reinterpret_cast<void (*)(uintptr_t)>(target)(argument);
+            reinterpret_cast<void (*)(void*)>(callback->function)(argument);
             break;
         }
     }

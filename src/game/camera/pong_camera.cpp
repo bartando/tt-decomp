@@ -6,6 +6,7 @@
  */
 
 #include "pong_camera.hpp"
+#include "game/game_message.hpp"
 #include <cmath>
 #include <cstring>
 
@@ -1701,8 +1702,6 @@ extern void  pongCreatureInst_50A0_g(CamMatrix44* out, const CamMatrix44* in);  
 extern void grcViewportUploadMatrices(grcViewport* viewport); // @ 0x82152E80
 extern void  game_7180(pongCineCamMgr* cine);      // @ 0x82167180 - per-frame cine update, sets m_mode
 extern void* pongCSActionCamAnim_4870_g(const void* table, const char* name);  // @ 0x82274870 - null if absent
-extern void  PostGameMessage(uint32_t messageId, uint32_t flags,
-                             uint32_t param1, uint32_t param2);  // @ 0x8225E6E0 (pg_E6E0)
 extern void  pg_7818(CamShotKey* key);             // @ 0x821F7818 - checks condition 5, bumps lbl_826064C4
 extern void  pongCameraMgr_78D8_2h(CamShotKey* key);  // @ 0x821F78D8
 extern bool  pongCameraMgr_7278_2h(void* evaluator, CamShotKey key, int conditionId,
@@ -1885,7 +1884,7 @@ void pongCameraMgr::Update() {
         const CameraNamedFlag* hasSides = static_cast<const CameraNamedFlag*>(
             pongCSActionCamAnim_4870_g(m_cmCamera->m_machine->m_flagTable, "CameraHasSides"));
         SharedCameraState()->m_cameraHasSides = hasSides != nullptr ? hasSides->m_value : 0;
-        PostGameMessage(2076, 64, 0, 0);  // message 0x81C; what listens to it isn't known
+        PostGameMessage(2076, 64, 0, nullptr);  // message 0x81C; what listens to it isn't known
     }
 
     camBaseCS* viewed = m_cameraObj->m_source;

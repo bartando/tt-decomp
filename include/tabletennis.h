@@ -24,7 +24,6 @@ extern "C" {
 
 /* Initialisation / configuration */
 int tabletennis_initialize(void);
-int game_E2B8(void);   /* State initialisation     (200 bytes) */
 int game_2610(void);   /* Game configuration       (288 bytes) */
 
 /* Per-frame update pipeline (called in order by game_E458) */

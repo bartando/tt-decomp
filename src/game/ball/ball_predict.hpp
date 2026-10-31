@@ -44,6 +44,15 @@ struct bpFunctor {
     uintptr_t words[4];  // pointer-sized on the host; four 32-bit words on Xenon
 };
 
+// What the replay keeps of the ball per frame (0x30 bytes; +0x08 is padding).
+struct bpReplayBall {
+    float time;
+    float time2;
+    uint32_t _pad08[2];
+    bpVec4 pos;
+    bpVec4 angVel;
+};
+
 struct gdBallPredictData {
     static constexpr int kMaxSamples = 120;
 
@@ -62,7 +71,7 @@ struct gdBallPredictData {
     uint16_t            m_idCapacity;              // +0x260E
     float               m_idTime;                  // +0x2610
     uint8_t             _pad2614[0x2630 - 0x2614];
-    uint8_t             m_shot[0xB8];              // +0x2630  the shot this prediction was made for
+    alignas(16) uint8_t m_shot[0xB8];              // +0x2630  the shot this prediction was made for
     uint8_t             _pad26E8[0x2790 - 0x26E8];
     bpBounceEvent       m_bounces[10];             // +0x2790  no bounds check: an 11th lands on m_bounceCount
     int32_t             m_bounceCount;             // +0x27E0

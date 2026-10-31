@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include "link/tt_alias.h"
+#include "rage/grc_resource_state.hpp"
 
 
 // @ 0x8202D110 (.rdata)
@@ -53,3 +54,12 @@ void* g_grcDefaultTexture = nullptr;
 
 // @ 0x8260663C (.data) — enable per-thread command handle tracking.
 uint32_t g_grcThreadCommandTracking = 0;
+// @ 0x8260640C (.data) — use the resource locking path for CPU mappings
+extern "C" uint8_t g_grcUseResourceLocks = 0;
+
+namespace rage {
+// @ 0x82606562 (.data) — suppress resource unlock while endian data is dirty
+// Image value is 0. The native loader may need to set this when byte-swapping
+// big-endian resource data on little-endian hosts.
+uint8_t g_bTextureEndianDirty = 0;
+}

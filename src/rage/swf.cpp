@@ -2385,7 +2385,7 @@ void swfRenderInstanceTree(void* instance, const void* parentTransform) {
     if (*reinterpret_cast<int32_t*>(node + 0x98) >= 0) {
         auto* owner = static_cast<uint8_t*>(g_swfRenderCallbackOwner);
         if (*reinterpret_cast<int32_t*>(owner + 16) != 0) {
-            sysCallback_Invoke(owner + 4, reinterpret_cast<uintptr_t>(node + 0x98));
+            sysCallback_Invoke(owner + 4, node + 0x98);
             flags = g_grmShaderFx_flushRequired;
             appliedMode = g_swfAppliedRenderState[6];
         }
