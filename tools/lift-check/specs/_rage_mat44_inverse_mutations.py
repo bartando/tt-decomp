@@ -39,14 +39,24 @@ def main():
     source = (root / "src/rage/math/mat44.cpp").read_text()
     spec = Path(__file__).with_name("rage_mat44_inverse.py")
     for name, old, new in MUTATIONS:
-        assert source.count(old) == 1, f"mutation anchor changed: {name}"
+        signature = ("\nstatic float mat44Minor(" if name in (
+            "reverse cofactor subtraction", "unfuse minor sum")
+            else "\nvoid mat44Inverse(")
+        assert source.count(signature) == 1, "target definition must be unique"
+        start = source.index(signature) + 1
+        end = source.index("\n}\n", start) + 2
+        body = source[start:end]
+        assert body.count(old) == 1, f"mutation anchor changed: {name}"
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
-            rc = Checker(spec, Options(seed=1, patches=((old, new),))).run()
-        first = output.getvalue().splitlines()[0]
-        print(f"{'CAUGHT' if rc == 1 else 'MISSED'} {name}: {first}", flush=True)
-        if rc != 1:
-            print(output.getvalue())
+            rc = Checker(spec, Options(seed=1,
+                                      patches=((body, body.replace(old, new)),))).run()
+        report = output.getvalue()
+        first = report.splitlines()[0] if report else "no checker output"
+        detected = rc == 1 and first.startswith("FAIL ") and "faulted" not in report
+        print(f"{'CAUGHT' if detected else 'MISSED'} {name}: {first}", flush=True)
+        if not detected:
+            print(report)
             return 1
     print(f"Caught {len(MUTATIONS)}/{len(MUTATIONS)} mutations")
     return 0
