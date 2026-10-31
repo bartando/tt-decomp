@@ -538,18 +538,7 @@ extern "C" void rage_threadpool_cleanup_6878() {
     // No-op on host
 }
 
-/**
- * rage_RegisterUIContext — Register a UI context with the RAGE UI system
- *
- * Associates a UI context pointer with a name and flags for the
- * Scaleform/SWF UI system.
- */
-extern "C" void rage_RegisterUIContext(void* a, unsigned b, const char* c) {
-    (void)a; (void)b;
-    if (c) {
-        std::printf("[RAGE] UI context registered: %s\n", c);
-    }
-}
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SECTION 6: Math Utilities

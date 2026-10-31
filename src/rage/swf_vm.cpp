@@ -3,6 +3,7 @@
 #include <cstring>
 #include <cmath>
 #include "rage/swf_value.hpp"
+#include "rage/swf_page_group.hpp"
 #include "rage/swf_text.hpp"
 
 // These tags are the interpreter's actual layout; swfValueType's historical
@@ -47,7 +48,7 @@ extern "C" void util_F7E8(const uint8_t* code, void* target, void* context,
     auto* constants = reinterpret_cast<uint32_t*>(0x82604D20);
     auto& constantCount = *reinterpret_cast<int32_t*>(0x826066D8);
     auto& functionCount = *reinterpret_cast<uint32_t*>(0x826066D0);
-    auto& commandHandler = *reinterpret_cast<uint32_t*>(0x826066D4);
+    auto& commandHandler = g_swfCommandHandler;
     auto& randomSeed = *reinterpret_cast<uint32_t*>(0x825E5A98);
     SwfVmValue localRegisters[256];
     for (auto& value : localRegisters) value = {0, 7};
@@ -176,8 +177,7 @@ extern "C" void util_F7E8(const uint8_t* code, void* target, void* context,
             }
             if (std::strncmp("FSCommand:", url, 10) == 0) {
                 if (commandHandler) {
-                    reinterpret_cast<void (*)(const char*, const SwfVmValue*)>(
-                        static_cast<uintptr_t>(commandHandler))(url, &argument);
+                    commandHandler(url, &argument);
                 } else {
                     nop_8240E6D0("FSCommand detected but no handler was specified: %s", url);
                 }

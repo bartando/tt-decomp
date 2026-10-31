@@ -33,3 +33,13 @@ uint32_t DialogPageGroup_IsComplete(void* group) {
     static_cast<DialogClose*>(group)->Close();
     return 0;
 }
+
+// @ 0x82309510
+void LegalsPageGroup_Register(void* group) {
+    hudFlashBase_LoadPageGroup(group, g_legalsResourceVersion + 50u);
+    const uint8_t acquired = static_cast<uint8_t>(hudFlashBase_IsNetworkDirty(group));
+    void* movie = hudFlashBase_GetPageGroup(group);
+    rage::ptr32<void> stored(movie);
+    __builtin_memcpy(static_cast<uint8_t*>(group) + 0xEC, &stored, sizeof(stored));
+    if (acquired != 0) hudFlashBase_PublishPageGroup(group);
+}

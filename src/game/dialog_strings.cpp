@@ -1,3 +1,4 @@
+#include "game/frontend_page_group.hpp"
 /**
  * dialog_strings.cpp — Original binary string constants for the dialog system
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -67,3 +68,14 @@ extern const char g_legalsQuitKey[] = "quit"; // @ 0x8205DFB0
 extern const char g_legalsDoneKey[] = "done"; // @ 0x8205DFB8
 extern const char g_dialogDoneKey[] = "iDone"; // @ 0x820627E4
 extern const char g_flashSemaphoreError[] = "[*** FLASHBASE ERROR ***] Updating without grabbing flash sema!"; // @ 0x8205AE98
+
+extern "C" {
+uint32_t g_creditsResourceVersion = 0; // @ 0x82606520
+uint32_t g_dialogResourceVersion = 0; // @ 0x82606514
+uint32_t g_legalsResourceVersion = 0; // @ 0x8260652C
+rage::ptr32<void> g_dialogPageGroup; // @ 0x82606628
+}
+extern const char g_loadingCredits[] = "Loading credits movie..."; // @ 0x8205ED64
+extern const char g_loadedCredits[] = "Credits movie loaded."; // @ 0x8205ED80
+extern const char g_loadingDialog[] = "Loading dialog box..."; // @ 0x8205F240
+extern const char g_loadedDialog[] = "Dialog box loaded."; // @ 0x8205F258

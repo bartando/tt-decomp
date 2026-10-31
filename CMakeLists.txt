@@ -141,6 +141,7 @@ set(SOURCES
     src/rage/swf.cpp
     src/rage/swf_image_data.cpp
     src/rage/hud_page_group.cpp
+    src/rage/hud_page_load.cpp
     src/rage/swf_page_group.cpp
     src/rage/swf_vm.cpp
     src/rage/swf_value_helpers.cpp

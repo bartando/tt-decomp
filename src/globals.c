@@ -283,7 +283,6 @@ uint32_t g_doexit_type = 0;
 // ============================================================================
 
 uint8_t g_creditsRollVisible = 0;
-void* g_pCreditsRollObj = NULL;
 uint32_t g_creditsAssetId_A = 0;
 uint32_t g_creditsAssetId_B = 0;
 uint32_t g_creditsAssetId_C = 0;
@@ -301,8 +300,6 @@ uint32_t g_dialogAssetId_A = 0;
 uint32_t g_dialogAssetId_B = 0;
 uint32_t g_dialogAssetId_C = 0;
 void* g_dialogFieldSchema = NULL;
-void* g_dialogPageGroup = NULL;
-void* g_pDialogRollObj = NULL;
 
 // ============================================================================
 // Frontend System Globals
