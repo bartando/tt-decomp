@@ -174,6 +174,8 @@ set(SOURCES
     src/graphics/fx_crowd.cpp
     src/graphics/grc_debug_strings.cpp
     src/graphics/grc_device.cpp
+    src/graphics/grc_gpu_resources.cpp
+    src/graphics/grc_vertex_buffer.cpp
     src/graphics/grc_render.cpp
     src/graphics/texture_reference.cpp
     src/graphics/grc_viewport_cull.cpp

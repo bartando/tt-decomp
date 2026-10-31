@@ -8,9 +8,12 @@ namespace {
 // Partial layout recovered from the attribute accessors around 0x82155B08.
 // Addresses stay 32-bit even on a host with 64-bit pointers.
 struct PgVertexBuffer {
-    uint8_t pad00[0x08];
+    uint32_t vertexCount;              // +0x00
+    uint8_t pad04[0x04];
     uint32_t formatAddress;             // +0x08: first word is the attribute flags
-    uint8_t pad0C[0x0C];
+    uint8_t pad0C[4];
+    uint32_t resourceAddress;           // +0x10
+    uint8_t pad14[4];
     uint32_t stagingAddress;            // +0x18: one vertex's data, no stride (pg_6B20_g)
     uint32_t dataAddress;               // +0x1C: CPU mapping, refreshed by pg_7578_g
     uint8_t positionOffset;             // +0x20
@@ -30,8 +33,10 @@ struct PgVertexBuffer {
     uint8_t packedTangent;              // +0xD9
     uint8_t padDA;
     uint8_t mapped;                     // +0xDB
+    uint32_t mappingThread;              // +0xDC
 };
 
+static_assert(offsetof(PgVertexBuffer, resourceAddress) == 0x10);
 static_assert(offsetof(PgVertexBuffer, stagingAddress) == 0x18);
 static_assert(offsetof(PgVertexBuffer, positionOffset) == 0x20);
 static_assert(offsetof(PgVertexBuffer, normalOffset) == 0x23);
@@ -42,6 +47,8 @@ static_assert(offsetof(PgVertexBuffer, tangentSize) == 0x94);
 static_assert(offsetof(PgVertexBuffer, stride) == 0xD4);
 static_assert(offsetof(PgVertexBuffer, packedNormal) == 0xD8);
 static_assert(offsetof(PgVertexBuffer, mapped) == 0xDB);
+static_assert(offsetof(PgVertexBuffer, mappingThread) == 0xDC);
+static_assert(sizeof(PgVertexBuffer) == 0xE0);
 
 // Xenon's VMX non-Java mode flushes subnormal inputs/results to signed zero.
 // Scalar host/PPC floating-point does not necessarily use that mode.
@@ -107,6 +114,67 @@ const float* align16(const float* p) {
 
 extern "C" uint8_t pg_7578_g(void* buffer); // @ 0x82157578
 extern "C" float* util_5B08(float* result, void* buffer, uint32_t index); // @ 0x82155B08
+
+extern "C" uint8_t g_grcUseResourceLocks; // @ 0x8260640C
+namespace rage { extern uint8_t g_bTextureEndianDirty; } // @ 0x82606562
+extern "C" uint32_t xe_GetCurrentThreadId(); // @ 0x82566B78
+extern "C" uint32_t grcResource_Lock(void* resource, uint32_t fence, uint32_t unusedR5,
+                                    uint32_t auxiliary, uint32_t base, uint32_t auxiliaryBase,
+                                    uint32_t data, uint32_t size, uint32_t flags,
+                                    uint32_t cacheFlags); // @ 0x823529E0
+extern "C" void grc_2CC8(void* resource, uint32_t data, uint32_t auxiliary); // @ 0x82352CC8
+
+// @ 0x82157578 | size: 0xB0
+extern "C" uint8_t pg_7578_g(void* vertexBuffer) {
+    auto* buffer = static_cast<PgVertexBuffer*>(vertexBuffer);
+    if (!buffer->mapped && buffer->resourceAddress) {
+        auto* resource = reinterpret_cast<uint32_t*>(uintptr_t(buffer->resourceAddress));
+        const uint32_t data = resource[3] & ~3u;
+        if (!g_grcUseResourceLocks) {
+            buffer->dataAddress = data;
+        } else {
+            buffer->dataAddress = grcResource_Lock(resource, resource[1], 0x2E, 0,
+                                                   data, 0, data, resource[4] & 0x03FFFFFCu,
+                                                   0, 0x03000000u);
+        }
+        buffer->mapped = 1;
+        buffer->mappingThread = xe_GetCurrentThreadId();
+    }
+    return buffer->mapped;
+}
+
+// @ 0x82157628 | size: 0xB8
+extern "C" bool grc_7628(void* vertexBuffer) {
+    auto* buffer = static_cast<PgVertexBuffer*>(vertexBuffer);
+    if (buffer->mapped) {
+        if (buffer->resourceAddress) {
+            auto* resource = reinterpret_cast<uint32_t*>(uintptr_t(buffer->resourceAddress));
+            if (!rage::g_bTextureEndianDirty && g_grcUseResourceLocks)
+                grc_2CC8(resource, resource[3] & ~3u, 0);
+#if defined(__powerpc__) || defined(__powerpc64__)
+            uint32_t line = buffer->dataAddress & ~127u;
+            const uint32_t last = uint32_t(buffer->dataAddress + buffer->stride * buffer->vertexCount - 1) & ~127u;
+            do {
+                __builtin_ppc_dcbst(reinterpret_cast<void*>(uintptr_t(line)));
+                line += 128;
+            } while (line <= last);
+#else
+            // Host GPU backends use coherent CPU mappings; retain ordering.
+            __atomic_thread_fence(__ATOMIC_RELEASE);
+#endif
+        }
+        buffer->mapped = 0;
+    }
+    return buffer->mapped == 0;
+}
+
+// Initialize the per-vertex cursor after mapping the underlying resource.
+// pg_54B0_g @ 0x821554B0 | size: 0x5C
+extern "C" void pg_54B0_g(void* vertexBuffer, uint32_t /*unusedR4*/) {
+    auto* buffer = static_cast<PgVertexBuffer*>(vertexBuffer);
+    if (!buffer->mapped) pg_7578_g(buffer);
+    buffer->stagingAddress = buffer->dataAddress;
+}
 
 // Static-initialized vectors used by the original's bitwise tangent/sign merge.
 extern const float lbl_82619BD0[4]; // @ 0x82619BD0
