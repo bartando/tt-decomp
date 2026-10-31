@@ -6,6 +6,7 @@
  */
 
 #include "pong_ball.hpp"
+#include "game/game_message.hpp"
 #include <cstddef>   // offsetof
 #include <cstring>   // memcpy, memset
 #include <cmath>     // fabs
@@ -511,7 +512,6 @@ void pongBallInstance::ActivateBall(void* activationContext) {
     extern void game_D500(void*, void*, void*);
     extern void game_DA60();
     extern void game_3860(void*, int, const char*);
-    extern void pg_E6E0(int, int, int, int);
     
     // Check if ball is already active
     bool isActive = *reinterpret_cast<uint8_t*>(reinterpret_cast<uint8_t*>(this) + 85) != 0;
@@ -603,7 +603,7 @@ void pongBallInstance::ActivateBall(void* activationContext) {
     game_3860(gameState, 1, kActivationEvent);
     
     // Send deactivation event (event ID 37, type 64)
-    pg_E6E0(37, 64, 0, 0);
+    PostGameMessage(37, 64, 0, nullptr);
 }
 
 /**
@@ -2174,8 +2174,8 @@ void pongBallInstance::ProcessCollisionAndActivate(pongBallInstance* other) {
 
     // 'Missed' path (case 3 / case 2 without physics throttle) and case 4
     // paddle-impact audio are inlined in the original — summarized here.
-    // Full re-expansion depends on pg_E6E0 and pongBall_PlayPaddleImpactCue
-    // getting their own lifts; both are tracked in the ball-audio follow-up.
+    // Full re-expansion still depends on pongBall_PlayPaddleImpactCue;
+    // that lift is tracked in the ball-audio follow-up.
     if (classification == 3 || classification == 2) {
         void* histEntry = pongPhysics_GetHistorySystem();
         int32_t gate = histEntry

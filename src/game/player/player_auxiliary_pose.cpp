@@ -1,5 +1,6 @@
 // Auxiliary facial pose update at the end of player pose assembly.
 #include "../../rage/animation/rage_anim.hpp"
+#include "game/game_message.hpp"
 #include "../../anim/locomotion.hpp"
 #include <cstdint>
 #include <cstring>
@@ -10,7 +11,6 @@ extern "C" void* g_pongMatchTiming; // @ 0x8271A2E8
 extern void LocomotionStateAnim_1CE8_g(void*); // @ 0x820C1CE8
 extern void LocomotionStateAnim_1B90(void*); // @ 0x820C1B90
 extern void LocomotionStateAnim_1978(void*); // @ 0x820C1978
-extern void pg_E6E0_msg(int, int, int, void*); // @ 0x8225E6E0
 // The callback's full register contract matches crAnimDofFilter.
 extern uint32_t LocomotionStateAnim_81A8(void*, uint32_t, uint32_t, void*, float*); // @ 0x822481A8
 
@@ -32,7 +32,7 @@ void LocomotionStateAnim_1E68_g(void* auxiliary, void* destination) {
                 char* name = at<char*>(active, 0x18);
                 const int mask = at<int32_t>(auxiliary, 8) == 0 ? 1 : 2;
                 const uint8_t words = static_cast<uint8_t>((std::strlen(name) + 4) >> 2);
-                pg_E6E0_msg(0x5810, mask, words, name);
+                PostGameMessage(0x5810, mask, words, name);
                 at<float>(auxiliary, 0x18) = 0.0f;
             }
             LocomotionStateAnim_1B90(auxiliary);

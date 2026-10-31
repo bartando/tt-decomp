@@ -1,8 +1,8 @@
 // Swing animation phase/pose helpers recovered from the original PPC.
 #include <cstdint>
+#include "game/game_message.hpp"
 
 extern "C" uint8_t g_swingInFlightFlag; // @ 0x8260633C
-extern void pg_E6E0(int, uint8_t, int, int); // @ 0x8225E6E0
 extern void* game_BAA0(void*); // @ 0x820DBAA0
 extern void pcrAnimBlender_ApplyClipWeights(void*, const char*, float, float); // @ 0x820CF420
 
@@ -35,15 +35,15 @@ void game_ADC0(void* swing, void* record) {
     if (g_swingInFlightFlag) return;
     const float current = at<float>(swing, 0x1C);
     if (current >= at<float>(swing, 0x30)) {
-        pg_E6E0(0x100B, swingRecipient(at<uint32_t>(swing, 0x88), 0x40), 0, 0);
+        PostGameMessage(0x100B, swingRecipient(at<uint32_t>(swing, 0x88), 0x40), 0, nullptr);
     } else if (at<float>(record, 0x80) > 0.0f) {
         const float previous = at<float>(swing, 0x18);
         const float entry = markerTime(record, 0x130);
         const float exit = markerTime(record, 0x132);
         if (previous < entry && current >= entry)
-            pg_E6E0(0x1009, swingRecipient(at<uint32_t>(swing, 0x88), 0x40), 0, 0);
+            PostGameMessage(0x1009, swingRecipient(at<uint32_t>(swing, 0x88), 0x40), 0, nullptr);
         if (previous < exit && current >= exit)
-            pg_E6E0(0x100A, swingRecipient(at<uint32_t>(swing, 0x88), 0x40), 0, 0);
+            PostGameMessage(0x100A, swingRecipient(at<uint32_t>(swing, 0x88), 0x40), 0, nullptr);
     }
     if (void* clip = game_BAA0(record)) {
         void* owner = at<void*>(swing, 8);
@@ -95,7 +95,7 @@ void pcrSwingBlender_UpdatePhase(void* swing, void* record) {
             void* clip = game_BAA0(record);
             nop_8240E6D0("pcrSwingBlender::UpdatePhase--anim %s is kAnimFrozenAtEnd\n",
                         at<const char*>(clip, 0x20));
-            pg_E6E0(0x1016, 0x40, 0, 0);
+            PostGameMessage(0x1016, 0x40, 0, nullptr);
         }
         at<float>(swing, 0x1C) -= 9.999999747378752e-05f;
     }

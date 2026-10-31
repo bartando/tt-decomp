@@ -28,7 +28,7 @@ CALLS = {
     "pongMover_GetInputSpeed": stub(ret=speed),
     "io_Input_poll_9D68": stub(ret=lambda ctx: ctx.rng.choice([0, 1, 0x100, 0x101]),
                                 preserves=("r9",)),
-    "pg_E6E0": stub(ret="void"),
+    "PostGameMessage": stub(ret="void"),
     "PostPageGroupMessageFmt": stub(ret="void", args=("r3", "r4", "r5", "r6")),
     "pongPlayer_7C78_g": stub(ret="void"),
 }

@@ -26,7 +26,7 @@ CALLS = {
     "LocomotionStateAnim_1CE8_g": model(update),
     "LocomotionStateAnim_1B90": model(select),
     "LocomotionStateAnim_1978": model(select),
-    "pg_E6E0_msg": stub(ret="void", args=("r3", "r4", "r5", "r6")),
+    "PostGameMessage": stub(ret="void", args=("r3", "r4", "r5", "r6")),
     "rage::crAnimFrame_ApplyMatchingDofs": stub(
         ret="void", args=("r3", "r4", "r5", "r6", "r7", "f1", "r9")),
 }

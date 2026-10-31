@@ -1,9 +1,9 @@
 // Swing clip activation and the selected clip's locomotion blend marker.
 #include <cstdint>
+#include "game/game_message.hpp"
 
 struct pongAnimState;
 extern uint32_t util_CDF0(void*, const void*, uint32_t); // @ 0x8224CDF0
-extern void pg_E6E0(int, uint8_t, int, int); // @ 0x8225E6E0
 
 namespace {
 template<class T> T& at(void* object, unsigned offset) {
@@ -37,7 +37,7 @@ uint32_t pg_C7A0_g(pongAnimState* animation, float inputTime) {
     if (static_cast<uint8_t>(result)) {
         const uint32_t shift = at<uint32_t>(state, 0x198) & 63u;
         const uint32_t mask = shift < 32 ? 1u << shift : 0;
-        pg_E6E0(0x1011, static_cast<uint8_t>(mask), 0, 0);
+        PostGameMessage(0x1011, static_cast<uint8_t>(mask), 0, nullptr);
     }
     return result;
 }

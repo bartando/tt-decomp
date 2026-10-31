@@ -8,7 +8,7 @@ SOURCE = "src/game/player/player_swing_pose_helpers.cpp"
 CASES = [
     ("player_swing_marker_events", [
         ("ignore in-flight suppression", "if (g_swingInFlightFlag) return;", "if (false) return;"),
-        ("lose completion event", "pg_E6E0(0x100B,", "pg_E6E0(0x100A,"),
+        ("lose completion event", "PostGameMessage(0x100B,", "PostGameMessage(0x100A,"),
         ("unsigned marker frames", "at<int16_t>(record, offset)", "at<uint16_t>(record, offset)"),
         ("lose broadcast recipient bit", "swingRecipient(at<uint32_t>(swing, 0x88), 0x40)", "swingRecipient(at<uint32_t>(swing, 0x88), 0)"),
         ("swap clip weights", "at<float>(swing, 0x18), at<float>(swing, 0x1C));", "at<float>(swing, 0x1C), at<float>(swing, 0x18));"),
