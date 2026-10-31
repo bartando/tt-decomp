@@ -2737,7 +2737,6 @@ void LocomotionStateMf::SerializeTriple(void* serializer, void* data) {  // 7480
 ////////////////////////////////////////////////////////////////////////////////
 
 // External helpers used by newly-lifted functions
-extern void phBoundCapsule_FindSegmentIndex(void* capsule, void* outResult);
 extern float LocomotionStateAnim_A1F8_g(float value, float rangeMin, float rangeMax);
 extern void LocomotionStateAnim_B218_g(float* out, const float* matrix); // @ 0x8223B218
 extern void util_BBB0(void* dst, float* src, float* work);
@@ -2796,37 +2795,22 @@ void LocomotionStateAnim_AD30_g(float* dst, const float* src) {
     dst[10] = 1.0f - (yy + xx);
 }
 
-/**
- * ComputeCapsuleAngle @ 0x822347E8 | size: 0x84
- *
- * Computes a signed angle from a capsule query result. If the
- * result is negative, wraps it by adding 2*PI. Stores the result at self+0.
- * Also copies 16 bytes from capsule+48 to self+16.
- */
-// LocomotionStateAnim_47E8_g @ 0x822347E8
-void LocomotionStateAnim_47E8_g(void* self, void* capsule) {
-    float result[6];
+extern "C" const float g_twoPi; // @ 0x8202C02C
 
-    // Store 0.0f at self+0 as default
-    *(float*)((char*)self + 0) = 0.0f;
-
-    // Copy 16 bytes from capsule+48 to self+16 (lvx/stvx)
-    memcpy((char*)self + 16, (char*)capsule + 48, 16);
-
-    // Call capsule angle computation
-    phBoundCapsule_FindSegmentIndex(capsule, result);
-
-    // Read the angle from result[1]
-    float angle = result[1];
-
-    // If negative, wrap by adding 2*PI
-    if (angle < 0.0f) {
-        extern const float g_twoPi;  // @ 0x8202C02C
-        angle += g_twoPi;
-    }
-
-    // Store final angle
-    *(float*)((char*)self + 0) = angle;
+// @ 0x822347E8 — cache the translation and canonicalize the extracted Y angle.
+// The zero and vector stores precede extraction, including when self aliases matrix.
+void* LocomotionStateAnim_47E8_g(void* self, void* matrix) {
+    auto* output = static_cast<uint8_t*>(self);
+    *reinterpret_cast<float*>(output) = 0.0f;
+    alignas(16) float translation[4];
+    std::memcpy(translation, static_cast<uint8_t*>(matrix) + 0x30, 16);
+    std::memcpy(output + 0x10, translation, 16);
+    alignas(16) float angles[4];
+    rage::mat33ToEulerXZY(static_cast<const float*>(matrix), angles);
+    float heading = angles[1];
+    if (heading < 0.0f) heading += g_twoPi;
+    *reinterpret_cast<float*>(output) = heading;
+    return self;
 }
 
 /**
