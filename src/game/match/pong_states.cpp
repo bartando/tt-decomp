@@ -1,3 +1,4 @@
+#include "game/network_context.hpp"
 /**
  * pong_states.cpp — HSM state/context classes for UI screens
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -82,11 +83,8 @@ extern void  atSingleton_QueryEventData(void* outData, void* table);    // @ 0x8
 extern void* PostStateTransitionRequest(void* hsmCtx, int stateIdx); // @ 0x822228B8
 extern void  FadePageGroup(void* mgr, int type, int mode, float fadeTime, float param2); // UI fade
 extern bool  CheckButtonPressed(void* record);                    // input button state check @ 0x821DFFF8
-extern uint8_t snSession_AcquireLock(void* pg);   // page group button poll
 extern uint8_t Dialog_IsComplete(void* pg);             // @ 0x820C2470 — dialog completion check
 extern void*   PageGroup_LookupText(uint32_t table, const char* key); // @ 0x820C9318 — text lookup
-extern void    snSession_ReleaseLock(void* pg);   // page group notify
-extern void    snSession_BeginOperation(void* pg);   // page group input clear
 extern void*   PageGroup_GetTextEntry(void* pg, const char* key); // @ 0x820C9280 — text entry lookup
 extern int32_t TextEntry_GetValue(void* entry);         // @ 0x820CA5C8 — text entry value
 extern void* LegalsPageGroup_Construct(void* mem);                   // page-group constructor @ 0x8230x
@@ -819,7 +817,7 @@ static void pongLegalsContext_InputPoll(pongLegalsContext* ctx) {
 input_found:
     {
         void* pageGroup = ctx->m_pPageGroup;
-        uint8_t buttonState = snSession_AcquireLock(pageGroup);
+        uint8_t buttonState = PollButtonState(pageGroup);
 
         // Check HSM manager's context pointer (+556)
         extern void* g_hsmMgrPtr;   // @ 0x825EAB30 (g_loop_obj_ptr)
@@ -842,7 +840,7 @@ input_found:
         }
 
         if ((buttonState & 0xFF) != 0) {
-            snSession_ReleaseLock(pageGroup);
+            InitiateConnection(pageGroup);
         }
 
         ctx->m_bInputDetected = 1;
@@ -877,10 +875,10 @@ void pongLegalsContext::Update() {
     int32_t resultValue = 0;
 
     // Check button state
-    uint8_t buttonState = snSession_AcquireLock(pg);
+    uint8_t buttonState = PollButtonState(pg);
 
     // Process input
-    snSession_BeginOperation(pg);
+    GetNetworkClient(pg);
 
     // Look up "SAVING" string in page group
     extern const char* k_SAVING;   // @ 0x8205DFB8
@@ -891,7 +889,7 @@ void pongLegalsContext::Update() {
 
     // If button was pressed, notify
     if ((buttonState & 0xFF) != 0) {
-        snSession_ReleaseLock(pg);
+        InitiateConnection(pg);
     }
 
     // If saving entry had a positive value, transition to state 6

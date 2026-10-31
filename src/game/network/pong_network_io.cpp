@@ -457,12 +457,7 @@ extern "C" {
     
     // SinglesNetworkClient_6838_g — lifted in src/game/network.cpp
     // SinglesNetworkClient_68A8_g — lifted in src/game/network.cpp
-    
-    // Original name: SinglesNetworkClient_2BE8_g
-    void SinglesNetworkClient_2BE8_g(void* client) {
-        UpdateNetworkState(client);
-    }
-    
+
     // Original name: SinglesNetworkClient_51C8_g
     void SinglesNetworkClient_51C8_g(void* client) {
         ProcessNetworkPacket(client);
@@ -474,22 +469,7 @@ extern "C" {
     }
     
     // SinglesNetworkClient_A818_g — lifted in src/game/network.cpp
-    
-    // Original name: snSession_AcquireLock
-    uint8_t snSession_AcquireLock(void* pageGroup) {
-        return PollButtonState(pageGroup);
-    }
-    
-    // Original name: snSession_BeginOperation
-    void* snSession_BeginOperation(void* context) {
-        return GetNetworkClient(context);
-    }
-    
-    // Original name: snSession_ReleaseLock
-    void snSession_ReleaseLock(void* context) {
-        InitiateConnection(context);
-    }
-    
+
     // Original name: SinglesNetworkClient_GetPlayerID_E408
     void SinglesNetworkClient_GetPlayerID_E408(void* client, uint32_t param) {
         GetPlayerID(client, param);

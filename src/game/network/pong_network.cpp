@@ -1,3 +1,4 @@
+#include "game/network_context.hpp"
 #include "rage/dat_bit_buffer.hpp"
 #include "rage/memory.h"
 #include "crt/rtti.h"
@@ -96,9 +97,7 @@ extern void pongNetMessageHolder_7668_2hr(void* stateArray);
 // Forward declarations for network functions
 extern void NetDataQuery_InitNested(void* a);
 extern bool CheckButtonPressed(void* record);
-extern uint8_t snSession_AcquireLock(void* client);
 extern void* snSession_FindProperty(void* context, const char* name);
-extern void snSession_ReleaseLock(void* client);
 extern void WriteInt8Bits(void* client, int16_t value, int size);
 extern void NetworkClient_WriteSecondaryPlayerData(void* client, int16_t index, void* data);
 extern void NetworkClient_BeginJoinRequest(void* client);
@@ -861,11 +860,11 @@ const char* RequestDataMessage::vfn_7() {
 // Each player slot has button state fields that are checked via CheckButtonPressed.
 //
 // Network setup involves:
-//  - Getting network status via snSession_AcquireLock
+//  - Acquiring the loop guard via PollButtonState
 //  - Checking a global singleton flag
 //  - Finding a network message slot via snSession_FindProperty
 //  - Initializing the message slot with values 1 and 3
-//  - Calling snSession_ReleaseLock if network status is non-zero
+//  - Releasing the acquired guard via InitiateConnection
 //  - Setting the ready flag at this+24 to 1
 // ===========================================================================
 void SinglesNetworkClient::CheckAllPlayersReady()
@@ -905,7 +904,7 @@ setup_network:
     void* networkClient = (void*)(uintptr_t)m_pNetworkSession;
 
     // Query network status
-    uint8_t networkStatus = snSession_AcquireLock(networkClient);
+    uint8_t networkStatus = PollButtonState(networkClient);
 
     // Check global singleton flag at offset +556
     extern void* g_pAtSingleton;  // @ 0x821EAB08
@@ -935,7 +934,7 @@ setup_network:
 
     // Perform network client update if status is non-zero
     if (networkStatus != 0) {
-        snSession_ReleaseLock(networkClient);
+        InitiateConnection(networkClient);
     }
 
     // Mark all players as ready

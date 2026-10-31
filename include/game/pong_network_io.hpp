@@ -8,6 +8,7 @@
 
 #pragma once
 #include <stdint.h>
+#include "game/network_context.hpp"
 
 // Forward declaration
 struct SinglesNetworkClient;
@@ -92,18 +93,6 @@ void WriteInt8Bits(void* client, int8_t value, int bitWidth);
 // ══════════════════════════════════════════════════════════════════════════════
 
 /**
- * UpdateNetworkState @ 0x823D2BE8 | size: 0x60
- * 
- * Updates the network client's internal state machine.
- * Called periodically to process pending network events.
- * 
- * @param client  SinglesNetworkClient to update
- * 
- * Original symbol: SinglesNetworkClient_2BE8_g
- */
-void UpdateNetworkState(void* client);
-
-/**
  * ProcessNetworkPacket @ 0x821D51C8 | size: 0xC8
  * 
  * Processes an incoming network packet.
@@ -145,43 +134,6 @@ void CopyNetworkString(const char* src, char* dest, int maxSize);
  * Original symbol: SinglesNetworkClient_A818_g
  */
 void ComputeNetworkHash(void* client, int value);
-
-/**
- * PollButtonState @ 0x822EB2A8 | size: 0x78
- * 
- * Polls the current controller button state for network synchronization.
- * Returns a bitmask of pressed buttons.
- * 
- * @param pageGroup  UI page group context (contains controller state)
- * @return           Button state bitmask (1 = button pressed)
- * 
- * Original symbol: SinglesNetworkClient_B2A8_g
- */
-uint8_t PollButtonState(void* pageGroup);
-
-/**
- * GetNetworkClient @ 0x822EB1E8 | size: 0x5C
- * 
- * Retrieves the SinglesNetworkClient instance from a context object.
- * 
- * @param context  Context object (e.g., hudBoot, pageGroup)
- * @return         Pointer to SinglesNetworkClient instance
- * 
- * Original symbol: SinglesNetworkClient_B1E8_g
- */
-void* GetNetworkClient(void* context);
-
-/**
- * InitiateConnection @ 0x822EB320 | size: 0x60
- * 
- * Initiates a network connection to a remote peer.
- * Kicks off the connection handshake process.
- * 
- * @param context  Context object containing connection parameters
- * 
- * Original symbol: SinglesNetworkClient_B320_g
- */
-void InitiateConnection(void* context);
 
 /**
  * GetPlayerID @ 0x8225E408 | size: 0x78
