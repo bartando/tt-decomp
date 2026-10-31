@@ -59,6 +59,8 @@ set(SOURCES
     src/xam/audio.c
     src/xam/input.c
     src/platform/host_imports.cpp
+    src/platform/audio_frame.cpp
+    src/platform/host_xma.cpp
     src/platform/host_sync.cpp
     src/platform/host_memory.cpp
     src/xam/kernel.c
@@ -216,6 +218,7 @@ set(SOURCES
     src/physics/ld_ph_data.cpp
     src/rage/animation/anim_data.cpp
     src/rage/audio/aud_data.cpp
+    src/rage/audio/image_data.cpp
     src/rage/network/sn_data.cpp
     src/rage/rage_data.cpp
     src/rage/ld_rage_data.cpp
