@@ -1,3 +1,5 @@
+#include "bound_copy.hpp"
+#include <cstring>
 #include "archetype_refs.hpp"
 #include "rage/mat33.hpp"
 #include "rage/ref_counted_header.hpp"
@@ -7942,7 +7944,6 @@ void rage::phArticulatedCollider::AccumulateTorqueAtRootJoint(const float* force
 // ═════════════════════════════════════════════════════════════════════════════
 
 // External declarations
-extern void util_DA50(void* dst, const void* src);  // phBound::CopyFrom base
 extern void* g_display_obj_ptr;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -8112,23 +8113,17 @@ retry:
 // the dirty flag at offset 96 to 1.
 // ─────────────────────────────────────────────────────────────────────────────
 void rage::phBoundCapsule::CopyFrom(const rage::phBoundCapsule* source) {
-    util_DA50(this, source);
-
-    memcpy((char*)this + 112, (const char*)source + 112, 16);
-    memcpy((char*)this + 128, (const char*)source + 128, 16);
-    memcpy((char*)this + 144, (const char*)source + 144, 16);
-    memcpy((char*)this + 160, (const char*)source + 160, 16);
-    memcpy((char*)this + 176, (const char*)source + 176, 16);
-
-    *(uint32_t*)((char*)this + 192) = *(const uint32_t*)((const char*)source + 192);
-
-    const uint8_t* srcBytes = (const uint8_t*)source + 196;
-    uint8_t* dstBytes = (uint8_t*)this + 196;
-    for (int i = 0; i < 12; i++) {
-        dstBytes[i] = srcBytes[i];
+    rage::phBound_CopyProperties(this, source);
+    auto* out = reinterpret_cast<uint8_t*>(this);
+    const auto* in = reinterpret_cast<const uint8_t*>(source);
+    for (unsigned offset = 0x70; offset < 0xc0; offset += 16) {
+        alignas(16) uint8_t row[16];
+        std::memcpy(row, in + offset, 16);
+        std::memcpy(out + offset, row, 16);
     }
-
-    *(uint16_t*)((char*)this + 96) = 1;
+    *reinterpret_cast<uint32_t*>(out + 0xc0) = *reinterpret_cast<const uint32_t*>(in + 0xc0);
+    for (unsigned offset = 0xc4; offset < 0xd0; ++offset) out[offset] = in[offset];
+    *reinterpret_cast<uint16_t*>(out + 0x60) = 1;
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -10866,14 +10861,14 @@ int phBound::CollideDispatch(void* other) {
 // ─────────────────────────────────────────────────────────────────────────────
 // phBound::CopyFrom (vfn_34 / slot 34) @ 0x8228DA18 | size: 0x34 (52B)
 //
-// Deep-copies the base-bound payload from a source bound via util_DA50
+// Copies the base-bound payload from a source bound via phBound_CopyProperties
 // (the shared rage::phBound bytewise copy @ 0x8228DA50) and then resets
 // the reference count to 1 at +0x60 (m_nRefCount, 16-bit).  Subclasses
 // (phBoundCapsule::CopyFrom @ 0x822A2F28 …) chain extra field copies
 // after calling this base helper.
 // ─────────────────────────────────────────────────────────────────────────────
 void phBound::CopyFrom(const phBound* src) {
-    util_DA50(this, src);                       // bytewise base copy
+    rage::phBound_CopyProperties(this, src);
     uint8_t* self = reinterpret_cast<uint8_t*>(this);
     *reinterpret_cast<uint16_t*>(self + 96) = 1u;  // m_nRefCount = 1
 }
