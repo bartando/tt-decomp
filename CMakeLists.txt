@@ -186,6 +186,7 @@ set(SOURCES
     src/game/ball/ball_prediction_quaternion.cpp
     src/game/camera/pong_camera.cpp
     src/game/camera/pong_camera_helpers.cpp
+    src/game/camera/camera_transition_queries.cpp
     src/game/camera/cm_cam_actions.cpp
     src/game/camera/dcam_polar_cam.cpp
     src/game/creature/pong_creature.cpp

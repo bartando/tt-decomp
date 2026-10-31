@@ -1,3 +1,4 @@
+#include "game/camera_queries.hpp"
 #include "rage/operator_new.hpp"
 /**
  * pong_camera.cpp
@@ -84,18 +85,6 @@ void pongCameraMgr::AdjustTimingForIndex(int index) {
     timingArr[clearIndex2] = 0.0f;
 }
 
-// Transition parameter structs used by TryTransition and related functions
-struct TransitionParams {
-    float value;
-    uint32_t vtableOrState;
-    uint32_t padding;
-};
-
-struct TransitionFlags {
-    uint32_t flag1;
-    uint32_t flag2;
-};
-
 // Extern helpers used by transition functions
 extern uint8_t pongCameraMgr_ValidateTransition(void* gameState, TransitionParams* params,
                                                  int mode, TransitionFlags* flags, int enable);
@@ -114,7 +103,6 @@ static bool doClampedTransition(void* self, void* gameState, int mode, void* fla
     TransitionParams params;
     params.value = clampedMin;
     params.vtableOrState = *(uint32_t*)self;
-    params.padding = 0;
     uint8_t result = pongCameraMgr_6E08(gameState, &params, mode, flags, r7);
     if (result != 0 && params.value <= clampedMax) {
         *(float*)self = params.value;
@@ -161,7 +149,6 @@ bool pongCameraMgr::TryTransition(void* gameState) {
 
     params.value = clampedMin;
     params.vtableOrState = *(uint32_t*)this;  // Copy vtable/state
-    params.padding = 0;
 
     TransitionFlags flags;
 
@@ -413,7 +400,6 @@ bool pongCameraMgr::ValidateAndClampTransition(void* gameState, int mode) {
 
     params.value = clampedMin;
     params.vtableOrState = *(uint32_t*)this;
-    params.padding = 0;
 
     uint8_t validationResult = pongCameraMgr_6E08(gameState, &params, mode, nullptr, 0);
     
@@ -455,7 +441,6 @@ bool pongCameraMgr::ValidateAndClampTransitionWithFlags(void* gameState, int mod
 
     params.value = clampedMin;
     params.vtableOrState = *(uint32_t*)this;
-    params.padding = 0;
 
     flags.flag1 = 3;
     flags.flag2 = 1;
@@ -955,25 +940,6 @@ extern float g_cameraOffsetDelta;  // @ 0x8202D108 (.rdata float constant)
  * without modifying the original camera state.
  */
 
-// ─────────────────────────────────────────────────────────────────────────────
-// pongCameraMgr::CheckOffsetQueryA()  @ 0x821F6990 | size: 0x8C
-// Queries mode 20 via QueryA, then retries offset-adjusted copy via QueryA mode 3
-// ─────────────────────────────────────────────────────────────────────────────
-bool pongCameraMgr::CheckOffsetQueryA(void* gameState) {
-    uint64_t stateCopy = *(uint64_t*)this;
-
-    bool initialCheck = pongCameraMgr_QueryA(&stateCopy, 20);
-    if (!initialCheck) {
-        return false;
-    }
-
-    // Add offset delta to the float value in the copy
-    float currentValue = *(float*)this;
-    float adjustedValue = currentValue + g_cameraOffsetDelta;
-    *(float*)&stateCopy = adjustedValue;
-
-    return pongCameraMgr_QueryA(&stateCopy, 3);
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // pongCameraMgr::CheckOffsetQueryB()  @ 0x821F6A20 | size: 0x8C
@@ -1104,10 +1070,7 @@ bool pongCameraMgr::TransitionMode6_V2(void* gameState) {  // @ 0x821F5248
     return doClampedTransition(this, gameState, 6, f, 2);
 }
 
-bool pongCameraMgr::TransitionMode6_V3(void* gameState) {  // @ 0x821F5308
-    uint32_t f[] = {5, 0};
-    return doClampedTransition(this, gameState, 6, f, 1);
-}
+
 
 bool pongCameraMgr::TransitionMode6_V4(void* gameState) {  // @ 0x821F53B8
     uint32_t f[] = {5, 1};
@@ -1184,8 +1147,6 @@ bool pongCameraMgr::TransitionMode12_V2(void* gameState) {  // @ 0x821F5E18
 // Forward declarations for callees
 extern "C" bool pongCameraMgr_3ED8_2h(void* statePtr, void* gameState, int extra);
 extern "C" bool pg_6F68(void* gameState, void* params, int mode, unsigned int* flags, int enable);
-extern "C" bool pongCameraMgr_6990(void* statePtr, void* gameState, float f1, float f2);
-extern "C" bool pongCameraMgr_5308_fw(void* statePtr, void* gameState);
 extern "C" bool pongCameraMgr_6EC0(void* statePtr, void* gameState);
 extern "C" bool pongCameraMgr_6FA8(void* statePtr, void* gameState, float f1, float f2);
 extern "C" bool pongCameraMgr_7250(void* statePtr, void* gameState, float f1, float f2);
@@ -1555,7 +1516,7 @@ bool pongCameraMgr::CheckAllCameraQueries(void* gameState, float f1, float f2) {
 
     // 2. pongCameraMgr_6990
     stateCopy = *(uint64_t*)this;
-    bool r2 = pongCameraMgr_6990(&stateCopy, gameState, f1, f2);
+    bool r2 = pongCameraMgr_6990(&stateCopy, gameState);
 
     // 3. pongCameraMgr_5308_fw
     stateCopy = *(uint64_t*)this;
