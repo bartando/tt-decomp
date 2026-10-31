@@ -2,6 +2,7 @@
 #include "ball_predict.hpp"
 #include "pong_ball.hpp"
 #include "ball_visual_spin.hpp"
+#include "ball_audio.hpp"
 #include <cstdint>
 #include <cmath>
 
@@ -91,7 +92,6 @@ extern void BallPredict_InterpolateSamples(void* ring, void* unusedR4, gdBallPre
 extern void BallPredict_InterpolateState(void* state, void* unusedR4, gdBallPredictSample* out, float time); // @ 0x821D3C60
 extern void BallPredict_AdvanceSamples(int bank, bool recordReplay); // @ 0x82287930
 extern bool BallPhysics_QueueInactive(void* sim, uint16_t handle); // @ 0x822C1B98
-extern void BallAudio_PlayImpact(void* audio, void* unusedR4, int kind, const bpVec4* position, int flags, float energy); // @ 0x8228AD58
 extern void nop_8240E6D0(const char* format, ...); // @ 0x8240E6D0
 extern void pg_E6E0(int message, int mask, int count, int args); // @ 0x8225E6E0
 
@@ -211,14 +211,14 @@ void pg_70C8_g() {
         const float vy = __builtin_fabsf(velocity.y);
         const float impulse = instance->archetype->GetMass() * vy;
         const float scaled = impulse * impactScale;
-        BallAudio_PlayImpact(instance->audio, nullptr, 2, &instance->matrix.d, 0, scaled * scaled);
+        BallAudio_PreImpact(instance->audio, nullptr, 2, &instance->matrix.d.x, 0, scaled * scaled);
     }
     if (flag9) {
         pg_E6E0(7, 0x40, 0, 0);
         const float vy = __builtin_fabsf(velocity.y);
         const float impulse = instance->archetype->GetMass() * vy;
         const float scaled = impulse * impactScale;
-        BallAudio_PlayImpact(instance->audio, nullptr, 3, &instance->matrix.d, 0, scaled * scaled);
+        BallAudio_PreImpact(instance->audio, nullptr, 3, &instance->matrix.d.x, 0, scaled * scaled);
     }
     if (passedTable) pg_E6E0(13, 0x40, 0, 0);
     if (belowTable) pg_E6E0(12, 0x40, 0, 0);

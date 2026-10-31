@@ -51,7 +51,7 @@ CALLS = {
     "archetype.vfn_7": stub(ret=lambda c: c.rng.uniform(0.1, 4.0)),
     "pg_E6E0": stub(ret="void"),
     "nop_8240E6D0": stub(ret="void", args=("r3", "f1"), deref={"r4": 2}),
-    "BallAudio_PlayImpact": stub(ret="void", args=("r3", "r5", "r6", "r7", "f1")),
+    "BallAudio_PreImpact": stub(ret="void", args=("r3", "r5", "r6", "r7", "f1")),
 }
 
 

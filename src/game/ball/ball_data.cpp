@@ -79,6 +79,9 @@ TT_DATA_ALIAS("g_ballInstancePtr", "g_pPhysicsSim");
 extern "C" void* lbl_826063C8 = nullptr;
 TT_DATA_ALIAS("g_phShadowState", "lbl_826063C8");
 
+// @ 0x82606424 (.data) — active listener envelope used by impact audio
+extern "C" void* g_ballAudioListener = nullptr;
+
 // @ 0x826064B8 (.data) — trajectory solver's table-height adjustment
 extern "C" float g_ballTableSurfaceOffset = 0.0f;
 
@@ -105,6 +108,10 @@ TT_DATA_ALIAS("lbl_8271A2F4", "g_ppBallInst");
 
 // @ 0x8271A310 (.data)
 extern "C" void* lbl_8271A310 = nullptr;
+
+// @ 0x8271A398 (.data) — shared audio/control-group configuration
+extern "C" const uint8_t* g_pongControlGroupConfig = nullptr;
+TT_DATA_ALIAS("lbl_8271A398", "g_pongControlGroupConfig");
 
 // @ 0x8271A7F8 (.data)
 extern "C" void* lbl_8271A7F8 = nullptr;
