@@ -1570,9 +1570,6 @@ extern void gmPracticeTargetFx_Load(gmPracticeTargetFx* fx, fiTokenizerView* tok
 // @ 0x82113F20 (pongNetMessageHolder_3F20_w) — reads "NumTargets" and that many
 // 0x44-byte targets (nine ints, then two groups of four floats).
 extern void gmPracticeTargetSet_Load(gmPracticeTargetSet* set, fiTokenizerView* tokenizer);
-// @ 0x821B2A58 (pg_2A58_g) — allocates `capacity` words; count = capacity.
-extern void gmPracticeTargetWordArray_Init(gmPracticeTargetWordArray* array, int32_t capacity,
-                                           bool flag6, bool flag7);
 
 extern int32_t  g_practiceTargetNumSets;       // @ 0x826063AC (lbl_826063AC)
 extern uint32_t g_practiceTargetDefaultColor;  // @ 0x825CA198, 0xAARRGGBB
@@ -1866,16 +1863,16 @@ void gmPracticeTargetWordArray_Shuffle(gmPracticeTargetWordArray* array) {
             uint32_t bits = AdvancePracticeTargetRandom() & 0x7FFFFFFFu;
             j = i + 1 + bits % (array->m_count - i - 1);
         }
-        uint32_t saved = array->m_data[i];
-        array->m_data[i] = array->m_data[j];
-        array->m_data[j] = saved;
+        uint32_t saved = array->m_data.get()[i];
+        array->m_data.get()[i] = array->m_data.get()[j];
+        array->m_data.get()[j] = saved;
     }
     array->field_0C = 0;
 }
 
 // @ 0x821B2C08 | size: 0x90
 uint32_t gmPracticeTargetWordArray_Next(gmPracticeTargetWordArray* array) {
-    uint32_t selected = array->m_data[array->field_0C];
+    uint32_t selected = array->m_data.get()[array->field_0C];
     array->field_0C = (array->field_0C + 1) % array->m_count;
     if (array->field_0C == 0 && (array->m_flags & 0x80)) {
         gmPracticeTargetWordArray_Shuffle(array);
@@ -1925,7 +1922,7 @@ void gmPracticeTarget_SelectSet(void* /*unused*/, int32_t setId, int /*unused*/,
         gmPracticeTargetWordArray* array = target->m_wordArray;
         int32_t count = target->m_sets[setId].m_numTargets;
         array->m_count = count == -1 ? array->m_capacity : count;
-        for (int32_t i = 0; i < array->m_capacity; ++i) array->m_data[i] = i;
+        for (int32_t i = 0; i < array->m_capacity; ++i) array->m_data.get()[i] = i;
         gmPracticeTargetWordArray_Shuffle(array);
     }
     uint32_t index = gmPracticeTargetWordArray_Next(target->m_wordArray);

@@ -11,6 +11,7 @@
  */
 #pragma once
 #include <stdint.h>
+#include "rage/ptr32.hpp"
 
 // Structs that carry the game's vtable as an explicit `vtable` member list
 // their slots as plain (non-virtual) methods: a C++ virtual would add a hidden
@@ -1075,12 +1076,16 @@ struct gmPracticeTargetSetBlock {
 // The 0x14-byte word array the target allocates at +0x18: data, count and
 // capacity, flags in the byte at +0x10. 0x821B2A58 sizes it, 0x821B29F8 frees it.
 struct gmPracticeTargetWordArray {
-    uint32_t* m_data;       // +0x00
+    rage::ptr32<uint32_t> m_data; // +0x00
     int32_t   m_count;      // +0x04
     int32_t   m_capacity;   // +0x08
     uint32_t  field_0C;     // +0x0C
     uint8_t   m_flags;      // +0x10  bit 7 and bit 6 come from 0x821B2A58's last two arguments
 };
+static_assert(sizeof(gmPracticeTargetWordArray) == 0x14, "practice word array layout");
+void gmPracticeTargetWordArray_Init(gmPracticeTargetWordArray* array, int32_t capacity,
+                                     bool flag6, bool flag7); // @ 0x821B2A58
+void gmPracticeTargetWordArray_Shuffle(gmPracticeTargetWordArray* array); // @ 0x821B2B28
 
 // pongRenderable sub-object (vtable 0x82032404, overridden by 0x82032428).
 struct gmPracticeTargetRenderable {

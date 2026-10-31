@@ -10,11 +10,11 @@ CASES = {
         ('allow self swap', 'j = i + 1 + bits % (array->m_count - i - 1);', 'j = i + bits % (array->m_count - i);'),
         ('use 23 random bits', 'AdvancePracticeTargetRandom() & 0x7FFFFFFFu', 'AdvancePracticeTargetRandom() & 0x7FFFFFu'),
         ('skip final swap', 'i < array->m_count - 1;', 'i < array->m_count - 2;'),
-        ('lose swapped word', 'array->m_data[j] = saved;', 'array->m_data[j] = 0;'),
+        ('lose swapped word', 'array->m_data.get()[j] = saved;', 'array->m_data.get()[j] = 0;'),
         ('retain cursor', '    array->field_0C = 0;', '    /* cursor reset lost */'),
     ],
     'match_practice_target_next': [
-        ('select next word', 'array->m_data[array->field_0C];', 'array->m_data[(array->field_0C + 1) % array->m_count];'),
+        ('select next word', 'array->m_data.get()[array->field_0C];', 'array->m_data.get()[(array->field_0C + 1) % array->m_count];'),
         ('never wrap cursor', '(array->field_0C + 1) % array->m_count', 'array->field_0C + 1'),
         ('ignore shuffle flag', 'array->field_0C == 0 && (array->m_flags & 0x80)', 'false'),
         ('swap flag bits', '(array->m_flags & 0x40) ? 1u : 0u', '(array->m_flags & 0x80) ? 1u : 0u'),
@@ -31,7 +31,7 @@ CASES = {
         ('force set reload', 'if (setId != static_cast<int32_t>(target->field_44))', 'if (true)'),
         ('omit selected set', 'target->field_44 = setId;', '/* selected set lost */'),
         ('lose capacity fallback', 'count == -1 ? array->m_capacity : count', 'count'),
-        ('retain previous order', 'array->m_data[i] = i;', '(void)i;'),
+        ('retain previous order', 'array->m_data.get()[i] = i;', '(void)i;'),
         ('omit selected index', 'g_practiceTargetSelectedIndex = index;', '/* selected index lost */'),
         ('wrong active zone source', 'selected.activeZones[i]', 'selected.activeZones[8 - i]'),
         ('wrong shape half', 'selected.gridShape[i]', 'selected.gridShape[(i + 4) % 8]'),
@@ -45,6 +45,12 @@ def main():
     caught = 0
     for spec, cases in CASES.items():
         for name, old, new in cases:
+            if spec == 'match_practice_target_layout_grid':
+                start = source.index('void gmPracticeTarget_LayOutTableGrid() {')
+                end = source.index('\n}', start) + 2
+                block = source[start:end]
+                assert block.count(old) == 1, (name, block.count(old))
+                old, new = block, block.replace(old, new)
             assert source.count(old) == 1, (name, source.count(old))
             output = io.StringIO()
             with contextlib.redirect_stdout(output):

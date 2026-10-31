@@ -16,3 +16,5 @@ extern "C" {
 bool pongCameraMgr_6990(void* key, void* evaluator); // @ 0x821F6990
 bool pongCameraMgr_5308_fw(void* key, void* evaluator); // @ 0x821F5308
 }
+
+float gameLoop_GetDisplayAspect(void* gameLoop); // @ 0x82228EA0
