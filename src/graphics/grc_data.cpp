@@ -47,3 +47,6 @@ extern "C" alignas(16) const uint32_t g_shaderMatrixTransposeMasks[3][4] = {
     {0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu},
     {1, 2, 1, 2},
 };
+
+// @ 0x825EBA20 (.data) — fallback texture used by render and texture references.
+void* g_grcDefaultTexture = nullptr;

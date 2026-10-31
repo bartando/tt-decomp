@@ -10,9 +10,11 @@ player/mode gates, raw enabled bytes, optional handles, signed tap-handle guard
 non-square dimensions, scalar subnormals, fused sampling taps, packed dirty bits,
 full softness versus single-lane blend stores, scratch preservation and counter wrap.
 
-Contract: at most three matching slots; descriptor lengths consume initialized
-data only (the helper clamps requested counts to descriptor sizes). Map-pass
-matrices are never initialized, so their descriptor length is zero. Player taps
+Contract: at most three matching slots. Boundary models snapshot only the
+initialized upload prefix, limited by fixture descriptor lengths; the real
+uploaders honor explicit counts without clamping. Standalone uploader specs
+verify that behavior. Full integration would expose uninitialized caller stack
+slots, including map-pass matrices (whose fixture descriptor length is zero). Player taps
 require both primary texture bindings. Missing bindings with taps enabled read
 uninitialized original stack data and have no reproducible result. Pointers are
 aligned/disjoint; invalid pointers, signaling NaNs and finite overflow are excluded.

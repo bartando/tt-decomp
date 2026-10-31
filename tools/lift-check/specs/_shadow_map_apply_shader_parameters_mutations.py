@@ -23,7 +23,7 @@ MUTATIONS = (
     ("wrong matrix upload count", "matrices, pass > 0 ? 2 : 1", "matrices, pass > 0 ? 1 : 2"),
     ("lose softness scratch update", "lbl_82617DF0.lane[2] = m_config->slots[pass].softness;",
      "/* omitted softness */"),
-    ("lose inline write counter", "        ++g_grmShaderFx_boundContext;", "/* omitted counter */"),
+    ("lose inline write counter", "if (m_draw_41c != 0) {\n        ++g_grmShaderFx_boundContext;", "if (m_draw_41c != 0) { /* omitted counter */"),
     ("omit second texture binding", "pongShadowMap_A5C8_g(m_draw_414, second);",
      "/* omitted second binding */"),
     ("omit fallback substitution", "texture = second;", "texture = texture;"),
@@ -46,15 +46,16 @@ def main():
     source = (root / "src/game/pong_render.cpp").read_text()
     spec = Path(__file__).with_name("shadow_map_apply_shader_parameters.py")
     for name, old, new in MUTATIONS:
-        expected = 3 if name == "lose inline write counter" else 1
+        expected = 1
         assert source.count(old) == expected, f"mutation anchor changed: {name}"
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             rc = Checker(spec, Options(trials=200, seed=1, patches=((old, new),),
                                         workdir=root / "tools/lift-check/build/shadow-mutations")).run()
         first = output.getvalue().splitlines()[0]
-        print(f"{'CAUGHT' if rc == 1 else 'MISSED'} {name}: {first}", flush=True)
-        if rc != 1:
+        caught = rc == 1 and first.startswith("FAIL ")
+        print(f"{'CAUGHT' if caught else 'MISSED'} {name}: {first}", flush=True)
+        if not caught:
             print(output.getvalue())
             return 1
     print(f"Caught {len(MUTATIONS)}/{len(MUTATIONS)} mutations", flush=True)

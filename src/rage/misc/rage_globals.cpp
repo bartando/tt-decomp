@@ -51,14 +51,6 @@ float g_cm_negateVec[4] = {-1.0f, -1.0f, -1.0f, -1.0f};
 // ============================================================================
 
 /**
- * g_pTextureFactory
- * 
- * Pointer to the global texture factory instance.
- * Used by grcTextureReferenceBase for texture management.
- */
-void* g_pTextureFactory = nullptr;
-
-/**
  * g_bTextureEndianDirty
  * 
  * Flag indicating whether texture endianness needs to be corrected.

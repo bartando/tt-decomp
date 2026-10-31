@@ -4,8 +4,8 @@
  *
  * grcTextureReferenceBase is the abstract base for all texture reference objects.
  * It wraps an underlying grcTexture* and delegates most vtable calls to it. When
- * no inner texture is bound, virtual methods that need one fall back to the global
- * grcTextureFactory singleton (g_pTextureFactory @ 0x825EBA20) to obtain a default.
+ * no inner texture is bound, virtual methods that require one use the fallback
+ * texture at 0x825EBA20 directly.
  *
  * The class owns a heap-allocated internal data block (m_pInternalData, offset +0x0C)
  * that is freed in the destructor. m_field06 (uint16) and m_field08 (uint32) are
@@ -24,13 +24,9 @@
 #include "texture_reference.hpp"
 #include "rage/memory.h"
 
-namespace rage {
+extern void* g_grcDefaultTexture; // @ 0x825EBA20 — fallback texture, not a factory
 
-// ---------------------------------------------------------------------------
-// Global texture factory singleton
-// @ 0x825EBA20   .data   4 bytes
-// ---------------------------------------------------------------------------
-extern grcTextureFactory* g_pTextureFactory;   // SDA-relative, r13 base
+namespace rage {
 
 // Global endian-swap / dirty-disc flag used during serialisation
 // @ 0x82606562   .data   1 byte   SDA offset +25954
@@ -38,64 +34,6 @@ extern uint8_t g_bTextureEndianDirty;
 
 // ---------------------------------------------------------------------------
 // Struct definitions are in texture_reference.hpp — see that file.
-
-// Additional declarations for incomplete types used in this TU.
-// grcTexture vtable layout (confirmed from grcTextureXenon @ 0x820353CC):
-//   slot  0: destructor
-//   slot  5: (forwarded by RefBase)
-//   slot  6: (forwarded by RefBase)
-//   slot  7: ApplyState(void*)
-//   slot  8: (forwarded by RefBase)
-//   slot  9: (forwarded by RefBase)
-//   slot 12: GetPlatformTexture() -> grcTexture*
-//   slot 13: (forwarded by RefBase)
-//   slot 14: (forwarded by RefBase)
-//   slot 15: (forwarded by RefBase)
-//   slot 16: (forwarded by RefBase)
-//   slot 17: (forwarded by RefBase)
-//   slot 18: (forwarded by RefBase)
-//   slot 20: Invalidate()
-//   slot 21: vfn_21(void*, void*, void*) -> grcTexture*
-//   slot 22: vfn_22(void*)
-//   slot 25: Flush()
-struct grcTexture {
-    virtual void destructor(bool deleteThis);       // slot  0
-    virtual void vfn_1();                           // slot  1
-    virtual void vfn_2();                           // slot  2
-    virtual void vfn_3();                           // slot  3
-    virtual void vfn_4();                           // slot  4
-    virtual void vfn_5();                           // slot  5
-    virtual void vfn_6();                           // slot  6
-    virtual void ApplyState(void* param);           // slot  7
-    virtual void vfn_8();                           // slot  8
-    virtual void vfn_9();                           // slot  9
-    virtual void vfn_10();                          // slot 10
-    virtual void vfn_11();                          // slot 11
-    virtual grcTexture* GetPlatformTexture();       // slot 12  (byte offset +48)
-    virtual void vfn_13(void*, void*);              // slot 13
-    virtual void vfn_14(void*, void*);              // slot 14
-    virtual void vfn_15();                          // slot 15
-    virtual void vfn_16(void*);                     // slot 16
-    virtual void vfn_17(float, void*);              // slot 17
-    virtual void vfn_18(void*, void*);              // slot 18
-    virtual void vfn_19();                          // slot 19
-    virtual void Invalidate();                      // slot 20
-    virtual grcTexture* vfn_21(void*, void*, void*);// slot 21
-    virtual void vfn_22(void*);                     // slot 22
-    virtual void vfn_23();                          // slot 23
-    virtual void vfn_24();                          // slot 24
-    virtual void Flush();                           // slot 25  (byte offset +100)
-};
-struct grcTextureFactory {
-    virtual void destructor(bool deleteThis);       // slot  0
-    virtual void vfn_1();                           // slot  1
-    virtual void vfn_2();                           // slot  2
-    virtual void vfn_3();                           // slot  3
-    virtual void vfn_4();                           // slot  4
-    virtual void vfn_5();                           // slot  5
-    virtual void vfn_6();                           // slot  6
-    virtual grcTexture* GetDefaultTexture();        // slot  7
-};
 
 // RAGE_ASSERT — stripped in release builds, mapped to no-op here
 #ifndef RAGE_ASSERT
@@ -141,53 +79,27 @@ void* grcTextureReferenceBase::GetHandle() const
 }
 
 // ---------------------------------------------------------------------------
-// grcTextureReferenceBase  —  slot 7 forwarding method
+// grcTextureReferenceBase — forward render state to the texture or its fallback.
 // @ 0x8215D6B0 | size: 0x6C
-//
-// Delegates vtable slot 7 to the bound inner texture (obtained via GetTexture,
-// slot 11). If no inner texture is bound, falls back to the global factory
-// singleton so the call is never silently dropped.
-//
-// r4 (param) is forwarded unchanged; semantics depend on the concrete texture
-// type's slot 7 implementation. Likely related to texture state management
-// or resource binding operations.
 // ---------------------------------------------------------------------------
 void grcTextureReferenceBase::ForwardSlot7(void* param)
 {
-    grcTexture* pTex = GetTexture();   // VCALL slot 11
-
-    if (pTex)
-    {
-        pTex->ApplyState(param);
-    }
-    else
-    {
-        grcTexture* pDefault = g_pTextureFactory->GetDefaultTexture();
-        pDefault->ApplyState(param);
-    }
+    grcTexture* texture = GetTexture();
+    if (texture == nullptr)
+        texture = static_cast<grcTexture*>(::g_grcDefaultTexture);
+    texture->ApplyState(param);
 }
 
 // ---------------------------------------------------------------------------
-// grcTextureReferenceBase  —  slot 20 forwarding method
+// grcTextureReferenceBase — resolve the shader resource through the bound texture.
 // @ 0x8215D510 | size: 0x6C
-//
-// Same delegation pattern as slot 7 but for vtable slot 20 (byte offset +80).
-// Falls back to g_pTextureFactory when no inner texture is bound.
-// Likely related to texture resource management or state updates.
 // ---------------------------------------------------------------------------
-void grcTextureReferenceBase::ForwardSlot20()
+void* grcTextureReferenceBase::ForwardSlot20()
 {
-    grcTexture* pTex = GetTexture();   // VCALL slot 11
-
-    if (pTex)
-    {
-        pTex->Invalidate();
-    }
-    else
-    {
-        grcTexture* pDefault = g_pTextureFactory->GetDefaultTexture();
-        pDefault->Invalidate();
-    }
+    grcTexture* texture = GetTexture();
+    if (texture == nullptr)
+        texture = static_cast<grcTexture*>(::g_grcDefaultTexture);
+    return texture->GetShaderResource();
 }
 
 // ---------------------------------------------------------------------------
@@ -528,38 +440,26 @@ void rage::grcTextureReferenceBase::ForwardSlot6()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// grcTextureReferenceBase::ForwardSlot8  [vtable slot 8 @ 0x8215D720]
-// Forwards slot 8 call to the bound inner texture, returns 0 if no texture.
-// ─────────────────────────────────────────────────────────────────────────────
-void rage::grcTextureReferenceBase::ForwardSlot8()
+// grcTextureReferenceBase::ForwardSlot8 — width, or zero if unbound.
+// @ 0x8215D720 | size: 0x58
+// ---------------------------------------------------------------------------
+int32_t rage::grcTextureReferenceBase::ForwardSlot8()
 {
-    grcTexture* texture = GetTexture();   // VCALL slot 11
-    
-    if (texture) {
-        texture->vfn_8();
-        return;
-    }
-    
-    // Return 0 if no texture
+    grcTexture* texture = GetTexture();
+    return texture ? texture->GetWidth() : 0;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// grcTextureReferenceBase::ForwardSlot9  [vtable slot 9 @ 0x8215D778]
-// Forwards slot 9 call to the bound inner texture, returns 0 if no texture.
-// ─────────────────────────────────────────────────────────────────────────────
-void rage::grcTextureReferenceBase::ForwardSlot9()
+// ---------------------------------------------------------------------------
+// grcTextureReferenceBase::ForwardSlot9 — height, or zero if unbound.
+// @ 0x8215D778 | size: 0x58
+// ---------------------------------------------------------------------------
+int32_t rage::grcTextureReferenceBase::ForwardSlot9()
 {
-    grcTexture* texture = GetTexture();   // VCALL slot 11
-    
-    if (texture) {
-        texture->vfn_9();
-        return;
-    }
-    
-    // Return 0 if no texture
+    grcTexture* texture = GetTexture();
+    return texture ? texture->GetHeight() : 0;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
 // grcTextureReferenceBase::ForwardSlot13  [vtable slot 13 @ 0x8215D7D0]
 // Forwards slot 13 call with two parameters to the texture from GetTexture2().
 // ─────────────────────────────────────────────────────────────────────────────

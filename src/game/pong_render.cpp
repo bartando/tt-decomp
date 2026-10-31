@@ -21,6 +21,7 @@
 #include "camera/pong_camera.hpp"
 #include <cstring>
 #include "rage/shader_parameters.hpp"
+#include "rage/grc_texture.hpp"
 
 // pongLightState_CopyLights @ 0x8213E110 | size: 0x30C (was game_E110)
 // Copies all eight slots, regardless of count. game_E0A8 (0x8213E0A8)
@@ -328,13 +329,40 @@ static_assert(__builtin_offsetof(pongShadowMap, m_config) == 8, "shadow config p
 static_assert(__builtin_offsetof(pongShadowMap, m_draw_430) == 1072, "last shader handle");
 #endif
 
-extern void* lbl_825EBA20;                       // @ 0x825EBA20  fallback texture
+extern void* g_grcDefaultTexture;                       // @ 0x825EBA20  fallback texture
 extern ShaderVector lbl_82617DF0;               // @ 0x82617DF0  softness upload scratch
 extern const float lbl_825CA430[2];             // @ 0x825CA430  half-texel offsets
 extern const ShaderVector lbl_825CA4A8[4];       // @ 0x825CA4A8  paired sampling taps
 extern const float lbl_825C4890;                // @ 0x825C4890  shadow blend (0.3)
-extern void* game_53C8(pongShadowMap* map, int32_t player, int32_t layer); // @ 0x821453C8
-extern void pongShadowMap_A5C8_g(uint32_t handle, void* texture);         // @ 0x8215A5C8
+// @ 0x821453C8 | size: 0x90
+void* game_53C8(pongShadowMap* map, int32_t player, int32_t layer) {
+    if (map->m_config->slots[3 + layer * 2 + player].enabled == 0)
+        return g_grcDefaultTexture;
+    if (static_cast<int32_t>(map->m_draw_444) < 2) {
+        if (player != static_cast<int32_t>(map->m_draw_448))
+            return g_grcDefaultTexture;
+        return map->m_singlePlayerTextures[layer];
+    }
+    if (player == static_cast<int32_t>(map->m_draw_448))
+        return map->m_activeTextures[layer];
+    if (layer > 0)
+        return g_grcDefaultTexture;
+    return map->m_playerTextures[player][layer];
+}
+// @ 0x8215A5C8 | size: 0xA4
+void pongShadowMap_A5C8_g(uint32_t handle, void* texture) {
+    ++g_grmShaderFx_boundContext;
+    if (texture == nullptr)
+        texture = g_grcDefaultTexture;
+    void* resource = static_cast<rage::grcTexture*>(texture)->GetShaderResource();
+    // The virtual can change the active table; capture it only after the call.
+    ShaderTable* table = lbl_825EBC40;
+    const uint32_t bit = (handle >> 1) & 0x1FFFFu;
+    const uint32_t slot = table->entries[(handle >> 18) * 2 + 1] & 0xFFFFu;
+    ShaderVector* bank = table->values;
+    table->dirtyBits[bit >> 3] |= g_shaderParameterDirtyMasks[bit & 7];
+    memcpy(bank + slot, &resource, sizeof(resource));
+}
 // @ 0x82159AA0 | size: 0x124
 void game_9AA0(ShaderTable* table, uint32_t handle, const ShaderVector* matrices,
                int32_t count) {
@@ -367,13 +395,6 @@ void game_9AA0(ShaderTable* table, uint32_t handle, const ShaderVector* matrices
         matrices += 4;
     }
 }
-
-namespace {
-int32_t shadowTextureDimension(void* texture, int slot) {
-    using DimensionFn = int32_t (*)(void*);
-    return reinterpret_cast<DimensionFn>((*static_cast<void***>(texture))[slot])(texture);
-}
-} // namespace
 
 // @ 0x82147228 | size: 0x600 (was pongShadowMap_7228_g)
 void pongShadowMap::applyShaderParameters(int32_t pass) {
@@ -414,9 +435,9 @@ void pongShadowMap::applyShaderParameters(int32_t pass) {
 
     float scaleX, scaleY, offsetX, offsetY;
     if (pass == 0) {
-        void* texture = reinterpret_cast<void*>(static_cast<uintptr_t>(m_draw_3d0));
-        int32_t height = shadowTextureDimension(texture, 9);
-        int32_t width = shadowTextureDimension(texture, 8);
+        void* texture = m_mapTexture;
+        int32_t height = static_cast<rage::grcTexture*>(texture)->GetHeight();
+        int32_t width = static_cast<rage::grcTexture*>(texture)->GetWidth();
         float radius = m_config->mapSampleScale * 0.5f;
         scaleY = radius / static_cast<float>(height);
         scaleX = radius / static_cast<float>(width);
@@ -426,30 +447,30 @@ void pongShadowMap::applyShaderParameters(int32_t pass) {
         void* texture = game_53C8(this, player, 0);
         pongShadowMap_A5C8_g(m_draw_408, texture);
         pongShadowMap_A5C8_g(m_draw_410, texture);
-        void* second = lbl_825EBA20;
+        void* second = g_grcDefaultTexture;
         if (m_config->slots[player + 5].enabled != 0 && player == static_cast<int32_t>(m_draw_448))
-            second = reinterpret_cast<void*>(static_cast<uintptr_t>(
-                static_cast<int32_t>(m_draw_444) < 2 ? m_draw_3fc : m_draw_3f4));
+            second = static_cast<int32_t>(m_draw_444) < 2 ? m_singlePlayerTextures[1]
+                                                            : m_activeTextures[1];
         pongShadowMap_A5C8_g(m_draw_40c, second);
         pongShadowMap_A5C8_g(m_draw_414, second);
-        if (texture == lbl_825EBA20)
+        if (texture == g_grcDefaultTexture)
             texture = second;
 
-        int32_t width = shadowTextureDimension(texture, 8);
-        void* reference = reinterpret_cast<void*>(static_cast<uintptr_t>(m_draw_3f0));
-        int32_t referenceWidth = shadowTextureDimension(reference, 8);
+        int32_t width = static_cast<rage::grcTexture*>(texture)->GetWidth();
+        void* reference = m_activeTextures[0];
+        int32_t referenceWidth = static_cast<rage::grcTexture*>(reference)->GetWidth();
         float scaledWidth = m_config->playerSampleScale * static_cast<float>(width);
         scaleX = scaledWidth / static_cast<float>(referenceWidth);
-        int32_t height = shadowTextureDimension(texture, 9);
-        int32_t referenceHeight = shadowTextureDimension(reference, 9);
+        int32_t height = static_cast<rage::grcTexture*>(texture)->GetHeight();
+        int32_t referenceHeight = static_cast<rage::grcTexture*>(reference)->GetHeight();
         float scaledHeight = m_config->playerSampleScale * static_cast<float>(height);
         scaleY = scaledHeight / static_cast<float>(referenceHeight);
-        height = shadowTextureDimension(texture, 9);
-        width = shadowTextureDimension(texture, 8);
+        height = static_cast<rage::grcTexture*>(texture)->GetHeight();
+        width = static_cast<rage::grcTexture*>(texture)->GetWidth();
         scaleY /= static_cast<float>(height);
         scaleX /= static_cast<float>(width);
-        height = shadowTextureDimension(texture, 9);
-        width = shadowTextureDimension(texture, 8);
+        height = static_cast<rage::grcTexture*>(texture)->GetHeight();
+        width = static_cast<rage::grcTexture*>(texture)->GetWidth();
         offsetY = lbl_825CA430[1] / static_cast<float>(height);
         offsetX = lbl_825CA430[0] / static_cast<float>(width);
     }
