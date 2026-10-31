@@ -768,41 +768,44 @@ void* LocomotionStateAnim::FindAnimationByID(uint32_t type, uint32_t id) {
     return nullptr;
 }
 
-/**
- * LocomotionStateAnim::SetupAnimationPair @ 0x8224C418 | size: 0x90
- * 
- * Finds two animations by their IDs and calls virtual methods on them
- * to set up animation blending or transition. This is commonly used for
- * locomotion state transitions where two animations need to be blended.
- * 
- * The function searches for both animations, and if both are found,
- * calls their respective virtual methods with the provided parameter.
- * 
- * @param animID1 First animation ID (upper 16 bits)
- * @param animID2 Second animation ID (upper 16 bits)
- * @param param Parameter to pass to animation virtual methods
- * @return true if both animations found and configured, false otherwise
- */
-bool LocomotionStateAnim::SetupAnimationPair(uint16_t animID1, uint16_t animID2, void* param) {
-    // Find first animation (ID1, 0)
-    void* anim1 = FindAnimationByID(animID1, 0);
-    
-    // Find second animation (ID2, 0)
-    void* anim2 = FindAnimationByID(animID2, 0);
-    
-    // Both animations must exist
-    if (!anim1 || !anim2) {
-        return false;
-    }
-    
-    // Call virtual method on first animation with offset parameter
-    // vtable[17] - likely SetupBlendSource or similar
-    VCALL(anim1, 17, void(*)(void*, void*))(anim1, (char*)param + 16);
+namespace {
+// The shared channel vtable has vector/quaternion setters at slots 17/18.
+// Its deleting entry occupies one slot; a C++ destructor would add an ABI pair.
+struct AnimationPairChannel {
+    virtual void slot0() = 0;
+    virtual void slot1() = 0;
+    virtual void slot2() = 0;
+    virtual void slot3() = 0;
+    virtual void slot4() = 0;
+    virtual void slot5() = 0;
+    virtual void slot6() = 0;
+    virtual void slot7() = 0;
+    virtual void slot8() = 0;
+    virtual void slot9() = 0;
+    virtual void slot10() = 0;
+    virtual void slot11() = 0;
+    virtual void slot12() = 0;
+    virtual void slot13() = 0;
+    virtual void slot14() = 0;
+    virtual void slot15() = 0;
+    virtual void slot16() = 0;
+    virtual void SetVector(const float* value) = 0;     // slot 17
+    virtual void SetQuaternion(const float* value) = 0; // slot 18
+};
+}
 
-    // Call virtual method on second animation with base parameter
-    // vtable[18] - likely SetupBlendTarget or similar
-    VCALL(anim2, 18, void(*)(void*, void*))(anim2, param);
-    
+// Find both type channels with ID zero, then write translation and rotation.
+// Keep the unused integer slot so param remains in r7; IDs arrive as full words.
+// LocomotionStateAnim::SetupAnimationPair @ 0x8224C418 | size: 0x90
+bool LocomotionStateAnim::SetupAnimationPair(uint32_t animID1, uint32_t animID2,
+                                            void* unusedR6, const void* param) {
+    (void)unusedR6;
+    auto* first = static_cast<AnimationPairChannel*>(FindAnimationByID(animID1, 0));
+    auto* second = static_cast<AnimationPairChannel*>(FindAnimationByID(animID2, 0));
+    if (!first || !second)
+        return false;
+    first->SetVector(reinterpret_cast<const float*>(static_cast<const uint8_t*>(param) + 16));
+    second->SetQuaternion(static_cast<const float*>(param));
     return true;
 }
 

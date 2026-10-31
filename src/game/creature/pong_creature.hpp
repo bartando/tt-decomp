@@ -223,7 +223,7 @@ struct LocomotionStateAnim {
 
     // ── implemented methods ──
     void* FindAnimationByID(uint32_t type, uint32_t id);  // @ 0x8224BEF8
-    bool SetupAnimationPair(uint16_t animID1, uint16_t animID2, void* param);  // @ 0x8224C418
+    bool SetupAnimationPair(uint32_t animID1, uint32_t animID2, void* unusedR6, const void* param);  // @ 0x8224C418
     void CopyAnimationData();       // @ 0x8214C8F8
     void ProcessAnimationList(void* animationList);  // @ 0x82380540
     float CalculateBlendFactor(void* timingData);  // @ 0x820C1910
