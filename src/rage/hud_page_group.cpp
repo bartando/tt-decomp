@@ -1,4 +1,5 @@
 #include "rage/hud_page_group.hpp"
+#include "xam/thread_sync.h"
 #include <cstdint>
 
 namespace {
@@ -18,9 +19,6 @@ struct FlashHud {
 
 extern void* g_loop_obj_ptr;        // @ 0x825EAB30
 extern uint8_t g_bNetworkDebugFlag; // @ 0x826065EB — shared Flash semaphore held
-extern "C" uint32_t sysThread_WaitTimeout(void* handle, int timeout) __asm__("_pg_C3B8_g"); // @ 0x8242C3B8
-extern "C" uint32_t sysThread_ReleaseSemaphore(void* handle, int32_t count,
-                                               int32_t* previousCount); // @ 0x82566DC0
 extern "C" void rage_debugLog(const char* text); // @ 0x8240E6D0
 
 // @ 0x822EB2A8 | size: 0x78

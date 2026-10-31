@@ -1,3 +1,4 @@
+#include "xam/thread_sync.h"
 /**
  * pong_misc.cpp — Miscellaneous game classes (fsmMachine, misc helpers)
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -1049,7 +1050,6 @@ extern "C" uint32_t xe_GetCurrentThreadId();      // @ 0x82566B78
 extern "C" void _locale_register(void* ptr);     // @ 0x820C02D0 - memory dealloc
 extern "C" void pg_SleepYield(int frames);           // @ 0x82566C80 - wait N frames
 extern "C" void sysIpcHandle_Release(void* ptr) __asm__("_pg_6F48");              // @ 0x82566F48 - release page ref
-extern "C" uint32_t sysThread_WaitTimeout(void* handle, int timeout) __asm__("_pg_C3B8_g"); // @ 0x8242C3B8 - wait with timeout
 extern "C" void sysIpcHandle_Close(void* handle) __asm__("_pg_6F10_g");                     // @ 0x82566F10 - close handle
 extern "C" void* sysThread_Create(void* r3, uint32_t stackSize, void* entryPoint,
                             void* context, uint32_t priority, void* r8) __asm__("_pg_6F88_w"); // @ 0x82566F88 - create thread
@@ -3419,7 +3419,6 @@ extern "C" void CCalMoviePlayer_CF28_wrh(void* pDevice, float f1,
 extern "C" void util_E8E8(void* context, const char* sourceLabel, const char* valueLabel, int32_t mode) __asm__("_util_E8E8");
 extern "C" void pg_1448_g(void* self) __asm__("_pg_1448_g");
 extern "C" void pg_6EB0_g(int32_t mode) __asm__("_pg_6EB0_g");
-extern "C" void pg_6DC0_g(void* handle, int32_t signalState, int32_t pulseMode) __asm__("_pg_6DC0_g");
 extern "C" void* pg_B760(uint32_t accessMask, int32_t inheritHandle, int32_t handleValue) __asm__("_pg_B760");
 extern "C" void pg_6C40_g(void* handle) __asm__("_pg_6C40_g");
 extern "C" void pg_6ED8_g(void* handle) __asm__("_pg_6ED8_g");
@@ -3555,12 +3554,12 @@ void pg_8058(void* channelContext) {
                 sysIpcHandle_Close(workerHandle);
             }
 
-            pg_6DC0_g(thisCtx->m_pWorkerFence, 1, 0);
+            sysThread_ReleaseSemaphore(thisCtx->m_pWorkerFence, 1, nullptr);
             thisCtx->m_bHasWorkerThread = 0;
         }
     }
 
-    pg_6DC0_g(thisCtx->m_pReadFence, 1, 0);
+    sysThread_ReleaseSemaphore(thisCtx->m_pReadFence, 1, nullptr);
 }
 
 // @ 0x82426708 | size: 0xB8

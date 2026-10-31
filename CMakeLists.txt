@@ -56,6 +56,7 @@ set(SOURCES
     src/xam/audio.c
     src/xam/input.c
     src/xam/kernel.c
+    src/xam/thread_sync.cpp
     src/xam/kernel_shims.c
     src/xam/network.c
     src/xam/static_init.c
