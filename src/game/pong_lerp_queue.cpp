@@ -121,54 +121,6 @@ void pongLerpQueue_ProcessCamera(pongLerpQueue* queue, pongPlayer* player) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// pongLerpQueue_3390_g @ 0x821D3390 | size: 0x7C
-// Checks if current time is within valid interpolation window
-// ─────────────────────────────────────────────────────────────────────────────
-bool pongLerpQueue_CheckTimeWindow(const pongLerpQueue* queue, float currentTime, float tolerance) {
-    // Get queue data pointer (at offset +20)
-    const void* queueData = reinterpret_cast<const void*>(
-        reinterpret_cast<uintptr_t>(queue) + 20
-    );
-    
-    // Load queue count from offset +9640
-    const int* countPtr = reinterpret_cast<const int*>(
-        reinterpret_cast<uintptr_t>(queueData) + 9640
-    );
-    int queueCount = *countPtr;
-    
-    // Check if queue has enough entries
-    if (queueCount <= 1) {
-        return false;
-    }
-    
-    // Calculate entry index using modulo 120
-    // Formula: (count + 2) % 120
-    const void* queueBase = reinterpret_cast<const void*>(
-        reinterpret_cast<uintptr_t>(queueData) + 32
-    );
-    
-    const int* indexPtr = reinterpret_cast<const int*>(
-        reinterpret_cast<uintptr_t>(queueBase) + 9604
-    );
-    int rawIndex = *indexPtr + 2;
-    
-    // Modulo 120 using multiply-high trick
-    int quotient = (rawIndex * 34953) >> 38;  // Magic number for division by 120
-    int remainder = rawIndex - (quotient * 120);
-    
-    // Calculate entry offset: remainder * 80 bytes per entry
-    int entryOffset = remainder * 80;
-    
-    // Load timestamp from entry
-    const float* entryTime = reinterpret_cast<const float*>(
-        reinterpret_cast<uintptr_t>(queueBase) + entryOffset
-    );
-    
-    // Check if time difference is within tolerance
-    float timeDiff = *entryTime - currentTime;
-    
-    return (timeDiff < tolerance);
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // pongLerpQueue_B3A0_w @ 0x821CB3A0 | size: 0x78
@@ -491,7 +443,7 @@ static inline float pongLerpQueueClock_GetFrame(const void* clock) {
 // its clock and widens the window by -10 frames.
 //
 // Magic constants explained:
-//   +20 / +9640 / +9604 / 34953 appear in pongLerpQueue_CheckTimeWindow, not
+//   The 0x821D3390 game-state predicate is lifted in ball/ball_playback.cpp, not
 //   here — this function's magic numbers are all struct offsets documented in
 //   the pongPlayerRemoteSlot / pongLerpQueueControl layouts above.
 // ─────────────────────────────────────────────────────────────────────────────

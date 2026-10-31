@@ -135,6 +135,13 @@ set(SOURCES
     src/game/ball/pong_ball.cpp
     src/game/ball/ball_flight.cpp
     src/game/ball/ball_shot.cpp
+    src/game/ball/ball_shot_solve.cpp
+    src/game/ball/ball_process_hit.cpp
+    src/game/ball/ball_playback.cpp
+    src/game/ball/ball_prediction_stream.cpp
+    src/game/ball/ball_prediction_queries.cpp
+    src/game/ball/ball_prediction_postprocess.cpp
+    src/game/ball/ball_prediction_quaternion.cpp
     src/game/camera/pong_camera.cpp
     src/game/camera/pong_camera_helpers.cpp
     src/game/creature/pong_creature.cpp

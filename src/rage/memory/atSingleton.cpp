@@ -722,27 +722,6 @@ uint32_t atSingleton_vfn_9_8C18_1(atSingleton* self)
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  atSingleton_9A08_h  @ 0x82289A08 | size: 0x104 (260 bytes)
-//  Resets a managed state slot at `g_atSingletonCtx->m_pSlotBase + 9736`:
-//    - Zeroes each of m_nCountA entries in array at +0 (stride 4).
-//    - Stores float(1.0f) at +8.
-//    - Calls atSingleton_9B10(slot) to publish the reset.
-//    - If bit 0 of *vtable (read back from +0) is CLEAR → calls
-//      atSingleton_9E90_h(1) to seed follow-up state.
-//    - Reload vtable at +0.  If bit 0 of *vtable is STILL CLEAR → emits a
-//      trace via nop_8240E6D0(const char* "<trace template>"), clears bit 0
-//      of *vtable on both the derived-vtable word and the outer vtable word
-//      (via not/xor mask dance), and stamps float(<k_resetFloat>) into +8.
-//
-//  TODO: Requires concrete derived-class identification — the "+20" path is
-//  a vtable@+0 bitfield re-written in-place, which is a known pongBall-style
-//  pattern but the ownership is ambiguous without its RTTI class.  Leaving
-//  unlifted pending class resolution.
-// ═══════════════════════════════════════════════════════════════════════════════
-// (intentionally left unlifted — see TODO above)
-
-
-// ═══════════════════════════════════════════════════════════════════════════════
 //  atSingleton_12D0_g  @ 0x821E12D0 | size: 0x174 (372 bytes)
 //  Cold-path initialiser for an atSingleton instance stored at lbl_826064A0.
 //    1. Calls sysMemAllocator_InitThreadHeap() for one-time TLS setup.

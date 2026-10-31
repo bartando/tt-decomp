@@ -19,6 +19,9 @@
 
 namespace rage {
 
+// @ 0x820C42D8 — shared scalar quaternion normalizer.
+void NormalizeQuaternion(float* quat);
+
 // ── rage::crAnimChannel  [vtable @ 0x8204F724] ──────────────────────────
 struct crAnimChannel {
     void**      vtable;           // +0x00

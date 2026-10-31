@@ -1,7 +1,7 @@
 """Four-lane normalization, including zero, tiny and large magnitudes."""
 from liftcheck.spec import *
 
-FUNCTION = "rage::(anonymous namespace)::NormalizeQuaternion(float*)"
+FUNCTION = "rage::NormalizeQuaternion"
 ADDRESS = 0x820C42D8
 SOURCE = "src/rage/animation/rage_anim.cpp"
 TRIALS = 1200

@@ -876,8 +876,6 @@ namespace rage {
 // crAnimDofQuaternion vtable implementations
 // ═════════════════════════════════════════════════════════════════════════════
 
-namespace {
-
 // ─────────────────────────────────────────────────────────────────────────────
 // NormalizeQuaternion — normalizes a quaternion in-place
 // Source: util_42D8 @ 0x820C42D8
@@ -894,6 +892,8 @@ void NormalizeQuaternion(float* quat) {
     quat[2] *= invMag;
     quat[3] *= invMag;
 }
+
+namespace {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GetQuaternionAngle — returns the rotation angle of a quaternion
