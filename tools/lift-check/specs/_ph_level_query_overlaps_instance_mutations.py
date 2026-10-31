@@ -37,17 +37,21 @@ MUTATIONS = [
 def main():
     root = Path(__file__).resolve().parents[3]
     source = (root / "src/physics/ph_physics.cpp").read_text()
+    start = source.index("uint8_t phLevelNew_QueryOverlapsInstance(")
+    body = source[start:source.index("\n}", start) + 2]
     spec = Path(__file__).with_name("ph_level_query_overlaps_instance.py")
     caught = 0
     for name, old, new in MUTATIONS:
-        assert source.count(old) == 1, f"mutation anchor changed: {name}"
+        assert body.count(old) == 1, f"mutation anchor changed: {name}"
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
-            rc = Checker(spec, Options(seed=1, patches=((old, new),))).run()
-        first = output.getvalue().splitlines()[0]
-        print(f"{'CAUGHT' if rc == 1 else 'MISSED'} {name}: {first}", flush=True)
-        if rc != 1:
-            print(output.getvalue())
+            rc = Checker(spec, Options(seed=1, patches=((body, body.replace(old, new)),))).run()
+        report = output.getvalue()
+        detected = rc == 1 and "FAIL" in report
+        first = report.splitlines()[0]
+        print(f"{'CAUGHT' if detected else 'MISSED'} {name}: {first}", flush=True)
+        if not detected:
+            print(report)
             return 1
         caught += 1
     print(f"Caught {caught}/{len(MUTATIONS)} mutations")
