@@ -36,7 +36,7 @@ CASES = [
          "if (sample.pos.y <= radius) ++expiredSteps; else expiredSteps = 0;"),
         ("count consecutive contacts", "if (previous.bounced == 0)", "if (true)"),
         ("omit completion flag", "state->predict->m_complete = 1;", "(void)state->predict->m_complete;"),
-        ("omit launch spin adjustment", "if (!live) BallPredict_ApplyLaunchSpin", "if (false) BallPredict_ApplyLaunchSpin"),
+        ("omit launch velocity retiming", "if (!live) BallPredict_RetimeSamplesForLaunchVelocity", "if (false) BallPredict_RetimeSamplesForLaunchVelocity"),
         ("test all playback bits", "static_cast<uint8_t>(updateNow) != 0", "updateNow != 0"),
         ("publish wrong spin", "data->m_hitVel = outSpin;", "data->m_hitVel = outVelocity;"),
         ("publish wrong velocity", "state->predict->m_hitPos = outVelocity;", "state->predict->m_hitPos = outSpin;"),

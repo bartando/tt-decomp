@@ -1,6 +1,7 @@
 // Rebuild the prediction after a hit. The authoritative implementation is
 // disasm/sections/.text.s, 0x82287B50..0x82288364.
 #include "ball_predict.hpp"
+#include "ball_prediction_postprocess.hpp"
 #include "ball_flight.hpp"
 
 #include <cmath>
@@ -12,7 +13,7 @@ struct HitView {
     bpVec4 spinAxis;                  // +0x40
     uint8_t _pad50[0x10];
     bpVec4 position;                  // +0x60
-    bpVec4 launchSpin;                // +0x70
+    bpVec4 launchVelocity;                // +0x70
     uint8_t _pad80[4];
     float pace;                       // +0x84
     uint8_t _pad88[0x3E];
@@ -109,8 +110,6 @@ extern int io_Input_poll_9D68(void* input);                  // @ 0x821C9D68
 extern void nop_8240E6D0(const char* format, ...);            // @ 0x8240E6D0
 extern void game_3860(void* state, int kind, const char* name); // @ 0x821D3860
 extern void BallPredict_StepSample(gdBallPredictSample* sample, int bank); // @ 0x82288368
-extern void BallPredict_ApplyLaunchSpin(const bpVec4* spin, int bank); // @ 0x82289738
-extern void BallPredict_ResetHitIds(int bank);               // @ 0x82289A08
 extern void BallReplay_RemoveSample(void* queue, int index); // @ 0x821CE910
 extern void gdReplayMgr_RecordBallSample(void* replay, bpReplayBall* sample); // @ 0x821CD0F8
 extern void BallPredict_Dump(gdBallPredictData* data);        // @ 0x821D9238
@@ -284,7 +283,7 @@ void ballPredict_ProcessHit(void* hitPtr, const BallFlightVec4* velocity,
             break;
         }
     }
-    if (!live) BallPredict_ApplyLaunchSpin(&hit->launchSpin, 1);
+    if (!live) BallPredict_RetimeSamplesForLaunchVelocity(&hit->launchVelocity, 1);
     BallPredict_ResetHitIds(1);
     state = GameState();
     state->predict->BuildBounceList(true);

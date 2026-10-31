@@ -133,7 +133,7 @@ CALLS = {
     "BallReplay_RemoveSample": model(remove, args=("r3", "r4")),
     "gdReplayMgr_RecordBallSample": stub(ret="void", args=("r3", "r4"), deref={"r4": 0x30}),
     "BallPredict_StepSample": model(step, args=("r3", "r4"), deref={"r3": 0x50}),
-    "BallPredict_ApplyLaunchSpin": stub(ret="void", args=("r3", "r4"), deref={"r3": 16}),
+    "BallPredict_RetimeSamplesForLaunchVelocity": stub(ret="void", args=("r3", "r4"), deref={"r3": 16}),
     "BallPredict_ResetHitIds": stub(ret="void", args=("r3",)),
     "gdBallPredictData::BuildBounceList": stub(ret="void", args=("r3", "r4")),
     "BallPredict_Dump": stub(ret="void", args=("r3",)),

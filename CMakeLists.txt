@@ -139,6 +139,7 @@ set(SOURCES
     src/game/ball/ball_process_hit.cpp
     src/game/ball/ball_playback.cpp
     src/game/ball/ball_prediction_stream.cpp
+    src/game/ball/ball_prediction_postprocess.cpp
     src/game/ball/ball_prediction_quaternion.cpp
     src/game/camera/pong_camera.cpp
     src/game/camera/pong_camera_helpers.cpp
