@@ -9,6 +9,7 @@
 #include "../rage/memory.hpp"
 #include "rage/mat33.hpp"
 #include "globals.h"
+#include "grc/viewport.hpp"
 
 // ── fxVector4 definition ──────────────────────────────────────────────
 // 16-byte SIMD vector. Only fwd-declared in the header; the cpp owns the
@@ -51,12 +52,6 @@ uint32_t* PackClampedColorARGB8(uint32_t* out, const fxVector4* color) {
 
 // Global effect parameter table @ 0x8271A394
 extern uint32_t* g_fxParameterTable;
-
-// Ambient streaming heap pointer @ 0x825CBAA0 — shared by fxSpecialFx::Tick
-// and fxAmbient::LoadAndApply. Declared once up top so both call-sites see
-// the same symbol (no canonical header yet — see fxAmbient block below for
-// the full ambient global map).
-extern void* g_ambientStreamingHeap;
 
 // Base class cleanup for fxCrowdGfx hierarchy
 extern void rage_5908(void*);
@@ -490,8 +485,7 @@ void* fxSpecialFx_FindFreeEntry(void* thisPtr) {
  * all active effects" workhorse invoked from the frame loop.
  *
  *   1. phBoundCapsule_FE58_g(this) — prepare scratch capsule state.
- *   2. pongShadowMap_38C0_g(g_ambientStreamingHeap, &lbl_825CB800 - 18432,
- *      &lbl_825CB800 - 18432) — rebind shadow slot for this frame.
+ *   2. Set the current viewport's transform matrices to identity.
  *   3. Locate the palette block at
  *         palette = (char*)this + ((allocator[+40] << 3) & ~7) + 36
  *      (allocator-indexed palette offset — the "round-up to qword" that
@@ -520,12 +514,10 @@ void fxSpecialFx_Tick(void* thisPtr) {
     // 1. Scratch capsule init (takes `this` as its workspace).
     phBoundCapsule_FE58_g(self);
 
-    // 2. Re-bind shadow/env slot for this frame.
-    extern uint32_t lbl_825CB800_arr[];   // alias to the 64-byte scratch
-    extern void pongShadowMap_38C0_g(void* heap, void* a, void* b);  // @ 0x821538C0
-    pongShadowMap_38C0_g(g_ambientStreamingHeap,
-                         (void*)lbl_825CB800_arr,
-                         (void*)lbl_825CB800_arr);
+    // 2. Install identity transforms on the current viewport.
+    static_cast<grcViewport*>(g_pCurrentViewport)->SetTransformMatrices(
+        *reinterpret_cast<const CamMatrix44*>(g_identityMatrixRef),
+        *reinterpret_cast<const CamMatrix44*>(g_identityMatrixRef));
 
     // 3. Compute palette pointer via the allocator-rounded offset.
     void* allocator = *(void**)(self + kFxMgrAllocatorOff);
@@ -1012,7 +1004,6 @@ extern void  LocomotionStateAnim_C128_g(void* entry, void* unusedR4, void* skele
 extern void  LocomotionStateAnim_C288_g(void* entry, void* unusedR4, void* skeleton,
                                         float weight);                 // @ 0x8224C288 — "full weight" apply variant
 extern void  LocomotionStateAnim_C8F8_g(void* anim);                   // @ 0x8214C8F8 — post-apply release
-extern void  pongShadowMap_38C0_g(void* heap, void* a, void* b);       // @ 0x821538C0 — tex/shadow bind
 extern void pongLighting_ApplyAmbientCube(uint32_t lightIndex); // @ 0x820FFF78
 extern void* sub_82389330(void* node);                                 // anim-node walker (inside fxBallSpinTex_vfn_0 +0xE8)
 extern void  sub_82388758(void* self, int a, int b);                   // flush helper
@@ -1026,7 +1017,6 @@ extern void  sub_82388758(void* self, int a, int b);                   // flush 
 // glob @ 0x82606671 — boolean: whether ApplyBoneOverrides patches lbl_825C2CDA
 // glob @ 0x825D0EF4 — "pending flush" counter tested at end of ApplyBoneOverrides
 extern uint32_t  lbl_825CB800[16];
-// g_ambientStreamingHeap hoisted to top of file (shared with fxSpecialFx::Tick).
 extern uint32_t  g_ambientStreamSlotCap;   // @ 0x825C8F54
 extern uint32_t  g_ambientCurSlot;         // @ 0x825EBBDC
 extern uint32_t  g_ambientMappedSlot;      // @ 0x825EBB84
@@ -1209,10 +1199,10 @@ void fxAmbient::RequestStreamSlot(int requestedSlot) {
 }
 
 /**
- * fxAmbient::LoadAndApply (rtti_B0BC_0) @ 0x82387E74
+ * fxAmbient::LoadAndApply (rtti_B0BC_0) @ 0x82387EC0
  * When enabled (this+108 != 0):
  *   1. RequestStreamSlot(2) to reserve the stream slot.
- *   2. pongShadowMap_38C0_g(streaming_heap, &lbl_825CB800, &lbl_825CB800).
+ *   2. Set the current viewport's transform matrices to identity.
  *   3. pongLighting_ApplyAmbientCube(2) — upload the selected ambient cube.
  *   4. If (this+24) != 0: VCALL(this+20, slot5,
  *          *(this + ((glob[0x82597198]+23)*4))) — dispatch to a per-frame
@@ -1228,7 +1218,9 @@ void fxAmbient::LoadAndApply(void* param) {
     if (*(uint8_t*)(self + 108) == 0) return;
 
     this->RequestStreamSlot(2);
-    pongShadowMap_38C0_g(g_ambientStreamingHeap, lbl_825CB800, lbl_825CB800);
+    static_cast<grcViewport*>(g_pCurrentViewport)->SetTransformMatrices(
+        *reinterpret_cast<const CamMatrix44*>(g_identityMatrixRef),
+        *reinterpret_cast<const CamMatrix44*>(g_identityMatrixRef));
     pongLighting_ApplyAmbientCube(2);
 
     void* target       = *(void**)(self + 20);

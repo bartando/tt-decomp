@@ -3,6 +3,7 @@
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
  */
 #include "rage/singleton.h"
+#include "grc/viewport.hpp"
 #include "rage_grm.hpp"
 #include "animation/rage_anim.hpp"   // rage::datResource
 #include <cstring>
@@ -38,14 +39,10 @@ extern "C" void   sysMemAllocator_InitThreadHeap();                // @ 0x820C00
 extern "C" void* g_rageDescriptorHead __asm__("_g_tls_base");  // r13+0: the thread's TLS block (globals.c g_tls_base)
 extern "C" rage::grmShaderFactory* g_grmShaderFactory_instance; // @ 0x82606374
 
-extern "C" void* g_pCurrentViewport;                // @ 0x825EBAA0
 extern "C" const float g_identityMatrixRef[16];     // @ 0x825CB800
 extern uint8_t lbl_8260633D;                        // @ 0x8260633D
 extern float lbl_82619D20[16];                      // @ 0x82619D20
 extern float lbl_82619D60[16];                      // @ 0x82619D60
-// Despite its auto-name, this sets the current viewport's model matrices.
-extern "C" void pongShadowMap_38C0_g(void* viewport, const float* world,
-                                     const float* composite); // @ 0x821538C0
 extern "C" void fragDrawable_D798_wrh(const float* transform, const float* view,
                                        const float* projection); // @ 0x8225D798
 extern "C" void fragDrawable_19C8_h(void* model, void* shaderGroup,
@@ -127,7 +124,9 @@ void rmcDrawable_DrawLodModels(void* lodGroup, void* shaderGroup, const float* t
         }
         if (model[0x15] != 0) {
             if (currentTransform != -1) {
-                pongShadowMap_38C0_g(g_pCurrentViewport, g_identityMatrixRef, g_identityMatrixRef);
+                static_cast<grcViewport*>(g_pCurrentViewport)->SetTransformMatrices(
+                    *reinterpret_cast<const CamMatrix44*>(g_identityMatrixRef),
+                    *reinterpret_cast<const CamMatrix44*>(g_identityMatrixRef));
                 currentTransform = -1;
             }
             // Xenon stores r9 with stb, so only its low byte selects the path.
@@ -142,7 +141,9 @@ void rmcDrawable_DrawLodModels(void* lodGroup, void* shaderGroup, const float* t
             const int wantedTransform = model[0x18] != 0 ? -1 : static_cast<int>(transformIndex);
             if (currentTransform != wantedTransform) {
                 const float* matrix = wantedTransform == -1 ? g_identityMatrixRef : transforms + transformIndex * 16;
-                pongShadowMap_38C0_g(g_pCurrentViewport, matrix, matrix);
+                static_cast<grcViewport*>(g_pCurrentViewport)->SetTransformMatrices(
+                    *reinterpret_cast<const CamMatrix44*>(matrix),
+                    *reinterpret_cast<const CamMatrix44*>(matrix));
                 currentTransform = wantedTransform;
             }
             // This update occurs for every rigid draw, including cache hits and
