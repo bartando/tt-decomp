@@ -36,6 +36,36 @@ CASES = {
         ('terminator', 'datBitBuffer_WriteU32(bb, 0, 8);', 'datBitBuffer_WriteU32(bb, 1, 8);'),
         ('count', 'return count + 1;', 'return count;'),
     ]),
+    'network_read_s8': (STREAM, [
+        ('width', 'reinterpret_cast<uint8_t*>(out), 7)', 'reinterpret_cast<uint8_t*>(out), 6)'),
+        ('sign', 'if (sign) *out = static_cast<int8_t>(-*out);', 'if (!sign) *out = static_cast<int8_t>(-*out);'),
+        ('failure', 'if (!datBitBuffer_ReadU32(bb, &sign, 1)) return false;', 'if (!datBitBuffer_ReadU32(bb, &sign, 1)) return true;'),
+    ]),
+    'network_score_payload': ('src/game/network/score_payload.cpp', [
+        ('first byte', 'bytes + 4, 8', 'bytes + 3, 8'),
+        ('flags', 'offset <= 10', 'offset <= 9'),
+        ('flag value', 'bytes[offset] = temporary != 0;', 'bytes[offset] = temporary == 0;'),
+        ('float offset', 'bytes + 12, &temporary', 'bytes + 16, &temporary'),
+    ]),
+    'network_read_named_u64': ('src/game/network/pong_network.cpp', [
+        ('destination name', 'datBitBuffer_ReadShortString(this, static_cast<char*>(outData))', 'datBitBuffer_ReadShortString(this, static_cast<char*>(outData) + 1)'),
+        ('identifier offset', 'static_cast<uint8_t*>(outData) + 0x10', 'static_cast<uint8_t*>(outData) + 0x08'),
+    ]),
+    'network_score_message': ('src/game/network/pong_network.cpp', [
+        ('score arguments', 'netScore_Deserialise(obj + 0x08, client);', 'netScore_Deserialise(client, obj + 0x08);'),
+    ]),
+    'network_match_score_message': ('src/game/network/pong_network.cpp', [
+        ('byte count', 'snBitStream_ReadString(client, obj + 0x08, 88);', 'snBitStream_ReadString(client, obj + 0x08, 11);'),
+    ]),
+    'network_gamer_ready_message': ('src/game/network/pong_network.cpp', [
+        ('byte count', 'snBitStream_ReadString(client, obj + 0x08, 24);', 'snBitStream_ReadString(client, obj + 0x08, 3);'),
+    ]),
+    'network_level_config_message': ('src/game/network/pong_network.cpp', [
+        ('byte count', 'snBitStream_ReadString(client, obj + 0x08, 4);\n}\n\n//', 'snBitStream_ReadString(client, obj + 0x08, 1);\n}\n\n//'),
+    ]),
+    'network_forfeit_message': ('src/game/network/pong_network.cpp', [
+        ('aux offset', 'snBitStream_ReadString(client, obj + 0x0C, 4);', 'snBitStream_ReadString(client, obj + 0x0D, 4);'),
+    ]),
 }
 
 def main():

@@ -7,3 +7,5 @@ int snBitStream_ReadString(void* buffer, void* destination, int count); // @ 0x8
 int datBitBuffer_ReadShortString(void* buffer, char* destination); // @ 0x82260A70
 uint32_t netStream_WriteString(void* buffer, const char* source, uint32_t count); // @ 0x82260738
 uint32_t datBitBuffer_WriteShortString(void* buffer, const char* source); // @ 0x82260688
+bool datBitBuffer_ReadU8(void* buffer, uint8_t* out, int32_t bits); // @ 0x820D7A08
+bool datBitBuffer_ReadS8(void* buffer, int8_t* out); // @ 0x82101668

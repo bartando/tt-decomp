@@ -113,6 +113,15 @@ bool datBitBuffer_ReadU8(void* bb, uint8_t* out, int32_t bits) {
     return ReadUnsigned(static_cast<datBitBufferView*>(bb), out, bits);
 }
 
+// @ 0x82101668 | size: 0x94
+bool datBitBuffer_ReadS8(void* bb, int8_t* out) {
+    uint32_t sign;
+    if (!datBitBuffer_ReadU32(bb, &sign, 1)) return false;
+    if (!datBitBuffer_ReadU8(bb, reinterpret_cast<uint8_t*>(out), 7)) return false;
+    if (sign) *out = static_cast<int8_t>(-*out);
+    return true;
+}
+
 // @ 0x820D7970 — datBitBuffer::ReadSigned<s16> (util_7970)
 // A sign bit, then 15 bits of magnitude, negated if the sign was set. The
 // width is fixed: the asm overwrites r5 before looking at it.
@@ -425,6 +434,7 @@ void netStream_ReadFloat(void* bb, void* out, uint32_t bits) {
     datBitBuffer_ReadU32(bb, static_cast<uint32_t*>(out), static_cast<int32_t>(bits));
 }
 
+// @ 0x82238DF8
 void snBitStream_ReadBits(void* bb, void* out, int bits) {
     datBitBuffer_ReadU32(bb, static_cast<uint32_t*>(out), bits);
 }

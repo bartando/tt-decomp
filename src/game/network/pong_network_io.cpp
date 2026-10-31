@@ -1,4 +1,5 @@
 #include "audio/xact_sink_io.hpp"
+#include "rage/dat_bit_buffer.hpp"
 #include "rage/hud_page_group.hpp"
 // pong_network_io.cpp — Network I/O helper functions | Rockstar Presents Table Tennis (Xbox 360, 2006)
 
@@ -296,7 +297,6 @@ extern void netStream_ReadS16(void* client, void* outBuf, uint32_t bitCount);
 // Reads a 1-bit sign flag followed by a 7-bit magnitude byte, then negates
 // the stored byte when the sign bit is set. Used for the hit-type control
 // byte stored at ballHitData+32.
-extern uint8_t netStream_ReadS8SignMagnitude(void* client, void* outByte);
 
 
 /**
@@ -392,7 +392,7 @@ void ReadBallHitDataFromNetwork(void* ballHitData, void* client)
     // Temporarily decoded into a local, then sign-extended into the s32
     // slot at +32 to mirror the final `stw r11,32(r30)` in the recomp.
     uint8_t hitTypeMag = 0;
-    netStream_ReadS8SignMagnitude(client, &hitTypeMag);
+    datBitBuffer_ReadS8(client, reinterpret_cast<int8_t*>(&hitTypeMag));
     int32_t hitTypeZone = static_cast<int32_t>(static_cast<int8_t>(hitTypeMag));
 
     // ── Additional physics scalars ──
@@ -1023,24 +1023,6 @@ void net_6BA0_fw(void* self, void* header36, void* gamerBlob)
 // the externally-named shapes used by message serialisers. Our callers
 // dispatch via function pointer so the actual data flow is satisfied.
 
-/** netStream_ReadStringRaw — mirror of pong_network.cpp's string reader. */
-int netStream_ReadStringRaw(void* client, void* buffer)
-{
-    (void)client; (void)buffer;
-    // No-op: upstream path sets the buffer from the preceding length read
-    // and the actual string decode is performed by snBitStream_ReadString
-    // in pong_network.cpp. Returning 0 satisfies callers that branch on
-    // `bytesRead != 0` to decide whether a string was present.
-    return 0;
-}
-
-/** netStream_ReadBlock — reads `bitCount` bits into dst. */
-void netStream_ReadBlock(void* client, void* dst, short bitCount)
-{
-    (void)client; (void)dst; (void)bitCount;
-    // Fixed-size block reader; backing impl lives in pong_network.cpp.
-}
-
 // pong_network.cpp's spelling of datBitBuffer::ReadSigned<s16> (0x820D7970,
 // lifted in dat_bit_buffer.cpp). The original reads 15 bits whatever r5 says.
 bool datBitBuffer_ReadS16(void* bb, int16_t* out);
@@ -1049,20 +1031,6 @@ uint8_t netStream_ReadS16(void* client, void* dst, int bitCount)
     (void)bitCount;
     return datBitBuffer_ReadS16(client, static_cast<int16_t*>(dst));
 }
-
-/**
- * netStream_ReadS8SignMagnitude @ 0x82101668 | size: 0x94
- *
- * Reads a 1-bit sign flag followed by a 7-bit magnitude byte, negating the
- * result when the sign bit is set. Returns the stored byte.
- */
-uint8_t netStream_ReadS8SignMagnitude(void* client, void* outByte)
-{
-    (void)client;
-    if (outByte) *static_cast<uint8_t*>(outByte) = 0;
-    return 0;
-}
-
 
 // ── snBitStream primitives ─────────────────────────────────────────────────
 
