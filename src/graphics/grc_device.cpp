@@ -508,6 +508,18 @@ extern "C" void rage_AA78(void* gpuDevice, uint32_t* handle);  // @ 0x8235AA78
 extern const uint32_t __imp_VdGlobalDevice;      // @ 0x82000730
 extern const uint32_t __imp_VdGlobalXamDevice;   // @ 0x82000734
 
+// @ 0x8235EAD8 | size: 0x54 (was rage_EAD8 / rmcDrawable_Release)
+extern "C" uint32_t grcDevice_Release(void* device) {
+    auto* state = static_cast<uint8_t*>(device);
+    auto& references = *reinterpret_cast<uint32_t*>(state + 0x0C);
+    if (references != 1)
+        return --references;
+    grcDeviceXenon_teardown(device);
+    void* allocation = *reinterpret_cast<void**>(state - sizeof(void*));
+    _locale_register(allocation, 0x24800000u);
+    return 0;
+}
+
 // Drop a reference to a GPU resource. On the last one, hand its handle (+0x08)
 // back to the kernel video device (the title's or, in a system process, XAM's)
 // and free its data block and itself if it owns them. Returns the references

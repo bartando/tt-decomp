@@ -1,3 +1,4 @@
+#include "rage/rage_utils_simple.h"
 #include "rage/ref_counted_header.hpp"
 #include "xam/thread_sync.h"
 /**
@@ -1054,7 +1055,6 @@ extern "C" void sysIpcHandle_Close(void* handle) __asm__("_pg_6F10_g");         
 extern "C" void* sysThread_Create(void* r3, uint32_t stackSize, void* entryPoint,
                             void* context, uint32_t priority, void* r8) __asm__("_pg_6F88_w"); // @ 0x82566F88 - create thread
 extern "C" int xe_SetThreadProcessor(void* threadHandle, uint32_t proc); // @ 0x8242B8A8 - defined in src/rage/core/app_init.c (accepts thread handle pointer)
-extern "C" void rmcDrawable_Release(void* ptr) __asm__("_rage_EAD8");            // @ 0x8235EAD8 - release callback object
 
 // Thread entry points for CCalMoviePlayer worker threads
 extern "C" void CCalMoviePlayer_EC88_p33(void* ctx); // @ 0x8248EC88 - FillReadBufferA entry
@@ -1457,7 +1457,6 @@ void CCalMoviePlayer::StopPlaybackFull(uint32_t mode) {
 
 // External helpers
 extern void rmcDrawable_AddRef(void* ptr) __asm__("_rage_EAC0");   // @ 0x8235EAC0 - AddRef on video callback
-extern void rmcDrawable_Release(void* ptr) __asm__("_rage_EAD8");   // @ 0x8235EAD8 - Release video callback
 
 /**
  * CCalMoviePlayer::SetStatusFlagsA @ 0x8248EF70 | size: 0x64
@@ -1586,7 +1585,7 @@ void CCalMoviePlayer::FlushAndNotify() {
  *
  * Replaces the video callback object at offset +48. If a new callback is
  * provided, calls rmcDrawable_AddRef (AddRef) on it. If an existing callback is
- * stored, calls rmcDrawable_Release (Release) before replacing. Returns 0.
+ * stored, calls grcDevice_Release (Release) before replacing. Returns 0.
  *
  * This mirrors SetAudioInterface but for the video path, using direct
  * helper calls rather than vtable dispatch for ref-counting.
@@ -1600,7 +1599,7 @@ int CCalMoviePlayer::SetVideoCallback(void* pCallback) {
     // Release the old callback if present
     void* pOldCallback = m_pBufferObject;
     if (pOldCallback != nullptr) {
-        rmcDrawable_Release(pOldCallback);
+        grcDevice_Release(pOldCallback);
         m_pBufferObject = nullptr;
     }
 
@@ -2355,7 +2354,7 @@ int32_t CCalMoviePlayer::DrainPlaybackBuffer(uint32_t statusC) {
  *    - signaling its event (vslots 48-51)
  *    - waiting with timeout (pg_C3B8_g, retrying on WAIT_TIMEOUT=258)
  *    - closing the handle (pg_6F10_g)
- * 4. Releases the callback object at +48 (rmcDrawable_Release)
+ * 4. Releases the callback object at +48 (grcDevice_Release)
  * 5. Releases the media source at +44 (vslot 2)
  * 6. Reinitializes defaults via vslot 38
  *
@@ -2442,7 +2441,7 @@ thread_cleanup:
 
     // Release callback object at +48
     if (m_pBufferObject != nullptr) {
-        rmcDrawable_Release(m_pBufferObject);
+        grcDevice_Release(m_pBufferObject);
         m_pBufferObject = nullptr;
     }
 
