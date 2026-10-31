@@ -1,6 +1,7 @@
 // Evaluate a clip's mover rotation and translation, then extract their delta.
 #include <cstdint>
 #include <cstddef>
+#include "mover_dof.hpp"
 
 extern bool LocomotionStateAnim_EvaluateChannel(void*, void*, void*, float); // @ 0x82248828
 // r4/r5 are unused; the two sampled DOFs occupy r6 and r7.
@@ -10,23 +11,7 @@ extern "C" void* const lbl_82027BF4[]; // crAnimDofQuaternion vtable @ 0x82027BF
 extern "C" void* const lbl_82027B9C[]; // crAnimDofVector3 vtable @ 0x82027B9C
 
 namespace {
-// Compact construction view of the two stack DOFs. Only their metadata and
-// value are used; dispatch remains inside the existing channel helpers.
-struct alignas(16) MoverDof {
-    const void* vtable;
-    uint8_t flags;
-    uint8_t type;
-    uint16_t id;
-    uint8_t reserved[12 - sizeof(void*)];
-    float value[4];
-};
-static_assert(offsetof(MoverDof, value) == 0x10, "mover DOF value offset");
-static_assert(sizeof(MoverDof) == 0x20, "mover DOF size");
-#if UINTPTR_MAX == 0xFFFFFFFFu
-static_assert(offsetof(MoverDof, flags) == 4, "mover DOF flags offset");
-static_assert(offsetof(MoverDof, type) == 5, "mover DOF type offset");
-static_assert(offsetof(MoverDof, id) == 6, "mover DOF id offset");
-#endif
+using MoverDof = MoverDofStorage;
 
 float clipDuration(void* clip) {
     return *reinterpret_cast<float*>(static_cast<uint8_t*>(clip) + 0x0C);
