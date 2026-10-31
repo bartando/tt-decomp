@@ -762,12 +762,32 @@ void rage_free_00C0(void* ptr);                // @ 0x820C00C0 — operator dele
 
 // @ 0x8222DD78 — uninitialized_copy for chars: memcpy when first != last,
 // returns dest + (last - first).
-char* game_DD78_h(const char* first, const char* last, char* dest);
+char* game_DD78_h(const char* first, const char* last, char* dest) {
+    if (first == last) return dest;
+    const size_t count = static_cast<size_t>(last - first);
+    std::memcpy(dest, first, count);
+    return dest + count;
+}
 
 // @ 0x8222DDD0 — uninitialized_copy for Matrix34: copy-constructs each element
 // (placement new, null-checked) and returns the end of the copy. Callers also
 // pass a type-dispatch tag pointer in r6 that it never reads.
-Matrix34* fiAsciiTokenizer_DDD0_w(const Matrix34* first, const Matrix34* last, Matrix34* dest);
+Matrix34* fiAsciiTokenizer_DDD0_w(const Matrix34* first, const Matrix34* last, Matrix34* dest) {
+    while (first != last) {
+        // The VMX copy loads and stores one row at a time. Preserve that order
+        // for partially overlapping ranges; snapshotting a whole matrix changes it.
+        if (dest) {
+            for (unsigned row = 0; row < 4; ++row) {
+                unsigned char bits[16];
+                std::memcpy(bits, reinterpret_cast<const unsigned char*>(first) + row * 16, 16);
+                std::memcpy(reinterpret_cast<unsigned char*>(dest) + row * 16, bits, 16);
+            }
+        }
+        ++first;
+        ++dest;
+    }
+    return dest;
+}
 
 // @ 0x8222DAF0 — vector<Matrix34>::_M_fill_insert_aux: inserts `count` copies
 // of *value at pos when the capacity already fits. Not lifted yet.
