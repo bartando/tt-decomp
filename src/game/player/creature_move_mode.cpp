@@ -1,5 +1,6 @@
 // Inner-creature mode transitions used by the outer-player movement controller.
 #include "../creature/pong_creature.hpp"
+#include "game/game_message.hpp"
 #include <cstdint>
 
 struct pongPlayer;
@@ -14,7 +15,6 @@ extern void game_E2B8(void*); // @ 0x820CE2B8
 extern "C" void LocomotionStateAnim_BBC8_g(void*); // @ 0x820CBBC8
 extern float pongMover_GetInputSpeed(pongMover*); // @ 0x820CB4D0
 extern int io_Input_poll_9D68(void*); // @ 0x821C9D68
-extern void pg_E6E0(int, uint8_t, int, int); // @ 0x8225E6E0
 extern void PostPageGroupMessageFmt(uint32_t, uint32_t, const char*, ...); // @ 0x8225E480
 
 namespace {
@@ -93,7 +93,7 @@ void pg_6CF8(void* creature, int32_t mode) {
         if (static_cast<uint8_t>(io_Input_poll_9D68(settings))) {
             const uint32_t player = at<uint32_t>(creature, 0xCC);
             if (at<int32_t>(settings, (player + 14) * 4) == 1)
-                pg_E6E0(0x3809, static_cast<uint8_t>((player == 0 ? 1 : 2) | 0x40), 0, 0);
+                PostGameMessage(0x3809, static_cast<uint8_t>((player == 0 ? 1 : 2) | 0x40), 0, nullptr);
         }
     } else if (mode == 1) {
         at<uint8_t>(creature, 0xC4) = 1;

@@ -18,6 +18,7 @@
  */
 
 #include "message.hpp"
+#include "game/game_message.hpp"
 #include <cstring>
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -64,11 +65,6 @@ extern void* SinglesNetworkClient_GetPlayer(uint8_t playerIndex);
 // @ 0x82192668
 extern void pongPlayer_EnterServeMode(void* player);
 
-// Post a game event message to the HSM / page-group system.
-// @ 0x8225E6E0
-extern void PostGameMessage(uint32_t messageId, uint32_t flags,
-                            uint32_t param1, uint32_t param2);
-
 // Post a game event with arbitrary data payload.
 // @ 0x8225E480
 extern void PostGameEvent(uint32_t eventId, uint32_t flags,
@@ -105,10 +101,10 @@ extern const float kZeroFloat;
 extern float g_ballHitTime;                 // @ 0x8260657C (.data)
 
 // Network client state (used by SignalReadyToServe)
-extern int32_t g_networkMode;               // @ 0x825D0000-area (SDA)
+extern "C" int32_t lbl_825C9A2C;             // @ 0x825C9A2C
 
 // Game state manager
-extern void* g_gameStateMgr;               // @ 0x826063AC (.data, SDA offset 25500)
+extern "C" void* g_pGameLogic;              // @ 0x8260639C
 
 // Class name strings (embedded in .rdata)
 // HitMessage:                  "HitMessage"
@@ -333,7 +329,7 @@ void BallHitMessage_Use(BallHitMessage* self)
     uint32_t msgState = (rallyState != 0) ? 4 : 3;
 
     // Post game message
-    PostGameMessage(msgState, 192, 0, 0);
+    PostGameMessage(msgState, 192, 0, nullptr);
 }
 
 /**
@@ -453,14 +449,14 @@ void SignalReadyToServeMessage_SetData(SignalReadyToServeMessage* self,
  *
  * Dispatches the serve-ready signal.  Behavior depends on game state:
  *
- * - If g_networkMode == 0 (offline / host):
- *     Switch on current HSM state ID (from g_gameStateMgr->+12):
+ * - If lbl_825C9A2C == 0 (offline / host):
+ *     Switch on current HSM state ID (from g_pGameLogic->+12):
  *       State 26: Post message 10244 (0x2804) with flags=64,param=1 and data=-1
  *       States 23/24/25: Post event 14371 (0x3823) with playerIndex
  *       States <= 8: Return immediately (no action)
  *       Other states: Fall through to enter serve mode
  *
- * - If g_networkMode == 2 (spectator):
+ * - If lbl_825C9A2C == 2 (spectator):
  *     Return immediately (no action)
  *
  * - Otherwise (client):
@@ -468,22 +464,21 @@ void SignalReadyToServeMessage_SetData(SignalReadyToServeMessage* self,
  */
 void SignalReadyToServeMessage_Use(SignalReadyToServeMessage* self)
 {
-    if (g_networkMode == 0) {
+    if (lbl_825C9A2C == 0) {
         // Offline/host path — check game state
-        void* stateMgr = g_gameStateMgr;
+        void* stateMgr = g_pGameLogic;
         int32_t stateId = *(int32_t*)((uint8_t*)stateMgr + 12);
 
         if (stateId == 26) {
             // Waiting-for-serve state → post serve-ready message
             int32_t negOne = -1;
-            PostGameMessage(10244, 64, 1, (uint32_t)negOne);
+            PostGameMessage(10244, 64, 1, &negOne);
             goto enterServe;
         }
 
         if (stateId == 25 || stateId == 23 || stateId == 24) {
             // Play states → post serve event with player index
-            extern const uint8_t kServeEventData[];  // @ 0x82027A18 area
-            PostGameEvent(14371, 64, (void*)kServeEventData, self->m_playerIndex);
+            PostGameEvent(14371, 64, const_cast<char*>("i"), self->m_playerIndex);
             return;
         }
 
@@ -493,7 +488,7 @@ void SignalReadyToServeMessage_Use(SignalReadyToServeMessage* self)
         }
 
         // Fall through to enter serve mode
-    } else if (g_networkMode == 2) {
+    } else if (lbl_825C9A2C == 2) {
         // Spectator — no action
         return;
     }

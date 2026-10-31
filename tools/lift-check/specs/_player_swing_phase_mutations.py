@@ -19,7 +19,7 @@ CASES = [
         ("normalize NaN input", "inputTime > 0.0f", "!(inputTime <= 0.0f)"),
         ("drop phase cap", "? 1.0f : float(nonnegative)", "? 2.0f : float(nonnegative)"),
         ("omit previous phase", "at<float>(state, 0x64) = phase;", "(void)phase;"),
-        ("wrong event", "pg_E6E0(0x1011,", "pg_E6E0(0x1012,"),
+        ("wrong event", "PostGameMessage(0x1011,", "PostGameMessage(0x1012,"),
         ("wrong slot mask", "1u << shift", "2u << shift"),
     ]),
     ("player_swing_blend_marker", [
