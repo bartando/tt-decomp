@@ -1,4 +1,5 @@
 #include "../../anim/look_at_controller.hpp"
+#include "../../anim/locomotion_heading.hpp"
 #include "rage/mat33.hpp"
 
 
@@ -2737,7 +2738,6 @@ void LocomotionStateMf::SerializeTriple(void* serializer, void* data) {  // 7480
 extern void phBoundCapsule_FindSegmentIndex(void* capsule, void* outResult);
 extern float LocomotionStateAnim_A1F8_g(float value, float rangeMin, float rangeMax);
 extern void LocomotionStateAnim_B218_g(float* out, const float* matrix); // @ 0x8223B218
-extern void LocomotionStateAnim_6E90_w(void* self, float weight);
 extern void util_BBB0(void* dst, float* src, float* work);
 extern void util_B9A8(void* dst, void* quat, void* axis);
 // @ 0x8224C128 / 0x8224C288 — apply one animation entry to a skeleton. Both read
@@ -3150,46 +3150,6 @@ void* LocomotionStateAnim_0A30_g(void* dst, void* animSrc) {
     }
 
     return dst;
-}
-
-/**
- * ComputeBlendWeight @ 0x820E6DD8 | size: 0xB4
- *
- * Computes a blend weight for animation transitions. Calls the
- * vtable slot 11 handler to get the current frame position, looks
- * up the animation's start/end range from the container data at
- * self+304 (indexed by self+28), and interpolates.
- */
-// LocomotionStateAnim_6DD8_w @ 0x820E6DD8
-float LocomotionStateAnim_6DD8_w(void* self, float maxWeight, float frameTime) {
-    LocomotionStateAnim* lsa = (LocomotionStateAnim*)self;
-
-    // Set up frame state
-    LocomotionStateAnim_6E90_w(self, frameTime);
-
-    // Call vtable slot 11 to get current position
-    float pos = VCALL(self, 11, float(*)(void*))(self);
-
-    // Get animation entry index and container data
-    uint32_t animIdx = lsa->field_0x001c;
-    char* containerData = (char*)lsa->field_0x0130;
-    char* entry = containerData + animIdx * 68;
-
-    float rangeStart = *(float*)(entry + 56);
-    float rangeEnd   = *(float*)(entry + 60);
-
-    if (pos < rangeStart) {
-        return 0.0f;
-    } else if (pos < rangeEnd) {
-        float t = (pos - rangeStart) / (rangeEnd - rangeStart);
-        extern const float g_blendCurveScale;   // @ 0x82079B20
-        extern float g_blendCurveOffset;         // @ 0x825C8078 (.data)
-        float blendVal = t * g_blendCurveScale + g_blendCurveOffset;
-        float diff = blendVal - maxWeight;
-        return (diff >= 0.0f) ? maxWeight : blendVal;
-    } else {
-        return maxWeight;
-    }
 }
 
 /**

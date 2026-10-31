@@ -273,6 +273,7 @@ set(SOURCES
     src/anim/bone_transform_lookup.cpp
     src/anim/motion_lookup_data.cpp
     src/anim/pcr_anim_blenders.cpp
+    src/anim/locomotion_heading.cpp
     src/anim/look_at_controller.cpp
     src/anim/locomotion.cpp
     src/anim/angle_helpers.cpp
