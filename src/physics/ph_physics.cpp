@@ -19,6 +19,7 @@
 #include "stream_configuration.hpp"
 #include "joint_initialization.hpp"
 #include "rage/math.hpp"
+#include "rage/swf_value.hpp"
 #include "rage/ptr32.hpp"
 
 extern "C" void* rage_alloc(uint32_t size);  // RAGE heap alloc (defined in heap.c)
@@ -161,7 +162,6 @@ extern void* ph_9EC0_1(void*);
 extern void* ph_E010(void*, void*, const char*);
 
 /* --- RAGE / kernel functions --- */
-extern void  rage_Alloc(int size, void* allocator);  // rage_AllocInternal
 extern void ke_ConstructObject(void* obj);
 extern void ke_DestroyObjectA(void* obj);
 extern void ke_DestroyObjectB(void* obj);
@@ -3804,12 +3804,15 @@ void phBoundCapsule_WritePacked24Shifted(int32_t value, uint8_t* base, void* /*r
 
 // ---------------------------------------------------------------------------
 // 17. phBoundCapsule_AllocArray @ 0x8256BAF0 | size: 0x14
-//     Multiplies r3 * r4, then tail-calls rage_Alloc with that size
-//     and allocator pointer 0x6489_0018.
+//     Multiplies the low 32 bits, then tail-calls the tagged allocator.
+//     0x648A0018 is an allocation-attribute word, not a pointer.
 // ---------------------------------------------------------------------------
-void phBoundCapsule_AllocArray(int32_t elemSize, int32_t count) {
-    int32_t totalSize = elemSize * count;
-    rage_Alloc(totalSize, g_phAllocator);
+extern "C" void* rage_AllocInternal(uint32_t size, uint32_t attributes); // @ 0x820C01B8
+
+// @ 0x8256BAF0
+void* phBoundCapsule_AllocArray(int32_t elemSize, int32_t count) {
+    const uint32_t totalSize = static_cast<uint32_t>(elemSize) * static_cast<uint32_t>(count);
+    return rage_AllocInternal(totalSize, 0x648a0018u);
 }
 
 // ---------------------------------------------------------------------------
@@ -6895,7 +6898,6 @@ void phBound_RelocatePointers(void* thisPtr, void* relocDesc) {
 // coordinate transformation utilities.
 // =========================================================================
 
-extern float phBoundCapsule_GetJointAngle(void* capsuleData);
 extern int32_t phBoundCapsule_ResolvePlayerIndex(void* capsuleData);
 extern void phBoundCapsule_ComputeAngleXZ(void* camera, float fovHoriz, float fovVert);
 extern void phBoundCapsule_UpdateCapsuleState(void* camera);
@@ -7055,17 +7057,15 @@ int32_t phBoundCapsule_ClassifyValueBySign(float* input) {
     return -1;
 }
 
-// ---------------------------------------------------------------------------
-// 6. phBoundCapsule::ComputeJointAngleSin @ 0x823FD888 | size: 0x44
-//    Sets the joint type to 4 (capsule constraint), computes angle from
-//    joint data via phBoundCapsule_GetJointAngle, stores sin of result.
-// ---------------------------------------------------------------------------
-void phBoundCapsule_ComputeJointAngleSin(void* /*r3*/, void* /*r4*/,
-                                          void* jointData, float* output) {
-    output[1] = 4;  // joint type = 4
-    float angle = phBoundCapsule_GetJointAngle(jointData);
-    float sinVal = (float)ph_Sinf(angle);
-    output[0] = sinVal;
+extern "C" float swfValueToFloat(const void* value); // @ 0x823FA688
+
+// @ 0x823FD888
+extern "C" void swfMathSin(void*, void*, const SwfVmValue* input, SwfVmValue* output) {
+    // Tag precedes conversion, including when the input and output alias.
+    output->tag = 4;
+    const float angle = swfValueToFloat(input);
+    const float sine = static_cast<float>(crt_sin(angle));
+    memcpy(&output->payload, &sine, sizeof(sine));
 }
 
 // ---------------------------------------------------------------------------
