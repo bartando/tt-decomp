@@ -132,6 +132,7 @@ set(SOURCES
     src/rage/scene_render.c
     src/rage/network/session_events.cpp
     src/rage/network/snSessionStates.cpp
+    src/rage/network/session_state_helpers.cpp
     src/rage/core/subsystem_init.c
     src/rage/swf.cpp
     src/rage/swf_image_data.cpp
@@ -218,6 +219,7 @@ set(SOURCES
     src/game/network/score_payload.cpp
     src/game/network/network_context.cpp
     src/game/network/msg_msg_sink.cpp
+    src/game/network/msg_sink_timing.cpp
     src/game/network/xonline_strings.cpp
     src/game/player/pong_player.cpp
     src/game/player/pong_player_swing.cpp
