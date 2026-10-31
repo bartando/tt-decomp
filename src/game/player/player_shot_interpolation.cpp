@@ -46,3 +46,44 @@ void pongPlayer_4EA0_g(void* vector, float minLength, float maxLength) {
     for (unsigned lane = 0; lane < 4; ++lane)
         value[lane] = multiplyVmx(value[lane], scale);
 }
+
+extern "C" void* g_gameDataMgr; // @ 0x8271A2E4
+extern "C" void* g_pCameraSharedState; // @ 0x8271A32C
+extern "C" float g_spinAxisRotation; // @ 0x82606498
+extern "C" const float g_phTwoPi; // @ 0x8202C02C
+extern "C" const float lbl_82606750[4]; // @ 0x82606750
+extern int fxBallSplash2D_5998_g(void*); // @ 0x821D5998
+extern float util_E1B0(void*, uint32_t, int32_t, uint8_t); // @ 0x8220E1B0
+extern void phBoundCapsule_RotateAxisXZ(float*, float); // @ 0x8223AB00
+extern uint8_t pongPlayer_7CC0_g(void*); // @ 0x821E7CC0
+extern void phBoundCapsule_2E70_fw(void*, float*); // @ 0x82282E70
+
+namespace {
+template<class T> T& at(void* object, unsigned offset) {
+    return *reinterpret_cast<T*>(static_cast<uint8_t*>(object) + offset);
+}
+}
+
+// Convert a shot's local spin axis to world space. The final flag uses its low
+// byte only, as does the camera-side predicate's integer return.
+// @ 0x821D5010 | size: 0x118
+void pongPlayer_5010_g(void* axis, void* output, void* hit, int adjustForTable) {
+    const uint8_t special = (at<uint16_t>(hit, 0xC6) & 0x1000) != 0;
+    const uint32_t kind = fxBallSplash2D_5998_g(hit);
+    const float turns = util_E1B0(at<void*>(g_gameDataMgr, 0x14), kind,
+                                  at<int32_t>(hit, 0x9C), special);
+    const float scale = turns * g_phTwoPi;
+    auto* source = static_cast<float*>(axis);
+    auto* spin = static_cast<float*>(output);
+    for (unsigned lane = 0; lane < 4; ++lane)
+        spin[lane] = multiplyVmx(source[lane], scale);
+    phBoundCapsule_RotateAxisXZ(spin, g_spinAxisRotation);
+    if (!(at<float>(hit, 0x68) > 0.0f)) {
+        for (unsigned lane = 0; lane < 4; ++lane)
+            spin[lane] = flushVmx(flushVmx(lbl_82606750[lane]) - flushVmx(spin[lane]));
+    }
+    const uint8_t side = pongPlayer_7CC0_g(g_pCameraSharedState);
+    if (static_cast<uint8_t>(side) == 0) spin[1] = -spin[1];
+    if (static_cast<uint8_t>(adjustForTable) != 0)
+        phBoundCapsule_2E70_fw(hit, spin);
+}

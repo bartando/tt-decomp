@@ -7310,17 +7310,15 @@ void rage::phBoundCapsule::InitializeCapsule(float halfHeight, float radius) {
 //    new[+4] = old[+4]*cos - old[+8]*sin
 // ---------------------------------------------------------------------------
 void phBoundCapsule_RotateAxisXZ(float* vec, float angle) {
-    float sinVal = (float)ph_Sinf(angle);
-    float cosVal = (float)ph_Cosf(angle);
-
-    float oldX = vec[1];  // +4
-    float oldZ = vec[2];  // +8
-
-    float newZ = oldZ * sinVal + oldX * cosVal;
-    vec[2] = newZ;
-
-    float newX = oldX * cosVal - oldZ * sinVal;
-    vec[1] = newX;
+    const float sine = static_cast<float>(crt_sin(angle));
+    const float cosine = static_cast<float>(crt_cos(angle));
+    const float oldY = vec[1];
+    const float oldZ = vec[2];
+    // The fmuls products round before the fused multiply-add/subtract.
+    const float ySine = oldY * sine;
+    const float zSine = oldZ * sine;
+    vec[2] = __builtin_fmaf(oldZ, cosine, ySine);
+    vec[1] = __builtin_fmaf(oldY, cosine, -zSine);
 }
 
 // ---------------------------------------------------------------------------
