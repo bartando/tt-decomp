@@ -1,6 +1,6 @@
 // Sample and blend the mover channels of up to three locomotion clips.
-#include "game/player/pong_player.hpp"
-#include "game/creature/pong_creature.hpp"
+#include "../game/player/pong_player.hpp"
+#include "../game/creature/pong_creature.hpp"
 
 extern float LocomotionStateAnim_BB48_g(void*, int); // @ 0x820DBB48
 // r4/r5 are unused; r6 receives a 32-byte rotation/translation pair.

@@ -43,13 +43,11 @@ extern uint32_t rage_atStringHash(const char* str);
 extern uint8_t pcrBlender_ApplyWeight(void* blenderEntry, void* animSystem,
                                        float weightA, float weightB);
 
-// Extracts the world-space displacement vector from a locomotion clip
-// at the given phase values.  Result is written to outDisplacement (vec3).
+// Samples a 32-byte rotation/translation pair through r6; r4/r5 are unused.
 // @ 0x82248C58 | size: 0x158
-extern void LocomotionStateAnim_ExtractDisplacement(void* locomotionClip,
-                                                     float phaseAbsolute,
-                                                     float phaseDelta,
-                                                     float* outDisplacement);
+extern uint32_t LocomotionStateAnim_ExtractDisplacement(
+    void* locomotionClip, void* unusedR4, void* unusedR5, void* outSample,
+    float phaseAbsolute, float phaseDelta);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Global constants & data
@@ -281,7 +279,9 @@ void pcrAnimState_ComputePosition(float* outPosition, pcrAnimState* animState)
     }
 
     // Temporary displacement vector (16-byte aligned for SIMD)
-    float displacement[4] = { kZeroPhase, kZeroPhase, kZeroPhase, 0.0f };
+    struct MotionSample { float rotation[4], translation[4]; };
+    alignas(16) MotionSample sample = {};
+    const float* displacement = sample.translation;
 
     // Only compute displacement when in active locomotion with a valid clip
     if (animState->m_locomotionMode == 1 && animState->m_pLocomotionClip != nullptr) {
@@ -295,10 +295,8 @@ void pcrAnimState_ComputePosition(float* outPosition, pcrAnimState* animState)
         float phaseRelative = phaseDelta * duration;
 
         LocomotionStateAnim_ExtractDisplacement(
-            animState->m_pLocomotionClip,
-            phaseAbsolute,
-            phaseRelative,
-            displacement);
+            animState->m_pLocomotionClip, nullptr, nullptr, &sample,
+            phaseAbsolute, phaseRelative);
     }
 
     // Write computed displacement to output

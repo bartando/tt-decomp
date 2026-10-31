@@ -159,6 +159,8 @@ set(SOURCES
     src/game/player/player_control_queries.cpp
     src/game/player/player_control_queries_data.cpp
     src/game/player/player_mode_data.cpp
+    src/game/player/player_mode_animation.cpp
+    src/game/player/player_swing_pose_helpers.cpp
     src/game/player/player_apply_movement_target.cpp
     src/game/player/player_pose_easing.cpp
     src/game/player/player_serve_callbacks.cpp
@@ -181,6 +183,10 @@ set(SOURCES
     
     # Animation
     src/anim/anim_blender_state.cpp
+    src/anim/root_motion_blend.cpp
+    src/anim/bone_matrix_lookup.cpp
+    src/anim/bone_transform_lookup.cpp
+    src/anim/motion_lookup_data.cpp
     src/anim/pcr_anim_blenders.cpp
     src/anim/locomotion.cpp
 

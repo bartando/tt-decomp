@@ -4259,7 +4259,7 @@ void* pongMatch_GetCharacterForSlot(void* /*match*/, uint32_t playerSlot) {
     return characters[characterIndex];
 }
 
-extern void phBoundCapsule_0880_g(void* capsule, void* outMatrix, uint32_t param);
+extern void phBoundCapsule_0880_g(void* capsule, void* outMatrix, void* samplingState);
 extern float pongPlayer_C7A8_g(pongPlayer* player);
 extern void pongPlayer_B088_2hr(void* timingData, float dir, float power);
 extern void pongPlayer_E2C8_g(void* obj, int a, int b, int c, int d);
@@ -4307,8 +4307,8 @@ void pongPlayer::UpdateOpponentBoundTransform() {  // pongPlayer_4C08_g @ 0x8219
     void* boundCapsule = *reinterpret_cast<void**>(chainEntry + 324);
 
     // Compute transform matrix from bound capsule
-    vec3 transformMatrix[4];  // 4x16 = 64 bytes
-    uint32_t meshParam = *reinterpret_cast<uint32_t*>(characterSub + 28);
+    alignas(16) vec3 transformMatrix[4];  // 4x16 = 64 bytes
+    void* meshParam = *reinterpret_cast<void**>(characterSub + 28);
     phBoundCapsule_0880_g(boundCapsule, transformMatrix, meshParam);
 
     // Copy matrix to locomotion state data at +32
@@ -5894,7 +5894,7 @@ void game_D468(void* player, vec3* targetPos) {
 // Offsets in comments are the game's 32-bit ones.
 
 // 16-byte AltiVec matrix, rows a, b, c and the translation d (rage::Matrix34).
-struct pongMatrix34 {
+struct alignas(16) pongMatrix34 {
     vec3 a, b, c, d;
 };
 
