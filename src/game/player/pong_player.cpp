@@ -1,6 +1,7 @@
 #include "game/network_timestamp.hpp"
 #include "rage/ptr32.hpp"
 #include "rage/float_approach.hpp"
+#include "game/ai_swing_direction.hpp"
 /**
  * pongPlayer — Player state query functions
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
@@ -6011,15 +6012,6 @@ struct shotTargetLayout {
 // rtti aiPlayer (vtable 0x8203A83C, stored by 0x821A5FC8); pongPlayer+0x1F0.
 // What 0x821A66A8 fills in: four direction weights the AI wants for its swing.
 // The names follow the pad's order (see pongPlayer_ReadSwingDirectionInput).
-struct aiSwingDirectionView {
-    uint8_t _pad00[0x04];
-    float   up;        // +0x04
-    float   down;      // +0x08
-    float   right;     // +0x0C
-    float   left;      // +0x10
-    uint8_t _pad14[0x44];
-    uint8_t resolved;  // +0x58  set by 0x821A66A8, which returns at once while it is set
-};
 
 struct aiPlayerServeView {
     struct Sub34 {
@@ -6222,8 +6214,6 @@ extern void* g_networkTimingObject;  // @ 0x8271A328
 // @ 0x82391480 — cached timestamp text for log lines.
 // @ 0x821D3860 — records a named transition on the game state object.
 extern void game_3860(void* gameState, int kind, const char* name);
-// @ 0x82198A48 — StartServe's query callback: *answer = io_Input_poll_9D68 && +0x17EC != 0.
-extern void io_8A48(pongPlayer* player, int32_t* answer);
 // Flags argument of PostGameMessage: one bit per player.
 static uint32_t PlayerMessageBit(int32_t playerIndex) {
     return playerIndex != 0 ? 2u : 1u;
@@ -6260,8 +6250,6 @@ extern bool pongPlayer_04B0_g(void* pad, int32_t button);
 // @ 0x821921D0 — 0, or the stick's direction as 1..8; going by how
 // ReadSwingDirectionInput maps it, 1 is up and they run clockwise.
 extern int32_t phBoundCapsule_21D0_g(pongPlayer* player);
-// @ 0x821A66A8 — works out the AI's direction weights once (sets `resolved`).
-extern void pongPlayer_66A8_g(aiSwingDirectionView* dir);
 // @ 0x82193A68 — applies the four weights (left, right, up, down) to the swing.
 extern void pongPlayer_3A68_g(pongPlayer* player, float left, float right, float up, float down);
 // @ 0x8219EE88 — the shotTarget's side: hands the weights to its +0xAF0 object.

@@ -1,6 +1,21 @@
 #include "pong_gameplay_queries.hpp"
 
 extern void* g_pTableDims; // @ 0x8271A304
+extern "C" void* g_input_obj_ptr; // @ 0x825EAB28
+int io_Input_poll_9D68(void* input); // @ 0x821C9D68
+
+// StartServe's query callback leaves a null output alone. Otherwise the
+// input gate must be active and the player's live serve state nonzero.
+// @ 0x82198A48 | size: 0x74
+void io_8A48(pongPlayer* player, int32_t* answer) {
+    if (answer == nullptr) return;
+    if (static_cast<uint8_t>(io_Input_poll_9D68(g_input_obj_ptr)) == 0) {
+        *answer = 0;
+        return;
+    }
+    const auto* bytes = reinterpret_cast<const uint8_t*>(player);
+    *answer = *reinterpret_cast<const int32_t*>(bytes + 0x17EC) != 0;
+}
 
 // Clip readiness, not a player swing predicate: callers also pass embedded
 // animation clips and remote playback state. Both float tests are ordered.
