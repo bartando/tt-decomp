@@ -1,4 +1,5 @@
 #include "rage_par.hpp"
+#include "rage/parameter_node.hpp"
 
 #include <algorithm>
 #include <array>
@@ -47,12 +48,6 @@ void cmOperator_CreateInt(void* pOperator, int value, int flags);
 float cmOperator_GetFloat(void* pOperator);
 bool cmOperator_GetBool(void* pOperator);
 void* rage_strDuplicate(void* pSource);
-void cmOperator_SetPrimaryName(void* pTemp, const char* pName, int flags);
-void cmOperator_ClearName(void* pTemp);
-void cmOperator_SetInt(void* pOperator, const char* pLabelAddr, int value);
-void cmOperator_SetFloat(void* pOperator, const char* pLabelAddr, float value);
-void* atFreeList_Alloc(void* pListHead, int nodeSize);
-void cmOperator_SetSecondaryName(void* pNameNode, const char* pName, std::uint32_t copyName);
 }
 
 namespace {
@@ -1892,7 +1887,7 @@ extern "C" void cmOperator_CreateInt(void* pOperator, int value, int flags) {
 
     // Set value label and store integer
     constexpr std::uintptr_t kValueLabelAddr = 0x82065B20;
-    cmOperator_SetInt(newOp, reinterpret_cast<const char*>(kValueLabelAddr), value);
+    cmOperator_SetInt(newOp, reinterpret_cast<const char*>(kValueLabelAddr), value, 0);
 
     // Return the new operator in the caller's expected location
     // The PPC code sets r3 = newOp, but in C the function is void
@@ -1926,7 +1921,7 @@ extern "C" void cmOperator_CreateFloat(void* pOperator, std::uint32_t valueData,
 
     constexpr std::uintptr_t kValueLabelAddr = 0x82065B20;
     float fValue = *reinterpret_cast<float*>(&valueData);
-    cmOperator_SetFloat(newOp, reinterpret_cast<const char*>(kValueLabelAddr), fValue);
+    cmOperator_SetFloat(newOp, reinterpret_cast<const char*>(kValueLabelAddr), 0, 0, fValue);
 
     (void)newOp;
 }
