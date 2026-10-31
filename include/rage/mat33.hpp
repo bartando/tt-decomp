@@ -25,4 +25,7 @@ void mat33RotateY(float* matrix, double angle);
 // XYZ Euler angles in radians; input may overlap output. Preserve row padding.
 void mat33FromEuler(float* out, const float* angles); // @ 0x82118278
 
+// Rebuild and normalize the basis; leave the translation row untouched.
+void mat33Orthonormalize(float* matrix); // @ 0x820C9220
+
 } // namespace rage

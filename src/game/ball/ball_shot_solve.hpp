@@ -6,10 +6,21 @@
 namespace ballshot {
 struct SolveSample {
     BallFlightVec4 velocity;
-    uint8_t _pad10[0x20];
+    BallFlightVec4 target;                 // +0x10
+    float firstMeasure, secondMeasure;     // +0x20
+    uint8_t flags[2];                      // +0x28
+    uint8_t _pad2A[6];
     float angle;                          // +0x30
     uint8_t _pad34[0x0C];
 };
+struct TrajectoryContacts {
+    BallFlightVec4 firstPosition;
+    BallFlightVec4 secondPosition;
+    float firstMeasure, secondMeasure;
+    uint8_t flags[3];
+    uint8_t _pad2B;
+};
+static_assert(sizeof(TrajectoryContacts) == 0x2C, "trajectory contacts layout");
 struct SolveSampleSet {
     SolveSample samples[32];
     float lowAngle, highAngle, step;       // +0x800

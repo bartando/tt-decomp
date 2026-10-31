@@ -137,13 +137,25 @@ set(SOURCES
     src/game/audio/pong_audio.cpp
     src/game/audio/pong_audio_effects.cpp
     src/game/ball/pong_ball.cpp
+    src/game/ball/ball_audio_emitters.cpp
+    src/game/ball/ball_audio_envelope.cpp
+    src/game/ball/ball_audio_impact.cpp
     src/game/ball/ball_flight.cpp
     src/game/ball/ball_shot.cpp
     src/game/ball/ball_shot_solve.cpp
+    src/game/ball/ball_shot_trajectory.cpp
+    src/game/ball/ball_shot_simulation.cpp
     src/game/ball/ball_process_hit.cpp
     src/game/ball/ball_playback.cpp
+    src/game/ball/ball_visual_spin.cpp
     src/game/ball/ball_prediction_stream.cpp
+    src/game/ball/ball_prediction_step.cpp
     src/game/ball/ball_prediction_queries.cpp
+    src/game/ball/ball_prediction_hit_ids.cpp
+    src/game/ball/ball_prediction_hit_queries.cpp
+    src/game/ball/ball_prediction_outcome_helpers.cpp
+    src/game/ball/ball_replay.cpp
+    src/game/ball/ball_replay_update.cpp
     src/game/ball/ball_prediction_postprocess.cpp
     src/game/ball/ball_prediction_quaternion.cpp
     src/game/camera/pong_camera.cpp
@@ -263,6 +275,8 @@ set(SOURCES
     src/rage/math/swf_matrix.cpp
     src/rage/math/mat44.cpp
     src/rage/math/mat33.cpp
+    src/rage/math/mat33_orthonormalize.cpp
+    src/rage/math/mat34_transform.cpp
     src/game/input/button_edges.cpp
     src/game/player/player_state_queries.cpp
     src/game/misc/ccal_ring_buffer.cpp
