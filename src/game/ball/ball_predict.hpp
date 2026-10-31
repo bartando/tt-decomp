@@ -132,3 +132,4 @@ bool ShotEqual(const bpShot* a, const bpShot* b);
 }
 
 void ballPredict_InitialiseShot(bpShot* shot); // @ 0x821D5128
+void bpShot_Reset(bpShot* shot); // @ 0x821D51C8

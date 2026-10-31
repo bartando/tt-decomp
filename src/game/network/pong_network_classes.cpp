@@ -1456,7 +1456,6 @@ uint8_t NetStateSync_GetName(NetStateSync* self, int stateIndex) {
 
 // Network/rendering subsystem initializers
 void grcDevice_FinalizeRenderSetup_1(void* obj);
-void SinglesNetworkClient_51C8_g(void* obj);
 void SinglesNetworkClient_2E88_isl(void* obj);
 void SinglesNetworkClient_DA08(void* obj);
 void util_AA38(void* obj);
