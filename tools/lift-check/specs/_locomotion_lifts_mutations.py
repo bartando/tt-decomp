@@ -1,4 +1,4 @@
-"""Mutation proof for C288 and 81A8. Run from the repo root:
+"""Mutation proof for C288 (weight ABI mutations are in _locomotion_weight_abi_mutations.py). Run from the repo root:
 PYTHONPATH=tools/lift-check tools/lift-check/.venv/bin/python \
     tools/lift-check/specs/_locomotion_lifts_mutations.py
 
@@ -26,17 +26,7 @@ CASES = [
           "std::memcpy(records + 0x30, vector, 12);"),
          ("wrong translation offset", "records + 0x30, vector", "records + 0x20, vector"),
      ]),
-    ("locomotion_state_anim_81a8", "src/game/creature/pong_creature.cpp",
-     "bool LocomotionStateAnim_81A8(", [
-         ("inline weights instead of pointer", "*(float**)((char*)animPair[1] + 16)",
-          "(float*)((char*)animPair[1] + 16)"),
-         ("wrong weight stride", "(uint32_t)index << 2", "(uint32_t)index << 1"),
-         ("accept zero weight", "return weight > 0.0f;", "return weight >= 0.0f;"),
-         ("accept NaN weight", "return weight > 0.0f;", "return !(weight <= 0.0f);"),
-         ("reject rotation channels", "if (type != 0 && type != 1)", "if (type != 0)"),
-         ("omit weight output", "*outWeight = weight;", "(void)outWeight;"),
-         ("always read first weight", "(uint32_t)index << 2", "0"),
-     ]),
+
 ]
 
 

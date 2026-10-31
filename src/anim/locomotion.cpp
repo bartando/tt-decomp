@@ -18,8 +18,8 @@
  *   LocomotionStateAnim_C8F8_g           → 0x8214C8F8 (size 0x0D0) — SIMD 48-byte block copy
  *   LocomotionStateAnim_BlendLocomotionAnims       → project-internal name (sub_table entry)
  *   LocomotionStateAnim_TransitionLocomotionState  → project-internal name (sub_table entry)
- *   LocomotionStateAnim_AccumNode / ApplySpeed / ComputeOffset / FindAnim /
- *     GrowArray / InitCapsuleImpl / ProcessNode / SetSpeed
+ *   LocomotionStateAnim_AccumNode / ComputeOffset / FindAnim /
+ *     GrowArray / InitCapsuleImpl / ProcessNode
  *                                  — all referenced as externs by pong_creature.cpp
  *   LocomotionStateMf_ApplyConstraints / BlendPoses / Finish / ScaleWeights /
  *     UpdateTransforms             — referenced as externs by pong_creature.cpp
@@ -141,7 +141,8 @@ bool LocomotionStateAnim::GetAnimTransform(void* outMatrix)
 // ── Free-function helpers (cross-unit externs) ──────────────────────────────
 
 // @ 0x821D04F0
-bool LocomotionStateAnim_04F0_g(void* animData, uint16_t animID, uint16_t* outIndex) {
+bool LocomotionStateAnim_04F0_g(void* animData, uint32_t id, uint16_t* outIndex) {
+    const uint16_t animID = static_cast<uint16_t>(id);
     const uint8_t* data = static_cast<const uint8_t*>(animData);
     const uint32_t flags = *reinterpret_cast<const uint32_t*>(data + 0x14);
     if ((flags & 2) == 0) {
@@ -281,7 +282,6 @@ void LocomotionStateAnim_BBA8_g(void* channel, void* /*unused*/, const void* pos
 }
 
 extern "C" void LocomotionStateAnim_AccumNode(void* self, void* node) { (void)self; (void)node; }
-extern "C" void LocomotionStateAnim_ApplySpeed(void* self) { (void)self; }
 extern "C" void LocomotionStateAnim_ComputeOffset(void* self, void* out) { (void)self; (void)out; }
 extern "C" void* LocomotionStateAnim_FindAnim(void* self) { (void)self; return nullptr; }
 extern "C" void LocomotionStateAnim_GrowArray(void* self) { (void)self; }
@@ -290,7 +290,6 @@ extern "C" void LocomotionStateAnim_InitCapsuleImpl(void* self, float radius, co
     (void)self; (void)radius; (void)desc;
 }
 extern "C" void LocomotionStateAnim_ProcessNode(void* self, void* node) { (void)self; (void)node; }
-extern "C" void LocomotionStateAnim_SetSpeed(void* self, float speed) { (void)self; (void)speed; }
 
 /**
  * LocomotionStateAnim_88E0_g @ 0x822488E0 | size 0x214

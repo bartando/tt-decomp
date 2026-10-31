@@ -239,7 +239,6 @@ struct LocomotionStateAnim {
     void AdvanceRingBuffer();  // @ 0x823804C0
     void PushBack(uint32_t key, const void* vecData);  // @ 0x82234190
     void ResetAccumulators();  // @ 0x820DB9F0
-    void SetAnimSpeed(float speed, float scale);  // @ 0x820C2858
     void InitBoundCapsule();  // @ 0x820C3D48
 };
 

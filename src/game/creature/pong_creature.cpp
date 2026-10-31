@@ -66,8 +66,6 @@ extern "C" void rage_Release(void* obj);
 extern "C" void pongCreature_BaseDtor(void* obj);  // @ 0x820C53E8
 extern "C" void pongCreature_Fixup(void* obj, void* relocator);
 extern "C" void pongCreatureInst_Cleanup(void* obj);  // @ 0x822C8FD0
-extern "C" void LocomotionStateAnim_SetSpeed(void* obj, float speed);
-extern "C" void LocomotionStateAnim_ApplySpeed(void* obj);
 extern "C" void LocomotionStateAnim_InitCapsuleImpl(void* obj, float radius, const void* center);
 extern "C" void* LocomotionState_FindFirstActive(void* list);
 extern "C" void* LocomotionStateAnim_FindAnim(void* obj);
@@ -1124,50 +1122,6 @@ void LocomotionStateAnim::Initialize() {
     this->field_0x0140 = 0;   // m_animData = null
     *(float*)&this->field_0x014c = zero;   // m_blendWeight
     this->field_0x0148 = 1;    // m_isComplete = false
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// LocomotionStateAnim::CalculateBlendFactor()  @ 0x820C1910
-// Calculates animation blend factor based on timing parameters
-// ─────────────────────────────────────────────────────────────────────────────
-float LocomotionStateAnim::CalculateBlendFactor(void* timingData) {
-    // Load global constants
-    const float zero = g_floatZero;
-    const float one = g_floatOne;
-    
-    // Get timing parameters from input data
-    float targetTime = *(float*)((char*)timingData + 20);
-    float blendInTime = *(float*)((char*)timingData + 12);
-    float blendOutTime = *(float*)((char*)timingData + 8);
-    
-    // If at target time, return zero blend
-    if (targetTime == one) {
-        targetTime = zero;
-    }
-    
-    // Calculate time until blend completes
-    float timeUntilBlend = one - blendInTime;
-    
-    // Check if we're in the blend-out phase
-    if (targetTime >= timeUntilBlend) {
-        // In blend-out phase: use blend-out time
-        blendOutTime = blendInTime;
-        targetTime = one - targetTime;
-    }
-    
-    // If past blend-out time, return full blend (1.0)
-    if (targetTime >= blendOutTime) {
-        return one;
-    }
-    
-    // If before blend-in time, return zero blend
-    if (targetTime <= one) {
-        return targetTime;
-    }
-    
-    // Calculate normalized blend factor
-    float blendFactor = targetTime / blendOutTime;
-    return blendFactor;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2604,19 +2558,6 @@ void LocomotionStateAnim::ResetAccumulators() {  // B9F0_w
 }
 
 /**
- * LocomotionStateAnim::SetAnimSpeed @ 0x820C2858 | size: 0x54
- *
- * Sets animation playback speed by multiplying speed × scale factor,
- * then calls the internal anim speed setter.
- */
-void LocomotionStateAnim::SetAnimSpeed(float speed, float scale) {  // 2858
-
-    float scaledSpeed = speed * scale;
-    LocomotionStateAnim_SetSpeed(this, scaledSpeed);
-    LocomotionStateAnim_ApplySpeed(this);
-}
-
-/**
  * LocomotionStateAnim::InitBoundCapsule @ 0x820C3D48 | size: 0x58
  *
  * Initializes a bounding capsule from float constants. Zeroes a vec128
@@ -2894,7 +2835,6 @@ extern void phBoundCapsule_ExtractPosition(void* matrix, float* outVec); // @ 0x
 extern float LocomotionStateAnim_A1F8_g(float value, float rangeMin, float rangeMax);
 extern void LocomotionStateAnim_B218_g(float* out, const float* matrix); // @ 0x8223B218
 extern void LocomotionStateAnim_6E90_w(void* self, float weight);
-extern bool LocomotionStateAnim_04F0_g(void* animData, uint16_t animID_high, uint16_t* outIndex);
 extern void util_BBB0(void* dst, float* src, float* work);
 extern void util_B9A8(void* dst, void* quat, void* axis);
 // @ 0x8224C128 / 0x8224C288 — apply one animation entry to a skeleton. Both read
@@ -3116,13 +3056,15 @@ void LocomotionStateAnim_5340_p46(void* self, void* relocator) {
  * blend weight from the weight array. Returns true if weight > 0.0.
  */
 // LocomotionStateAnim_81A8 @ 0x822481A8
-bool LocomotionStateAnim_81A8(void* self, uint8_t type, uint16_t animID, void** animPair, float* outWeight) {
-    // Only types 0 and 1 are valid
-    if (type != 0 && type != 1) {
+uint32_t LocomotionStateAnim_81A8(void* /*self*/, uint32_t type, uint32_t animID,
+                                  void* userdata, float* outWeight) {
+    const uint8_t channel = static_cast<uint8_t>(type);
+    if (channel != 0 && channel != 1) {
         return false;
     }
 
-    // Look up animation index via 04F0_g
+    // Forward the entire ID word; 04F0 narrows it inside its lookup.
+    auto** animPair = static_cast<void**>(userdata);
     uint16_t index;
     bool found = LocomotionStateAnim_04F0_g(animPair[0], animID, &index);
 
@@ -3137,7 +3079,7 @@ bool LocomotionStateAnim_81A8(void* self, uint8_t type, uint16_t animID, void** 
 
     *outWeight = weight;
 
-    return weight > 0.0f;
+    return weight > g_floatZero;
 }
 
 /**

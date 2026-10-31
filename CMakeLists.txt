@@ -165,6 +165,7 @@ set(SOURCES
     src/anim/pcr_anim_blenders.cpp
     src/anim/locomotion.cpp
     src/anim/angle_helpers.cpp
+    src/anim/animation_timing.cpp
 
     # Physics
     src/physics/ph_physics.cpp

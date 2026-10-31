@@ -636,7 +636,7 @@ const float g_floatConstant3 = 0.0f;       // @ 0x8202D110
 const float g_floatConstant4 = -11.85f;       // @ 0x825C7600
 const float g_floatEpsilon   = 0.0f;       // @ 0x8202D110
 const float g_floatNegOne    = 0.0f;       // @ 0x8202D110
-const float g_floatOne       = 0.0f;       // @ 0x8202D110
+const float g_floatOne       = 1.0f;       // @ 0x8202D108
 const float g_floatZero      = 0.0f;       // @ 0x8202D110
 
 // FloatAverager vtables (network classes) — RTTI: FloatAverager (4 vtables, MI).
