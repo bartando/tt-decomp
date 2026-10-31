@@ -167,7 +167,7 @@ void pongPlayer_06A0_g(float* outVec, pongPlayer* player);  // ComputeSwingTarge
 
 // Swing/target helpers
 extern void pongPlayer_ComputeTargetPosition(vec3* outVec, void* targetStruct);
-extern float fiAsciiTokenizer_ParseFloat(float input);
+extern double crt_tan(double input); // @ 0x82432628
 extern void pongPlayer_ComputeCourtPosition(vec3* outVec, void* targetData);
 extern void pongPlayer_GetCourtBounds(void* self, int r4, void* p3, void* p4, int p5, void* p6, void* p7, uint8_t metadataByte);
 extern void pongPlayer_InterpolateCourtPoint(void* adjustedVec, void* gridBase, void* p3, void* p4, void* p5);
@@ -1219,7 +1219,7 @@ void pongPlayer::UpdateSwingTimingAdjustment() {
     float timingFactor = clockValue * g_kTimingConstant;
 
     // Step 4: Call math function
-    float mathResult = fiAsciiTokenizer_ParseFloat(scaledPhase * g_kFloatConst_79BAC);  // was g_kAdjustmentScale @ 0x82079BAC
+    float mathResult = static_cast<float>(crt_tan(scaledPhase * g_kFloatConst_79BAC));  // was g_kAdjustmentScale @ 0x82079BAC
     
     // Step 5: Compute adjustment magnitude
     float adjustment = mathResult * timingFactor;
