@@ -12,6 +12,12 @@ CASES = [
         ("ignore shot type eight", "shotType == 9 || shotType == 8", "shotType == 9"),
         ("wrong unknown-direction default", "if (direction > 3) return at<float>(settings, 0x10);", "if (direction > 3) return at<float>(settings, 0x14);"),
     ]),
+    ("player_orient_spin_to_shot", [
+        ("reverse side orientation", "positiveSide = source.lane[2] > 0.0f", "positiveSide = source.lane[2] < 0.0f"),
+        ("omit flight normalization", "direction = normalize3(delta)", "direction = delta"),
+        ("lose vertical spin", "output.lane[1] = verticalSpin;", "output.lane[1] = 0.0f;"),
+        ("lose side query", "phBoundCapsule_DD20_fw(dot3(tableDirection, direction));", "phBoundCapsule_DD20_fw(0.0f);"),
+    ]),
 ]
 
 
