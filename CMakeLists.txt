@@ -167,6 +167,7 @@ set(SOURCES
     src/rage/rtti_class_strings.cpp
     
     # Animation
+    src/anim/anim_blender_state.cpp
     src/anim/pcr_anim_blenders.cpp
     src/anim/locomotion.cpp
 
