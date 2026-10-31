@@ -117,6 +117,8 @@ extern void phArticulatedCollider_F0E0(void* collider);
 extern void phArticulatedCollider_8450(void* jointData);
 extern void ph_Sqrtf_joint(rage::phJoint3Dof*, float);
 extern void ph_ApplyAngularVelocity(void* capsule);
+extern void phArticulatedCollider_8A30(void* jointData, const float* velocity); // @ 0x82258A30
+extern void phArticulatedCollider_8B10(void* jointData, const float* angularVelocity); // @ 0x82258B10
 extern void phBoundCapsule_ACB0_p45(void* capsule);
 extern "C" void phCollider_vfn_4(rage::phArticulatedCollider* collider);
 extern void phInst_5910_p39(void* obj);
@@ -5737,8 +5739,6 @@ extern void ph_IntegrateJointPositions(void* jointArray);           // Update ca
 extern void phArticulatedCollider_8450(void* jointArray);      // Post-integrate joint transforms
 extern void phArticulatedCollider_5D58(void* jointArray);      // Reset joint integration state
 extern void phArticulatedCollider_ResetJointChain(void* jointArray);   // Reset joint chain state
-extern void phArticulatedCollider_8A30(void* jointArray, float* forceVec);  // Sync joint velocities
-extern void phArticulatedCollider_8B10(void* jointArray, float* torqueVec); // Sync joint torques
 
 extern void phArticulatedCollider_ResetForceAccumulators(void* jointArray);  // Reset joint force accumulators
 extern void phArticulatedCollider_F0E0(void* collider);        // Update articulated internal state
@@ -8074,8 +8074,6 @@ void rage::phArticulatedCollider::DispatchJointSlot7(int jointIndex) {
 // rage::phArticulatedCollider — Dispatch, Force, and Matrix Functions (10 fns)
 // ═════════════════════════════════════════════════════════════════════════════
 
-extern void phArticulatedCollider_8A30(void* jointData, const float* velocity);
-extern void phArticulatedCollider_8B10(void* jointData, const float* angularVelocity);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // phArticulatedCollider::DelegateToBoundCapsule (vfn_24) @ 0x822CC700 | size: 0x8
@@ -8934,6 +8932,65 @@ static float phDotVmx(const float* a, const float* b, unsigned count) {
     for (unsigned lane = 0; lane < count; ++lane)
         sum += static_cast<double>(phFlushVmx(a[lane])) * phFlushVmx(b[lane]);
     return phFlushVmx(static_cast<float>(sum));
+}
+
+// Body vectors are position (+0xC0), linear/angular velocity (+0x110/+0x120),
+// then their cached angular and point velocities (+0x130/+0x140). The scalar
+// cross product deliberately rounds its second product before fused subtraction.
+static void phRefreshJointVelocity(float* body) {
+    const float* position = body + 0xC0 / 4;
+    const float* angular = body + 0x120 / 4;
+    float* pointVelocity = body + 0x140 / 4;
+    memcpy(body + 0x130 / 4, angular, 16);
+    memcpy(pointVelocity, body + 0x110 / 4, 16);
+    for (unsigned axis = 0; axis < 3; ++axis) {
+        const unsigned y = (axis + 1) % 3, z = (axis + 2) % 3;
+        const float product = angular[y] * position[z];
+        const float cross = __builtin_fmaf(angular[z], position[y], -product);
+        pointVelocity[axis] += cross;
+    }
+}
+
+// Shift all body velocities by the root's change, preserving relative motion.
+// phArticulatedCollider_8A30 @ 0x82258A30 | size: 0xE0
+void phArticulatedCollider_8A30(void* jointData, const float* velocity) {
+    uint32_t* data = static_cast<uint32_t*>(jointData);
+    const float* root = reinterpret_cast<const float*>(uintptr_t(data[10]));
+    float delta[4];
+    for (unsigned lane = 0; lane < 4; ++lane)
+        delta[lane] = phFlushVmx(phFlushVmx(velocity[lane]) - phFlushVmx(root[0x110 / 4 + lane]));
+    for (int i = 0; i < static_cast<int32_t>(data[1]); ++i) {
+        float* body = reinterpret_cast<float*>(uintptr_t(data[10 + i]));
+        for (unsigned lane = 0; lane < 4; ++lane)
+            body[0x110 / 4 + lane] = phFlushVmx(delta[lane] + phFlushVmx(body[0x110 / 4 + lane]));
+        phRefreshJointVelocity(body);
+    }
+}
+
+// Changing angular velocity also shifts each body's linear velocity by
+// deltaAngular x position. VMX rounds/flushed products separately; the cached
+// point velocity uses the scalar fused cross product above. Input may alias a body.
+// phArticulatedCollider_8B10 @ 0x82258B10 | size: 0x188
+void phArticulatedCollider_8B10(void* jointData, const float* angularVelocity) {
+    uint32_t* data = static_cast<uint32_t*>(jointData);
+    const float* root = reinterpret_cast<const float*>(uintptr_t(data[10]));
+    float delta[4];
+    for (unsigned lane = 0; lane < 4; ++lane)
+        delta[lane] = phFlushVmx(phFlushVmx(angularVelocity[lane]) - phFlushVmx(root[0x120 / 4 + lane]));
+    for (int i = 0; i < static_cast<int32_t>(data[1]); ++i) {
+        float* body = reinterpret_cast<float*>(uintptr_t(data[10 + i]));
+        for (unsigned lane = 0; lane < 4; ++lane) {
+            const unsigned y = lane < 3 ? (lane + 1) % 3 : 3;
+            const unsigned z = lane < 3 ? (lane + 2) % 3 : 3;
+            const float product1 = phFlushVmx(phFlushVmx(body[0xC0 / 4 + z]) * delta[y]);
+            const float product2 = phFlushVmx(phFlushVmx(body[0xC0 / 4 + y]) * delta[z]);
+            const float cross = phFlushVmx(-(product2 - product1));
+            body[0x110 / 4 + lane] = phFlushVmx(cross + phFlushVmx(body[0x110 / 4 + lane]));
+        }
+        for (unsigned lane = 0; lane < 4; ++lane)
+            body[0x120 / 4 + lane] = phFlushVmx(delta[lane] + phFlushVmx(body[0x120 / 4 + lane]));
+        phRefreshJointVelocity(body);
+    }
 }
 
 // Rotate the first two complete vec4 rows; the Z and translation rows are untouched.
