@@ -1,4 +1,5 @@
 #include "game/network_static_node.hpp"
+#include "../ball/ball_predict.hpp"
 #include "game/network_context.hpp"
 #include "rage/dat_bit_buffer.hpp"
 #include "rage/memory.h"
@@ -72,7 +73,6 @@ extern int   SinglesNetworkClient_8CC0_w(void* client);                       //
 extern void WriteFloatToNetworkStream(void* client, float value);              // @ 0x820D6990
 extern void WriteBallHitDataToNetwork(void* ballHitData, void* client);       // @ 0x821D5738
 extern void DeserializeNetworkData(void* client, void* dst, int size);  // @ 0x821D5538 - read size-bit aligned block
-extern void CopyVectorThreadSafe(void* dst, void* src);       // @ 0x82287040 - copy 16-byte vector
 extern void ReadBitsFromStream(void* client, void* field, int size); // @ 0x820D7A08 - read byte from net stream
 // Serve setup
 extern void  ServeStartedMessage_CFE8_2h(void* matchState);
@@ -315,9 +315,8 @@ void ServeStartedMessage::Process(void* matchObj)
     // The lerp table is indexed by (lerpSlot + 17) * 4.
     // Python-verified: rlwinm(lerpSlot+17, 2, 0, 29) = (lerpSlot+17)*4
     int32_t  lerpSlot   = *(int32_t*)((uint8_t*)player + 464);
-    uint8_t* lerpTable  = g_pPlayerLerpTable + (lerpSlot * 416) + 12;
-    void*    lerpEntry  = (void*)(lerpTable + (lerpSlot + 17) * 4);
-    CopyVectorThreadSafe(lerpEntry, &m_targetPos);
+    uint8_t* lerpEntry = g_pPlayerLerpTable + lerpSlot * 416;
+    CopyVectorThreadSafe(lerpEntry, reinterpret_cast<const bpShot*>(&m_targetPos));
 
     // Step 4: write handedness flag into the recovery state.
     pongPlayer* pPlayer    = *(pongPlayer**)((uint8_t*)player + 452);

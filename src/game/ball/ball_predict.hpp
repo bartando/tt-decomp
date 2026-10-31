@@ -130,3 +130,6 @@ namespace ballPredict {
 bool VecPairEqual(const bpVec4* a, const bpVec4* b);
 bool ShotEqual(const bpShot* a, const bpShot* b);
 }
+
+// Publish a complete shot into the player context while its write flag is clear.
+void CopyVectorThreadSafe(void* context, const bpShot* shot);
