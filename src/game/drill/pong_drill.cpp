@@ -210,7 +210,7 @@ void* gmPracticeTarget_SetPosition(void* object, const float* position) {
 }
 // Shows one of the table target sets (gmPracticeTarget, 0x821137B0).
 extern void gmPracticeTarget_SelectSet(  // @ 0x821137B0
-    DrillPracticeTarget* target, int32_t setId, int arg2, int arg3);
+    void* target, int32_t setId, int arg2, int arg3);
 // Whether `point` (x/z) is inside the active target zone; sets m_spinStopped on a
 // hit. Every caller leaves r4 unset and the callee reads neither it nor `radius`.
 extern float g_practiceTargetGrid[9][8];       // @ 0x82617C90 — 4 x/z corner pairs per zone

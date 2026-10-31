@@ -197,3 +197,9 @@ float g_practiceTargetGrid[9][8] = {};       // @ 0x82617C90 (.data)
 int32_t g_practiceTargetActiveZones[9] = {}; // @ 0x825EB280 (.data)
 float g_practiceTargetHitPadding = 0.025f;   // @ 0x825C8144 (.data)
 float g_practiceTargetLastPadding = 0.0f;    // @ 0x8271A360 (.data)
+
+// Normalized target boundaries selected from the practice-target data file.
+float g_practiceTargetGridShape[8] = {  // @ 0x825C99E0 (.data)
+    -1.0f, -0.33f, 0.33f, 1.0f, -1.0f, -0.78f, -0.59f, -0.4f
+};
+int32_t g_practiceTargetSelectedIndex = 0; // @ 0x826063B0 (.data)
