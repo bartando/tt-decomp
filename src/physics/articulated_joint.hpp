@@ -22,5 +22,16 @@ struct phArticulatedJointOps {
     virtual void ReservedSlot15() = 0;
     virtual void ClearForceConstraints() = 0; // +0x40
     virtual void ClearVelocityConstraints() = 0; // +0x44
+    virtual void ReservedSlot18() = 0;
+    virtual void PrepareForwardSolve() = 0; // +0x4C
+    virtual void PrepareBackwardSolve() = 0; // +0x50
+    virtual void GetBackwardMatrix(float* output) = 0; // +0x54
+    virtual void GetForwardMatrix(float* output) = 0; // +0x58
+    virtual void ReservedSlot23() = 0;
+    virtual void ReservedSlot24() = 0;
+    virtual void ReservedSlot25() = 0;
+    virtual void ReservedSlot26() = 0;
+    virtual void ResolveParentResponse(const float* input, float* output) = 0; // +0x6C
+    virtual void ResolveChildResponse(const float* input, float* output) = 0; // +0x70
 };
 }
