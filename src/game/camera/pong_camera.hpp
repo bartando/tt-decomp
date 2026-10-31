@@ -332,7 +332,6 @@ struct pongCameraMgr {
     // Clamped transition functions (mode, flags[], r7 variants)
     bool TransitionMode6_V1(void* gameState);   // @ 0x821F5188
     bool TransitionMode6_V2(void* gameState);   // @ 0x821F5248
-    bool TransitionMode6_V3(void* gameState);   // @ 0x821F5308
     bool TransitionMode6_V4(void* gameState);   // @ 0x821F53B8
     bool TransitionMode11_V1(void* gameState);  // @ 0x821F5608
     bool TransitionMode11_V2(void* gameState);  // @ 0x821F56C8
@@ -438,7 +437,6 @@ struct pongCameraMgr {
 
     // Multi-mode and offset queries
     bool CheckMultiModeQueryA(void* gameState);  // @ 0x821F47D8
-    bool CheckOffsetQueryA(void* gameState);     // @ 0x821F4A08
     bool CheckOffsetQueryB(void* gameState);     // @ 0x821F4A78
     bool CheckOffsetQueryC(void* gameState);     // @ 0x821F4AE8
 
