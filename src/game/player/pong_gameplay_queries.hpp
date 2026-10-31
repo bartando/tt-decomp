@@ -8,3 +8,4 @@ extern "C" void pongMatchSettings_GetCourtBounds(void* settings, int sideIndex,
 
 struct pongPlayer;
 void io_8A48(pongPlayer* player, int32_t* answer); // @ 0x82198A48
+void pongPlayer_4C08_g(pongPlayer* player); // @ 0x82194C08

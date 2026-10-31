@@ -17,6 +17,12 @@ CASES = [
     ("player_ai_swing_direction", "wrong first weight", "const float p0 = scale * w0", "const float p0 = scale * w1"),
     ("player_ai_swing_direction", "wrong direction priority", "else if (direction->downSelected != 0)", "if (direction->downSelected != 0)"),
     ("player_ai_swing_direction", "omit resolved flag", "direction->resolved = 1;", "direction->resolved = 0;"),
+    ("player_opponent_bound_transform", "wrong opponent", "player, 0x1C4", "player, 0x1C0"),
+    ("player_opponent_bound_transform", "wrong slot", "character + 8", "character + 12"),
+    ("player_opponent_bound_transform", "wrong sampling state", "character, 0x1C", "character, 0x18"),
+    ("player_opponent_bound_transform", "cache destination", "    phBoundCapsule_0880_g(capsule, matrix, samplingState);\n    auto* destination = rage::load_ptr32<uint8_t>(player, 0x30) + 0x20;", "    auto* destination = rage::load_ptr32<uint8_t>(player, 0x30) + 0x20;\n    phBoundCapsule_0880_g(capsule, matrix, samplingState);"),
+    ("player_opponent_bound_transform", "wrong transform size", "matrix, sizeof matrix", "matrix, sizeof matrix - 16"),
+    ("player_opponent_bound_transform", "lose VMX alignment", "& ~uintptr_t(15)", "& ~uintptr_t(0)"),
 ]
 
 def main():

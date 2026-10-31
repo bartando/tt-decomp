@@ -412,7 +412,6 @@ struct pongPlayer {
     void FindRegisteredListener(void* unused, void* target); // @ 0x8218AED0
 
     // ── Additional methods (batch 10: medium pongPlayer functions) ──────
-    void UpdateOpponentBoundTransform();                      // @ 0x82194C08
     void UpdateOpponentSwingTiming(float swingDir, float swingPower); // @ 0x82193738
     static void ResetButtonSlotTrackingData(void* buttonStateBase, int slotIndex); // @ 0x821C9918
     void SendServeOrMovementMessage(vec3* targetVec, uint8_t hasDirectMovement); // @ 0x82195598
