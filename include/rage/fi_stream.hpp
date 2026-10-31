@@ -40,6 +40,8 @@ extern "C" {
 // @ 0x822E3040 — searches asset roots for the first successful open. r6 unused.
 void* fiStreamBuf_OpenAll(void* assets, const char* name, const char* extension,
                           uint32_t unused, uint32_t flags);
+// @ 0x822E12A0 — flags are tested as a byte; zero excludes read-only mounts.
+void* fiDevice_GetDevice(const char* path, uint32_t flags);
 // @ 0x822E3518
 void* fiStream_Open(const char* path, int32_t flags);
 // @ 0x822E3828 — returns bytes transferred, or -1.
