@@ -12,3 +12,7 @@ extern "C" void* rage_A8C0(void* device, void* commands, uint32_t gpuAddress,
 extern "C" void rage_A780(void* device); // @ 0x8235A780
 extern "C" void rage_35A8(void* device, uint32_t flags); // @ 0x823535A8
 extern "C" int32_t rage_7BD0(void* device, uint32_t flush, uint32_t mask); // @ 0x82367BD0
+
+uint32_t* grcDevice_WriteRegisterRunOverflow(void* device, uint32_t* cursor,
+    uint32_t firstRegister, const uint32_t* valuesBeforeRun, uint32_t count,
+    uint32_t stride); // @ 0x823625A0
