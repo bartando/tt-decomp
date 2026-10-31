@@ -8,6 +8,7 @@
 #include "pong_drill.hpp"
 #include "globals.h"
 #include "game/pong_strings.hpp"
+#include "rage/hud_page_group.hpp"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -121,10 +122,11 @@ int RoundHalfAwayFromZero(float value) {
     if (rounded >= 2147483648.0f) return INT32_MAX;
     return static_cast<int32_t>(rounded);
 }
-extern "C" uint32_t hudFlashBase_IsNetworkDirty(void* hud); // @ 0x822EB2A8
-extern "C" void* hudFlashBase_GetPageGroup(void* hud);      // @ 0x822EB1E8
-extern "C" void* SinglesNetworkClient_BindEntry(void* group, const char* key); // @ 0x823F9318
-extern "C" void hudFlashBase_PublishPageGroup(void* hud);   // @ 0x822EB320
+
+extern "C" const char g_trainingHudPossibleKey[];  // @ 0x8205C83C
+extern "C" const char g_trainingHudCompletedKey[]; // @ 0x8205C848
+extern "C" const char g_trainingHudTimeLowKey[];   // @ 0x8205C860
+extern "C" const char g_trainingHudArrowKey[];     // @ 0x8205C86C
 
 struct DrillHudEntry { int32_t value, type; };
 
@@ -142,17 +144,17 @@ static void SetTrainingHudInteger(DrillTrainingHud* hud, const char* key, int32_
 
 // @ 0x822FA7B8 | size: 0x60
 void hudTrainingHUD_SetRemaining(DrillTrainingHud* hud, int count) {
-    SetTrainingHudInteger(hud, "possible", count);
+    SetTrainingHudInteger(hud, g_trainingHudPossibleKey, count);
 }
 
 // @ 0x822FA818 | size: 0x60
 void hudTrainingHUD_SetCompleted(DrillTrainingHud* hud, int count) {
-    SetTrainingHudInteger(hud, "completed", count);
+    SetTrainingHudInteger(hud, g_trainingHudCompletedKey, count);
 }
 
 // @ 0x822FA878 | size: 0x74
 void hudTrainingHUD_SetTimeLow(DrillTrainingHud* hud, uint32_t low) {
-    SetTrainingHudInteger(hud, "time_low", (low & 0xFFu) != 0 ? 1 : 0);
+    SetTrainingHudInteger(hud, g_trainingHudTimeLowKey, (low & 0xFFu) != 0 ? 1 : 0);
 }
 
 // @ 0x822FA8F0 | size: 0x60
@@ -162,7 +164,7 @@ void hudTrainingHUD_PushArrowDirection(DrillTrainingHud* hud) {
     void* group = hudFlashBase_GetPageGroup(hud);
     int32_t direction = hud->m_arrowDirection;
     auto* entry = static_cast<DrillHudEntry*>(
-        SinglesNetworkClient_BindEntry(group, "arrow_direction"));
+        SinglesNetworkClient_BindEntry(group, g_trainingHudArrowKey));
     if (entry) {
         entry->value = direction;
         entry->type = 3;

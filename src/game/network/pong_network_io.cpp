@@ -1,3 +1,4 @@
+#include "rage/hud_page_group.hpp"
 // pong_network_io.cpp — Network I/O helper functions | Rockstar Presents Table Tennis (Xbox 360, 2006)
 
 /**
@@ -476,17 +477,17 @@ extern "C" {
     
     // Original name: snSession_AcquireLock
     uint8_t snSession_AcquireLock(void* pageGroup) {
-        return PollButtonState(pageGroup);
+        return static_cast<uint8_t>(hudFlashBase_IsNetworkDirty(pageGroup));
     }
     
     // Original name: snSession_BeginOperation
     void* snSession_BeginOperation(void* context) {
-        return GetNetworkClient(context);
+        return hudFlashBase_GetPageGroup(context);
     }
     
     // Original name: snSession_ReleaseLock
     void snSession_ReleaseLock(void* context) {
-        InitiateConnection(context);
+        hudFlashBase_PublishPageGroup(context);
     }
     
     // Original name: SinglesNetworkClient_GetPlayerID_E408

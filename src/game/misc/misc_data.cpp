@@ -205,3 +205,9 @@ float g_practiceTargetGridShape[8] = {  // @ 0x825C99E0 (.data)
 int32_t g_practiceTargetSelectedIndex = 0; // @ 0x826063B0 (.data)
 
 extern const float g_practiceTargetNearEdge = -0.2f; // @ 0x82079EB4 (.rdata)
+
+// SWF members retain these string pointers, so share the image's key objects.
+extern "C" const char g_trainingHudPossibleKey[] = "possible";   // @ 0x8205C83C
+extern "C" const char g_trainingHudCompletedKey[] = "completed"; // @ 0x8205C848
+extern "C" const char g_trainingHudTimeLowKey[] = "time_low";     // @ 0x8205C860
+extern "C" const char g_trainingHudArrowKey[] = "arrow_direction"; // @ 0x8205C86C
