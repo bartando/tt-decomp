@@ -130,3 +130,5 @@ namespace ballPredict {
 bool VecPairEqual(const bpVec4* a, const bpVec4* b);
 bool ShotEqual(const bpShot* a, const bpShot* b);
 }
+
+void ballPredict_InitialiseShot(bpShot* shot); // @ 0x821D5128
