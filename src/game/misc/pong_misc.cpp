@@ -5,6 +5,7 @@
  * Lifted from recomp/structured_pass5_final/tt-decomp_recomp.9.cpp
  */
 
+#include "rage/indexed_registry.h"
 #include "pong_misc.hpp"
 #include <cstring>
 
@@ -3415,7 +3416,6 @@ extern "C" void CCalMoviePlayer_CF28_wrh(void* pDevice, float f1,
 // pg batch lift: async/reset helpers and judge-point dispatch
 // -----------------------------------------------------------------------------
 
-extern "C" void* pg_C2A0_g(void* lookupRoot, uint32_t lookupKey) __asm__("_pg_C2A0_g");
 extern "C" void util_E8E8(void* context, const char* sourceLabel, const char* valueLabel, int32_t mode) __asm__("_util_E8E8");
 extern "C" void pg_1448_g(void* self) __asm__("_pg_1448_g");
 extern "C" void pg_6EB0_g(int32_t mode) __asm__("_pg_6EB0_g");

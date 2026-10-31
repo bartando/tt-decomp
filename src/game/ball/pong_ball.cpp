@@ -5,6 +5,7 @@
  * Rockstar Presents Table Tennis (Xbox 360, 2006)
  */
 
+#include "rage/indexed_registry.h"
 #include "pong_ball.hpp"
 #include <cstddef>   // offsetof
 #include <cstring>   // memcpy, memset
@@ -1390,7 +1391,6 @@ extern void              fxBallSplash2D_ResetSplashes(fxBallSplash2D* splash); /
 extern pongBallInstance* pongBallInstance_Construct(void* mem);               // @ 0x8227F870
 extern void      game_4B60(void* scene, uint16_t handle);                     // @ 0x822C4B60  deactivates the object
 extern void      game_3860(void* gameState, int kind, const char* name);      // @ 0x821D3860
-extern "C" void* pg_C2A0_g(void* lookupRoot, uint32_t lookupKey);             // @ 0x821DC2A0
 extern int       io_Input_poll_9D68(void* inputObj);                          // @ 0x821C9D68
 extern uint32_t  game_A2F8(const char* name, int create);                     // @ 0x8215A2F8  returns a shader-global handle (inferred)
 struct pongDrawBucket;
