@@ -171,6 +171,7 @@ extern const char    k_audPathFmt[];     /* path format1 @ 0x82027434 */
 extern const char    k_audPathFmt2[];    /* path format2 @ 0x8204DBFC */
 
 // Virtual-call helper: fiDevice::Mount (vtable slot 10, byte offset 40)
+struct fiDevice;
 typedef int (*fiDevice_MountFn)(struct fiDevice*, const char*);
 #define fiDevice_Mount(dev, path) \
     ((fiDevice_MountFn)(*(void***)(dev))[10])((dev), (path))

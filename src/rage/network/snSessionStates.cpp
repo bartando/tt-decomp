@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include "rage/heap.hpp"
 #include "rage/session_state_helpers.hpp"
+#include "rage/hsm_transition.hpp"
 
 namespace rage {
 
@@ -1253,112 +1254,6 @@ void snSession_EnqueueEvtMigrateFailed(hsmStateBase* thisPtr, hsmEventData* even
  */
 void snSession_EnqueueEvtChangePresenceSucceeded(hsmStateBase* thisPtr, hsmEventData* eventData) { // @ 0x823EAAC8
     snSession_EnqueueTypedEvent(thisPtr, eventData, &g_vtbl_EvtChangePresenceSucceeded);
-}
-
-// --------------------------------------------------------------------------
-// snSession Connection List Management -- Batch 4 (2 functions)
-// --------------------------------------------------------------------------
-
-/**
- * snSession::InsertConnectionNode @ 0x823EDD10 | size: 0xA4
- *
- * Inserts a connection node into the session's connection list at offset +92.
- * Guards: returns if node is null or if the node's flags byte (at +12)
- * has bit 7 set (already queued). On insertion, clears bit 7 of the flags
- * byte and increments the list count at list+8.
- *
- * The list structure at this+92:
- *   +0: head pointer
- *   +4: tail pointer
- *   +8: count
- *
- * Each node (at r4):
- *   +4: prev pointer (in node-relative terms, node+4 = prev)
- *   +8: next pointer
- *   +12: flags byte (bit 7 = "dequeued" marker)
- */
-void snSession_InsertConnectionNode(snSessionData* thisPtr, snListNode* node) { // @ 0x823EDD10
-    if (node == nullptr) return;
-
-    // Check if bit 7 of flags is clear (meaning node is dequeued)
-    if ((node->m_flags & 0x80) == 0) return;
-
-    snLinkedList* list = &thisPtr->m_connectionList;
-    snListNode* head = list->m_pHead;
-
-    if (head != nullptr) {
-        // List is non-empty -- insert after the current tail
-        snListNode* tail = list->m_pTail;
-
-        node->m_pNext = tail->m_pNext;
-        if (tail->m_pNext != nullptr) {
-            tail->m_pNext->m_pPrev = node;
-        } else {
-            list->m_pTail = node;
-        }
-        tail->m_pNext = node;
-        node->m_pPrev = tail;
-    } else {
-        // List is empty -- node becomes both head and tail
-        list->m_pHead = node;
-        list->m_pTail = node;
-        node->m_pPrev = nullptr;
-        node->m_pNext = nullptr;
-    }
-
-    // Increment count
-    list->m_nCount++;
-
-    // Clear bit 7 of flags (mark as queued)
-    node->m_flags = node->m_flags & 0x7F;
-}
-
-/**
- * snSession::RemoveConnectionNode @ 0x823EDDB8 | size: 0xA8
- *
- * Removes a connection node from the session's connection list at offset +92.
- * Guards: returns if node is null or if the node's flags byte (at +12)
- * has bit 7 clear (not queued / already removed). On removal, sets bit 7
- * of the flags byte and decrements the list count at list+8.
- */
-void snSession_RemoveConnectionNode(snSessionData* thisPtr, snListNode* node) { // @ 0x823EDDB8
-    if (node == nullptr) return;
-
-    // Check if bit 7 of flags is set (meaning node is queued)
-    if ((node->m_flags & 0x80) != 0) return;
-
-    snLinkedList* list = &thisPtr->m_connectionList;
-
-    snListNode* prev = node->m_pPrev;
-    snListNode* next = node->m_pNext;
-
-    if (prev == nullptr) {
-        // Node is the head -- update head to next
-        list->m_pHead = next;
-        if (next != nullptr) {
-            next->m_pPrev = nullptr;
-        } else {
-            list->m_pTail = nullptr;
-        }
-    } else {
-        // Node has a predecessor -- unlink
-        prev->m_pNext = next;
-        if (next != nullptr) {
-            next->m_pPrev = prev;
-        } else {
-            list->m_pTail = prev;
-        }
-    }
-
-    // Clear links
-    node->m_pPrev = nullptr;
-    node->m_pNext = nullptr;
-
-    // Decrement count
-    list->m_nCount--;
-
-    // Set bit 7 of flags (mark as dequeued)
-    node->m_flags = node->m_flags | 0x80;
 }
 
 } // namespace snSession_States

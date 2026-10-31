@@ -1,5 +1,6 @@
 #include "audio/xact_sink_io.hpp"
 #include "game/message_sink_children.hpp"
+#include "rage/hsm_transition.hpp"
 #include "rage/dat_bit_buffer.hpp"
 #include "rage/ptr32.hpp"
 #include "rage/hud_page_group.hpp"
@@ -460,7 +461,6 @@ uint32_t GetPlayerID(void* client, uint32_t reportInvalid) {
 
 // ── Forward declarations for sibling-owned helpers ──────────────────────────
 extern uint32_t atSingleton_6F98_g(); // @ 0x82566F98
-extern int32_t atSingleton_9B98_p39(void* node, void* key);           // @ 0x82459b98
 extern int32_t game_3FD0_h(void* sink);                               // @ 0x82453fd0
 extern int32_t game_9A48_h(void* node);                               // @ 0x82459a48
 extern void  msgMsgSink_8B78_g(void* sessionRef, uint16_t hdr);       // @ 0x82448b78
@@ -472,14 +472,9 @@ extern void  msgMsgSink_EA00(void);                                   // @ 0x824
 extern void  _locale_register(void* sink, uint32_t tag);              // @ 0x820c02d0
 extern int32_t snNotifyGamerAdded_E790(void* self, void* param,
                                        void** outHandle);             // @ 0x8244e790
-extern uint32_t atSingleton_7CE0_w(void* bucket, int inBounds,
-                                   int boundExcl);                    // @ 0x82447ce0
 extern int32_t net_1CC8(uint32_t* outSlot, int one, int zero,
                         int zero2, int zero3, uint32_t flags,
                         int eight, int zero4, int zero5);              // @ 0x82481cc8
-extern void* snSession_D418_w(void* self, void* state);                // @ 0x823ed418
-extern void  snSession_DDB8_w(void* self, void* state);               // @ 0x823eddb8
-extern void  snSession_DD10_w(void* self, void* state);               // @ 0x823edd10
 extern void  nop_8240E6D0(char* out, const char* fmt, void* arg);     // @ 0x8240e6d0
 extern "C" void* memset(void*, int, size_t);
 extern "C" void snSession_AddNode_C068(void* nodeList, void* node);
@@ -525,27 +520,6 @@ uint32_t msgMsgSink_3C88_g(void* self, uint32_t flag)
 }
 
 
-/**
- * msgMsgSink_3D70_p39 @ 0x82453D70 | size: 0x58
- *
- * Walks the sink's child linked list at +36 forwarding each node into
- * atSingleton_9B98_p39(child, key). Returns 1 on first non-zero response.
- */
-uint32_t msgMsgSink_3D70_p39(void* self)
-{
-    uint8_t* s = static_cast<uint8_t*>(self);
-    uint8_t* head = s + 36;
-    uint32_t key  = 0;  // original takes r4 into r30, passed below
-    uint32_t node = *reinterpret_cast<uint32_t*>(s + 40);
-    while (node != static_cast<uint32_t>(reinterpret_cast<uintptr_t>(head))) {
-        if (atSingleton_9B98_p39(reinterpret_cast<void*>(node),
-                                 reinterpret_cast<void*>(key)) != 0) {
-            return 1;
-        }
-        node = *reinterpret_cast<uint32_t*>(node + 4);
-    }
-    return 0;
-}
 
 
 /**
@@ -1129,126 +1103,6 @@ void snSession_Detach(void* session)
 }
 
 
-/**
- * snSession_AssociateConnections @ 0x823ED988 | size: 0x104
- *
- * Walks an incoming connection list, forwarding each entry into
- * snSession_DDB8_w which appends it to the session. Bumps the per-session
- * refcount at (+84) and clears the activation bit at (+104).
- */
-void snSession_AssociateConnections(void* session, void* dispatcher,
-                                    void* connList)
-{
-    if (!session || !connList) return;
-    uint8_t* s = static_cast<uint8_t*>(session);
-
-    int32_t queueLen = *reinterpret_cast<int32_t*>(s + 88);
-    int32_t pending  = *reinterpret_cast<int32_t*>(s + 84);
-    bool skipWalk = (queueLen > 0 && pending == queueLen);
-
-    if (!skipWalk) {
-        void* head = snSession_D418_w(session, dispatcher);
-        void* stopAt = *reinterpret_cast<void**>(s + 8);
-        if (head != stopAt) {
-            for (void* cur = head; cur != stopAt; ) {
-                void* curSess = *reinterpret_cast<void**>(s + 8);
-                // state transitions via two vtable slots
-                void** vt = *reinterpret_cast<void***>(curSess);
-                using Fn1 = void*(*)(void*);
-                using Fn2 = void(*)(void*);
-                reinterpret_cast<Fn1>(vt[2])(curSess);
-                reinterpret_cast<Fn2>(vt[15])(curSess);
-                reinterpret_cast<Fn2>(vt[8])(curSess);
-                snSession_DDB8_w(session, curSess);
-                void* next = *reinterpret_cast<void**>(s + 8);
-                cur = next;
-            }
-        }
-    }
-
-    int32_t newCount = *reinterpret_cast<int32_t*>(s + 84) + 1;
-    *reinterpret_cast<int32_t*>(s + 84) = newCount;
-    uint8_t b = *(s + 104);
-    *(s + 104) = static_cast<uint8_t>(b & 0x7F);
-}
-
-
-/**
- * snSession_ProcessPendingConnections @ 0x823EDA90 | size: 0x1ac
- *
- * Two-phase drain: first walks the pending-connection linked list splicing
- * each into the session via snSession_DD10_w, then re-visits the live list
- * re-calling slot-13 on each node until convergence. Decrements the
- * pending-counter at (+84) by one after the drain.
- */
-void snSession_ProcessPendingConnections(void* session, void* dispatcher,
-                                         void* connList)
-{
-    if (!session || !connList) return;
-    uint8_t* s = static_cast<uint8_t*>(session);
-    uint8_t* c = static_cast<uint8_t*>(connList);
-
-    // First phase: splice predecessors into session.
-    for (uint8_t* cur = c;;) {
-        uint32_t prev = *reinterpret_cast<uint32_t*>(cur + 8);
-        *reinterpret_cast<uint32_t*>(prev + 12) =
-            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cur));
-        uint32_t nxt = *reinterpret_cast<uint32_t*>(cur + 8);
-        uint32_t sp  = *reinterpret_cast<uint32_t*>(s + 8);
-        if (nxt == sp) break;
-        cur = reinterpret_cast<uint8_t*>(nxt);
-    }
-
-    void* curSession = *reinterpret_cast<void**>(s + 8);
-    if (curSession != connList) {
-        while (curSession != connList) {
-            void* nextSess = *reinterpret_cast<void**>(
-                static_cast<uint8_t*>(curSession) + 12);
-            *reinterpret_cast<void**>(s + 8) = nextSess;
-            void** vt = *reinterpret_cast<void***>(nextSess);
-            using Fn1 = void*(*)(void*);
-            using Fn2 = void(*)(void*);
-            reinterpret_cast<Fn1>(vt[2])(nextSess);
-            reinterpret_cast<Fn2>(vt[14])(nextSess);
-            reinterpret_cast<Fn2>(vt[8])(nextSess);
-            snSession_DD10_w(session, nextSess);
-            curSession = *reinterpret_cast<void**>(s + 8);
-        }
-    }
-
-    // Phase 2: commit any follow-up state change signaled by slot 7.
-    void* finalSess = *reinterpret_cast<void**>(s + 8);
-    void** vt = *reinterpret_cast<void***>(finalSess);
-    using Fn = int32_t(*)(void*);
-    int32_t rc = reinterpret_cast<Fn>(vt[7])(finalSess);
-    if (rc == 1) {
-        void* peer = *reinterpret_cast<void**>(
-            static_cast<uint8_t*>(finalSess) + 12);
-        if (peer) {
-            *reinterpret_cast<void**>(s + 8) = peer;
-            void** pvt = *reinterpret_cast<void***>(peer);
-            using Fn1 = void*(*)(void*);
-            using Fn2 = void(*)(void*);
-            reinterpret_cast<Fn1>(pvt[2])(peer);
-            reinterpret_cast<Fn2>(pvt[14])(peer);
-            reinterpret_cast<Fn2>(pvt[8])(peer);
-            snSession_DD10_w(session, peer);
-        }
-    }
-
-    int32_t count = *reinterpret_cast<int32_t*>(s + 84);
-    *reinterpret_cast<int32_t*>(s + 84) = count - 1;
-}
-
-
-// ══════════════════════════════════════════════════════════════════════════════
-// rage:: namespace aliases
-// ══════════════════════════════════════════════════════════════════════════════
-//
-// snSessionStates.cpp / snMigrateMachine.cpp etc. reference the session
-// helpers inside `namespace rage` while pong_network.cpp and the ph_physics
-// code reach them at global scope. Provide thin aliases that forward to the
-// global-scope impls above so both linkage forms resolve.
 
 namespace rage {
 

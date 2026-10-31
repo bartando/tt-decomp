@@ -12,7 +12,7 @@ CASES = {
         ('pause tick offset', 'bytes + 0x6C) = atSingleton_6F98_g();', 'bytes + 0x68) = atSingleton_6F98_g();'),
         ('elapsed sign', 'atSingleton_6F98_g() - *reinterpret_cast<uint32_t*>(bytes + 0x6C)', '*reinterpret_cast<uint32_t*>(bytes + 0x6C) - atSingleton_6F98_g()'),
         ('deadline offset', 'node + 0x14);', 'node + 0x10);'),
-        ('child flag', 'result = game_9D70_h(child, flag);', 'result = game_9D70_h(child, 0);'),
+        ('child flag', 'result = msgChild_SetPaused(child, flag);', 'result = msgChild_SetPaused(child, 0);'),
     ]),
     'network_sink_poll': ('src/game/network/pong_network_io.cpp', [
         ('probe branch', 'if (session()->IsPending() == 0) {', 'if (session()->IsPending() != 0) {'),

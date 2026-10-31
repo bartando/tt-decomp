@@ -1,3 +1,4 @@
+#include "game/game_message.hpp"
 #include "game/network_static_node.hpp"
 #include "game/network_context.hpp"
 #include "rage/dat_bit_buffer.hpp"
@@ -76,7 +77,6 @@ extern void DeserializeNetworkData(void* client, void* dst, int size);  // @ 0x8
 extern void ReadBitsFromStream(void* client, void* field, int size); // @ 0x820D7A08 - read byte from net stream
 // Serve setup
 extern void  ServeStartedMessage_CFE8_2h(void* matchState);
-extern void  PostPageGroupMessage(int eventCode, int arg1, int arg2, int arg3, int arg4);
 // Pool intrinsics
 extern uint8_t* g_pNetMsgPoolBase;    // @ 0x825D11D0 (singleton pointer)
 extern const char g_szServeStartedTypeName[];  // @ 0x8206E9D0
@@ -292,8 +292,8 @@ void ServeStartedMessage::Serialise(void* client)
 //     Stores that inverted flag at pongLerpQueue[500][+360] (m_bIsServer).
 //  7. Checks whether the inner player state is in "serve ready" (stateCode=0,
 //     subState=3) and m_bNotServer is set.  If so fires a network event
-//     PostPageGroupMessage(14348, playerCount|0x40, 0, 0) — "serve accepted" event.
-//  8. Fires a second PostPageGroupMessage(14377, playerCount|0x40, 0, 0) unconditionally
+//     PostGameMessage(14348, playerCount|0x40, 0, 0) — "serve accepted" event.
+//  8. Fires a second PostGameMessage(14377, playerCount|0x40, 0, 0) unconditionally
 //     — "serve started" broadcast event.
 //
 // Python-verified:
@@ -348,14 +348,14 @@ void ServeStartedMessage::Process(void* matchObj)
         // lerpSlot == 0 → playerCount=1, else playerCount=2
         int32_t lerpSlot2    = *(int32_t*)((uint8_t*)player + 464);
         uint8_t playerCount  = (lerpSlot2 == 0) ? 1 : 2;
-        PostPageGroupMessage(14348, (int)(playerCount | 0x40), 0, 0, 0);
+        PostGameMessage(14348, (int)(playerCount | 0x40), 0, nullptr);
     }
 
     // Step 8: unconditional "serve started" broadcast.
     {
         int32_t lerpSlot3   = *(int32_t*)((uint8_t*)player + 464);
         uint8_t playerCount = (lerpSlot3 == 0) ? 1 : 2;
-        PostPageGroupMessage(14377, (int)(playerCount | 0x40), 0, 0, 0);
+        PostGameMessage(14377, (int)(playerCount | 0x40), 0, nullptr);
     }
 }
 
@@ -917,7 +917,7 @@ setup_network:
     // Find available network message slot
     extern const char g_szMessageType[];  // @ 0x8205DFB0
     uint32_t clientState = *(uint32_t*)((uint8_t*)networkClient + 92);
-    void* messageSlot = SinglesNetworkClient_BindEntry((void*)clientState, g_szMessageType);
+    void* messageSlot = swfGetOrCreatePageGroupValue((void*)clientState, g_szMessageType);
 
     // Initialize message slot if found
     if (messageSlot != nullptr) {
@@ -1730,49 +1730,21 @@ void SinglesNetworkClient::ProcessMessageQueue()
 // TournamentCompleteMessage — Tournament completion network message
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ===========================================================================
-// TournamentCompleteMessage::Process  [vtable slot 4 @ 0x823BC8C8] | size: 0x98
-//
-// Processes a tournament completion message. Checks game state and posts
-// a page group event if conditions are met.
-//
-// Logic:
-//  1. Calls rage_debugLog with "top_spin" string (debug/logging)
-//  2. Checks g_loop_obj_ptr[578] (boolean flag)
-//  3. If flag is false, checks g_loop_obj_ptr[12] == 8 (state check)
-//  4. If state matches, sets g_input_obj_ptr[48] = 4
-//  5. Posts page group message with event code 14386 and m_tournamentId
-// ===========================================================================
+extern "C" void* g_loop_obj_ptr; // @ 0x825EAB30
+extern "C" void* g_input_obj_ptr; // @ 0x825EAB28
+
+// TournamentCompleteMessage::Process @ 0x823BC8C8
+// Notify the input state, then send the signed tournament byte as one word.
 void TournamentCompleteMessage::Process()
 {
-    // Debug logging with "top_spin" string
-    extern const char g_szTopSpin[];  // @ 0x8206CB54
+    extern const char g_szTopSpin[]; // @ 0x8206CB54
     rage_debugLog(g_szTopSpin);
-    
-    // Load global loop object pointer
-    extern void* g_loop_obj_ptr;  // @ 0x825EAB30
-    void* loopObj = *(void**)&g_loop_obj_ptr;
-    
-    // Check flag at offset +578
-    uint8_t flag = *(uint8_t*)((char*)loopObj + 578);
-    
-    if (flag == 0) {
-        // Check state value at offset +12
-        int32_t state = *(int32_t*)((char*)loopObj + 12);
-        
-        if (state == 8) {
-            // Set input object state to 4
-            extern void* g_input_obj_ptr;  // @ 0x825EAB28
-            void* inputObj = *(void**)&g_input_obj_ptr;
-            *(int32_t*)((char*)inputObj + 48) = 4;
-        }
-    }
-    
-    // Post page group message with tournament ID
-    // Event code 14386, mask 128, active flag 1
-    int32_t eventData[2] = { 4, 0 };
-    eventData[0] = (int32_t)*(uint8_t*)((char*)this + 4);  // tournament ID byte at +0x04
-    PostPageGroupMessage(14386, 128, 1, 0, (uintptr_t)eventData);
+    const auto* loop = static_cast<const uint8_t*>(g_loop_obj_ptr);
+    if (loop[0x242] != 0 || *reinterpret_cast<const int32_t*>(loop + 0x0C) == 8)
+        *reinterpret_cast<int32_t*>(static_cast<uint8_t*>(g_input_obj_ptr) + 0x30) = 4;
+
+    const int32_t tournament = reinterpret_cast<const int8_t*>(this)[8];
+    PostGameMessage(14386, 128, 1, &tournament);
 }
 
 
@@ -5474,7 +5446,6 @@ extern void pongNetMessageHolder_0838_w(void* dst, void* src);                //
 extern void PongNetRoundRobinCoordinator_FC20_w(void* obj);                    // @ 0x8220FC20
 extern void* ke_8F70(void* obj);                                               // @ 0x822C8F70 — ctor returning this
 extern void pongCreatureInst_9030_g(void* creatureInst, void* srcPayload);    // @ 0x822C9030
-extern void* atSingleton_7CE0_w(void* singleton, int zero, int slotMinusOne); // @ 0x82447CE0 — returns slot key
 
 // The max-float init value is at 0x82079AD4 (.rdata, 4 bytes).  Bodies read
 // it by symbol reference via a small accessor so the raw address stays out
@@ -5790,71 +5761,6 @@ void pongNetMessageHolder_D040_w(pongNetMessageHolder* holder, void* extraArg, c
             fn(&lbl_826065E4);
         }
     }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// pongNetMessageHolder_AAC8_w @ 0x8245AAC8 | size: 0x150
-//
-// Scans a packed 16-byte-stride "candidate list" embedded inside the inner
-// pool at holder->m_pInternalArray + 8 for entries whose float at +4
-// exceeds an input threshold (r1 / f1).  The matching slot indices are
-// compacted into a scratch u16 array of size `slotCount * 2 bytes`, then
-// atSingleton_7CE0_w picks one of them, and the winner's 32-bit payload
-// at +0 and its 16-bit slot-id are written back to caller-provided out
-// pointers (r5 = uint16*, r6 = uint32*).  Returns 0 on success, or the
-// fixed error code 0x80070000 | 14 on OOM.
-// ─────────────────────────────────────────────────────────────────────────────
-uint32_t pongNetMessageHolder_AAC8_w(pongNetMessageHolder* holder,
-                                     uint32_t /*unusedArg*/,
-                                     uint16_t* outSlotId,
-                                     uint32_t* outPayload,
-                                     float threshold) {
-    // Default "no match" outputs (written up-front so early-returns leave
-    // sentinel values behind).
-    *outPayload = 0xFFFFFFFFu;
-    *outSlotId  = 0xFFFFu;
-
-    // Inner pool lives at holder->m_pInternalArray; slotCount is its u16 at
-    // +0.  The candidate array starts at +8 with a 16-byte stride.
-    auto* inner = reinterpret_cast<uint8_t*>(holder->m_pInternalArray);
-    const uint32_t slotCount = *reinterpret_cast<uint16_t*>(inner + 0);
-    const uint32_t scratchBytes = slotCount * 2u;
-
-    auto* scratch = static_cast<uint16_t*>(rage_Alloc(scratchBytes));
-    if (scratch == nullptr) {
-        // Fixed error code observed in the original: (-32761 << 16) | 14.
-        return 0x80070000u | 14u;
-    }
-
-    uint8_t* entries = inner + 8;  // 16-byte-stride entries
-    uint16_t matchCount = 0;
-    for (uint32_t i = 0; i < slotCount; ++i) {
-        const float candidate = *reinterpret_cast<float*>(entries + i * 16 + 4);
-        if (candidate > threshold) {
-            scratch[matchCount] = static_cast<uint16_t>(i);
-            ++matchCount;
-        }
-    }
-
-    if (matchCount != 0) {
-        // atSingleton_7CE0_w returns a chosen index into the scratch list
-        // (takes the raw handle + match-count-minus-one).
-        int chosenRaw = reinterpret_cast<intptr_t>(
-            atSingleton_7CE0_w(reinterpret_cast<uint8_t*>(holder) + 4,
-                               0, matchCount - 1));
-        const uint32_t chosen = static_cast<uint32_t>(chosenRaw);
-
-        // Fetch the winning slot's u16 index and its 32-bit payload.
-        const uint16_t winnerSlot = scratch[chosen];
-        const uint32_t winnerPayload =
-            *reinterpret_cast<uint32_t*>(entries + winnerSlot * 16);
-
-        *outPayload = winnerPayload;
-        *outSlotId  = winnerSlot;
-    }
-
-    rage_free(scratch);
-    return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -6786,12 +6692,6 @@ void Player_ApplyServeStarted(void* matchObj, void* slotA, void* slotB, float ti
 // Pushes a game-event message onto the internal HSM/page queue.
 void QueueGameMessage(int eventCode, int arg1, void* payload, int arg3, void* argA, void* argB) {
     (void)eventCode; (void)arg1; (void)payload; (void)arg3; (void)argA; (void)argB;
-}
-
-// Sends a 4-arg context message (short-int arg bundle) to the active
-// state-machine target. Wrapped by several network dispatch paths.
-void SendContextMessage(int ctx, int a, int b, int c) {
-    (void)ctx; (void)a; (void)b; (void)c;
 }
 
 // ── Raw net helpers (address unknown — documented placeholders) ───────────

@@ -8,7 +8,7 @@ from liftcheck.runner import Checker, Options
 SHARED = [
     ("wrong bank", '(handle & 1) != 0', '(handle & 1) == 0'),
     ("wrong dirty byte", 'dirty[bit >> 3] |=', 'dirty[bit >> 4] |='),
-    ("wrong dirty mask", 'g_shaderParameterDirtyMasks[bit & 7]', 'g_shaderParameterDirtyMasks[(bit + 1) & 7]'),
+    ("wrong dirty mask", 'dirty[bit >> 3] |= g_shaderParameterDirtyMasks[bit & 7]', 'dirty[bit >> 3] |= g_shaderParameterDirtyMasks[(bit + 1) & 7]'),
     ("wrong descriptor index", '(handle >> 18) * 8', '(handle >> 19) * 8'),
     ("wrong value slot", 'return values + slot * 16;', 'return values + ((slot + 1) & 0xff) * 16;'),
 ]

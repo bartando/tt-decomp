@@ -34,6 +34,7 @@ void mat33FromEuler(float* out, const float* angles); // @ 0x82118278
 // input and output may overlap. ToEuler inverts mat33FromEuler.
 void mat33ToEuler(const float* matrix, float* angles); // @ 0x82137B08
 void mat33ToEulerZXY(const float* matrix, float* angles); // @ 0x820D0658
+void mat33ToEulerXZY(const float* matrix, float* angles); // @ 0x82234360
 
 // Rebuild and normalize the basis; leave the translation row untouched.
 void mat33Orthonormalize(float* matrix); // @ 0x820C9220

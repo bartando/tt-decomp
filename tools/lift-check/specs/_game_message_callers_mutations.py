@@ -17,7 +17,7 @@ CASES = [
     ]),
     ("message_signal_ready_use", "src/game/message.cpp", [
         ("drop negative-one payload", "PostGameMessage(10244, 64, 1, &negOne);", "PostGameMessage(10244, 64, 1, nullptr);"),
-        ("wrong formatted event type", 'const_cast<char*>("i")', 'const_cast<char*>("f")'),
+        ("wrong formatted event type", '"i"', '"f"'),
         ("wrong spectator mode", "} else if (lbl_825C9A2C == 2) {", "} else if (lbl_825C9A2C == 1) {"),
     ]),
 ]

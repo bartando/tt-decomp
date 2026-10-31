@@ -10,6 +10,7 @@ extern const float g_swfTwipScale = 0x1.99999ap-5f; // @ 0x820290F0
 }
 TT_DATA_ALIAS("_ZN4rage18g_swfTwipsToPixelsE", "_ZN4rage14g_swfTwipScaleE");
 extern "C" {
+extern const char g_localizedFontResetName[] = "default"; // @ 0x82027C50
 rage::ptr32<LocalizedFont> g_localizedFontHead; // @ 0x826066E0
 LocalizedFontShutdownRecord g_localizedFontShutdownRecords[32]{}; // @ 0x8261A1D0
 LocalizedFontShutdownRegistry g_localizedFontShutdownRegistry{ // @ 0x825CB9A0

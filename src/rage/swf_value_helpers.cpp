@@ -5,7 +5,6 @@
 extern "C" {
 // The caller explicitly consumes the low byte, even with dirty upper bits.
 uint32_t swfValueToBoolean(const SwfVmValue* value); // @ 0x823FA420
-int32_t swfValueToInteger(const SwfVmValue* value); // @ 0x823FA5C8
 float swfValueToFloat(const SwfVmValue* value); // @ 0x823FA688
 const char* util_A768_1(const void* value, void* buffer, int maxLen); // @ 0x823FA768
 }

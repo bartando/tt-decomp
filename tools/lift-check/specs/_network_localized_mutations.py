@@ -8,7 +8,7 @@ CASES = {
     'network_localized_copy': [
         ('capacity', 'written + count >= limit', 'written + count > limit'),
         ('UTF-8 boundary', 'character < 0x800', 'character < 0x801'),
-        ('continuation bits', '0x80 | (character & 0x3F)', '0x80 | (character & 0x1F)'),
+        ('continuation bits', 'encoded[2] = static_cast<char>(0x80 | (character & 0x3F));', 'encoded[2] = static_cast<char>(0x80 | (character & 0x1F));'),
         ('control replacement', "destination[i] = '\\r';", "destination[i] = '\\n';"),
         ('terminator', 'destination[written] = 0;', 'destination[written + 1] = 0;'),
     ],
@@ -21,7 +21,7 @@ CASES = {
     ],
     'network_localized_wide_duplicate': [
         ('terminator', 'localizedWideLength(text) + 1;', 'localizedWideLength(text);'),
-        ('allocation bytes', 'count * 2));', 'count * 2 + 2));'),
+        ('allocation bytes', 'rage_Alloc(count > 0x7FFFFFFFu ? UINT32_MAX : count * 2)', 'rage_Alloc(count > 0x7FFFFFFFu ? UINT32_MAX : count * 2 + 2)'),
     ],
     'network_localized_insert': [
         ('count', '++table->count;', '--table->count;'),
@@ -41,7 +41,7 @@ def main():
     total = 0
     for spec, mutations in CASES.items():
         for label, old, new in mutations:
-            assert old in source, (spec, label)
+            assert source.count(old) == 1, (spec, label, source.count(old))
             output = io.StringIO()
             with contextlib.redirect_stdout(output):
                 rc = Checker(Path(__file__).with_name(spec + '.py'),

@@ -55,6 +55,7 @@ set(SOURCES
     # CRT layer
     src/crt/crt_init.c
     src/crt/ctrlfp.cpp
+    src/crt/exp.cpp
     src/crt/fp_helpers.cpp
     src/crt/entry.c
     src/crt/exit.c
@@ -101,6 +102,8 @@ set(SOURCES
     src/rage/audio/xma_source.cpp
     src/rage/audio/ld_xaudio_data.cpp
     src/rage/audio/xact_fade.cpp
+    src/rage/audio/xact_volume.cpp
+    src/rage/audio/xact_buffer.cpp
     src/rage/audio/xact_sound.cpp
     src/rage/audio/xaudio_effect_buffer.cpp
     src/rage/audio/xaudio_effect.cpp
@@ -136,6 +139,7 @@ set(SOURCES
     src/rage/network/session_events.cpp
     src/rage/network/snSessionStates.cpp
     src/rage/network/session_state_helpers.cpp
+    src/rage/network/hsm_transition.cpp
     src/rage/core/subsystem_init.c
     src/rage/swf.cpp
     src/rage/swf_image_data.cpp
@@ -150,6 +154,7 @@ set(SOURCES
     src/rage/localized_font.cpp
     src/rage/localized_font_lifecycle.cpp
     src/rage/localized_font_effect.cpp
+    src/rage/localized_font_array.cpp
     src/rage/swf_clip_events.cpp
     src/rage/core/timer.cpp
     src/rage/core/rage_core_utils.cpp
@@ -223,12 +228,14 @@ set(SOURCES
     src/game/network/pong_network_classes.cpp
     src/game/network/pong_network_io.cpp
     src/game/network/network_timestamp.cpp
+    src/game/network/network_selection.cpp
     src/game/network/round_robin_state.cpp
     src/game/network/score_payload.cpp
     src/game/network/network_context.cpp
     src/game/network/msg_msg_sink.cpp
     src/game/network/msg_sink_timing.cpp
     src/game/network/msg_sink_children.cpp
+    src/game/network/msg_sink_key.cpp
     src/game/network/xonline_strings.cpp
     src/game/player/pong_player.cpp
     src/game/player/pong_player_swing.cpp
@@ -282,6 +289,7 @@ set(SOURCES
     src/anim/bone_transform_lookup.cpp
     src/anim/motion_lookup_data.cpp
     src/anim/pcr_anim_blenders.cpp
+    src/anim/locomotion_heading.cpp
     src/anim/look_at_controller.cpp
     src/anim/locomotion.cpp
     src/anim/angle_helpers.cpp
@@ -293,6 +301,9 @@ set(SOURCES
     src/physics/collider_velocity.cpp
     src/physics/ph_float_property.cpp
     src/physics/ph_physics.cpp
+    src/physics/archetype_refs.cpp
+    src/physics/bound_copy.cpp
+    src/physics/composite_bounds.cpp
     src/physics/bound_lookup.cpp
     src/physics/articulated_constraints.cpp
     src/physics/ph_update_object.cpp
@@ -358,10 +369,14 @@ set(SOURCES
     src/xam/kernel_import_thunks.c
     src/rage/math/float_approach.cpp
     src/rage/math/index_wrap.cpp
+    src/rage/math/random_range.cpp
+    src/rage/math/random_shuffle_data.cpp
     src/rage/math/ph_math.cpp
     src/rage/math/polygon_clip.cpp
     src/rage/math/swf_matrix.cpp
     src/rage/math/mat44.cpp
+    src/rage/math/normal_density.cpp
+    src/rage/math/quat_ops.cpp
     src/rage/math/mat33_extract_euler.cpp
     src/rage/math/mat33.cpp
     src/rage/math/mat33_orthonormalize.cpp

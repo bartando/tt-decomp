@@ -1,3 +1,6 @@
+#include "bound_copy.hpp"
+#include <cstring>
+#include "archetype_refs.hpp"
 #include "grc/resource_release.hpp"
 #include "rage/mat33.hpp"
 #include "rage/ref_counted_header.hpp"
@@ -134,9 +137,7 @@ extern void phInst_5910_p39(void* obj);
 extern void phJoint1Dof_AFF8_p42(rage::phJoint3Dof*, int, float*);
 extern void phJoint_1388(rage::phJoint3Dof*, int, float, float*, float*);
 extern void phJoint_PreSyncState(rage::phJoint3Dof*);
-extern void ph_9E50(void*, void*);
 extern void ph_A330(void* obj);
-extern void ph_CEE0(void*, int);
 extern void ph_E088(void*, void*, void*, float, int);
 extern void ph_E1E8(void* obj);
 extern void ph_FE48(void* obj, void* p);
@@ -178,7 +179,6 @@ extern void pongCreatureInst_RegisterPhysics(void*, void*);
 /* --- Audio functions --- */
 extern void aud_1498(void* obj);
 extern void aud_6A20_wrap_6A20(void* obj);
-extern double aud_2478(double x);  // exp() approximation @ 0x82432478
 
 /* --- Utility / tokenizer / singleton functions --- */
 extern uint8_t fiAsciiTokenizer_ReadBool(void*, void*, void*);
@@ -7944,7 +7944,6 @@ void rage::phArticulatedCollider::AccumulateTorqueAtRootJoint(const float* force
 // ═════════════════════════════════════════════════════════════════════════════
 
 // External declarations
-extern void util_DA50(void* dst, const void* src);  // phBound::CopyFrom base
 extern void* g_display_obj_ptr;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -8114,23 +8113,17 @@ retry:
 // the dirty flag at offset 96 to 1.
 // ─────────────────────────────────────────────────────────────────────────────
 void rage::phBoundCapsule::CopyFrom(const rage::phBoundCapsule* source) {
-    util_DA50(this, source);
-
-    memcpy((char*)this + 112, (const char*)source + 112, 16);
-    memcpy((char*)this + 128, (const char*)source + 128, 16);
-    memcpy((char*)this + 144, (const char*)source + 144, 16);
-    memcpy((char*)this + 160, (const char*)source + 160, 16);
-    memcpy((char*)this + 176, (const char*)source + 176, 16);
-
-    *(uint32_t*)((char*)this + 192) = *(const uint32_t*)((const char*)source + 192);
-
-    const uint8_t* srcBytes = (const uint8_t*)source + 196;
-    uint8_t* dstBytes = (uint8_t*)this + 196;
-    for (int i = 0; i < 12; i++) {
-        dstBytes[i] = srcBytes[i];
+    rage::phBound_CopyProperties(this, source);
+    auto* out = reinterpret_cast<uint8_t*>(this);
+    const auto* in = reinterpret_cast<const uint8_t*>(source);
+    for (unsigned offset = 0x70; offset < 0xc0; offset += 16) {
+        alignas(16) uint8_t row[16];
+        std::memcpy(row, in + offset, 16);
+        std::memcpy(out + offset, row, 16);
     }
-
-    *(uint16_t*)((char*)this + 96) = 1;
+    *reinterpret_cast<uint32_t*>(out + 0xc0) = *reinterpret_cast<const uint32_t*>(in + 0xc0);
+    for (unsigned offset = 0xc4; offset < 0xd0; ++offset) out[offset] = in[offset];
+    *reinterpret_cast<uint16_t*>(out + 0x60) = 1;
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -9486,40 +9479,7 @@ void CPeakMeterEffect_Create(void* config, void* allocator, void** outResult) {
 
 // (F420 and 5D88 are lifted as GetJointLimitsForAxis and phMatrix_RotateZ)
 
-/**
- * phBoundCapsule_26B8 @ 0x821426B8 | size: 0x84 (132 bytes)
- *
- * Computes an exponential decay factor from a capsule radius and height.
- * Uses the formula: (1/height) * exp(-height^2 / (radius^2 * 3.0))
- *
- * This produces a Gaussian-like falloff used for capsule soft-shadow
- * or contact response weighting.
- *
- * @param height - Capsule height (f1)
- * @param radius - Capsule radius (f3)
- * @return Weighted decay factor
- */
-float phBoundCapsule_26B8(float height, float radius) {
-    float radiusSq = radius * radius;
-
-    // Multiply by constant (3.0 or similar scale) from .rdata
-    float scaledRadiusSq = radiusSq * 3.0f;  // constant from lbl_8202D108+124
-
-    // Call sqrtf on scaled radius squared
-    float expResult = (float)ph_Sqrtf(scaledRadiusSq);
-
-    float heightSq = height * height;
-    float denom = radiusSq * 3.0f;  // reloaded from lbl_8202D108+124
-    float ratio = heightSq / denom;
-
-    // Compute exp(-ratio) via aud_2478
-    float expNegRatio = (float)aud_2478(-ratio);
-
-    float invHeight = 1.0f / expResult;  // 1.0f from lbl_8202D110+0
-    float result = invHeight * expNegRatio;
-
-    return result;
-}
+// (26B8 is rage::normalDensity in rage/math/normal_density.cpp)
 
 // (3F08 lifted as rage::expandAabbByOffsetBox in rage/math/polygon_clip.cpp)
 
@@ -10867,14 +10827,14 @@ int phBound::CollideDispatch(void* other) {
 // ─────────────────────────────────────────────────────────────────────────────
 // phBound::CopyFrom (vfn_34 / slot 34) @ 0x8228DA18 | size: 0x34 (52B)
 //
-// Deep-copies the base-bound payload from a source bound via util_DA50
+// Copies the base-bound payload from a source bound via phBound_CopyProperties
 // (the shared rage::phBound bytewise copy @ 0x8228DA50) and then resets
 // the reference count to 1 at +0x60 (m_nRefCount, 16-bit).  Subclasses
 // (phBoundCapsule::CopyFrom @ 0x822A2F28 …) chain extra field copies
 // after calling this base helper.
 // ─────────────────────────────────────────────────────────────────────────────
 void phBound::CopyFrom(const phBound* src) {
-    util_DA50(this, src);                       // bytewise base copy
+    rage::phBound_CopyProperties(this, src);
     uint8_t* self = reinterpret_cast<uint8_t*>(this);
     *reinterpret_cast<uint16_t*>(self + 96) = 1u;  // m_nRefCount = 1
 }

@@ -23,6 +23,8 @@
  * the plain `hsmContext_SetNextState` definition so the two linkages match.
  */
 
+#include "rage/hsm_context.hpp"
+#include "rage/ptr32.hpp"
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -223,7 +225,7 @@ void hsmContext_InitTimers(void)       {}
 void* snEvent_Construct(void* event);
 void hsmEvent_Init(void* e)            { snEvent_Construct(e); }
 void HSM_QueueNotification(void* n)    { (void)n; }
-void PostStateTransitionRequest(void* m, int e) { (void)m; (void)e; }
+
 void SetTrainingState(int s)           { (void)s; }
 
 
@@ -256,11 +258,42 @@ extern "C" void gmLogic_StepFrame(void* obj) {
     }
 }
 
-// asm-alias wrapper for the C-side PostStateTransitionRequest symbol.
-extern "C" void _c_PostStateTransitionRequest(void* m, int e)
-    __asm__("_PostStateTransitionRequest");
-extern "C" void _c_PostStateTransitionRequest(void* m, int e) {
-    PostStateTransitionRequest(m, e);
+namespace {
+struct StateNameManager {
+    virtual void Reserved0() = 0;
+    virtual void Reserved1() = 0;
+    virtual void Reserved2() = 0;
+    virtual void Reserved3() = 0;
+    virtual void Reserved4() = 0;
+    virtual void Reserved5() = 0;
+    virtual uint32_t CanQueryStateName() = 0;
+};
+struct NamedState {
+    virtual void Reserved0() = 0;
+    virtual void Reserved1() = 0;
+    virtual void Reserved2() = 0;
+    virtual void Reserved3() = 0;
+    virtual void Reserved4() = 0;
+    virtual void Reserved5() = 0;
+    virtual void Reserved6() = 0;
+    virtual void Reserved7() = 0;
+    virtual void Reserved8() = 0;
+    virtual void Reserved9() = 0;
+    virtual void Reserved10() = 0;
+    virtual void Reserved11() = 0;
+    virtual void Reserved12() = 0;
+    virtual const char* GetName() = 0;
+};
+}
+extern "C" const char g_hsmUnknownState[]; // @ 0x8204DD08
+
+// @ 0x822228B8
+const char* hsmContext_GetStateName(void* manager, uint32_t stateIndex) {
+    if (static_cast<uint8_t>(static_cast<StateNameManager*>(manager)->CanQueryStateName()) == 0)
+        return g_hsmUnknownState;
+    // The query callback can replace the child array.
+    auto* states = rage::load_ptr32<rage::ptr32<NamedState>>(manager, 8);
+    return states[stateIndex]->GetName();
 }
 
 

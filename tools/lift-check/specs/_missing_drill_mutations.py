@@ -25,8 +25,8 @@ CASES = {
         ('remaining off by one', 'm_pConfig->m_totalNumTries - m_numAttempts + 1',
          'm_pConfig->m_totalNumTries - m_numAttempts'),
         ('boolean low bit only', 'if (UseAlternateAttemptEvent())', 'if (UseAlternateAttemptEvent() & 1)'),
-        ('wrong ordinary event', 'NotifyUIEvent(0x0F, 0x40, 0, 0);', 'NotifyUIEvent(0x0E, 0x40, 0, 0);'),
-        ('drop final message', '    NotifyUIEvent(0x5005, 0x40, 0, 0);', '    /* event lost */'),
+        ('wrong ordinary event', 'PostGameMessage(0x0F, 0x40, 0, 0);', 'PostGameMessage(0x0E, 0x40, 0, 0);'),
+        ('drop final message', '    PostGameMessage(0x5005, 0x40, 0, 0);', '    /* event lost */'),
     ],
     'drill_base_choose_robot_target': [
         ('easy boundary', 'm_numAttempts <= m_pConfig->m_numEasyShots',

@@ -5,7 +5,7 @@ No ignored memory; the array-pool slot must survive cleanup.
 import struct
 from liftcheck.spec import *
 
-FUNCTION = 'SinglesNetworkClient_BindEntry'
+FUNCTION = 'swfGetOrCreatePageGroupValue'
 ADDRESS = 0x823F9318
 SOURCE = 'src/rage/swf_page_group.cpp'
 TRIALS = 1400
