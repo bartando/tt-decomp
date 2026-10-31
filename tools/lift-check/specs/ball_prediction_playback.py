@@ -6,7 +6,7 @@ FUNCTION = "pg_70C8_g"
 ADDRESS = 0x822870C8
 SOURCE = "src/game/ball/ball_playback.cpp"
 TRIALS = 1000
-EXTERNS = {"g_pongMatchTiming": 0x8271A2E8}
+EXTERNS = {"g_pongMatchTiming": 0x8271A2E8, "PostGameMessage": 0x8225E6E0}
 SCRIPT = {}
 
 
@@ -49,7 +49,7 @@ CALLS = {
     "instance.vfn_4": model(get_velocity),
     "level.vfn_11": stub(ret="void", args=("r3", "r4")),
     "archetype.vfn_7": stub(ret=lambda c: c.rng.uniform(0.1, 4.0)),
-    "pg_E6E0": stub(ret="void"),
+    "PostGameMessage": stub(ret="void"),
     "nop_8240E6D0": stub(ret="void", args=("r3", "f1"), deref={"r4": 2}),
     "BallAudio_PreImpact": stub(ret="void", args=("r3", "r5", "r6", "r7", "f1")),
 }

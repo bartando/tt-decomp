@@ -3,6 +3,7 @@
 #include "pong_ball.hpp"
 #include "ball_visual_spin.hpp"
 #include "ball_audio.hpp"
+#include "game/game_message.hpp"
 #include <cstdint>
 #include <cmath>
 
@@ -93,7 +94,6 @@ extern void BallPredict_InterpolateState(void* state, void* unusedR4, gdBallPred
 extern void BallPredict_AdvanceSamples(int bank, bool recordReplay); // @ 0x82287930
 extern bool BallPhysics_QueueInactive(void* sim, uint16_t handle); // @ 0x822C1B98
 extern void nop_8240E6D0(const char* format, ...); // @ 0x8240E6D0
-extern void pg_E6E0(int message, int mask, int count, int args); // @ 0x8225E6E0
 
 // @ 0x821D3390
 // Previously called pongLerpQueue_CheckTimeWindow; the receiver is game state,
@@ -201,32 +201,32 @@ void pg_70C8_g() {
     }
     Velocity velocity{zero, zero, zero};
     instance->GetVelocity(&velocity);
-    if (descending) pg_E6E0(11, 0x40, 0, 0);
+    if (descending) PostGameMessage(11, 0x40, 0, nullptr);
     const float impactScale = g_lookAtMultiplier;
     if (bounce) {
         nop_8240E6D0("Sending msgBall::kBounceTable%s now(%f)",
             localBounce ? "A" : "B",
             static_cast<Timing*>(g_pongMatchTiming)->now);
-        pg_E6E0(localBounce ? 1 : 2, 0x40, 0, 0);
+        PostGameMessage(localBounce ? 1 : 2, 0x40, 0, nullptr);
         const float vy = __builtin_fabsf(velocity.y);
         const float impulse = instance->archetype->GetMass() * vy;
         const float scaled = impulse * impactScale;
         BallAudio_PreImpact(instance->audio, nullptr, 2, &instance->matrix.d.x, 0, scaled * scaled);
     }
     if (flag9) {
-        pg_E6E0(7, 0x40, 0, 0);
+        PostGameMessage(7, 0x40, 0, nullptr);
         const float vy = __builtin_fabsf(velocity.y);
         const float impulse = instance->archetype->GetMass() * vy;
         const float scaled = impulse * impactScale;
         BallAudio_PreImpact(instance->audio, nullptr, 3, &instance->matrix.d.x, 0, scaled * scaled);
     }
-    if (passedTable) pg_E6E0(13, 0x40, 0, 0);
-    if (belowTable) pg_E6E0(12, 0x40, 0, 0);
+    if (passedTable) PostGameMessage(13, 0x40, 0, nullptr);
+    if (belowTable) PostGameMessage(12, 0x40, 0, nullptr);
     if (passedNet) {
-        pg_E6E0(10, 0x40, 0, 0);
-        pg_E6E0(44, 0x40, 0, 0);
+        PostGameMessage(10, 0x40, 0, nullptr);
+        PostGameMessage(44, 0x40, 0, nullptr);
     }
-    if (passedPlayer) pg_E6E0(14, (1u << playerSide) | 0x40, 0, 0);
+    if (passedPlayer) PostGameMessage(14, (1u << playerSide) | 0x40, 0, nullptr);
 }
 
 namespace ballPlayback {

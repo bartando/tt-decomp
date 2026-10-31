@@ -6,8 +6,6 @@
 #include <cmath>
 #pragma clang fp contract(off)
 
-// Batch17 supplies this existing lift; its declaration is in mat33.hpp there.
-namespace rage { void mat33ComposeInPlace(float* matrix,const float* rotation); } // @ 0x820C3BC8
 extern double crt_sqrt(double value); // @ 0x824301D0
 extern "C" const float lbl_825CB7C0[4]; // @ 0x825CB7C0
 
