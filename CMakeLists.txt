@@ -233,6 +233,7 @@ set(SOURCES
     src/game/network/msg_msg_sink.cpp
     src/game/network/msg_sink_timing.cpp
     src/game/network/msg_sink_children.cpp
+    src/game/network/msg_sink_key.cpp
     src/game/network/xonline_strings.cpp
     src/game/player/pong_player.cpp
     src/game/player/pong_player_swing.cpp

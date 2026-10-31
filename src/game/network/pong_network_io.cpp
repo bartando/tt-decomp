@@ -461,7 +461,6 @@ uint32_t GetPlayerID(void* client, uint32_t reportInvalid) {
 
 // ── Forward declarations for sibling-owned helpers ──────────────────────────
 extern uint32_t atSingleton_6F98_g(); // @ 0x82566F98
-extern int32_t atSingleton_9B98_p39(void* node, void* key);           // @ 0x82459b98
 extern int32_t game_3FD0_h(void* sink);                               // @ 0x82453fd0
 extern int32_t game_9A48_h(void* node);                               // @ 0x82459a48
 extern void  msgMsgSink_8B78_g(void* sessionRef, uint16_t hdr);       // @ 0x82448b78
@@ -521,27 +520,6 @@ uint32_t msgMsgSink_3C88_g(void* self, uint32_t flag)
 }
 
 
-/**
- * msgMsgSink_3D70_p39 @ 0x82453D70 | size: 0x58
- *
- * Walks the sink's child linked list at +36 forwarding each node into
- * atSingleton_9B98_p39(child, key). Returns 1 on first non-zero response.
- */
-uint32_t msgMsgSink_3D70_p39(void* self)
-{
-    uint8_t* s = static_cast<uint8_t*>(self);
-    uint8_t* head = s + 36;
-    uint32_t key  = 0;  // original takes r4 into r30, passed below
-    uint32_t node = *reinterpret_cast<uint32_t*>(s + 40);
-    while (node != static_cast<uint32_t>(reinterpret_cast<uintptr_t>(head))) {
-        if (atSingleton_9B98_p39(reinterpret_cast<void*>(node),
-                                 reinterpret_cast<void*>(key)) != 0) {
-            return 1;
-        }
-        node = *reinterpret_cast<uint32_t*>(node + 4);
-    }
-    return 0;
-}
 
 
 /**

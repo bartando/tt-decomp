@@ -19,7 +19,6 @@
  * drop the slot-index body (second column). Tracked for a follow-up batch.
  *       - 0x8244DCF0 (vslot 25): GenerateAndCleanup / GenerateWithLock
  *       - 0x8244DB58 (vslot 52): SendEvent / ResetEventDispatch
- *       - 0x8244E148 (vslot 46): GetNestedObjectValue / GetConnectionCount
  *       - 0x8244E628 (vslot 49): FlushAndDisconnect / OnDisconnect
  *       - 0x8244E680 (vslot 50): BeginDisconnect / OnReconnect
  *       - 0x8244E6D0 (vslot 30): FindValidMessageSlot / FindGamerByIndex
@@ -33,7 +32,7 @@
  *       - 0x8244F7B8 (vslot 115): GetNameLength / GetMessageBufferPtr
  *       - 0x8244F768 (vslot 119): SendPulseToConnection / GetSessionLock
  *       - 0x824564A0 (vslot 120): DispatchEventWithSessionInfo / NotifyStateChange
- *       - 0x8244DCF0 / 0x8244E0C0 / 0x8244E138 / 0x8244E148 also appear as
+ *       - 0x8244DCF0 / 0x8244E0C0 / 0x8244E138 also appear as
  *         free-function msgMsgSink_XXXX_g alongside method versions.
  *       These should be consolidated; most represent the same function body
  *       renamed during incremental decomp passes.
@@ -602,21 +601,6 @@ void msgMsgSink::ClearPointers() {
     *(void**)((uint8_t*)this + 40) = nullptr;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// msgMsgSink::GetNestedObjectValue() [vtable slot 46 @ 0x8244E148]
-// Returns value from nested object or 0 if null
-// ─────────────────────────────────────────────────────────────────────────────
-uint32_t msgMsgSink::GetNestedObjectValue() {
-    void* nestedObj = *(void**)((uint8_t*)this + 52);
-    
-    if (nestedObj == nullptr) {
-        return 0;
-    }
-    
-    // Call helper function on nested object
-    extern uint32_t msgMsgSink_3D70_p39(void*);
-    return msgMsgSink_3D70_p39(nestedObj);
-}
 
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1496,7 +1480,6 @@ extern void game_0388_h(void*, uint16_t);
 extern uint32_t game_8CF8_h(void*, uint16_t);
 extern void* msgMsgSink_8D10_g(void*, uint16_t);
 extern void jumptable_3A48(void*, uint32_t, uint16_t, uint32_t);
-extern uint32_t msgMsgSink_3D70_p39(void*);
 extern void atSingleton_B0E8_sp(void*, uint32_t, uint32_t);
 extern uint32_t RtlEnterCriticalSection_A158_h(void*, void*, uint32_t, uint32_t, uint32_t);
 
@@ -1556,21 +1539,6 @@ void msgMsgSink::ResetEventDispatch() {
     jumptable_3A48(eventSink, 2, 0, 0);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// msgMsgSink::GetConnectionCount() [vfn_46 @ 0x8244E148 | 24B]
-//
-// Returns the active connection count from the delegate object at +52.
-// If the delegate pointer is null, returns 0.
-// ─────────────────────────────────────────────────────────────────────────────
-uint32_t msgMsgSink::GetConnectionCount() {
-    void* delegate = *(void**)((uint8_t*)this + 52);
-
-    if (delegate == nullptr) {
-        return 0;
-    }
-
-    return msgMsgSink_3D70_p39(delegate);
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // msgMsgSink::ForwardMessageToSession() [vfn_68 @ 0x82456F28 | 20B]
