@@ -51,8 +51,12 @@ struct DrillPracticeTarget {
     uint8_t _pad00[0x14];
     bool    m_visible;        // +0x14
     uint8_t _pad15[2];
-    bool    m_clampToTable;   // +0x17 SetPosition keeps the target on the table while set
-    uint8_t _pad18[0x4C];
+    uint8_t m_clampToTable;   // +0x17 any nonzero byte enables table clamping
+    uint8_t _pad18[0x10];
+    float   m_heightOffset;   // +0x28
+    uint8_t _pad2C[0x24];
+    DrillVector4 m_position;  // +0x50
+    uint8_t _pad60[4];
     bool    m_spinStopped;    // +0x64 set by IsPointOnTarget on a hit
 };
 extern DrillPracticeTarget* g_pPracticeTarget;  // @ 0x826063A8
@@ -60,7 +64,8 @@ extern DrillPracticeTarget* g_pPracticeTarget;  // @ 0x826063A8
 // hudTrainingHUD (hud.hpp), the fields the drill touches.
 struct DrillTrainingHud {
     uint8_t _pad00[0x98];
-    char    m_timeText[32];   // +0x98 clock text; +0xB8 is pushed as "arrow_direction"
+    char    m_timeText[32];   // +0x98 clock text
+    int32_t m_arrowDirection; // +0xB8
 };
 extern DrillTrainingHud* g_pTrainingHud;  // @ 0x82606614
 
@@ -116,18 +121,93 @@ int RoundHalfAwayFromZero(float value) {
     if (rounded >= 2147483648.0f) return INT32_MAX;
     return static_cast<int32_t>(rounded);
 }
-extern void hudTrainingHUD_SetCompleted(DrillTrainingHud* hud, int count);            // @ 0x822FA818
-extern void hudTrainingHUD_SetTimeLow(DrillTrainingHud* hud, bool low);               // @ 0x822FA878
-// Pushes the HUD's +0xB8 as "arrow_direction". Every caller passes 0 in r4;
-// the callee never reads it.
-extern void hudTrainingHUD_PushArrowDirection(DrillTrainingHud* hud, int unused);     // @ 0x822FA8F0
+extern "C" uint32_t hudFlashBase_IsNetworkDirty(void* hud); // @ 0x822EB2A8
+extern "C" void* hudFlashBase_GetPageGroup(void* hud);      // @ 0x822EB1E8
+extern "C" void* SinglesNetworkClient_BindEntry(void* group, const char* key); // @ 0x823F9318
+extern "C" void hudFlashBase_PublishPageGroup(void* hud);   // @ 0x822EB320
+
+struct DrillHudEntry { int32_t value, type; };
+
+// A missing entry still releases the page-group lock acquired by the poll.
+static void SetTrainingHudInteger(DrillTrainingHud* hud, const char* key, int32_t value) {
+    uint8_t acquired = hudFlashBase_IsNetworkDirty(hud);
+    void* group = hudFlashBase_GetPageGroup(hud);
+    auto* entry = static_cast<DrillHudEntry*>(SinglesNetworkClient_BindEntry(group, key));
+    if (entry) {
+        entry->value = value;
+        entry->type = 3;
+    }
+    if (acquired != 0) hudFlashBase_PublishPageGroup(hud);
+}
+
+// @ 0x822FA7B8 | size: 0x60
+void hudTrainingHUD_SetRemaining(DrillTrainingHud* hud, int count) {
+    SetTrainingHudInteger(hud, "possible", count);
+}
+
+// @ 0x822FA818 | size: 0x60
+void hudTrainingHUD_SetCompleted(DrillTrainingHud* hud, int count) {
+    SetTrainingHudInteger(hud, "completed", count);
+}
+
+// @ 0x822FA878 | size: 0x74
+void hudTrainingHUD_SetTimeLow(DrillTrainingHud* hud, uint32_t low) {
+    SetTrainingHudInteger(hud, "time_low", (low & 0xFFu) != 0 ? 1 : 0);
+}
+
+// @ 0x822FA8F0 | size: 0x60
+void hudTrainingHUD_PushArrowDirection(DrillTrainingHud* hud) {
+    // The original fetches the value after obtaining the page group.
+    uint8_t acquired = hudFlashBase_IsNetworkDirty(hud);
+    void* group = hudFlashBase_GetPageGroup(hud);
+    int32_t direction = hud->m_arrowDirection;
+    auto* entry = static_cast<DrillHudEntry*>(
+        SinglesNetworkClient_BindEntry(group, "arrow_direction"));
+    if (entry) {
+        entry->value = direction;
+        entry->type = 3;
+    }
+    if (acquired != 0) hudFlashBase_PublishPageGroup(hud);
+}
 // Corners of side `side`'s play area: (min.x, 0, min.z) and (max.x, 0, max.z).
 extern void DrillMatch_GetSideBounds(  // @ 0x821C9CD0
     DrillMatchView* match, int side, DrillVector4* pMin, DrillVector4* pMax);
 // Moves the target to `position` (w = radius); clamps it to the table while
 // m_clampToTable is set.
-extern void gmPracticeTarget_SetPosition(  // @ 0x82113BA8
-    DrillPracticeTarget* target, const DrillVector4* position);
+struct DrillTableDimensions {
+    uint8_t _pad00[0x10];
+    float width, height, length;
+};
+extern void* g_pTableDims;  // @ 0x8271A304
+
+// fsubs + fsel for the lower bound; fsub + fsel for the upper bound.
+// NaN selects the lower bound. Keep the single/double subtraction distinction.
+static float ClampPracticeTarget(float value, float halfExtent) {
+    float lower = -halfExtent;
+    float delta = value - lower;
+    float raised = delta >= 0.0f ? value : lower;
+    return double(raised) - double(halfExtent) >= 0.0 ? halfExtent : raised;
+}
+
+// @ 0x82113BA8 | size: 0x8C
+// Raw word 0x100020C3 at +4 is lvx128 v0,0,r4, misprinted as vmaddfp128
+// in .text.s. It consumes a pointer, rounds it down to a 16-byte boundary,
+// copies all four lanes, then clamps x/z and adds the target's height offset.
+void* gmPracticeTarget_SetPosition(void* object, const float* position) {
+    auto* target = static_cast<DrillPracticeTarget*>(object);
+    const void* alignedPosition = reinterpret_cast<const void*>(
+        reinterpret_cast<uintptr_t>(position) & ~uintptr_t(15));
+    __builtin_memcpy(&target->m_position, alignedPosition, sizeof(target->m_position));
+    if (target->m_clampToTable != 0) {
+        const auto* table = static_cast<const DrillTableDimensions*>(g_pTableDims);
+        float halfWidth = table->width * 0.5f;
+        float halfLength = table->length * 0.5f;
+        target->m_position.x = ClampPracticeTarget(target->m_position.x, halfWidth);
+        target->m_position.z = ClampPracticeTarget(target->m_position.z, halfLength);
+    }
+    target->m_position.y = target->m_heightOffset + target->m_position.y;
+    return target;
+}
 // Shows one of the table target sets (gmPracticeTarget, 0x821137B0).
 extern void gmPracticeTarget_SelectSet(  // @ 0x821137B0
     DrillPracticeTarget* target, int32_t setId, int arg2, int arg3);
@@ -259,7 +339,6 @@ struct DrillRobotView {
     uint8_t m_mode;
 };
 extern DrillRobotView* g_pBallRobot;  // @ 0x826063A4
-extern void hudTrainingHUD_SetRemaining(DrillTrainingHud* hud, int count); // @ 0x822FA7B8
 
 /**
  * pongTrainingDrill::NextAttempt
@@ -688,7 +767,7 @@ void pongDrillMovement::Init() {
  */
 void pongDrillMovement::Start() {
     pongTrainingDrill::Start();
-    hudTrainingHUD_PushArrowDirection(g_pTrainingHud, 0);
+    hudTrainingHUD_PushArrowDirection(g_pTrainingHud);
     UpdateTimeDisplay();
     hudTrainingHUD_SetTimeLow(g_pTrainingHud, false);
 
@@ -705,7 +784,7 @@ void pongDrillMovement::Start() {
  */
 void pongDrillMovement::Finish() {
     pongTrainingDrill::Finish();
-    hudTrainingHUD_PushArrowDirection(g_pTrainingHud, 0);
+    hudTrainingHUD_PushArrowDirection(g_pTrainingHud);
 }
 
 /**
@@ -858,7 +937,8 @@ void pongDrillMovement::NextAttempt(int count) {
     DrillPracticeTarget* practiceTarget = g_pPracticeTarget;
     practiceTarget->m_spinStopped = false;
     practiceTarget->m_clampToTable = false;
-    gmPracticeTarget_SetPosition(practiceTarget, &target);
+    practiceTarget = static_cast<DrillPracticeTarget*>(
+        gmPracticeTarget_SetPosition(practiceTarget, &target.x));
     practiceTarget->m_visible = true;
 }
 
