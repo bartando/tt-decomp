@@ -129,6 +129,9 @@ int32_t KeResetEvent(void* Event);
  */
 NTSTATUS KeWaitForSingleObject(void* Object, uint32_t WaitReason, uint32_t WaitMode,
                                 uint32_t Alertable, LARGE_INTEGER* Timeout);
+NTSTATUS NtWaitForSingleObjectEx(void* Object, uint32_t WaitMode, uint32_t Alertable,
+                                const int64_t* Timeout);
+NTSTATUS NtClose(HANDLE Handle);
 
 //=============================================================================
 // Semaphore Functions
@@ -446,6 +449,8 @@ typedef struct _RTL_CRITICAL_SECTION {
  * @param CriticalSection Pointer to critical section
  */
 void RtlEnterCriticalSection(RTL_CRITICAL_SECTION* CriticalSection);
+void RtlInitializeCriticalSection(RTL_CRITICAL_SECTION* CriticalSection);
+void RtlDeleteCriticalSection(RTL_CRITICAL_SECTION* CriticalSection);
 
 /**
  * RtlLeaveCriticalSection @ 0x82585DFC | ordinal: varies
