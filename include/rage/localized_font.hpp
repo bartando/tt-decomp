@@ -56,6 +56,7 @@ extern "C" {
 extern rage::ptr32<LocalizedFont> g_localizedFontHead; // @ 0x826066E0
 extern LocalizedFontShutdownRegistry g_localizedFontShutdownRegistry; // @ 0x825CB9A0
 extern const char g_localizedFontReleaseError[]; // @ 0x8207580C
+extern const char g_localizedFontResetName[]; // @ 0x82027C50
 }
 
 void* localizedFontCreate(const char* name); // @ 0x82409128
@@ -68,3 +69,4 @@ void localizedFontClearResources(void* font); // @ 0x82409F08
 void localizedFontShutdown(); // @ 0x8240A208
 uint32_t localizedFontEffectRelease(void* effect); // @ 0x82151268
 void* localizedFontEffectDestroy(void* effect, uint32_t flags); // @ 0x821512B8
+void localizedFontResizeArray(void* array, uint32_t count); // @ 0x8240A250
