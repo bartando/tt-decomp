@@ -320,6 +320,7 @@ set(SOURCES
     src/game/player/player_data.cpp
     src/graphics/grc_data.cpp
     src/graphics/image_data.cpp
+    src/graphics/image_descriptor_queries.cpp
     src/physics/ph_data.cpp
     src/physics/ld_ph_data.cpp
     src/rage/animation/anim_data.cpp
