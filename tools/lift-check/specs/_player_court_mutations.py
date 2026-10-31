@@ -39,7 +39,7 @@ CASES = {
         ("wrong live offset", "self + 0x370, sizeof offset", "self + 0x360, sizeof offset"),
         ("wrong output", "self + 0x340, result", "self + 0x350, result"),
         ("drop fourth lane", "lane < 4", "lane < 3"),
-        ("omit VMX flushing", "flushVmx(flushVmx(point[lane]) + flushVmx(offset[lane]))", "point[lane] + offset[lane]"),
+        ("omit VMX flushing", "rage::vmxAddFloat(point[lane], offset[lane])", "point[lane] + offset[lane]"),
         ("wrong return pointer", "return reinterpret_cast<vec3*>(self + 0x340);", "return reinterpret_cast<vec3*>(self + 0x350);"),
     ]),
 }

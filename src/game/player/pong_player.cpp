@@ -1,3 +1,5 @@
+#include "game/player_shot_position.hpp"
+#include "rage/vmx_float.hpp"
 #include "game/player_court.hpp"
 #include "game/player_manager_state.hpp"
 #include "game/network_timestamp.hpp"
@@ -168,7 +170,6 @@ void pongPlayer_D6C8_fw(void* animTransObj);  // ResetAnimTransitionState @ 0x82
 void pongPlayer_06A0_g(float* outVec, pongPlayer* player);  // ComputeSwingTargetDelta @ 0x821906A0
 
 // Swing/target helpers
-extern void pongPlayer_ComputeTargetPosition(vec3* outVec, void* targetStruct);
 extern double crt_tan(double input); // @ 0x82432628
 extern void pongPlayer_InterpolateCourtPoint(void* adjustedVec, void* gridBase, void* p3, void* p4, void* p5);
 
@@ -1203,7 +1204,7 @@ void pongPlayer::UpdateSwingTimingAdjustment() {
     void* targetStruct = static_cast<void*>(g_ballSplashArray + 48 + (index * 416));
     
     // Call helper to compute target vector
-    pongPlayer_ComputeTargetPosition(&targetVec, targetStruct);
+    pongPlayer_ComputeTargetPosition(&targetVec, targetStruct, 0);
     
     // Step 2: Load timing values
     float animPhase = this->m_swingPhaseInput;  // this+68
@@ -1279,17 +1280,8 @@ vec3* pongPlayer::UpdatePositionFromSwingTarget() {
     alignas(16) float point[4], offset[4], result[4];
     __builtin_memcpy(point, position, sizeof point);
     __builtin_memcpy(offset, self + 0x370, sizeof offset);
-    auto flushVmx = [](float value) {
-        uint32_t bits;
-        __builtin_memcpy(&bits, &value, sizeof bits);
-        if ((bits & 0x7F800000u) == 0) {
-            bits &= 0x80000000u;
-            __builtin_memcpy(&value, &bits, sizeof value);
-        }
-        return value;
-    };
     for (int lane = 0; lane < 4; ++lane)
-        result[lane] = flushVmx(flushVmx(point[lane]) + flushVmx(offset[lane]));
+        result[lane] = rage::vmxAddFloat(point[lane], offset[lane]);
     __builtin_memcpy(self + 0x340, result, sizeof result);
     return reinterpret_cast<vec3*>(self + 0x340);
 }
@@ -1347,7 +1339,7 @@ void pongPlayer::ProcessInputVector(float x, float y, float z, uint8_t flags) {
     memcpy(&currentPos, inputData + 240, sizeof(vec3));
 
     vec3 tempVec1;
-    pongPlayer_ComputeTargetPosition(&tempVec1, inputData);
+    pongPlayer_ComputeTargetPosition(&tempVec1, inputData, 0);
 
     // Scale input by player-specific factors
     // this+36 and this+40 are within the pongPlayer struct pad region
@@ -1371,7 +1363,7 @@ void pongPlayer::ProcessInputVector(float x, float y, float z, uint8_t flags) {
     
     // Call helper again with updated data
     vec3 tempVec2;
-    pongPlayer_ComputeTargetPosition(&tempVec2, inputData);
+    pongPlayer_ComputeTargetPosition(&tempVec2, inputData, 0);
     
     // Add the two computed vectors
     vec3 finalVec;
@@ -2161,72 +2153,6 @@ int pongPlayer::GetFrameIndexDelta(void* frameData) {  // pongPlayer_7A48_g @ 0x
         return diff + 1;
     }
     return diff + 21;
-}
-
-
-// ===========================================================================
-// SECTION 31 — ComputePositionWithOffsets  @ 0x821D62A8 | size: 0x60 (96 bytes)
-// ===========================================================================
-/**
- * pongPlayer::ComputePositionWithOffsets(void* inputData)
- *
- * Computes a combined position vector by calling pongPlayer_ComputeTargetPosition to get
- * a base target vector, then adding the offset vectors at this+224 (vec4)
- * and this+240 (vec4), storing the result at this+32.
- *
- * result = 6470_g(self, inputData) + vec4@(self+224) + vec4@(self+240)
- */
-void pongPlayer::ComputePositionWithOffsets(void* inputData) {  // pongPlayer_62A8_g @ 0x821D62A8
-    float tempVec[4];
-    pongPlayer_ComputeTargetPosition(reinterpret_cast<vec3*>(tempVec), inputData);
-
-    // NOTE: pongPlayer_62A8_g is called by phBoundCapsule_25F0_g and the
-    //       pongPlayer_EF38/F2A0/F7B0 family — `this` here is NOT a pongPlayer
-    //       but a phBound-adjacent struct where +224/+240 are adjacent 16-byte
-    //       offset vectors and +32 is the result slot. Kept as a pongPlayer
-    //       method for binding parity with the call-site thunk.
-    uint8_t* base = reinterpret_cast<uint8_t*>(this);
-    float* offset1 = reinterpret_cast<float*>(base + 224);
-    float* offset2 = reinterpret_cast<float*>(base + 240);
-    float* dest    = reinterpret_cast<float*>(base + 32);
-
-    // vaddfp: result = temp + offset1 + offset2
-    dest[0] = tempVec[0] + offset1[0] + offset2[0];
-    dest[1] = tempVec[1] + offset1[1] + offset2[1];
-    dest[2] = tempVec[2] + offset1[2] + offset2[2];
-    dest[3] = tempVec[3] + offset1[3] + offset2[3];
-}
-
-
-// ===========================================================================
-// SECTION 32 — ComputePositionWithOffset  @ 0x821D6308 | size: 0x54 (84 bytes)
-// ===========================================================================
-/**
- * pongPlayer::ComputePositionWithOffset()
- *
- * Similar to ComputePositionWithOffsets but only adds one offset vector
- * (at this+224).  Calls pongPlayer_ComputeTargetPosition with r5=0 (no input data),
- * then adds vec4@(this+224), storing the result at this+32.
- *
- * result = 6470_g(self, NULL) + vec4@(self+224)
- */
-void pongPlayer::ComputePositionWithOffset() {  // pongPlayer_6308_g @ 0x821D6308
-    float tempVec[4];
-    pongPlayer_ComputeTargetPosition(reinterpret_cast<vec3*>(tempVec), nullptr);
-
-    // NOTE: as with 62A8_g above, this is called by phBoundCapsule_E830_g and
-    //       the pongPlayer_EF38/F2A0/F7B0 family — operates on a phBound-shaped
-    //       struct, not on pongPlayer. +224 is a 16-byte offset vector, +32 is
-    //       the result slot.
-    uint8_t* base = reinterpret_cast<uint8_t*>(this);
-    float* offset = reinterpret_cast<float*>(base + 224);
-    float* dest   = reinterpret_cast<float*>(base + 32);
-
-    // vaddfp: result = temp + offset
-    dest[0] = tempVec[0] + offset[0];
-    dest[1] = tempVec[1] + offset[1];
-    dest[2] = tempVec[2] + offset[2];
-    dest[3] = tempVec[3] + offset[3];
 }
 
 
@@ -3603,17 +3529,8 @@ void pongPlayer_InterpolateCourtGridPosition(float* lerpFactors, uint32_t flip, 
     }
 
     // vaddfp flushes subnormal operands and results, preserving the zero sign.
-    auto flushVmx = [](float value) {
-        uint32_t bits;
-        __builtin_memcpy(&bits, &value, sizeof(bits));
-        if ((bits & 0x7F800000u) == 0) {
-            bits &= 0x80000000u;
-            __builtin_memcpy(&value, &bits, sizeof(value));
-        }
-        return value;
-    };
     for (int lane = 0; lane < 4; ++lane)
-        outPos[lane] = flushVmx(flushVmx(outPos[lane]) + flushVmx(offset[lane]));
+        outPos[lane] = rage::vmxAddFloat(outPos[lane], offset[lane]);
 }
 
 
@@ -4724,12 +4641,6 @@ extern "C" void pongPlayer_1460_g(void* /*self*/, int /*arg*/) {}
 
 // pongPlayer_5B60_gen @ 0x82195B60 — lifted below as pongPlayer_CheckServeInput.
 extern "C" bool pongPlayer_5B60_gen(pongPlayer* p) { return pongPlayer_CheckServeInput(p); }
-
-// pongPlayer_6470_g @ 0x821D6470 | size: 0x13C
-// Two signatures were historically declared for this symbol (vec3* vs float*).
-// They are C++-overloaded here; callers include both forms.
-void pongPlayer_6470_g(float* /*a*/, void* /*b*/, int /*c*/) {}
-void pongPlayer_6470_g(vec3*  /*a*/, void* /*b*/) {}
 
 // pongPlayer_B208_g @ 0x820CB208 | size: 0x15C
 // Applies a swing vector to the player's swing state (extern-decl above).

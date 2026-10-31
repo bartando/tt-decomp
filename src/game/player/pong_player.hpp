@@ -375,8 +375,6 @@ struct pongPlayer {
     bool IsLocomotionReady() const;
     void ResetServePosition();
     int GetFrameIndexDelta(void* frameData);
-    void ComputePositionWithOffsets(void* inputData);
-    void ComputePositionWithOffset();
     static void SyncByteField(void* target, void* source);
     void SyncFloatField(void* target, void* source);
     void UpdateDirtyFlags(void* obj, uint8_t forceReset);
