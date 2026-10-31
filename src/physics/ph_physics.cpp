@@ -814,23 +814,13 @@ float ph_Atan2fSafe(float f1, float f2) {
 // If the value is outside the valid range [minThreshold, maxThreshold],
 // it's clamped. Otherwise, it's scaled and passed through a trig function.
 // ─────────────────────────────────────────────────────────────────────────────
-float ph_ClampAndSin(float inputValue) {
-    // Load threshold constants from global data
-    const float minThreshold = g_phNegThreshold;  // @ 0x8202D010
-    const float maxThreshold = g_phClampMax;  // @ 0x8202D008
-    const float scaleFactor = *(float*)0x8202CFF0;   // offset +0 from base
-    
-    if (inputValue <= minThreshold) {
-        return minThreshold;
-    }
-    
-    if (inputValue >= maxThreshold) {
-        return maxThreshold;
-    }
-    
-    // Apply scaling and trigonometric transformation
-    float scaledValue = inputValue * scaleFactor;
-    return ph_Sinf(scaledValue);
+extern double crt_sin(double); // @ 0x824301D8
+// @ 0x820CB6A0 | size: 0x50
+float ph_ClampAndSin(float value) {
+    if (!(value > 0.0f)) return 0.0f;
+    if (!(value < 1.0f)) return 1.0f;
+    const float angle = value * 1.5707963705062866f;
+    return static_cast<float>(crt_sin(angle));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1090,33 +1080,6 @@ float rage::phBoundCapsule::GetRadius() const {
 
     // Return custom radius from field +28
     return *(const float*)&m_fAABBMaxZ;  // +0x1C
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// rage::phBoundCapsule::ScaleRadius @ 0x820CB6A0 | size: 0x50
-//
-// Conditionally scales the capsule radius based on the input scale factor.
-// If scale is outside the range (floatZero, floatOne), applies scaling.
-//
-// Parameters:
-//   scale - Scale factor to apply to radius
-// ─────────────────────────────────────────────────────────────────────────────
-void rage::phBoundCapsule::ScaleRadius(float scale) {
-    const float* constants = &g_floatOne;  // constant table base
-    const float one = constants[0];    // +0 = 1.0f
-    const float zero = constants[72];  // +288 = 0.0f (offset in bytes / 4)
-    
-    // Only scale if outside valid range
-    if (scale > zero && scale < one) {
-        return;  // No scaling needed
-    }
-    
-    // Apply scaling: multiply by constant at offset +0
-    float scaleFactor = constants[0];  // 1.0f
-    float scaledValue = scale * scaleFactor;
-    
-    // Call helper function to apply the scaled value
-    ph_Sinf(scaledValue);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

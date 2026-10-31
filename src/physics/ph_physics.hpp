@@ -863,7 +863,6 @@ struct phBoundCapsule {
     // Non-virtual methods
     int32_t ComputeFixedPointDotProduct();  // @ 0x824C35C8
     float GetRadius() const;
-    void ScaleRadius(float scale);
     float ComputeExtent(float param1, float param2) const;
     void InitializeAxisAlignedZ(float halfLength, float* outMatrix);
     void SetMaterialIndex(uint32_t index);

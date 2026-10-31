@@ -1,0 +1,7 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
+from _player_pose_easing_common import *
+
+FUNCTION = "cmSmoothRemap_B768"
+ADDRESS = 0x820CB768
