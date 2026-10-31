@@ -1,3 +1,4 @@
+#include "crt/host_format.h"
 #include "grc/device_state.h"
 #include "rage/math.hpp"
 /**
@@ -51,7 +52,6 @@ extern "C" {
     float swfINSTANCE_F0D8_w(void* instance, float* outMin);  // @ 0x823FF0D8 — display height, optional minimum
     void* util_B188(void* slots, int index);  // @ 0x823FB188
     uint8_t util_0068(void* record);  // @ 0x821E0068 — button released this frame
-    int _snprintf(char* buffer, size_t count, const char* format, ...);  // @ 0x820C0B40
     extern void* g_sda_6404;  // @ 0x82606404 — shared texture lookup owner
     void hudFlashBase_76F8_g(int stage, int slot, void* texture);  // @ 0x820F76F8
     void sysCallback_Invoke(void* callback, void* argument);  // @ 0x8225FFF8

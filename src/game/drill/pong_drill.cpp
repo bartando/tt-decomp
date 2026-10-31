@@ -1,3 +1,4 @@
+#include "crt/host_format.h"
 // pong_drill.cpp — Training drill implementations | Rockstar Presents Table Tennis (Xbox 360, 2006)
 
 /**
@@ -105,7 +106,6 @@ static inline float NextRandomBits() {
     return (float)(g_prngState[0] & 0x7FFFFF);
 }
 
-extern "C" int _snprintf(char* buffer, size_t count, const char* format, ...);
 extern void PostPageGroupMessageFmt(uint32_t messageId, uint32_t mask, const char* format, ...);  // @ 0x8225E480
 extern int  RoundHalfAwayFromZero(float value);                                       // @ 0x8210CB88
 extern void hudTrainingHUD_SetCompleted(DrillTrainingHud* hud, int count);            // @ 0x822FA818

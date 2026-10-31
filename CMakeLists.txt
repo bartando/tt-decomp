@@ -44,6 +44,7 @@ set(SOURCES
     src/crt/entry.c
     src/crt/exit.c
     src/crt/heap.c
+    src/crt/host_format.cpp
     src/crt/memory.c
     src/crt/rtti.cpp
     src/crt/startup.c
