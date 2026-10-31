@@ -133,8 +133,27 @@ extern void gmPracticeTarget_SelectSet(  // @ 0x821137B0
     DrillPracticeTarget* target, int32_t setId, int arg2, int arg3);
 // Whether `point` (x/z) is inside the active target zone; sets m_spinStopped on a
 // hit. Every caller leaves r4 unset and the callee reads neither it nor `radius`.
-extern bool gmPracticeTarget_IsPointOnTarget(  // @ 0x82113C38
-    DrillPracticeTarget* target, int unused, const DrillVector4* point, float radius);
+extern float g_practiceTargetGrid[9][8];       // @ 0x82617C90 — 4 x/z corner pairs per zone
+extern int32_t g_practiceTargetActiveZones[9]; // @ 0x825EB280 — exactly 1 means active
+extern float g_practiceTargetHitPadding;      // @ 0x825C8144 — 0.025 for active zones
+extern float g_practiceTargetLastPadding;     // @ 0x8271A360 — padding of last tested zone
+
+// @ 0x82113C38
+bool gmPracticeTarget_IsPointOnTarget(
+    DrillPracticeTarget* target, int /*unused*/, const DrillVector4* point, float /*radius*/) {
+    for (int i = 0; i < 9; ++i) {
+        int32_t active = g_practiceTargetActiveZones[i];
+        float padding = active == 1 ? g_practiceTargetHitPadding : 0.0f;
+        g_practiceTargetLastPadding = padding;
+        const float* zone = g_practiceTargetGrid[i];
+        if (point->x >= zone[0] - padding && point->x <= zone[6] + padding &&
+            point->z >= zone[1] - padding && point->z <= zone[7] + padding && active == 1) {
+            target->m_spinStopped = true;
+            return true;
+        }
+    }
+    return false;
+}
 
 static inline DrillReticle* ActivePlayerReticle() {
     DrillGameStateView* state = reinterpret_cast<DrillGameStateView*>(g_pGameState);

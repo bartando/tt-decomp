@@ -431,7 +431,7 @@ public:
     virtual void OnBallMiss() {}                             // vfn_28
     virtual void OnRallyEnd(void* pRallyEvent);              // vfn_29 @ 0x8210D660
     virtual void OnPointScored() {}                          // vfn_30
-    virtual void ChooseRobotTarget(void* event);                  // vfn_31
+    virtual void ChooseRobotTarget(void* event);             // vfn_31 @ 0x8210D8B0
     virtual uint8_t UseAlternateAttemptEvent() { return 1; } // vfn_32
 
 protected:
@@ -659,7 +659,7 @@ public:
 
     virtual void Init() override {}
 
-    void ChooseRobotTarget(); // 0x82111A98
+    void ChooseRobotTarget(void* event) override; // vfn_31 @ 0x82111A98
 
 private:
     pongTrainingDrillConfig* m_pDrillConfig;  // +0x24 (overrides base class config field, or additional)

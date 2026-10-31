@@ -191,3 +191,9 @@ extern "C" uint8_t g_sda_660D = 0x0u;
 uint32_t g_assetVersions_verA = 0x825C5864u;      // @ 0x825C5864
 uint32_t g_assetVersionsChar_verA = 0x825C5868u;  // @ 0x825C5868
 uint32_t g_assetVersionsCS_verA = 0x825C586Cu;    // @ 0x825C586C
+
+// Practice target grid is filled from table dimensions by 0x821132B0.
+float g_practiceTargetGrid[9][8] = {};       // @ 0x82617C90 (.data)
+int32_t g_practiceTargetActiveZones[9] = {}; // @ 0x825EB280 (.data)
+float g_practiceTargetHitPadding = 0.025f;   // @ 0x825C8144 (.data)
+float g_practiceTargetLastPadding = 0.0f;    // @ 0x8271A360 (.data)

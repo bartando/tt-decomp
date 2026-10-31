@@ -41,6 +41,19 @@ CASES = {
         ('lose target z', '*output = targets[m_targetIndex];\n}',
          'output->x = targets[m_targetIndex].x;\n}'),
     ],
+    'drill_practice_target_is_point_on_target': [
+        ('skip ninth zone', 'for (int i = 0; i < 9; ++i)', 'for (int i = 0; i < 8; ++i)'),
+        ('treat any flag as active', 'active == 1', 'active != 0'),
+        ('drop active padding', 'active == 1 ? g_practiceTargetHitPadding : 0.0f', '0.0f'),
+        ('wrong max corner', 'zone[6] + padding', 'zone[4] + padding'),
+        ('exclude lower x edge', 'point->x >= zone[0] - padding', 'point->x > zone[0] - padding'),
+        ('exclude upper z edge', 'point->z <= zone[7] + padding', 'point->z < zone[7] + padding'),
+        ('wrong z coordinate', 'point->z >= zone[1] - padding', 'point->y >= zone[1] - padding'),
+        ('drop padding publication', 'g_practiceTargetLastPadding = padding;', '(void)padding;'),
+        ('drop hit flag', 'target->m_spinStopped = true;', 'target->m_spinStopped = false;'),
+        ('incorrect miss result', '    return false;\n}\n\nstatic inline DrillReticle',
+         '    return true;\n}\n\nstatic inline DrillReticle'),
+    ],
     'drill_round_half_away_from_zero': [
         ('wrong positive half', 'value + 0.5f : value - 0.5f', 'value + 0.4f : value - 0.5f'),
         ('wrong negative sign', 'value + 0.5f : value - 0.5f', 'value + 0.5f : value + 0.5f'),
@@ -57,7 +70,7 @@ def main():
     caught = 0
     for spec, cases in CASES.items():
         for name, old, new in cases:
-            assert source.count(old) == 1, (name, source.count(old))
+            assert source.count(old) == (2 if name == 'treat any flag as active' else 1), (name, source.count(old))
             output = io.StringIO()
             with contextlib.redirect_stdout(output):
                 rc = Checker(Path(__file__).with_name(spec + '.py'),
