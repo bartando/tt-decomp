@@ -7,3 +7,5 @@
 extern "C" uint32_t hudFlashBase_IsNetworkDirty(void* hud); // @ 0x822EB2A8
 extern "C" void* hudFlashBase_GetPageGroup(void* hud);      // @ 0x822EB1E8
 extern "C" void hudFlashBase_PublishPageGroup(void* hud);   // @ 0x822EB320
+// Resource version is numeric; the historical category argument was unused.
+extern "C" void hudFlashBase_LoadPageGroup(void* hud, uint32_t resourceVersion); // @ 0x822EADF8

@@ -1,3 +1,4 @@
+#include "game/frontend_page_group.hpp"
 #include "rage/ptr32.hpp"
 #include "rage/swf_page_group.hpp"
 #include "rage/swf_value.hpp"
@@ -63,8 +64,6 @@ extern void  QueueGameMessage(int a, int b, void* c, int d, void* e, void* f); /
 extern void  DismissPageGroup(void* obj);                         // page group helper
 extern void  pongAttractState_Shutdown(void* state);       // attract state cleanup
 extern void  rage_AssertMainThread();                   // thread init
-extern void  InitializePageGroup(void* pageGroup);         // @ 0x8231F4C0 - page group constructor
-extern void  rage_RegisterUIContext(void* obj, uint32_t categoryId, const char* nameStr);  // @ 0x822EADF8
 extern void  xmlNodeStruct_Init(void* obj);                // XML node base init
 
 // Allocation macro (SDA[0] = main alloc table, slot 1 = Alloc)
@@ -73,7 +72,6 @@ extern uint32_t g_mainAllocTable[];  // SDA global
 #define VCALL_ALLOC(obj, size, align) VTABLE_SLOT1(obj)(obj, size, align)
 
 
-extern void* PageGroup_SetState(void* pageGroup);                   // @ 0x820C0890 — page group state helper
 namespace rage {
     void ReleaseSingleton(void* obj);     // @ 0x821A9420
     void ClearPendingFlag(void* obj);     // HSM pending flag clear
@@ -86,12 +84,8 @@ extern void* CreditsRoll_NotifyEntry(void* obj, uint32_t count);       // credit
 extern void  atSingleton_QueryEventData(void* outData, void* table);    // @ 0x82017888 — event query
 extern void  FadePageGroup(void* mgr, int type, int mode, float fadeTime, float param2); // UI fade
 extern bool  CheckButtonPressed(void* record);                    // input button state check @ 0x821DFFF8
-extern uint8_t Dialog_IsComplete(void* pg);             // @ 0x820C2470 — dialog completion check
-extern void* LegalsPageGroup_Construct(void* mem);                   // page-group constructor @ 0x8230x
-extern void  PageGroup_Register(void* pg);              // @ 0x820C9510 — register page group
 extern void  HSM_QueueNotification(void* ctx);          // @ 0x820C0708 — queue HSM notification
 extern void  CreditsRoll_Deactivate(void* roll, int a, int b);    // credits roll toggle
-extern void* DialogPageGroup_Construct(void* mem);                   // dialog page-group constructor
 
 
 
@@ -388,7 +382,7 @@ void pongCreditsContext::OnEnterCredits() {
     }
 
     // Notify page group to open/present
-    PageGroup_SetState(m_pPageGroup);
+    CreditsPageGroup_PollInput(m_pPageGroup);
     m_pPageGroup->Open();   // vtable slot 2
 
     // Check page group active state (+152) and m_bActive (+28)
@@ -448,67 +442,37 @@ void pongCreditsContext::OnExitCredits() {
     m_pPageGroup->Close();   // vtable slot 6
 }
 
-/**
- * pongCreditsContext::RegisterWithCreditsRoll  @ 0x82309CA0  |  size: 0x94
- *
- * Slot 23.  Allocates and initialises the UI page group for the credits roll,
- * then registers this context with the credits roll manager.
- *
- * Steps:
- *   1. Calls rage_AssertMainThread to assert we're on the main thread.
- *   2. Allocates a 220-byte page group object from the main thread allocator
- *      (via vtable slot 1 of the SDA-resident allocator table).
- *   3. If allocation succeeds, calls InitializePageGroup to construct the page group.
- *   4. Stores the result in m_pPageGroup (this+24).
- *   5. Calls rage_RegisterUIContext to bind this context to the credits roll system,
- *      passing the credits roll name string and the category tag 202.
- *
- * Debug note: the strings "cfail" / "yreadyfail" are debug log tags
- * passed to the no-op logger (rage_debugLog) as bookends; they are
- * harmless in the shipping build.
- */
-void pongCreditsContext::RegisterWithCreditsRoll() {
-    // Entry debug bookend: "cfail" @ 0x8205ED64
-    // rage_debugLog(g_str_pongStates_cfail);   // stripped in release
-
-    // Assert main thread is ready
-    rage_AssertMainThread();
-
-    // Allocate a UI page group (220 bytes, 16-byte aligned).
-    // The main allocator table is at SDA offset 0 (base 0x82600000);
-    // index [1] (byte offset 4) holds the active allocator pointer.
-    // vtable slot 1 on that allocator is Alloc(size, align).
-    // g_mainAllocTable declared globally as uint32_t[]
-    uint32_t* allocTableBase = (uint32_t*)g_mainAllocTable;
-    void*     allocator      = (void*)allocTableBase[1];  // [4 bytes in]
-    void* pageGroupMem = VCALL_ALLOC(allocator, /*size=*/220, /*align=*/16);
-
-    if (pageGroupMem != nullptr) {
-        // Construct the page group object
-        InitializePageGroup(pageGroupMem);  // Construct the page group object
-    } else {
-        pageGroupMem = nullptr;
-    }
-    m_pPageGroup = (pongPageGroup*)pageGroupMem;
-
-    // Register with the credits-roll manager.
-    // g_pCreditsRollObj is a global pointer (SDA offset 25888 @ lbl_82606520)
-    // that points to the live credits-roll singleton object; the name string
-    // for this context lives at offset +50 within that object.
-    extern void* g_pCreditsRollObj;   // @ lbl_82606520 [.data sz:4, SDA +25888]
-    const char* nameStr = (const char*)((uint8_t*)g_pCreditsRollObj + 50);
-    rage_RegisterUIContext(this, /*category=*/202, nameStr);
-
-    // Exit debug bookend: "yreadyfail" @ 0x8205ED80
-    // rage_debugLog(g_str_pongStates_yreadyfail);   // stripped in release
+extern "C" void* g_sda_base; // @ 0x82600000, host binding for the SDA storage
+extern "C" void sysMemAllocator_InitThreadHeap(); // @ 0x820C0038
+extern const char g_loadingCredits[]; // @ 0x8205ED64
+extern const char g_loadedCredits[]; // @ 0x8205ED80
+extern const char g_loadingDialog[]; // @ 0x8205F240
+extern const char g_loadedDialog[]; // @ 0x8205F258
+namespace {
+struct FrontendAllocator {
+    virtual void Destroy() = 0;
+    virtual void* Allocate(uint32_t bytes, uint32_t alignment) = 0;
+};
+struct FrontendRegistrationContext {
+    uint8_t pad00[0x18];
+    rage::ptr32<void> group;
+};
+FrontendAllocator* frontendAllocator() {
+    void* thread = rage::load_ptr32<void>(g_sda_base, 0);
+    return rage::load_ptr32<FrontendAllocator>(thread, 4);
+}
 }
 
-
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// pongCreditsState  [vtable @ 0x8205EE7C]
-// ─────────────────────────────────────────────────────────────────────────────
+// @ 0x82309CA0
+void pongCreditsContext::RegisterWithCreditsRoll() {
+    rage_debugLog(g_loadingCredits);
+    sysMemAllocator_InitThreadHeap();
+    void* memory = frontendAllocator()->Allocate(0xDC, 16);
+    void* group = memory ? CreditsPageGroup_Construct(memory) : nullptr;
+    reinterpret_cast<FrontendRegistrationContext*>(this)->group = group;
+    hudFlashBase_LoadPageGroup(group, g_creditsResourceVersion + 50u);
+    rage_debugLog(g_loadedCredits);
+}
 
 /**
  * pongCreditsState::~pongCreditsState  @ 0x8230A000  |  size: 0x60
@@ -872,7 +836,7 @@ void* pongLegalsState::GetContext() {
  *   3. Stores the context in m_pContext (this+8).
  *   4. Allocates a 240-byte page group sub-object via LegalsPageGroup_Construct.
  *   5. Stores the page group in the context's m_pPageGroup (+20).
- *   6. Calls PageGroup_Register to register.
+ *   6. Calls LegalsPageGroup_Register to register.
  */
 void pongLegalsState::Init() {
     rage_AssertMainThread();
@@ -918,7 +882,7 @@ void pongLegalsState::Init() {
     }
 
     // Register with the state manager
-    PageGroup_Register(pageGroup);
+    LegalsPageGroup_Register(pageGroup);
 
     rage_debugLog("Legals screen loaded.");   // @ 0x8205F880
 }
@@ -1037,48 +1001,17 @@ static void pongDialogContext_secondaryBase_dtor(void* base, bool shouldFree) {
     self->~pongDialogContext();  // shouldFree handled by caller
 }
 
-/**
- * pongDialogContext::Register  @ 0x8230C808  |  size: 0x94
- *
- * Slot 23.  Allocates and initialises the dialog page group (1508 bytes),
- * then registers this context with the dialog system.
- *
- * Steps:
- *   1. Asserts main thread via rage_AssertMainThread.
- *   2. Allocates 1508 bytes (16-byte aligned) from the main allocator.
- *   3. Constructs the page group via DialogPageGroup_Construct.
- *   4. Stores the result in m_pPageGroup (+24).
- *   5. Loads the dialog manager name from g_pDialogRollObj (+50).
- *   6. Registers this context via rage_RegisterUIContext with category 204.
- *   7. Stores the page group in g_dialogPageGroup global.
- */
+// @ 0x8230C808
 void pongDialogContext::Register() {
-    rage_debugLog("Loading dialog box...");   // @ 0x8205F240
-
-    rage_AssertMainThread();
-
-    // Allocate dialog page group (1508 bytes, 16-byte aligned)
-    // g_mainAllocTable declared externally   // SDA @ 0x82600000
-    uint32_t* allocBase = (uint32_t*)*(uint32_t*)&g_mainAllocTable;
-    void* allocator = (void*)allocBase[1];
-    void* pgMem = VCALL_ALLOC(allocator, /*size=*/1508, /*align=*/16);
-
-    void* pageGroup = nullptr;
-    if (pgMem != nullptr) {
-        pageGroup = DialogPageGroup_Construct(pgMem);   // construct dialog page group
-    }
-    m_pPageGroup = pageGroup;
-
-    // Register with the dialog manager
-    extern void* g_pDialogRollObj;   // @ 0x82606514  [.data, 4 bytes]
-    const char* nameStr = (const char*)((uint8_t*)g_pDialogRollObj + 50);
-    rage_RegisterUIContext(this, /*category=*/204, nameStr);
-
-    // Store page group in global
-    extern void* g_dialogPageGroup;   // @ 0x82606628  [.data, 4 bytes]
-    g_dialogPageGroup = m_pPageGroup;
-
-    rage_debugLog("Dialog box loaded.");   // @ 0x8205F258
+    rage_debugLog(g_loadingDialog);
+    sysMemAllocator_InitThreadHeap();
+    void* memory = frontendAllocator()->Allocate(0x5E4, 16);
+    void* group = memory ? DialogPageGroup_Construct(memory) : nullptr;
+    auto* context = reinterpret_cast<FrontendRegistrationContext*>(this);
+    context->group = group;
+    hudFlashBase_LoadPageGroup(group, g_dialogResourceVersion + 50u);
+    g_dialogPageGroup = context->group.get();
+    rage_debugLog(g_loadedDialog);
 }
 
 /**
@@ -1087,28 +1020,17 @@ void pongDialogContext::Register() {
  * Slot 16.  Checks whether the dialog is ready to advance.
  * If the page group exists:
  *   1. Calls Open (vtable slot 2) on the page group.
- *   2. Calls Dialog_IsComplete to check if dialog completed.
+ *   2. Calls DialogPageGroup_IsComplete to check if dialog completed.
  *   3. If completed, transitions to m_nextStateIdx via the HSM manager.
  */
+// @ 0x8230C8A8
 void pongDialogContext::Update() {
-    if (m_pPageGroup == nullptr) {
-        return;
-    }
-
-    // Open/present the dialog page group (vtable slot 2)
-    typedef void (*OpenFn)(void*);
-    OpenFn openFn = (OpenFn)(*(uint32_t*)(*(uint32_t*)m_pPageGroup + 8));
-    openFn(m_pPageGroup);
-
-    // Check if the dialog has finished
-    uint8_t isReady = Dialog_IsComplete(m_pPageGroup);
-    if ((isReady & 0xFF) == 0) {
-        return;   // Not yet ready
-    }
-
-    // Transition to the stored next state
-    extern void* g_hsmContextPtr;   // loaded from 0x825EAB30 area
-    hsmContext_SetNextState(g_hsmContextPtr, m_nextStateIdx);
+    auto* group = rage::load_ptr32<FrontendPageUpdate>(this, 0x18);
+    if (!group) return;
+    group->Update();
+    if (static_cast<uint8_t>(DialogPageGroup_IsComplete(rage::load_ptr32<void>(this, 0x18))) == 0) return;
+    const int32_t next = *reinterpret_cast<const int32_t*>(reinterpret_cast<const uint8_t*>(this) + 0x1C);
+    hsmContext_SetNextState(g_loop_obj_ptr, next);
 }
 
 /**

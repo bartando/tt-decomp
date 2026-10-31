@@ -32,7 +32,7 @@ CASES = (
 def main():
     root = Path(__file__).resolve().parents[3]
     source = (root / "src/rage/swf.cpp").read_text()
-    start = source.index("bool swfSCRIPTARRAY::GetMember(")
+    start = source.index("uint32_t swfSCRIPTARRAY::GetMember(")
     end = source.index("\n}\n", start) + 2
     body = source[start:end]
     caught = 0

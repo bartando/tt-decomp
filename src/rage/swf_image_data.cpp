@@ -1,4 +1,5 @@
 #include "rage/swf_state.hpp"
+#include "rage/swf_page_group.hpp"
 #include "rage/localized_font.hpp"
 #include "link/tt_alias.h"
 // Mutable SWF state and font shutdown storage reproduced from the image.
@@ -10,6 +11,7 @@ extern const float g_swfTwipScale = 0x1.99999ap-5f; // @ 0x820290F0
 }
 TT_DATA_ALIAS("_ZN4rage18g_swfTwipsToPixelsE", "_ZN4rage14g_swfTwipScaleE");
 extern "C" {
+SwfCommandHandler g_swfCommandHandler = nullptr; // @ 0x826066D4, host executable dispatch binding
 extern const char g_localizedFontResetName[] = "default"; // @ 0x82027C50
 rage::ptr32<LocalizedFont> g_localizedFontHead; // @ 0x826066E0
 LocalizedFontShutdownRecord g_localizedFontShutdownRecords[32]{}; // @ 0x8261A1D0
@@ -27,3 +29,10 @@ uint8_t g_swfPriorityMemberHashesReady = 0; // @ 0x826066C8
 // Relocated native string pointers, in the exact 13-entry image order.
 extern const char* const g_swfPriorityMemberNames[13] = {"_global", "i", "j", "k", "x", "y", "z", "f", "Array", "0", "1", "2", "3"}; // @ 0x825C2D30
 }
+
+extern const char g_flashAssetFolder[] = "$/flash"; // @ 0x8205AE18
+extern const char g_flashResourceFolder[] = "$/resource/flash"; // @ 0x8205AE04
+extern const char g_flashExtension[] = "swf"; // @ 0x8205AE54
+extern const char g_flashPathFormat[] = "%s/%s"; // @ 0x8202F610
+extern const char g_flashEmptyName[] = ""; // @ 0x82027423
+extern const char g_flashCreateError[] = "[hudFlashBase] Could not create a context for flash file %s"; // @ 0x8205AE58

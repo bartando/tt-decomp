@@ -12,19 +12,6 @@ extern "C" {
 #endif
 
 /**
- * rage_RegisterUIContext @ 0x822EADF8 | size: 0x1CC
- * 
- * Registers a UI context (credits, dialog, leaderboard, etc.) with the
- * UI management system. Creates a UI page group, binds it to the context,
- * and registers it with the appropriate category manager.
- * 
- * @param pContext    Pointer to the UI context object (e.g., pongCreditsContext)
- * @param categoryId  Category ID (202=credits, 204=dialog, etc.)
- * @param nameStr     Display name string for the context
- */
-void rage_RegisterUIContext(void* pContext, uint32_t categoryId, const char* nameStr);
-
-/**
  * rage_RenderDebugOverlay @ 0x82228C68 | size: 0x194
  * 
  * Renders debug FPS overlay text on screen. Called as a config callback
