@@ -889,4 +889,96 @@ void grcDevice_FlushDirtySixteenRegisterGroups(void* device, uint64_t dirty, uin
     state[0] = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(cursor));
 }
 
+
+extern uint32_t KeGetCurrentProcessType(); // @ 0x82585E9C
+extern uint32_t xe_GetCurrentThreadId(); // @ 0x82566B78
+extern void rage_AA78(void* device, uint32_t* fence); // @ 0x8235AA78
+extern const uint32_t __imp_VdGlobalDevice; // @ 0x82000730
+extern const uint32_t __imp_VdGlobalXamDevice; // @ 0x82000734
+
+static void* resourceKernelDevice() {
+    const uint32_t slot = KeGetCurrentProcessType() == 2 ? __imp_VdGlobalXamDevice : __imp_VdGlobalDevice;
+    return reinterpret_cast<void*>(uintptr_t(*reinterpret_cast<const uint32_t*>(uintptr_t(slot))));
+}
+
+static uint32_t resourceGpuAddress(uint32_t address) {
+    return (address & 0x1FFFFFFFu) + (((address >> 20) + 0x200u) & 0x1000u);
+}
+
+static uint32_t& resourceDeviceWord(void* device, uint32_t offset) {
+    return *reinterpret_cast<uint32_t*>(static_cast<uint8_t*>(device) + offset);
+}
+
+// Wait for the resource fence, invalidate its CPU-visible range, record dirty
+// cache lines and increment its lock count. Flags can request an aperture alias.
+// grcResource_Lock @ 0x823529E0 | size: 0x2E8
+uint32_t grcResource_Lock(void* resource, uint32_t fence, uint32_t /*unusedR5*/,
+                          uint32_t auxiliary, uint32_t base, uint32_t auxiliaryBase,
+                          uint32_t data, uint32_t size, uint32_t flags, uint32_t cacheFlags) {
+    auto* control = static_cast<uint32_t*>(resource);
+    if ((flags & 0x1010u) == 0 && fence != 0) {
+        void* device = resourceKernelDevice();
+        uint32_t pending = fence;
+        const uint32_t thread = xe_GetCurrentThreadId();
+        const bool ownedThread = thread == resourceDeviceWord(device, 0x2888);
+        const bool shared = control && (control[0] & 0x00F80000u) != 0;
+        if (shared) fence = resourceDeviceWord(device, 0x289C);
+        if (fence != 0 && shared && ownedThread)
+            pending = resourceDeviceWord(device, 0x289C);
+        if (pending != 0) rage_AA78(device, &pending);
+    }
+    if ((flags & 0x12u) == 0) {
+        void* device = resourceKernelDevice();
+        const uint32_t start = resourceGpuAddress(data);
+        const uint32_t end = start + size;
+        if (xe_GetCurrentThreadId() != resourceDeviceWord(device, 0x2888)) {
+            auto* range = reinterpret_cast<uint64_t*>(static_cast<uint8_t*>(device) + 0x2C98);
+            uint64_t observed = __atomic_load_n(range, __ATOMIC_RELAXED);
+            uint64_t desired;
+            do {
+                const uint32_t oldStart = uint32_t(observed);
+                const uint32_t oldEnd = uint32_t(observed >> 32);
+                const uint32_t mergedStart = start < oldStart ? start : oldStart;
+                const uint32_t mergedEnd = end > oldEnd ? end : oldEnd;
+                desired = (uint64_t(mergedEnd) << 32) | mergedStart;
+            } while (!__atomic_compare_exchange_n(range, &observed, desired, false,
+                                                  __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+        } else {
+            auto* cursor = reinterpret_cast<uint32_t*>(uintptr_t(resourceDeviceWord(device, 0)));
+            if (resourceDeviceWord(device, 0) > resourceDeviceWord(device, 8))
+                cursor = static_cast<uint32_t*>(rage_A980(device));
+            const uint32_t pageStart = start & ~0xFFFu;
+            const uint32_t pageBytes = ((end + 0xFFFu) & ~0xFFFu) - pageStart;
+            *++cursor = 0xA31;
+            *++cursor = cacheFlags;
+            *++cursor = 0x10A2F;
+            *++cursor = pageBytes;
+            *++cursor = pageStart;
+            *++cursor = 0xC0043C00u;
+            *++cursor = 3;
+            *++cursor = 0xA31;
+            *++cursor = 0;
+            *++cursor = 0x80000000u;
+            *++cursor = 8;
+            resourceDeviceWord(device, 0) = uint32_t(reinterpret_cast<uintptr_t>(cursor));
+        }
+    }
+    const bool aperture = (flags & 0x10u) != 0;
+    if (aperture || (control[0] & 0x40000000u) != 0) {
+        if ((flags & 1) == 0) {
+            const bool second = auxiliary != 0 && auxiliaryBase != 0;
+            uint32_t& dirty = control[second ? 3 : 2];
+            const uint32_t offset = data - (second ? auxiliaryBase : base);
+            const uint32_t lineStart = offset >> 7;
+            const uint32_t lineEnd = (offset + size + 127u) >> 7;
+            const uint32_t oldStart = dirty >> 16, oldEnd = dirty & 0xFFFFu;
+            dirty = ((lineStart < oldStart ? lineStart : oldStart) << 16)
+                  | (lineEnd > oldEnd ? lineEnd : oldEnd);
+        }
+        if (aperture) data = resourceGpuAddress(data) - 0x40000000u;
+    }
+    control[0] += 0x1000;
+    return data;
+}
+
 } // extern "C"
