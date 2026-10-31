@@ -1303,6 +1303,17 @@ struct AssetManagerView {
 struct Options825C5EC8View {
     uint8_t _pad00[0x30];
     uint8_t flag30;                // +0x30  with it set (and the 0x822823E0 test true) Reset draws the ball 5x
+    uint8_t _pad31[0x17];
+    uint8_t hitTrailEnabled;       // +0x48  enables trail type 2 in local play
+};
+
+// The first four slots of fxBallTrail's renderable interface. The game uses
+// the deleting destructor as one slot (the Itanium C++ destructor uses two).
+struct HitTrailView {
+    virtual void Destroy(int flags) = 0;
+    virtual void Draw() = 0;
+    virtual void Reset() = 0;
+    virtual void Setup(int32_t type, int32_t intensity, void* data) = 0;
 };
 
 }  // namespace gmball
@@ -1392,6 +1403,22 @@ extern void      fxBallSplash2D_Update(fxBallSplash2D* splash);               //
 extern void      pg_0C98_g(gmball::AudioEmitterView* emitter, const gmBallNode::Vec4* position);  // @ 0x82160C98
 extern void      msgMessage_ReadArgs(const gmball::MessageView* msg, const char* format, ...);  // @ 0x8225E998
 void pongBallInstance_4980_g(void* instance, unsigned short s, int a, int b, int c, int d);  // @ 0x822C4980  activates the object
+
+// @ 0x82282010
+// A hit selects both trails' style and intensity, then clears their old samples.
+void game_2010(gmBallNode* node, int intensity) {
+    const bool localPlay = static_cast<uint8_t>(io_Input_poll_9D68(g_input_obj_ptr)) == 0 &&
+                           lbl_825C9A2C == 0;
+    const int type = localPlay && lbl_825C5EC8.hitTrailEnabled != 0 ? 2 : 0;
+    for (int i = 0; i < 2; ++i) {
+        if (node->trails[i] != nullptr) {
+            reinterpret_cast<gmball::HitTrailView*>(node->trails[i])->Setup(
+                type, intensity, lbl_82630710);
+            // Setup is virtual; reload the pointer as the original does.
+            reinterpret_cast<gmball::HitTrailView*>(node->trails[i])->Reset();
+        }
+    }
+}
 
 namespace gmball {
 

@@ -5,6 +5,7 @@
 
 #include "rage/singleton.h"
 #include "pong_match.hpp"
+#include "../ball/ball_predict.hpp"
 #include <cstdint>
 #include <cstddef>
 
@@ -1838,29 +1839,10 @@ void gdaiComeBackLogic_SplitLeadAndDeficit(void* self) {
 // game_3860 @ 0x821D3860 | size: 0x84
 // ═════════════════════════════════════════════════════════════════════════════
 
-// The 16-byte callback shape pong_player.cpp documents (rage::datCallback-like).
-typedef void (*pongCallbackFn)();
-struct pongCallback {
-    void*          target;    // +0x00
-    pongCallbackFn function;  // +0x04
-    void*          data;      // +0x08
-    int32_t        kind;      // +0x0C  1: function(target); 4: function(target, int* answer)
-};
-
-// The object at gameState+0x14: 0x821D7750 logs
-// "%s called BallPredictData::Reset() %s" and clears it.
-struct BallPredictData {
-    uint8_t      _pad00[0x27E8];
-    pongCallback m_callback;  // +0x27E8
-};
-
 struct pongGameStatePredictView {
     uint8_t          _pad00[0x14];
-    BallPredictData* m_pBallPredict;  // +0x14
+    gdBallPredictData* m_pBallPredict;  // +0x14
 };
-
-// @ 0x821D7750 (game_7750) — BallPredictData::Reset(caller name).
-extern void BallPredictData_Reset(BallPredictData* data, const char* caller);
 
 /**
  * game_3860 @ 0x821D3860 | size: 0x84
@@ -1870,12 +1852,12 @@ extern void BallPredictData_Reset(BallPredictData* data, const char* caller);
  */
 void game_3860(void* gameState, int /*kind*/, const char* name) {
     pongGameStatePredictView* state = static_cast<pongGameStatePredictView*>(gameState);
-    BallPredictData_Reset(state->m_pBallPredict, name);
+    state->m_pBallPredict->Reset(name);
 
-    pongCallback callback;
-    callback.target = gameState;
-    callback.function = reinterpret_cast<pongCallbackFn>(&nop_8240E6D0);  // the empty logger
-    callback.data = nullptr;
-    callback.kind = 4;
-    state->m_pBallPredict->m_callback = callback;
+    state->m_pBallPredict->m_onPop = bpFunctor{{
+        reinterpret_cast<uintptr_t>(gameState),
+        reinterpret_cast<uintptr_t>(&nop_8240E6D0),
+        0,
+        4,
+    }};
 }

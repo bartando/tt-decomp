@@ -41,7 +41,7 @@ struct bpBounceEvent {
 
 // A bound callback (16 bytes); the empty one is the zero template at 0x8261A0C0.
 struct bpFunctor {
-    uint32_t words[4];
+    uintptr_t words[4];  // pointer-sized on the host; four 32-bit words on Xenon
 };
 
 struct gdBallPredictData {
