@@ -5,11 +5,26 @@ from pathlib import Path
 from liftcheck.runner import Checker, Options
 CASES = {
     'network_timestamp_format': ('src/game/network/network_timestamp.cpp', [
-        ('fraction scale', 'fraction * 1000.0f', 'fraction * 100.0f'),
+        ('fraction scale', 'const float scaled = fraction * 1000.0f;', 'const float scaled = fraction * 100.0f;'),
         ('minute divisor', 'whole / 60', 'whole / 59'),
         ('second modulus', 'whole % 60', 'whole % 59'),
-        ('saturation', 'milliseconds = UINT32_MAX;', 'milliseconds = 0;'),
+        ('saturation', 'if (value >= 0x1p63f) return UINT32_MAX;', 'if (value >= 0x1p63f) return 0;'),
         ('format bound', 'g_networkTimestampLogBuffer, 50,', 'g_networkTimestampLogBuffer, 49,'),
+    ]),
+    'network_elapsed_time_format': ('src/game/network/network_timestamp.cpp', [
+        ('sign', 'const bool negative = seconds < 0.0f;', 'const bool negative = seconds > 0.0f;'),
+        ('minutes scale', 'magnitude * (1.0f / 60.0f)', 'magnitude * (1.0f / 61.0f)'),
+        ('uint32 conversion', 'static_cast<float>(minutes) * k_initRefreshRate', 'static_cast<float>(static_cast<int32_t>(minutes)) * k_initRefreshRate'),
+        ('fixed bound', '_snprintf(destination, 50,', '_snprintf(destination, 49,'),
+    ]),
+    'network_clock_timestamp': ('src/game/network/network_timestamp.cpp', [
+        ('cache test', 'timestamp->lastFormatted != value', 'timestamp->lastFormatted == value'),
+        ('cache update', 'timestamp->lastFormatted = value;', '(void)value;'),
+        ('fraction', 'timestamp->fraction + static_cast<float>(timestamp->whole)', 'static_cast<float>(timestamp->whole)'),
+    ]),
+    'network_clock_refresh': ('src/game/player/pong_player.cpp', [
+        ('virtual sample', 'const float value = inner->GetTime();', 'const float value = 0.0f;'),
+        ('forward time', 'networkFormatElapsedTime(destination, 50, value);', 'networkFormatElapsedTime(destination, 50, value * 2.0f);'),
     ]),
     'network_force_time_log': ('src/game/network/pong_network.cpp', [
         ('timestamp offset', 'FormatTimestampForLog(static_cast<uint8_t*>(thisPtr) + 8)', 'FormatTimestampForLog(static_cast<uint8_t*>(thisPtr) + 4)'),
